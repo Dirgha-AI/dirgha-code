@@ -1,0 +1,28 @@
+node_modules/
+*.log
+*.tsbuildinfo
+.DS_Store
+.env
+.env.local
+.env.*.local
+
+# Build artifacts
+dist/*.mjs.map
+coverage/
+.vitest/
+.turbo/
+
+# Local dev
+.idea/
+.vscode/
+!.vscode/settings.json
+
+# CLI runtime state (never ship)
+.dirgha/
+credentials.json
+keys.json
+
+# Temp
+*.bak
+*.tmp
+.claude/

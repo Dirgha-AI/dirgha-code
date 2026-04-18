@@ -1,0 +1,25 @@
+{
+  "name": "dirgha-example-plugin",
+  "version": "1.0.0",
+  "description": "Example plugin demonstrating CLI-Hub plugin format",
+  "author": "Dirgha Team",
+  "license": "MIT",
+  "main": "index.js",
+  "bin": "dirgha-example",
+  "keywords": ["example", "demo", "template"],
+  "categories": ["tool"],
+  "repository": "https://github.com/dirgha-ai/example-plugin",
+  "homepage": "https://dirgha.ai/plugins/example",
+  "engines": {
+    "node": ">=20.0.0",
+    "dirgha": ">=2.0.0"
+  },
+  "dependencies": {},
+  "capabilities": [
+    {
+      "type": "command",
+      "name": "hello",
+      "description": "Say hello from plugin"
+    }
+  ]
+}

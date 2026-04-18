@@ -1,0 +1,10 @@
+# We ship a bundled dist, not source — package.json `files` is the allowlist.
+src/
+build.mjs
+tsconfig.json
+.github/
+.gitignore
+*.test.ts
+*.test.tsx
+**/__tests__/
+**/*.map

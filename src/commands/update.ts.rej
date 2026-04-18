@@ -1,0 +1,11 @@
+--- commands/update.ts
++++ commands/update.ts
+@@ -42,7 +42,7 @@ export const updateCommand = new Command('update')
+     console.log(chalk.dim(`\n  Installing ${PKG}@${latest}…\n`));
+     try {
+       // For npm install -g, safeExec may fail if it expects a string return or specific stdio.
+-      safeExec('npm', ['install', '-g', `${PKG}@latest`], { stdio: 'inherit' });
++      execCmd('npm', ['install', '-g', `${PKG}@latest`], { stdio: 'inherit' });
+       console.log(chalk.green(`\n  ✓ Updated to ${latest}. Restart dirgha to use the new version.\n`));
+     } catch {
+       console.error(chalk.red(`\n  ✗ Update failed. Try manually: npm install -g ${PKG}@latest\n`));

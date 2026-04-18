@@ -1,0 +1,686 @@
+/**
+ * Dirgha CLI - Terminal UI Design System
+ * ========================================
+ * Comprehensive CSS variables for terminal UI styling.
+ * Use with ANSI color codes and hex equivalents for maximum compatibility.
+ *
+ * @version 2.0.0
+ * @dirgha-ai/design-system
+ */
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   ROOT TOKENS - ANSI + HEX DUAL SYSTEM
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ───────────────────────────────────────────────────────────────────────────
+     ANSI COLOR CODES (Terminal Native)
+     Format: \e[38;5;${code}m (foreground) or \e[48;5;${code}m (background)
+     ─────────────────────────────────────────────────────────────────────────── */
+  --ansi-black: 0;
+  --ansi-red: 1;
+  --ansi-green: 2;
+  --ansi-yellow: 3;
+  --ansi-blue: 4;
+  --ansi-magenta: 5;
+  --ansi-cyan: 6;
+  --ansi-white: 7;
+  --ansi-bright-black: 8;
+  --ansi-bright-red: 9;
+  --ansi-bright-green: 10;
+  --ansi-bright-yellow: 11;
+  --ansi-bright-blue: 12;
+  --ansi-bright-magenta: 13;
+  --ansi-bright-cyan: 14;
+  --ansi-bright-white: 15;
+
+  /* Extended 256-color palette (selected) */
+  --ansi-gray: 245;
+  --ansi-dark-gray: 240;
+  --ansi-light-gray: 250;
+  --ansi-orange: 208;
+  --ansi-purple: 141;
+  --ansi-teal: 80;
+  --ansi-pink: 212;
+  --ansi-lime: 154;
+
+  /* ───────────────────────────────────────────────────────────────────────────
+     DIRGHA BRAND COLORS - HEX VALUES
+     Primary brand identity for terminal rendering
+     ─────────────────────────────────────────────────────────────────────────── */
+  
+  /* Core Brand */
+  --dirgha-brand: #22C55E;
+  --dirgha-brand-rgb: 34, 197, 94;
+  --dirgha-brand-dark: #16A34A;
+  --dirgha-brand-light: #4ADE80;
+  --dirgha-brand-muted: #166534;
+  
+  /* Accent Colors */
+  --dirgha-accent: #F59E0B;
+  --dirgha-accent-rgb: 245, 158, 11;
+  --dirgha-accent-dark: #D97706;
+  --dirgha-accent-light: #FCD34D;
+  
+  /* Semantic Colors */
+  --dirgha-success: #22C55E;
+  --dirgha-success-rgb: 34, 197, 94;
+  --dirgha-warning: #F59E0B;
+  --dirgha-warning-rgb: 245, 158, 11;
+  --dirgha-error: #EF4444;
+  --dirgha-error-rgb: 239, 68, 68;
+  --dirgha-info: #3B82F6;
+  --dirgha-info-rgb: 59, 130, 246;
+  
+  /* ───────────────────────────────────────────────────────────────────────────
+     TEXT COLORS - Monochrome Scale
+     For terminal typography hierarchy
+     ─────────────────────────────────────────────────────────────────────────── */
+  --text-primary: #E5E7EB;
+  --text-primary-rgb: 229, 231, 235;
+  --text-secondary: #9CA3AF;
+  --text-secondary-rgb: 156, 163, 175;
+  --text-muted: #6B7280;
+  --text-muted-rgb: 107, 114, 128;
+  --text-dim: #4B5563;
+  --text-dim-rgb: 75, 85, 99;
+  --text-inverse: #111827;
+  --text-inverse-rgb: 17, 24, 39;
+
+  /* ───────────────────────────────────────────────────────────────────────────
+     BACKGROUND COLORS
+     For terminal UI elements and panels
+     ─────────────────────────────────────────────────────────────────────────── */
+  --bg-primary: #0F0F0F;
+  --bg-primary-rgb: 15, 15, 15;
+  --bg-secondary: #1A1A1A;
+  --bg-secondary-rgb: 26, 26, 26;
+  --bg-tertiary: #262626;
+  --bg-tertiary-rgb: 38, 38, 38;
+  --bg-elevated: #333333;
+  --bg-elevated-rgb: 51, 51, 51;
+  --bg-overlay: rgba(0, 0, 0, 0.8);
+  
+  /* ───────────────────────────────────────────────────────────────────────────
+     BORDER COLORS
+     For separators, panels, and focus states
+     ─────────────────────────────────────────────────────────────────────────── */
+  --border-active: #22C55E;
+  --border-accent: #F59E0B;
+  --border-idle: #1F2937;
+  --border-subtle: #374151;
+  --border-assist: #4B5563;
+  --border-error: #EF4444;
+  --border-warning: #F59E0B;
+  --border-success: #22C55E;
+
+  /* ───────────────────────────────────────────────────────────────────────────
+     TYPOGRAPHY - Monospace System
+     Optimized for terminal readability
+     ─────────────────────────────────────────────────────────────────────────── */
+  
+  /* Font Families */
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'SF Mono', 'Menlo', 'Monaco', 'Consolas', monospace;
+  --font-mono-alt: 'IBM Plex Mono', 'Source Code Pro', 'Ubuntu Mono', 'Inconsolata', monospace;
+  --font-emoji: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', emoji;
+  
+  /* Font Sizes (terminal-relative) */
+  --text-xs: 0.75rem;      /* 12px - Hints, labels */
+  --text-sm: 0.875rem;     /* 14px - Secondary text */
+  --text-base: 1rem;       /* 16px - Body text */
+  --text-lg: 1.125rem;     /* 18px - Emphasis */
+  --text-xl: 1.25rem;      /* 20px - Headings */
+  --text-2xl: 1.5rem;      /* 24px - Large headings */
+  --text-3xl: 1.875rem;    /* 30px - Display */
+  
+  /* Font Weights */
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+  
+  /* Line Heights */
+  --leading-none: 1;
+  --leading-tight: 1.25;
+  --leading-snug: 1.375;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+  --leading-loose: 2;
+  
+  /* Letter Spacing */
+  --tracking-tight: -0.025em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.025em;
+  --tracking-wider: 0.05em;
+  --tracking-widest: 0.1em;
+
+  /* ───────────────────────────────────────────────────────────────────────────
+     SPACING SYSTEM
+     8px base grid for CLI layouts
+     ─────────────────────────────────────────────────────────────────────────── */
+  --space-0: 0;
+  --space-px: 1px;
+  --space-0-5: 0.125rem;   /* 2px */
+  --space-1: 0.25rem;      /* 4px */
+  --space-1-5: 0.375rem;   /* 6px */
+  --space-2: 0.5rem;       /* 8px - Base unit */
+  --space-2-5: 0.625rem;   /* 10px */
+  --space-3: 0.75rem;      /* 12px */
+  --space-3-5: 0.875rem;   /* 14px */
+  --space-4: 1rem;         /* 16px */
+  --space-5: 1.25rem;      /* 20px */
+  --space-6: 1.5rem;       /* 24px */
+  --space-7: 1.75rem;      /* 28px */
+  --space-8: 2rem;         /* 32px */
+  --space-9: 2.25rem;      /* 36px */
+  --space-10: 2.5rem;      /* 40px */
+  --space-11: 2.75rem;     /* 44px */
+  --space-12: 3rem;        /* 48px */
+  --space-14: 3.5rem;      /* 56px */
+  --space-16: 4rem;        /* 64px */
+  --space-20: 5rem;        /* 80px */
+  --space-24: 6rem;        /* 96px */
+  --space-28: 7rem;        /* 112px */
+  --space-32: 8rem;        /* 128px */
+  --space-36: 9rem;        /* 144px */
+  --space-40: 10rem;       /* 160px */
+  --space-44: 11rem;       /* 176px */
+  --space-48: 12rem;       /* 192px */
+  --space-52: 13rem;       /* 208px */
+  --space-56: 14rem;       /* 224px */
+  --space-60: 15rem;       /* 240px */
+  --space-64: 16rem;       /* 256px */
+  --space-72: 18rem;       /* 288px */
+  --space-80: 20rem;       /* 320px */
+  --space-96: 24rem;       /* 384px */
+
+  /* ───────────────────────────────────────────────────────────────────────────
+     CLI LAYOUT SPECIFIC SPACING
+     For terminal-based UI layouts
+     ─────────────────────────────────────────────────────────────────────────── */
+  --cli-padding-xs: 1;
+  --cli-padding-sm: 2;
+  --cli-padding-md: 4;
+  --cli-padding-lg: 6;
+  --cli-padding-xl: 8;
+  
+  --cli-gap-xs: 1;
+  --cli-gap-sm: 2;
+  --cli-gap-md: 4;
+  --cli-gap-lg: 6;
+  --cli-gap-xl: 8;
+  
+  --cli-margin-xs: 1;
+  --cli-margin-sm: 2;
+  --cli-margin-md: 4;
+  --cli-margin-lg: 6;
+  --cli-margin-xl: 8;
+
+  /* ───────────────────────────────────────────────────────────────────────────
+     ANIMATION & TRANSITIONS
+     For terminal UI micro-interactions
+     ─────────────────────────────────────────────────────────────────────────── */
+  --duration-instant: 0ms;
+  --duration-fast: 100ms;
+  --duration-normal: 200ms;
+  --duration-slow: 300ms;
+  --duration-slower: 500ms;
+  
+  --ease-linear: linear;
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  
+  /* Spinner animation */
+  --spinner-frames: '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏';
+  --spinner-interval: 80ms;
+  
+  /* Pulse animation */
+  --pulse-duration: 2s;
+  
+  /* Blink animation */
+  --blink-duration: 1s;
+
+  /* ───────────────────────────────────────────────────────────────────────────
+     SHADOWS & EFFECTS
+     For terminal UI depth (when supported)
+     ─────────────────────────────────────────────────────────────────────────── */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px -1px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -2px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.6), 0 4px 6px -4px rgba(0, 0, 0, 0.5);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.6);
+  
+  /* Glow effects */
+  --glow-brand: 0 0 10px rgba(34, 197, 94, 0.5);
+  --glow-accent: 0 0 10px rgba(245, 158, 11, 0.5);
+  --glow-error: 0 0 10px rgba(239, 68, 68, 0.5);
+  
+  /* ───────────────────────────────────────────────────────────────────────────
+     Z-INDEX SCALE
+     For layered terminal UI
+     ─────────────────────────────────────────────────────────────────────────── */
+  --z-base: 0;
+  --z-dropdown: 10;
+  --z-sticky: 20;
+  --z-fixed: 30;
+  --z-modal-backdrop: 40;
+  --z-modal: 50;
+  --z-popover: 60;
+  --z-tooltip: 70;
+  --z-toast: 80;
+  --z-max: 9999;
+
+  /* ───────────────────────────────────────────────────────────────────────────
+     COMPONENT-SPECIFIC TOKENS
+     Pre-built values for common CLI components
+     ─────────────────────────────────────────────────────────────────────────── */
+  
+  /* Status Bar */
+  --statusbar-height: 1;
+  --statusbar-bg: var(--bg-secondary);
+  --statusbar-border: var(--border-idle);
+  --statusbar-text: var(--text-secondary);
+  
+  /* Command Palette */
+  --palette-bg: var(--bg-secondary);
+  --palette-border: var(--border-subtle);
+  --palette-max-height: 20;
+  --palette-item-hover: var(--bg-tertiary);
+  --palette-item-selected: var(--bg-elevated);
+  
+  /* Panels / Cards */
+  --panel-bg: var(--bg-secondary);
+  --panel-border: var(--border-idle);
+  --panel-padding: var(--cli-padding-md);
+  --panel-radius: 0;
+  
+  /* Input */
+  --input-bg: var(--bg-tertiary);
+  --input-border: var(--border-subtle);
+  --input-focus-border: var(--border-active);
+  --input-placeholder: var(--text-dim);
+  
+  /* Buttons */
+  --button-primary-bg: var(--dirgha-brand);
+  --button-primary-text: var(--text-inverse);
+  --button-secondary-bg: var(--bg-elevated);
+  --button-secondary-text: var(--text-primary);
+  --button-ghost-text: var(--text-secondary);
+  
+  /* Syntax Highlighting */
+  --syntax-keyword: #569CD6;
+  --syntax-string: #CE9178;
+  --syntax-comment: #6A9955;
+  --syntax-number: #B5CEA8;
+  --syntax-function: #DCDCAA;
+  --syntax-type: #4EC9B0;
+  --syntax-operator: #D4D4D4;
+  --syntax-variable: #9CDCFE;
+  --syntax-property: #9CDCFE;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   THEME VARIANTS
+   Alternative color schemes for the TUI
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* Midnight Theme - Deep purple aesthetic */
+[data-theme="midnight"] {
+  --dirgha-brand: #8B5CF6;
+  --dirgha-brand-rgb: 139, 92, 246;
+  --dirgha-brand-dark: #7C3AED;
+  --dirgha-brand-light: #A78BFA;
+  --dirgha-brand-muted: #5B21B6;
+  
+  --text-primary: #E2E8F0;
+  --text-secondary: #94A3B8;
+  --text-muted: #64748B;
+  --text-dim: #334155;
+  
+  --border-active: #8B5CF6;
+  --border-idle: #1E293B;
+  --border-subtle: #1E293B;
+  
+  --bg-primary: #0F172A;
+  --bg-secondary: #1E293B;
+}
+
+/* Ocean Theme - Teal/Cyan sea-glass palette */
+[data-theme="ocean"] {
+  --dirgha-brand: #06B6D4;
+  --dirgha-brand-rgb: 6, 182, 212;
+  --dirgha-brand-dark: #0891B2;
+  --dirgha-brand-light: #67E8F9;
+  --dirgha-brand-muted: #164E63;
+  
+  --text-primary: #ECFEFF;
+  --text-secondary: #67E8F9;
+  --text-muted: #22D3EE;
+  --text-dim: #0E7490;
+  
+  --border-active: #06B6D4;
+  --border-idle: #164E63;
+  --border-subtle: #164E63;
+  
+  --bg-primary: #083344;
+  --bg-secondary: #164E63;
+}
+
+/* Solarized Dark - Classic Ethan Schoonover */
+[data-theme="solarized"] {
+  --dirgha-brand: #859900;
+  --dirgha-brand-rgb: 133, 153, 0;
+  --dirgha-accent: #CB4B16;
+  
+  --dirgha-success: #859900;
+  --dirgha-warning: #B58900;
+  --dirgha-error: #DC322F;
+  --dirgha-info: #268BD2;
+  
+  --text-primary: #EEE8D5;
+  --text-secondary: #839496;
+  --text-muted: #657B83;
+  --text-dim: #586E75;
+  
+  --border-active: #859900;
+  --border-idle: #073642;
+  --border-subtle: #073642;
+  
+  --bg-primary: #002B36;
+  --bg-secondary: #073642;
+  
+  --syntax-keyword: #859900;
+  --syntax-string: #2AA198;
+  --syntax-comment: #586E75;
+  --syntax-number: #D33682;
+  --syntax-function: #268BD2;
+  --syntax-type: #B58900;
+}
+
+/* Warm Theme - Amber/Orange cozy campfire */
+[data-theme="warm"] {
+  --dirgha-brand: #F59E0B;
+  --dirgha-brand-rgb: 245, 158, 11;
+  --dirgha-brand-dark: #D97706;
+  --dirgha-brand-light: #FCD34D;
+  --dirgha-brand-muted: #92400E;
+  
+  --text-primary: #FEF3C7;
+  --text-secondary: #FDE68A;
+  --text-muted: #D97706;
+  --text-dim: #92400E;
+  
+  --border-active: #F59E0B;
+  --border-idle: #1C0A00;
+  --border-subtle: #1C0A00;
+  
+  --bg-primary: #1C0A00;
+  --bg-secondary: #2D1A0A;
+}
+
+/* High Contrast Theme - Accessibility focused */
+[data-theme="high-contrast"] {
+  --dirgha-brand: #00FF00;
+  --dirgha-brand-rgb: 0, 255, 0;
+  --dirgha-accent: #FFFF00;
+  
+  --text-primary: #FFFFFF;
+  --text-secondary: #CCCCCC;
+  --text-muted: #999999;
+  --text-dim: #666666;
+  
+  --border-active: #00FF00;
+  --border-idle: #444444;
+  --border-subtle: #666666;
+  
+  --bg-primary: #000000;
+  --bg-secondary: #111111;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   UTILITY CLASSES
+   Helper classes for terminal UI generation
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* Text utilities */
+.tui-text-primary { color: var(--text-primary); }
+.tui-text-secondary { color: var(--text-secondary); }
+.tui-text-muted { color: var(--text-muted); }
+.tui-text-dim { color: var(--text-dim); }
+.tui-text-brand { color: var(--dirgha-brand); }
+.tui-text-accent { color: var(--dirgha-accent); }
+.tui-text-success { color: var(--dirgha-success); }
+.tui-text-warning { color: var(--dirgha-warning); }
+.tui-text-error { color: var(--dirgha-error); }
+.tui-text-info { color: var(--dirgha-info); }
+
+.tui-text-bold { font-weight: var(--font-bold); }
+.tui-text-semibold { font-weight: var(--font-semibold); }
+.tui-text-medium { font-weight: var(--font-medium); }
+.tui-text-normal { font-weight: var(--font-normal); }
+
+.tui-text-xs { font-size: var(--text-xs); }
+.tui-text-sm { font-size: var(--text-sm); }
+.tui-text-base { font-size: var(--text-base); }
+.tui-text-lg { font-size: var(--text-lg); }
+.tui-text-xl { font-size: var(--text-xl); }
+
+/* Background utilities */
+.tui-bg-primary { background-color: var(--bg-primary); }
+.tui-bg-secondary { background-color: var(--bg-secondary); }
+.tui-bg-tertiary { background-color: var(--bg-tertiary); }
+.tui-bg-elevated { background-color: var(--bg-elevated); }
+
+/* Border utilities */
+.tui-border-active { border-color: var(--border-active); }
+.tui-border-accent { border-color: var(--border-accent); }
+.tui-border-idle { border-color: var(--border-idle); }
+.tui-border-subtle { border-color: var(--border-subtle); }
+
+/* Spacing utilities */
+.tui-p-0 { padding: var(--space-0); }
+.tui-p-1 { padding: var(--space-1); }
+.tui-p-2 { padding: var(--space-2); }
+.tui-p-3 { padding: var(--space-3); }
+.tui-p-4 { padding: var(--space-4); }
+
+.tui-m-0 { margin: var(--space-0); }
+.tui-m-1 { margin: var(--space-1); }
+.tui-m-2 { margin: var(--space-2); }
+.tui-m-3 { margin: var(--space-3); }
+.tui-m-4 { margin: var(--space-4); }
+
+/* Flex/Layout utilities for terminal layouts */
+.tui-flex { display: flex; }
+.tui-flex-row { flex-direction: row; }
+.tui-flex-col { flex-direction: column; }
+.tui-justify-between { justify-content: space-between; }
+.tui-justify-center { justify-content: center; }
+.tui-items-center { align-items: center; }
+.tui-gap-1 { gap: var(--space-1); }
+.tui-gap-2 { gap: var(--space-2); }
+.tui-gap-3 { gap: var(--space-3); }
+.tui-gap-4 { gap: var(--space-4); }
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   COMPONENT PATTERNS
+   Common CLI component styling
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* Status Bar Pattern */
+.tui-statusbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 var(--cli-padding-sm);
+  height: var(--statusbar-height);
+  background: var(--statusbar-bg);
+  border-top: 1px solid var(--statusbar-border);
+  color: var(--statusbar-text);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+/* Panel/Card Pattern */
+.tui-panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  padding: var(--panel-padding);
+  font-family: var(--font-mono);
+}
+
+.tui-panel-header {
+  border-bottom: 1px solid var(--panel-border);
+  padding-bottom: var(--cli-padding-sm);
+  margin-bottom: var(--cli-padding-sm);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+}
+
+/* Input Pattern */
+.tui-input {
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  padding: var(--cli-padding-sm) var(--cli-padding-md);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+.tui-input:focus {
+  border-color: var(--input-focus-border);
+  outline: none;
+}
+
+/* Button Pattern */
+.tui-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--cli-padding-sm) var(--cli-padding-md);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.tui-button-primary {
+  background: var(--button-primary-bg);
+  color: var(--button-primary-text);
+}
+
+.tui-button-secondary {
+  background: var(--button-secondary-bg);
+  color: var(--button-secondary-text);
+  border: 1px solid var(--border-subtle);
+}
+
+.tui-button-ghost {
+  background: transparent;
+  color: var(--button-ghost-text);
+}
+
+/* List/Menu Pattern */
+.tui-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tui-list-item {
+  padding: var(--cli-padding-sm) var(--cli-padding-md);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.tui-list-item:hover,
+.tui-list-item-active {
+  background: var(--palette-item-hover);
+}
+
+.tui-list-item-selected {
+  background: var(--palette-item-selected);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   ANSI ESCAPE SEQUENCES
+   Direct terminal control codes
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* Reset codes */
+.ansi-reset { \e[0m }
+.ansi-bold { \e[1m }
+.ansi-dim { \e[2m }
+.ansi-italic { \e[3m }
+.ansi-underline { \e[4m }
+.ansi-blink { \e[5m }
+.ansi-inverse { \e[7m }
+.ansi-hidden { \e[8m }
+.ansi-strikethrough { \e[9m }
+
+/* Foreground colors (standard 16) */
+.ansi-fg-black { \e[30m }
+.ansi-fg-red { \e[31m }
+.ansi-fg-green { \e[32m }
+.ansi-fg-yellow { \e[33m }
+.ansi-fg-blue { \e[34m }
+.ansi-fg-magenta { \e[35m }
+.ansi-fg-cyan { \e[36m }
+.ansi-fg-white { \e[37m }
+.ansi-fg-default { \e[39m }
+
+/* Bright foreground colors */
+.ansi-fg-bright-black { \e[90m }
+.ansi-fg-bright-red { \e[91m }
+.ansi-fg-bright-green { \e[92m }
+.ansi-fg-bright-yellow { \e[93m }
+.ansi-fg-bright-blue { \e[94m }
+.ansi-fg-bright-magenta { \e[95m }
+.ansi-fg-bright-cyan { \e[96m }
+.ansi-fg-bright-white { \e[97m }
+
+/* Background colors (standard 16) */
+.ansi-bg-black { \e[40m }
+.ansi-bg-red { \e[41m }
+.ansi-bg-green { \e[42m }
+.ansi-bg-yellow { \e[43m }
+.ansi-bg-blue { \e[44m }
+.ansi-bg-magenta { \e[45m }
+.ansi-bg-cyan { \e[46m }
+.ansi-bg-white { \e[47m }
+.ansi-bg-default { \e[49m }
+
+/* Cursor control */
+.ansi-cursor-up { \e[{n}A }
+.ansi-cursor-down { \e[{n}B }
+.ansi-cursor-forward { \e[{n}C }
+.ansi-cursor-back { \e[{n}D }
+.ansi-cursor-next-line { \e[{n}E }
+.ansi-cursor-prev-line { \e[{n}F }
+.ansi-cursor-horizontal { \e[{n}G }
+.ansi-cursor-position { \e[{row};{col}H }
+.ansi-cursor-hide { \e[?25l }
+.ansi-cursor-show { \e[?25h }
+
+/* Screen control */
+.ansi-clear-screen { \e[2J }
+.ansi-clear-line { \e[2K }
+.ansi-clear-line-end { \e[K }
+.ansi-scroll-up { \e[S }
+.ansi-scroll-down { \e[T }
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   PRINT HELPERS
+   For debugging and documentation
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+@media print {
+  :root {
+    --dirgha-brand: #000000;
+    --text-primary: #000000;
+    --text-secondary: #333333;
+    --bg-primary: #ffffff;
+    --bg-secondary: #f5f5f5;
+  }
+}

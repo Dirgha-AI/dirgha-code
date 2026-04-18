@@ -1,0 +1,101 @@
+# Functional Source License, Version 1.1, MIT Future License
+
+## Abbreviation
+
+FSL-1.1-MIT
+
+## Notice
+
+Copyright 2026 Dirgha LLC
+
+## Terms and Conditions
+
+### Licensor ("We")
+
+Dirgha LLC, a United States limited liability company, and its affiliates or successors. "Dirgha AI" is the product and brand; Dirgha LLC is the legal entity that owns and licenses the Licensed Work.
+
+### The Licensed Work
+
+"The Licensed Work" is each version of the software made available under these
+terms by Us. The Licensed Work is "Dirgha Code" (`@dirgha/code`).
+
+### The Change Date
+
+The Change Date is two years from the date We make a version of the Licensed
+Work available to the public under these terms.
+
+### The Change License
+
+The Change License is the MIT License.
+
+### Permitted Purposes
+
+A "Permitted Purpose" is any purpose other than a Competing Use. A "Competing
+Use" means making the Licensed Work available to others in a commercial
+product or service that:
+
+1. substitutes for the use of the Licensed Work;
+
+2. substitutes for any other product or service We offer using the Licensed
+   Work that exists as of the date We make the Licensed Work available; or
+
+3. offers the same or substantially similar functionality as the Licensed
+   Work.
+
+Permitted Purposes specifically include using the Licensed Work:
+
+1. for your internal use and access;
+
+2. for non-commercial education;
+
+3. for non-commercial research; and
+
+4. in connection with professional services that you provide to a licensee
+   using the Licensed Work in accordance with these terms.
+
+### Notices
+
+You must ensure that anyone who gets a copy of any part of the Licensed Work
+from you also gets a copy of these terms or the URL for them above, as well
+as the following copyright notice:
+
+> This Licensed Work is made available under the Functional Source License,
+> Version 1.1, MIT Future License (FSL-1.1-MIT).
+
+### Redistribution
+
+The Licensed Work may be redistributed under the MIT License upon the Change
+Date, or any earlier date on which We elect to make the Licensed Work
+available under the MIT License.
+
+### Disclaimer
+
+THE LICENSED WORK IS PROVIDED "AS IS" AND WITHOUT WARRANTIES OF ANY KIND,
+INCLUDING ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+PURPOSE, NON-INFRINGEMENT, TITLE, OR NON-INTERFERENCE. IN NO EVENT WILL WE
+HAVE ANY LIABILITY TO YOU ARISING OUT OF OR RELATED TO THE LICENSED WORK,
+INCLUDING INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, EVEN IF
+WE HAVE BEEN INFORMED OF THEIR POSSIBILITY IN ADVANCE.
+
+## Use Grant
+
+Subject to these terms, We grant you a non-exclusive, worldwide, royalty-free,
+non-transferable, non-sublicensable right to use, copy, modify, create
+derivative works, publish, and redistribute the Licensed Work for any
+Permitted Purpose.
+
+If you violate these terms, or if you sue anyone over patents that you think
+may apply to the Licensed Work for a Permitted Purpose, these terms will
+terminate automatically, your license under these terms will end, and you
+must stop using the Licensed Work.
+
+## Future License
+
+On the Change Date, We will make the Licensed Work available under the terms
+of the Change License, and the license granted above will terminate. After
+the Change Date, you may use the Licensed Work under the terms of the Change
+License without the restrictions set forth in these terms.
+
+Any modifications or derivative works that you make under these terms may be
+redistributed under either these terms or, after the Change Date, under the
+Change License.

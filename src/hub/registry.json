@@ -1,0 +1,82 @@
+{
+  "version": "1.0.0",
+  "updatedAt": "2026-04-18T10:47:00Z",
+  "plugins": [
+    {
+      "name": "dirgha-ollama",
+      "version": "1.0.0",
+      "description": "Local LLM inference with Ollama",
+      "author": "Dirgha Team",
+      "categories": ["ai-model"],
+      "downloads": 1523,
+      "rating": 4.5,
+      "updatedAt": "2026-04-15",
+      "sources": {
+        "npm": "dirgha-ollama",
+        "github": "dirgha-ai/ollama-plugin"
+      }
+    },
+    {
+      "name": "dirgha-comfyui",
+      "version": "0.9.0",
+      "description": "AI image generation via ComfyUI",
+      "author": "Community",
+      "categories": ["ai-model"],
+      "downloads": 892,
+      "rating": 4.2,
+      "updatedAt": "2026-04-10",
+      "sources": {
+        "github": "dirgha-ai/comfyui-plugin"
+      }
+    },
+    {
+      "name": "dirgha-zotero",
+      "version": "1.2.0",
+      "description": "Reference management with Zotero",
+      "author": "Dirgha Team",
+      "categories": ["integration"],
+      "downloads": 2156,
+      "rating": 4.7,
+      "updatedAt": "2026-04-16",
+      "sources": {
+        "npm": "dirgha-zotero",
+        "github": "dirgha-ai/zotero-plugin"
+      }
+    },
+    {
+      "name": "dirgha-obsidian",
+      "version": "0.8.0",
+      "description": "Knowledge graph sync with Obsidian",
+      "author": "Community",
+      "categories": ["integration"],
+      "downloads": 1456,
+      "rating": 4.3,
+      "updatedAt": "2026-04-12",
+      "sources": {
+        "github": "dirgha-ai/obsidian-plugin"
+      }
+    },
+    {
+      "name": "dirgha-n8n",
+      "version": "1.0.0",
+      "description": "Workflow automation with n8n",
+      "author": "Dirgha Team",
+      "categories": ["workflow", "integration"],
+      "downloads": 756,
+      "rating": 4.4,
+      "updatedAt": "2026-04-14",
+      "sources": {
+        "npm": "dirgha-n8n",
+        "github": "dirgha-ai/n8n-plugin"
+      }
+    }
+  ],
+  "categories": {
+    "ai-model": 2,
+    "tool": 0,
+    "integration": 3,
+    "theme": 0,
+    "language": 0,
+    "workflow": 1
+  }
+}
