@@ -25,7 +25,7 @@ export function endsMidEscape(s: string): boolean {
 const BURST_GAP_MS = 8;        // chars arriving <8ms apart = paste burst
 const BURST_MIN_LEN = 3;        // paste if ≥3 chars accumulate within the gap
 
-/** Text input hook with proper UTF-8, ANSI escape, and paste-burst handling. */
+/** Text input hook with proper UTF-8, ANSI escape, paste-burst, and cursor handling. */
 export function useTextInput({
   value,
   onChange,
@@ -46,6 +46,22 @@ export function useTextInput({
   const valueRef = React.useRef(value);
   valueRef.current = value;
 
+  // Cursor position — always clamped to [0, value.length]
+  const [cursorPos, setCursorPosState] = React.useState(() => value.length);
+  const cursorPosRef = React.useRef(cursorPos);
+
+  // Keep cursor at end when value changes externally (e.g. submit clears value)
+  React.useEffect(() => {
+    cursorPosRef.current = value.length;
+    setCursorPosState(value.length);
+  }, [value]);
+
+  const setCursor = React.useCallback((pos: number) => {
+    const clamped = Math.max(0, Math.min(pos, valueRef.current.length));
+    cursorPosRef.current = clamped;
+    setCursorPosState(clamped);
+  }, []);
+
   React.useEffect(() => {
     if (!focus || !stdin) return;
     setRawMode?.(true);
@@ -62,7 +78,11 @@ export function useTextInput({
         onSubmit(valueRef.current);
         return;
       }
-      onChange(valueRef.current + buf);
+      const cur = cursorPosRef.current;
+      const next = valueRef.current.slice(0, cur) + buf + valueRef.current.slice(cur);
+      cursorPosRef.current = cur + buf.length;
+      setCursorPosState(cursorPosRef.current);
+      onChange(next);
     };
 
     const handler = (data: Buffer) => {
@@ -78,16 +98,52 @@ export function useTextInput({
         escBufferRef.current = '';
       }
 
-      // Drop raw control sequences that have no text meaning.
-      if (str === '\x03') return; // Ctrl+C (upstream handler deals)
-      if (str === '\x1b') return; // ESC alone
-      if (str.startsWith('\x1b[')) return; // Arrow/ANSI CSI
+      // Drop Ctrl+C (upstream handler deals)
+      if (str === '\x03') return;
+      // ESC alone — no action
+      if (str === '\x1b') return;
 
-      // Handle backspace eagerly (never part of a paste)
+      // ── Arrow keys and navigation ──────────────────────────────────────────
+      if (str === '\x1b[D') { setCursor(cursorPosRef.current - 1); return; } // left
+      if (str === '\x1b[C') { setCursor(cursorPosRef.current + 1); return; } // right
+      if (str === '\x1b[H' || str === '\x1b[1~') { setCursor(0); return; }   // Home
+      if (str === '\x1b[F' || str === '\x1b[4~') { setCursor(valueRef.current.length); return; } // End
+      // Up/down: leave to caller (history navigation) — drop here
+      if (str === '\x1b[A' || str === '\x1b[B') return;
+      // Delete key — remove char at cursor
+      if (str === '\x1b[3~') {
+        const cur = cursorPosRef.current;
+        if (cur < valueRef.current.length) {
+          onChange(valueRef.current.slice(0, cur) + valueRef.current.slice(cur + 1));
+        }
+        return;
+      }
+      // Ctrl+Left / Ctrl+Right — word jump
+      if (str === '\x1b[1;5D' || str === '\x1bOD') {
+        let p = cursorPosRef.current - 1;
+        while (p > 0 && valueRef.current[p - 1] === ' ') p--;
+        while (p > 0 && valueRef.current[p - 1] !== ' ') p--;
+        setCursor(p); return;
+      }
+      if (str === '\x1b[1;5C' || str === '\x1bOC') {
+        let p = cursorPosRef.current;
+        while (p < valueRef.current.length && valueRef.current[p] === ' ') p++;
+        while (p < valueRef.current.length && valueRef.current[p] !== ' ') p++;
+        setCursor(p); return;
+      }
+      // Drop remaining unhandled CSI sequences
+      if (str.startsWith('\x1b[') || str.startsWith('\x1bO')) return;
+
+      // Handle backspace at cursor position
       if (str === '\x7f' || str === '\b') {
-        // Flush any pending burst first so backspace is relative to committed state
         flushBurst();
-        onChange(valueRef.current.slice(0, -1));
+        const cur = cursorPosRef.current;
+        if (cur > 0) {
+          const next = valueRef.current.slice(0, cur - 1) + valueRef.current.slice(cur);
+          cursorPosRef.current = cur - 1;
+          setCursorPosState(cur - 1);
+          onChange(next);
+        }
         return;
       }
 
@@ -95,22 +151,22 @@ export function useTextInput({
       const gap = now - burstLastTsRef.current;
       burstLastTsRef.current = now;
 
-      // Big chunk in one read = obvious paste (already not character-by-character)
+      // Big chunk in one read = obvious paste
       if (str.length > 1) {
-        // Cancel pending burst timer and merge this chunk
         if (burstTimerRef.current) { clearTimeout(burstTimerRef.current); burstTimerRef.current = null; }
         burstBufRef.current += str;
-        // Commit immediately — we know this is a paste
         const buf = burstBufRef.current;
         burstBufRef.current = '';
-        onChange(valueRef.current + buf);
+        const cur = cursorPosRef.current;
+        cursorPosRef.current = cur + buf.length;
+        setCursorPosState(cursorPosRef.current);
+        onChange(valueRef.current.slice(0, cur) + buf + valueRef.current.slice(cur));
         return;
       }
 
-      // Single-char read
       const isNewline = str === '\r' || str === '\n';
 
-      // If this arrives inside a burst, keep accumulating (even newlines are text)
+      // Inside a burst — accumulate
       if (gap < BURST_GAP_MS) {
         burstBufRef.current += str;
         if (burstTimerRef.current) clearTimeout(burstTimerRef.current);
@@ -118,21 +174,17 @@ export function useTextInput({
         return;
       }
 
-      // First char after a quiet period
       if (burstBufRef.current.length >= BURST_MIN_LEN) {
-        // Previous burst is still pending — flush it
         flushBurst();
       }
 
       if (isNewline) {
-        // Solo Enter with no burst ahead — submit
         if (burstBufRef.current) flushBurst();
         onSubmit(valueRef.current);
         return;
       }
 
-      // Start a new potential burst; if more chars follow quickly it grows,
-      // otherwise the timer flushes it as a single char.
+      // Single char — insert at cursor
       burstBufRef.current += str;
       if (burstTimerRef.current) clearTimeout(burstTimerRef.current);
       burstTimerRef.current = setTimeout(flushBurst, BURST_GAP_MS * 3);
@@ -146,7 +198,7 @@ export function useTextInput({
       if (burstTimerRef.current) { clearTimeout(burstTimerRef.current); burstTimerRef.current = null; }
       setRawMode?.(false);
     };
-  }, [stdin, focus, onChange, onSubmit, setRawMode]);
+  }, [stdin, focus, onChange, onSubmit, setRawMode, setCursor]);
 
-  return { value };
+  return { value, cursorPos };
 }

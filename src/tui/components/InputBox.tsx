@@ -36,8 +36,8 @@ export function InputBox({
   const [internalEditingPaste, setInternalEditingPaste] = useState(false);
   const isEditingPaste = externalEditingPaste ?? internalEditingPaste;
 
-  // Use the input hook with proper UTF-8/ANSI handling
-  useTextInput({ value, onChange, onSubmit, focus });
+  // Use the input hook with proper UTF-8/ANSI and cursor handling
+  const { cursorPos } = useTextInput({ value, onChange, onSubmit, focus });
 
   const borderColor = busy ? C.accent : focus ? C.brand : C.borderSubtle;
   const promptColor = plan ? C.brand : C.accent;
@@ -70,9 +70,15 @@ export function InputBox({
     }
   }
 
+  // Render block cursor at cursorPos position
+  function withCursor(text: string, pos: number): string {
+    const clamped = Math.min(pos, text.length);
+    return text.slice(0, clamped) + '█' + text.slice(clamped);
+  }
+
   const display = showPaste
-    ? (focus ? visibleTail + '█' : visibleTail)
-    : (focus ? value + '█' : value || placeholder);
+    ? (focus ? withCursor(visibleTail, cursorPos - (value.length - visibleTail.length)) : visibleTail)
+    : (focus ? withCursor(value, cursorPos) : value || placeholder);
 
   const collapsedLineCount = collapsedPrefix ? collapsedPrefix.split('\n').length : 0;
 
