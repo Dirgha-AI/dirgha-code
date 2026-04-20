@@ -601,6 +601,12 @@ From the CLI:
 dirgha contribute
 ```
 
+## Related reading
+
+- **[CREDITS.md](./CREDITS.md)** — inspirations, dependencies, acknowledgements
+- **[alternatives/](./alternatives/)** — honest comparison with 9 other AI coding CLIs (Claude Code, Gemini CLI, Codex, OpenCode, Aider, Hermes, Cline, CLI-Anything, Continue)
+- **[docs/](./docs/)** — getting started, BYOK, fleet, commands
+
 ## Links
 
 - Website — <https://dirgha.ai>
