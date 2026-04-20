@@ -11,6 +11,7 @@ export interface ActiveTurn {
 export interface ToolCall {
   name: string;
   label: string;
+  arg?: string;
 }
 
 export interface ChatMsg {

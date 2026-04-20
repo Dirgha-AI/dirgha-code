@@ -434,7 +434,10 @@ export function DirghaApp({ initialPrompt, resumeSessionId, maxBudgetUsd }: { in
         setActiveTurnsTools(activeToolsRef.current);
 
         toolIdMap.set(name, tid); // last invocation of this tool name
-        const arg = String(Object.values(toolInput)[0] ?? '');
+        // Pick the most informative single-line arg for display
+        const _primaryKeys = ['path', 'command', 'pattern', 'query', 'url', 'message'];
+        const _pk = _primaryKeys.find(k => k in toolInput);
+        const arg = String(_pk ? toolInput[_pk] : Object.values(toolInput)[0] ?? '').split('\n')[0]!
         const evs = streamEventsRef.current;
         evs.push({
           type: 'tool_start',
@@ -474,7 +477,11 @@ export function DirghaApp({ initialPrompt, resumeSessionId, maxBudgetUsd }: { in
         push({
           role: 'tool-group',
           content: '',
-          tools: activeToolsRef.current.map(t => ({ name: t.name, label: t.label })),
+          tools: activeToolsRef.current.map(t => ({
+            name: t.name,
+            label: t.label,
+            arg: String(Object.values(t.input ?? {})[0] ?? '').slice(0, 60) || undefined,
+          })),
         });
       }
       push({
