@@ -7,7 +7,7 @@ Dirgha Code is built on the shoulders of giants.
 - **[CLI-Anything](https://github.com/HKUDS/CLI-Anything)** (HKU Data Science) — the `SKILL.md` manifest and universal `--json` contract that shaped Dirgha's agent-native story.
 - **[Hermes Agent](https://github.com/nousresearch/hermes-agent)** (Nous Research) — modal overlay UX, paste-collapse, `/verbose` cycle.
 - **[OpenAI Codex CLI](https://github.com/openai/codex)** — paste-burst detector, shimmer on in-flight cells, tool-output cap with transcript escape.
-- **[OpenCode](https://github.com/opencode-ai/opencode)** — chronological stream-render pattern, two-row input box.
+- **[OpenCode (sst fork)](https://github.com/sst/opencode)** — chronological stream-render pattern, two-row input box. (The earlier `opencode-ai/opencode` is archived; `sst/opencode` is the active fork.)
 - **[Claude Code](https://claude.com/claude-code)** (Anthropic) — behavioural reference for what an agent TUI can feel like.
 
 ## Multi-agent + worktree patterns

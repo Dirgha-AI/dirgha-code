@@ -7,23 +7,26 @@ See [README.md](./README.md) for contribution rules.
 
 | # | Tool | Vendor | Stack | License | BYOK? | Stand-out |
 |---|---|---|---|---|---|---|
-| 1 | **[Claude Code](https://claude.com/claude-code)** | Anthropic | TS + Ink | Closed / commercial SaaS | Anthropic only | Best pure-coding quality because it runs on Anthropic's best model |
-| 2 | **[Gemini CLI](https://github.com/google-gemini/gemini-cli)** | Google | TS + Ink | Apache 2.0 | Gemini only (free tier via Google account) | Generous free tier; sanctioned integration with Google ecosystem |
-| 3 | **[OpenAI Codex CLI](https://github.com/openai/codex)** | OpenAI | Rust + ratatui | Apache 2.0 | OpenAI only | Rewritten from TS+Ink to Rust+ratatui; shimmer rendering, multi-agent `/side` fork |
-| 4 | **[OpenCode](https://github.com/opencode-ai/opencode)** | Community | Go + Bubbletea | MIT | 75+ providers | Most providers; community-first, sanest license |
-| 5 | **[Aider](https://github.com/Aider-AI/aider)** | Paul Gauthier / community | Python | Apache 2.0 | Anthropic, OpenAI, others | Deepest git integration; pair-programming flow with auto-commits |
-| 6 | **[Hermes Agent](https://github.com/nousresearch/hermes-agent)** | Nous Research | Python + Textual | Open source | Multi | Multi-transport (CLI + Telegram + Slack + WhatsApp) from one gateway; persona-driven |
-| 7 | **[Cline](https://github.com/cline/cline)** | Community | TypeScript (VS Code) | Apache 2.0 | Anthropic, OpenAI | VS Code-native; CLI secondary. If you live in VS Code, this fits |
-| 8 | **[CLI-Anything](https://github.com/HKUDS/CLI-Anything)** | HKU Data Science | Python + click | MIT | — (not a coding agent itself) | Makes any software agent-native via SKILL.md; the specification Dirgha adopted |
-| 9 | **[Dirgha Code](https://github.com/dirghaai/dirgha-code)** | Dirgha LLC | TS + Ink | FSL-1.1-MIT | 14 providers | Parallel multi-agent fleet in git worktrees; universal `--json` |
-| 10 | **[Continue.dev](https://github.com/continuedev/continue)** | Continue Inc. | TS (VS Code + JetBrains) | Apache 2.0 | 20+ providers | Premier IDE plugin ecosystem; CLI is nascent |
+| 1 | **[Claude Code](https://claude.com/claude-code)** | Anthropic | TypeScript (minified npm bundle) | Closed (proprietary, no public source) | Anthropic only | Best pure-coding quality; reference harness most other tools clone |
+| 2 | **[Gemini CLI](https://github.com/google-gemini/gemini-cli)** | Google | TypeScript + Ink | Apache 2.0 | Gemini only | First-party free tier via Google auth; 100k+ stars |
+| 3 | **[OpenAI Codex CLI](https://github.com/openai/codex)** | OpenAI | Rust (primary) + ratatui; TS predecessor deprecated | Apache 2.0 | OpenAI only | Sandboxed exec; `/side` ephemeral fork; shimmer on in-flight tool cells |
+| 4 | **[OpenCode](https://github.com/sst/opencode)** | sst (community — the active fork) | TypeScript server + Rust TUI client | MIT | 75+ providers | Provider-agnostic client/server split; LSP-native; headless mode |
+| 5 | **[Cursor CLI](https://cursor.com/install)** | Cursor (Anysphere) | Closed binary (installer) | Closed (no public repo) | Cursor-managed | Runs Composer/Codex models outside the IDE on the same account |
+| 6 | **[Aider](https://github.com/Aider-AI/aider)** | Community (Paul Gauthier) | Python | Apache 2.0 | Multi | Auto-commits each LLM edit as a discrete git commit; tree-sitter repo map |
+| 7 | **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** | Nous Research | Python + TypeScript adapters | MIT | Multi | DSPy + GEPA self-evolution; runs as a long-running "employee" agent across transports |
+| 8 | **[Cline](https://github.com/cline/cline)** | Community | TypeScript (VS Code extension + headless CLI) | Apache 2.0 | Multi | Computer-use browser automation; canonical surface is the IDE extension, CLI is newer |
+| 9 | **[CLI-Anything](https://github.com/HKUDS/CLI-Anything)** | HKU Data Science | Python + Click | Apache 2.0 | — (not a coding agent) | Generates agent-native CLIs for GUI apps (Blender, LibreOffice). The SKILL.md spec Dirgha adopted |
+| 10 | **[Dirgha Code](https://github.com/dirghaai/dirgha-code)** | Dirgha LLC | TypeScript + Ink + React | FSL-1.1-MIT (→ MIT after 2 years) | 14 providers | Parallel multi-agent fleet in git worktrees; universal `--json`; CLI-Anything compliant |
 
 ## How to read this
 
-**"Vendor"** — who maintains the project. Commercial = paid subscription default. Community = open governance.
+**"Vendor"** — who maintains the project. Closed-vendor tools (Claude
+Code, Cursor CLI) ship as proprietary; the rest are OSI-approved
+licenses (Apache 2.0 or MIT).
 
 **"BYOK?"** — can you bring your own API key for a non-vendor model?
-Closed-vendor tools (Claude Code, Gemini CLI, Codex) typically require their own provider.
+Vendor-locked tools (Claude Code, Gemini CLI, Codex, Cursor) require
+their own provider.
 
 **"Stack"** — implementation language + TUI framework. Matters for
 extensibility, startup time, and install footprint.
@@ -34,13 +37,14 @@ extensibility, startup time, and install footprint.
 |---|---|
 | Best raw coding quality, budget no object | **Claude Code** |
 | Free tier + Google ecosystem | **Gemini CLI** |
-| IDE-integrated pair programming | **Cline** or **Continue** |
+| Same account as the Cursor editor, but headless | **Cursor CLI** |
 | Git-flow first (auto-commit, pair mode) | **Aider** |
-| Every provider under one roof | **OpenCode** or **Dirgha Code** |
-| Multi-transport (Slack/Telegram/CLI as one persona) | **Hermes Agent** |
-| Make a specific piece of software agent-native | **CLI-Anything** |
-| Parallel multi-agent in worktrees (one-shot refactors) | **Dirgha Code** (this repo) |
-| Closed-source Rust speed | **OpenAI Codex CLI** |
+| Every provider under one roof + LSP-native | **OpenCode** |
+| Provider-agnostic with parallel worktrees | **Dirgha Code** |
+| Long-running "employee" agent across Slack/Telegram/CLI | **Hermes Agent** |
+| IDE-primary workflow, CLI as secondary | **Cline** (VS Code) |
+| Make an existing GUI app agent-usable | **CLI-Anything** |
+| Sandboxed Rust speed | **OpenAI Codex CLI** |
 
 ## Honest positioning for Dirgha Code
 
