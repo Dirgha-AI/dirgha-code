@@ -55,5 +55,4 @@ export const TOGETHERAI_MODELS = {
   'databricks/dbrx-instruct': { context: 32768, description: 'Databricks DBRX' },
   'nvidia/Llama-3.1-Nemotron-70B-Instruct-HF': { context: 131072, description: 'NVIDIA Nemotron 70B' },
   'google/gemma-2-27b-it': { context: 8192, description: 'Google Gemma 2 27B' },
-  'NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO': { context: 32768, description: 'Nous Hermes 2 Mixtral' },
 };

@@ -1,32 +1,22 @@
 /** tools/search.ts — Search tools: files, glob, web, QMD, FTS5 knowledge base */
-import { spawn } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { readdirSync, lstatSync, existsSync, readFileSync } from 'node:fs';
 import { resolve, join, sep } from 'node:path';
 import { glob as globFn } from 'glob';
 import type { ToolResult } from '../types.js';
 import { searchFiles, searchMemory, indexFile } from '../session/db.js';
 
-export async function searchFilesTool(input: Record<string, any>): Promise<ToolResult> {
-  const pattern = input['pattern'] as string;
-  const dir = (input['path'] as string | undefined) ?? '.';
-  const g = input['glob'] as string | undefined;
-
-  const run = (cmd: string, args: string[]) => new Promise<{ out: string; code: number | null }>((resolve) => {
-    const proc = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'ignore'] });
-    let out = '';
-    proc.stdout.on('data', (d: Buffer) => { out += d.toString(); });
-    const timer = setTimeout(() => { proc.kill(); resolve({ out, code: null }); }, 10000);
-    proc.on('close', (code) => { clearTimeout(timer); resolve({ out, code }); });
-  });
-
+export function searchFilesTool(input: Record<string, any>): ToolResult {
   try {
+    const pattern = input['pattern'] as string;
+    const dir = (input['path'] as string | undefined) ?? '.';
+    const g = input['glob'] as string | undefined;
     const rgArgs = ['--no-heading', '-n', '--max-count', '50', pattern, dir];
     if (g) rgArgs.push('--glob', g);
-    const rg = await run('rg', rgArgs);
-    if (rg.code === 0 || rg.out) return { tool: 'search_files', result: rg.out.trim() || 'No matches found' };
-
-    const grep = await run('grep', ['-rn', '--', pattern, dir]);
-    return { tool: 'search_files', result: grep.out.trim().split('\n').slice(0, 50).join('\n') || 'No matches found' };
+    const out = spawnSync('rg', rgArgs, { encoding: 'utf8', timeout: 10000 });
+    if (out.status === 0 || out.stdout) return { tool: 'search_files', result: out.stdout.trim() || 'No matches found' };
+    const gout = spawnSync('grep', ['-rn', '--', pattern, dir], { encoding: 'utf8', timeout: 10000 });
+    return { tool: 'search_files', result: (gout.stdout || '').trim().split('\n').slice(0, 50).join('\n') || 'No matches found' };
   } catch (e) { return { tool: 'search_files', result: '', error: (e as Error).message }; }
 }
 
@@ -96,37 +86,20 @@ export async function webSearchTool(input: Record<string, any>): Promise<ToolRes
   } catch (e) { return { tool: 'web_search', result: '', error: (e as Error).message }; }
 }
 
-/** Resolve QMD binary: PATH → npm global → DIRGHA_QMD_PATH env override.
- *  Memoized so the spawn cost is paid once per process lifetime. */
-let qmdCache: string | null | undefined; // undefined = not resolved yet
-async function resolveQMD(): Promise<string | null> {
-  if (qmdCache !== undefined) return qmdCache;
-  if (process.env['DIRGHA_QMD_PATH']) { qmdCache = process.env['DIRGHA_QMD_PATH']; return qmdCache; }
-  try {
-    const which = await runCapture('which', ['qmd']);
-    if (which.code === 0 && which.stdout.trim()) { qmdCache = which.stdout.trim(); return qmdCache; }
-  } catch { /* fall through */ }
-  try {
-    const npmRoot = await runCapture('npm', ['root', '-g']);
-    if (npmRoot.code === 0) {
-      const candidate = join(npmRoot.stdout.trim(), '@tobilu', 'qmd', 'qmd');
-      if (existsSync(candidate)) { qmdCache = candidate; return qmdCache; }
-    }
-  } catch { /* fall through */ }
-  qmdCache = null;
+/** Resolve QMD binary: PATH → npm global → DIRGHA_QMD_PATH env override */
+function resolveQMD(): string | null {
+  // Explicit override (useful for custom installs)
+  if (process.env['DIRGHA_QMD_PATH']) return process.env['DIRGHA_QMD_PATH'];
+  // Check PATH
+  const which = spawnSync('which', ['qmd'], { encoding: 'utf8' });
+  if (which.status === 0 && which.stdout.trim()) return which.stdout.trim();
+  // npm global root
+  const npmRoot = spawnSync('npm', ['root', '-g'], { encoding: 'utf8' });
+  if (npmRoot.status === 0) {
+    const candidate = join(npmRoot.stdout.trim(), '@tobilu', 'qmd', 'qmd');
+    if (existsSync(candidate)) return candidate;
+  }
   return null;
-}
-
-function runCapture(cmd: string, args: string[], timeoutMs = 5000): Promise<{ code: number | null; stdout: string; stderr: string }> {
-  return new Promise((resolve) => {
-    const proc = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] });
-    let stdout = ''; let stderr = '';
-    proc.stdout.on('data', (d: Buffer) => { stdout += d.toString(); });
-    proc.stderr.on('data', (d: Buffer) => { stderr += d.toString(); });
-    const timer = setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} }, timeoutMs);
-    proc.on('close', (code) => { clearTimeout(timer); resolve({ code, stdout, stderr }); });
-    proc.on('error', () => { clearTimeout(timer); resolve({ code: -1, stdout, stderr }); });
-  });
 }
 
 /** FTS5 search over indexed file content + memory (built-in, no external deps) */
@@ -172,10 +145,12 @@ export function indexFilesTool(input: Record<string, any>): ToolResult {
 
 export async function qmdSearchTool(input: Record<string, any>): Promise<ToolResult> {
   try {
-    const qmd = await resolveQMD();
+    const qmd = resolveQMD();
     if (!qmd) return { tool: 'qmd_search', result: '', error: 'QMD not found. Install with: npm i -g @tobilu/qmd' };
-    const out = await runCapture(qmd, ['query', input['query'] as string, '--limit', String((input['limit'] as number) ?? 5)], 15_000);
-    if (out.code !== 0) return { tool: 'qmd_search', result: '', error: out.stderr || 'qmd failed' };
+    const out = spawnSync(qmd, ['query', input['query'] as string, '--limit', String((input['limit'] as number) ?? 5)], {
+      encoding: 'utf8', timeout: 15000,
+    });
+    if (out.status !== 0) return { tool: 'qmd_search', result: '', error: out.stderr || 'qmd failed' };
     return { tool: 'qmd_search', result: out.stdout.trim().slice(0, 8000) };
   } catch (e) { return { tool: 'qmd_search', result: '', error: (e as Error).message }; }
 }

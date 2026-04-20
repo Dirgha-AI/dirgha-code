@@ -60,13 +60,7 @@ export function classifyQuery(input: string, history: Message[]): ModelTier {
   return 'full';
 }
 
-/**
- * Tier → model. NVIDIA MiniMax is the post-Firepass default (2026-04-18+).
- * Fireworks is only reached when the user explicitly selects a Fireworks
- * model ID or sets DIRGHA_PROVIDER=fireworks — no automatic default path
- * routes there, because the Firepass router now 429s server-side and
- * other Fireworks models bill per-token.
- */
+/** Tier → model, provider-aware so Fireworks key never routes to Anthropic model IDs */
 export function resolveModel(tier: ModelTier, preferredModel?: string): string {
   if (preferredModel && preferredModel !== 'auto') return preferredModel;
 
@@ -76,12 +70,13 @@ export function resolveModel(tier: ModelTier, preferredModel?: string): string {
 
   const provider = getActiveProvider();
 
-  // Explicit Fireworks opt-in — user set DIRGHA_PROVIDER=fireworks themselves.
-  // Kept so a user who gets Firepass back can still use it without code changes.
+  // If Fireworks is explicitly chosen or is the default for a BYOK user,
+  // use the Kimi router for the unlimited pass.
   if (provider === 'fireworks' && process.env['FIREWORKS_API_KEY']) {
     return 'accounts/fireworks/routers/kimi-k2p5-turbo';
   }
 
+  // Use provider-specific defaults for "auto" based on tier
   switch (provider) {
     case 'nvidia':
       return tier === 'fast'
@@ -96,9 +91,10 @@ export function resolveModel(tier: ModelTier, preferredModel?: string): string {
     case 'groq':
       return tier === 'fast' ? 'meta-llama/llama-4-scout-17b-16e-instruct' : 'llama-3.3-70b-versatile';
     case 'gateway':
-      // Subscription users: gateway picks the best available (now MiniMax).
-      return 'dirgha:minimax';
+      // Subscription users: gateway picks the best model (usually Kimi)
+      return 'accounts/fireworks/routers/kimi-k2p5-turbo';
     default:
+      // Fallback for other providers (mistral, xai, etc.)
       switch (tier) {
         case 'fast': return process.env['DIRGHA_FAST_MODEL'] ?? 'claude-haiku-4-5';
         case 'full': return process.env['DIRGHA_CODE_MODEL'] ?? 'claude-sonnet-4-6';

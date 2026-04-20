@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * StableScroll.tsx — Smooth scrolling container with RAF-based updates
  */
@@ -11,7 +10,8 @@ import { useScrollBuffer } from './hooks/index.js';
 export const StableScroll = memo(function StableScroll({
   children,
   smooth = true,
-}: StableScrollProps): JSX.Element {
+}: StableScrollProps): React.JSX.Element {
+  // @ts-ignore — ink's Box ForwardRefExoticComponent doesn't satisfy abstract new() constraint
   const containerRef = useRef<InstanceType<typeof Box>>(null);
   const { bufferScroll, flush } = useScrollBuffer();
   const scrollPos = useRef(0);

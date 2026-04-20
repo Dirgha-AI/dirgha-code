@@ -39,7 +39,7 @@ class LRUWindowStore {
       this.cache.delete(key);
     } else if (this.cache.size >= this.maxSize) {
       // Evict least recently used (first item)
-      const firstKey = this.cache.keys().next().value;
+      const firstKey = this.cache.keys().next().value as string | undefined;
       if (firstKey !== undefined) this.cache.delete(firstKey);
     }
     this.cache.set(key, value);
@@ -80,7 +80,7 @@ export function checkRateLimit(
   if (!entry || now >= entry.resetAt) {
     entry = {
       count: 0,
-      resetAt: now + limits.window,
+      resetAt: now + limits.windowMs,
     };
     windows.set(key, entry);
   }
@@ -92,7 +92,7 @@ export function checkRateLimit(
     allowed,
     remainingRequests,
     resetAt: new Date(entry.resetAt),
-    windowMs: limits.window,
+    windowMs: limits.windowMs,
   };
 }
 
@@ -133,4 +133,4 @@ setInterval(() => {
       windows.delete(key);
     }
   }
-}, 5 * 60 * 1000);
+}, 5 * 60 * 1000).unref();

@@ -1,8 +1,7 @@
-// @ts-nocheck
 /**
  * providers/anthropic.ts — Anthropic Claude API provider
  */
-import { postJSON, streamJSON } from './http.js';
+import { postJSON, streamAnthropic } from './http.js';
 import { TOOL_DEFINITIONS } from '../agent/tools.js';
 import type { Message, ModelResponse, ContentBlock } from '../types.js';
 
@@ -56,7 +55,7 @@ export async function callAnthropic(
   let usage: any;
   let stop_reason: string | undefined;
 
-  const stream = streamJSON(
+  const stream = streamAnthropic(
     'https://api.anthropic.com/v1/messages',
     { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
     payload,
@@ -80,7 +79,7 @@ export async function callAnthropic(
         block.text = (block.text || '') + delta.text;
         onStream(delta.text);
       } else if (delta.type === 'thinking_delta') {
-        (block as any).thinking = (block as any).thinking + delta.thinking;
+        (block as any).thinking = ((block as any).thinking || '') + delta.thinking;
         onThinking?.(delta.thinking);
       } else if (delta.type === 'input_json_delta') {
         (block as any).input_str = ((block as any).input_str || '') + delta.partial_json;
@@ -101,5 +100,5 @@ export async function callAnthropic(
 
 /** Check if model supports extended thinking capabilities */
 export function supportsThinking(model: string): boolean {
-  return model.includes('claude-3-7') || model.includes('claude-sonnet-4-5');
+  return model.includes('claude-3-7') || model.includes('claude-sonnet-4-5') || model.includes('claude-3-5-sonnet');
 }

@@ -198,7 +198,7 @@ export async function startRepl(singleShotPrompt?: string): Promise<void> {
     new Promise((resolve, reject) => {
       const onClose = () => reject(new Error('closed'));
       rl.once('close', onClose);
-      rl.question(theme.primary('▸ '), (line) => {
+      rl.question(chalk.cyan('> '), (line) => {
         rl.removeListener('close', onClose);
         resolve(line);
       });

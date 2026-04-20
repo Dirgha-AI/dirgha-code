@@ -40,7 +40,7 @@ export class TaskQueue {
   enqueue(prompt: string, options: { priority?: number; metadata?: Record<string, any> } = {}): QueuedTask {
     const task: QueuedTask = {
       id: `task_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
-      prompt: prompt,
+      prompt: prompt.slice(0, 500),
       status: 'pending',
       submittedAt: Date.now(),
       priority: options.priority ?? 0,

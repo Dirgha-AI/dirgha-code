@@ -4,6 +4,7 @@ import type { SlashCommand } from './types.js';
 import path from 'node:path';
 import os from 'node:os';
 import fs from 'node:fs';
+import { execSync } from 'node:child_process';
 
 const JOURNALS_DIR = path.join(os.homedir(), '.dirgha', 'journals');
 
@@ -122,8 +123,7 @@ export const sprintCommands: SlashCommand[] = [
         try {
           const journal = new SprintJournal(id);
           journal.setSprintStatus(id, 'paused');
-          const { spawn } = await import('node:child_process');
-          spawn('pm2', ['stop', id!], { stdio: 'ignore' });
+          execSync(`pm2 stop ${id}`, { stdio: 'ignore' });
           return 'paused';
         } catch (err) {
           return `Error pausing sprint: ${err instanceof Error ? err.message : String(err)}`;
@@ -182,8 +182,7 @@ export const sprintCommands: SlashCommand[] = [
         try {
           const journal = new SprintJournal(id);
           journal.setSprintStatus(id, 'aborted');
-          const { spawn } = await import('node:child_process');
-          spawn('pm2', ['stop', id!], { stdio: 'ignore' });
+          execSync(`pm2 stop ${id}`, { stdio: 'ignore' });
           return 'aborted';
         } catch (err) {
           return `Error aborting sprint: ${err instanceof Error ? err.message : String(err)}`;

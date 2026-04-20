@@ -2,16 +2,7 @@
  * billing/ratelimit.ts — Rate limiting with sliding window
  */
 import type { RateLimitStatus } from './types.js';
-
-// Tier → { requests per window, window in ms }. Inlined here so the CLI ships
-// without a hard dependency on the shared @dirgha/types workspace package.
-// Keep in sync with the gateway-side definition if either changes.
-const API_RATE_LIMITS: Record<string, { requests: number; windowMs: number }> = {
-  free:  { requests: 30,    windowMs: 60_000 },
-  pro:   { requests: 300,   windowMs: 60_000 },
-  team:  { requests: 1000,  windowMs: 60_000 },
-  admin: { requests: 10000, windowMs: 60_000 },
-};
+import { API_RATE_LIMITS } from '@dirgha/types';
 
 interface WindowEntry {
   count: number;
@@ -84,4 +75,4 @@ setInterval(() => {
       windows.delete(key);
     }
   }
-}, 5 * 60 * 1000);
+}, 5 * 60 * 1000).unref();

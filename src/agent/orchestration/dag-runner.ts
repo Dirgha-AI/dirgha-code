@@ -15,6 +15,7 @@ interface RunOptions {
   traceHandler?: (span: TraceSpan) => void | Promise<void>;
   onTaskStart?: (taskId: TaskId) => void;
   onTaskComplete?: (result: TaskResult) => void;
+  onTaskFailed?: (result: TaskResult) => void;
   onTaskError?: (taskId: TaskId, error: string) => void;
 }
 
@@ -22,7 +23,8 @@ interface RunOptions {
 export async function runDAG(
   dag: TaskDAG,
   pool: AgentPool,
-  options: RunOptions
+  options: RunOptions,
+  teamId = ''
 ): Promise<TeamResult> {
   const startTime = Date.now();
   const completed = new Set<TaskId>();
@@ -30,12 +32,12 @@ export async function runDAG(
   const results = new Map<TaskId, TaskResult>();
   const executionOrder: TaskId[] = [];
   const errors: Array<{ taskId: TaskId; error: string }> = [];
-  
+
   // Get topological order for sequential execution
   const topoOrder = options.parallel ? null : topologicalSort(dag);
   if (!options.parallel && !topoOrder) {
     return {
-      teamId: '',
+      teamId,
       success: false,
       results,
       executionOrder: [],
@@ -45,7 +47,7 @@ export async function runDAG(
   }
 
   const runId = generateRunId();
-  
+
   // Execute tasks
   if (options.parallel) {
     await executeParallel(dag, pool, options, completed, failed, results, executionOrder, errors, runId);
@@ -54,9 +56,9 @@ export async function runDAG(
   }
 
   const durationMs = Date.now() - startTime;
-  
+
   return {
-    teamId: '',
+    teamId,
     success: errors.length === 0 && failed.size === 0,
     results,
     executionOrder,
@@ -80,6 +82,8 @@ async function executeParallel(
   const running = new Map<TaskId, Promise<void>>();
   const queued = new Set<TaskId>();
   const total = dag.tasks.size;
+  let activeCount = 0;
+  const concurrencyLimit = options.maxConcurrency ?? Infinity;
 
   const tryDispatch = (): void => {
     const ready = getReadyTasks(dag, completed).filter(t => {
@@ -96,10 +100,13 @@ async function executeParallel(
     });
 
     for (const task of ready) {
+      if (activeCount >= concurrencyLimit) break;
       queued.add(task.id);
+      activeCount++;
       options.onTaskStart?.(task.id);
       const p = executeTask(task, pool, options, runId).then(result => {
         running.delete(task.id);
+        activeCount--;
         results.set(task.id, result);
         executionOrder.push(task.id);
         if (result.success) {
@@ -153,17 +160,18 @@ async function executeSequential(
     options.onTaskStart?.(taskId);
     
     const result = await executeTask(task, pool, options, runId);
-    
+
+    results.set(taskId, result);
+    executionOrder.push(taskId);
+
     if (result.success) {
       completed.add(taskId);
+      options.onTaskComplete?.(result);
     } else {
       failed.add(taskId);
       errors.push({ taskId, error: result.error || 'Unknown error' });
+      options.onTaskFailed?.(result);
     }
-    
-    results.set(taskId, result);
-    executionOrder.push(taskId);
-    options.onTaskComplete?.(result);
   }
 }
 
@@ -206,7 +214,7 @@ async function executeTask(
       durationMs: Date.now() - startTime,
     };
   } finally {
-    pool.release(agent.id);
+    if (agent.id) pool.release(agent.id);
   }
 }
 

@@ -67,19 +67,9 @@ export async function createAgent(options: CreateAgentOptions = {}): Promise<Age
 }
 
 function buildAgentCommand(options: CreateAgentOptions): string[] {
-  let cmd: string[];
-  
-  if (options.provider === 'anthropic' || !options.provider) {
-    cmd = ['claude'];
-  } else if (options.provider === 'openai') {
-    cmd = ['codex'];
-  } else {
-    cmd = ['dirgha', 'chat'];
-  }
-  
+  const cmd = ['dirgha', 'chat'];
   if (options.model) cmd.push('--model', options.model);
   if (options.args) cmd.push(...options.args);
-  
   return cmd;
 }
 

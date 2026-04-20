@@ -9,6 +9,7 @@ import type { AgentId, AgentPoolConfig, PoolStatus } from './types.js';
 import { decomposeGoal } from './coordinator.js';
 import type { AgentConfig } from '../spawn/types.js';
 import { createAgent, destroyAgent } from '../spawn/lifecycle.js';
+import { getDefaultModel } from '../gateway.js';
 import { PoolQueue } from './pool-queue.js';
 import { PoolScaler } from './pool-scaler.js';
 import { cleanupIdleAgents, startIdleChecks, stopIdleChecks } from './pool-cleanup.js';
@@ -56,14 +57,14 @@ export class AgentPool {
   }
   
   /** Acquire an agent from the pool */
-  async acquire(specificAgentId?: AgentId, timeoutMs = 30000): Promise<AgentConfig | null> {
+  async acquire(specificAgentId?: AgentId, timeoutMs = 30000, model?: string): Promise<AgentConfig | null> {
     if (this.stopping) return null;
-    
+
     const idle = this.findIdle(specificAgentId);
     if (idle) return this.activate(idle);
-    
+
     if (this.canCreate()) {
-      const created = await this.createAndActivate(specificAgentId);
+      const created = await this.createAndActivate(specificAgentId, model);
       if (created) return created;
     }
     
@@ -156,11 +157,12 @@ export class AgentPool {
     return active < this.config.maxConcurrent;
   }
   
-  private async createAndActivate(specificId?: AgentId): Promise<AgentConfig | null> {
+  private async createAndActivate(specificId?: AgentId, model?: string): Promise<AgentConfig | null> {
     try {
-      const agent = await createAgent({ name: `pool-${Date.now()}`, model: 'gpt-4' });
+      const resolvedModel = model ?? getDefaultModel();
+      const agent = await createAgent({ name: `pool-${Date.now()}`, model: resolvedModel });
       if (specificId && agent.id !== specificId) {
-        await destroyAgent(agent.id);
+        destroyAgent(agent.name);
         return null;
       }
       
@@ -173,8 +175,10 @@ export class AgentPool {
   }
   
   private async removeAgent(id: AgentId): Promise<void> {
-    this.agents.get(id)!.status = 'stopping';
-    await destroyAgent(id);
+    const entry = this.agents.get(id);
+    if (!entry) return;
+    entry.status = 'stopping';
+    if (entry.agent.name) destroyAgent(entry.agent.name);
     this.agents.delete(id);
   }
   

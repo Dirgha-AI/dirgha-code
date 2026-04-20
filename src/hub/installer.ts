@@ -172,9 +172,9 @@ export function removePlugin(name: string): boolean {
 export function listInstalled(): PluginManifest[] {
   if (!existsSync(PLUGINS_DIR)) return [];
   
-  const entries = require('fs').readdirSync(PLUGINS_DIR, { withFileTypes: true });
+  const entries: import('fs').Dirent[] = require('fs').readdirSync(PLUGINS_DIR, { withFileTypes: true });
   return entries
-    .filter((e: any) => e.isDirectory() && !e.name.startsWith('.'))
-    .map((e: any) => readManifest(join(PLUGINS_DIR, e.name)))
+    .filter((e: import('fs').Dirent) => e.isDirectory() && !e.name.startsWith('.'))
+    .map((e: import('fs').Dirent) => readManifest(join(PLUGINS_DIR, e.name)))
     .filter(Boolean) as PluginManifest[];
 }

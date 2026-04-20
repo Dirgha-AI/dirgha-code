@@ -1,5 +1,5 @@
 /** tools/sandbox.ts — Code execution sandbox (PTC pattern) */
-import { spawn, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { writeFileSync, readFileSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -35,7 +35,7 @@ function makeTempFile(ext: string): string {
  * Implements the PTC loop: LLM writes code, sandbox runs it,
  * only stdout is returned (zero context cost for internal tool calls).
  */
-export async function executeSandbox(input: Record<string, any>): Promise<ToolResult> {
+export function executeSandbox(input: Record<string, any>): ToolResult {
   const lang = input.language as string;
   const code = input.code as string;
   const timeoutSec = Math.min(Math.max(Number(input.timeout) || DEFAULT_TIMEOUT, 1), MAX_TIMEOUT);
@@ -53,6 +53,8 @@ export async function executeSandbox(input: Record<string, any>): Promise<ToolRe
   try {
     writeFileSync(tmpFile, code, 'utf8');
 
+    // JavaScript: memory-capped node process
+    // Python: memory-limited via ulimit wrapper if available, else direct
     let cmd: string;
     let args: string[];
     if (lang === 'javascript') {
@@ -61,32 +63,34 @@ export async function executeSandbox(input: Record<string, any>): Promise<ToolRe
     } else {
       cmd = 'python3';
       args = [tmpFile];
+      // Inject memory cap via resource module preamble
       const memPreamble = `import resource as _r; _r.setrlimit(_r.RLIMIT_AS, (${PYTHON_MEMORY_MB * 1024 * 1024}, ${PYTHON_MEMORY_MB * 1024 * 1024}))\n`;
       try {
         const existing = readFileSync(tmpFile, 'utf8');
         writeFileSync(tmpFile, memPreamble + existing, 'utf8');
-      } catch { /* ok */ }
+      } catch { /* best-effort */ }
     }
 
-    const { stdout, stderr, code: exitCode, killed } = await new Promise<{ stdout: string; stderr: string; code: number | null; killed: boolean }>((resolve) => {
-      const proc = spawn(cmd, args, {
-        env: sandboxEnv(),
-        cwd: tmpdir(),
-      });
-      let out = '';
-      let err = '';
-      proc.stdout.on('data', (d) => { out += d.toString(); });
-      proc.stderr.on('data', (d) => { err += d.toString(); });
-      const timer = setTimeout(() => { proc.kill(); resolve({ stdout: out, stderr: err, code: null, killed: true }); }, timeoutSec * 1000);
-      proc.on('close', (code) => { clearTimeout(timer); resolve({ stdout: out, stderr: err, code, killed: false }); });
+    const result = spawnSync(cmd, args, {
+      encoding: 'utf8',
+      timeout: timeoutSec * 1000,
+      env: sandboxEnv(),
+      cwd: tmpdir(),
+      maxBuffer: 1024 * 1024, // 1MB
     });
 
-    if (killed) {
-      return { tool: 'execute_code', result: truncate(stdout), error: `Execution timed out after ${timeoutSec}s` };
+    const stdout = result.stdout ?? '';
+    const stderr = result.stderr ?? '';
+
+    if (result.error) {
+      const msg = (result.error as any).code === 'ETIMEDOUT'
+        ? `Execution timed out after ${timeoutSec}s`
+        : result.error.message;
+      return { tool: 'execute_code', result: truncate(stdout), error: msg };
     }
 
-    if (exitCode !== 0) {
-      const errOut = stderr || `Process exited with code ${exitCode}`;
+    if (result.status !== 0) {
+      const errOut = stderr || `Process exited with code ${result.status}`;
       return { tool: 'execute_code', result: truncate(stdout), error: truncate(errOut) };
     }
 
@@ -97,6 +101,6 @@ export async function executeSandbox(input: Record<string, any>): Promise<ToolRe
     const msg = err instanceof Error ? err.message : String(err);
     return { tool: 'execute_code', result: '', error: msg };
   } finally {
-    try { unlinkSync(tmpFile); } catch { /* ok */ }
+    try { unlinkSync(tmpFile); } catch { /* already gone */ }
   }
 }

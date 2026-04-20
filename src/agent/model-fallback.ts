@@ -22,6 +22,11 @@ const FALLBACK_ERRORS = [
   'not_found_error',
   'permission denied',
   'invalid_api_key',
+  // Upstream model gateway failures (NVIDIA NIM 502s, Fireworks 503s)
+  '502 bad gateway',
+  '503 service unavailable',
+  'upstream error',
+  'bad gateway',
 ];
 
 /** Ordered fallback chains by primary model.
@@ -57,19 +62,24 @@ const FALLBACK_CHAINS: Record<string, string[]> = {
   'llama-3.3-70b-versatile': ['llama-3.1-8b-instant', 'meta-llama/llama-3.3-70b-instruct:free'],
 
   // OpenRouter — free tier chains for BYOK resilience
-  'qwen/qwen3-coder:free':          ['meta-llama/llama-4-scout:free', 'deepseek/deepseek-r1:free'],
+  'openrouter/elephant-alpha':      ['qwen/qwen3-coder:free', 'deepseek/deepseek-r1:free'],
+  'qwen/qwen3-coder:free':          ['openrouter/elephant-alpha', 'meta-llama/llama-4-scout:free', 'deepseek/deepseek-r1:free'],
   'meta-llama/llama-4-scout:free':  ['qwen/qwen3-coder:free', 'deepseek/deepseek-r1:free'],
-  'deepseek/deepseek-r1:free':      ['qwen/qwen3-coder:free'],
+  'deepseek/deepseek-r1:free':      ['openrouter/elephant-alpha', 'qwen/qwen3-coder:free'],
 
   // OpenRouter — paid
-  'anthropic/claude-opus-4-7': ['qwen/qwen3-coder:free'],
-  'openai/gpt-5.4':            ['qwen/qwen3-coder:free'],
+  'anthropic/claude-opus-4-7': ['openrouter/elephant-alpha', 'qwen/qwen3-coder:free'],
+  'openai/gpt-5.4':            ['openrouter/elephant-alpha', 'qwen/qwen3-coder:free'],
 
-  // NVIDIA
-  'minimax/minimax-m2.7':                     ['minimax/minimax-m2', 'qwen/qwen3-coder:free'],
-  'minimax/minimax-m2':                       ['qwen/qwen3-coder:free'],
-  'meta/llama-4-maverick-17b-128e-instruct':  ['minimax/minimax-m2.7', 'qwen/qwen3-coder:free'],
-  'meta/llama-4-scout-17b-16e-instruct':      ['minimax/minimax-m2.7', 'qwen/qwen3-coder:free'],
+  // NVIDIA — cover both minimax/* and minimaxai/* prefixes (NVIDIA NIM uses the latter)
+  'minimaxai/minimax-m2.7':                   ['minimaxai/minimax-m2', 'openrouter/elephant-alpha', 'qwen/qwen3-coder:free'],
+  'minimaxai/minimax-m2':                     ['openrouter/elephant-alpha', 'qwen/qwen3-coder:free'],
+  'minimax/minimax-m2.7':                     ['minimax/minimax-m2', 'minimaxai/minimax-m2', 'qwen/qwen3-coder:free'],
+  'minimax/minimax-m2':                       ['minimaxai/minimax-m2', 'qwen/qwen3-coder:free'],
+  'moonshotai/kimi-k2-instruct-0905':         ['minimaxai/minimax-m2.7', 'openrouter/elephant-alpha', 'qwen/qwen3-coder:free'],
+  'mistralai/mistral-nemotron':               ['minimaxai/minimax-m2.7', 'openrouter/elephant-alpha'],
+  'meta/llama-4-maverick-17b-128e-instruct':  ['minimaxai/minimax-m2.7', 'qwen/qwen3-coder:free'],
+  'meta/llama-4-scout-17b-16e-instruct':      ['minimaxai/minimax-m2.7', 'qwen/qwen3-coder:free'],
 
   // Groq
   'meta-llama/llama-4-scout-17b-16e-instruct': ['llama-3.3-70b-versatile', 'qwen/qwen3-coder:free'],

@@ -50,11 +50,7 @@ export async function gitLogTool(input: Record<string, any>): Promise<ToolResult
 
 export async function gitCommitTool(input: Record<string, any>): Promise<ToolResult> {
   await git(['add', '-A'], 10_000);
-  const amend = !!input['amend'];
-  const commitArgs = amend
-    ? ['commit', '--amend', '-m', input['message'] as string]
-    : ['commit', '-m', input['message'] as string];
-  const { out, err, code } = await git(commitArgs, 15_000);
+  const { out, err, code } = await git(['commit', '-m', input['message'] as string], 15_000);
   if (code !== 0) return { tool: 'git_commit', result: '', error: (err || out || 'commit failed') };
   return { tool: 'git_commit', result: out };
 }

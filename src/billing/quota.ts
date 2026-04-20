@@ -106,13 +106,23 @@ export function canMakeRequest(
 }
 
 export function recordUsage(
-  tokens: number,
-  costUsd: number,
+  tokensOrObj: number | { tokens: number; costUsd?: number },
+  costUsd: number = 0,
   tier: string = 'free'
 ): void {
+  let tokens: number;
+  let cost = costUsd;
+
+  if (typeof tokensOrObj === 'object') {
+    tokens = tokensOrObj.tokens;
+    cost = tokensOrObj.costUsd ?? 0;
+  } else {
+    tokens = tokensOrObj;
+  }
+
   const userId = getUserId();
   const today = getToday();
-  incrementDailyUsage(userId, today, tier, tokens, costUsd);
+  incrementDailyUsage(userId, today, tier, tokens, cost);
 }
 
 export function getQuotaSummary(tier = 'free'): string {

@@ -44,7 +44,6 @@ interface HistorySearchProps {
 
 export function HistorySearch({ history, onSelect, onCancel }: HistorySearchProps) {
   const [query, setQuery] = useState('');
-  const [cursorVisible, setCursorVisible] = useState(true);
 
   const matches = query
     ? history.filter(h => h.toLowerCase().includes(query.toLowerCase())).reverse().slice(0, 8)
@@ -56,12 +55,6 @@ export function HistorySearch({ history, onSelect, onCancel }: HistorySearchProp
       onSelect(matches[0]!);
     }
   });
-
-  // Blink cursor
-  useEffect(() => {
-    const interval = setInterval(() => setCursorVisible(v => !v), 530);
-    return () => clearInterval(interval);
-  }, []);
 
   // Custom input hook
   useSimpleInput({
@@ -75,12 +68,12 @@ export function HistorySearch({ history, onSelect, onCancel }: HistorySearchProp
       <Box>
         <Text color={C.accent} bold>history-search: </Text>
         <Text color={query ? C.textPrimary : C.textDim}>
-          {query || 'type to filter…'}{cursorVisible ? '█' : ' '}
+          {query || 'type to filter…'}█
         </Text>
       </Box>
       {matches.map((m, i) => (
         <Text key={i} color={i === 0 ? C.brand : C.textDim} dimColor={i !== 0}>
-          {i === 0 ? '▸ ' : '  '}{m}
+          {i === 0 ? '> ' : '  '}{m}
         </Text>
       ))}
       {matches.length === 0 && <Text color={C.textDim}>(no matches)</Text>}

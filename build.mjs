@@ -32,29 +32,36 @@ const __dirname = __banner_dirname(__filename);`,
     'process.env.DIRGHA_VERSION': JSON.stringify(CLI_VERSION),
     '__CLI_VERSION__': JSON.stringify(CLI_VERSION),
   },
-  // Externals for deps we don't want inlined:
-  //   fsevents — macOS native, optional peer
-  //   better-sqlite3 — native build artifact, installed by user
-  //   js-yaml — optional runtime loader for .yaml configs
-  //   @dirgha/bucky — sibling package, only reached via dynamic import when
-  //     a user opts into mesh features by installing it separately
-  external: ['fsevents', 'better-sqlite3', 'js-yaml', '@dirgha/bucky'],
+  external: [
+    'fsevents', 'better-sqlite3', '@dirgha/bucky', 'js-yaml', 'rxjs', 'es-toolkit', 'chromium-bidi',
+    // Heavy optional deps — loaded at runtime if present, graceful fallback if not
+    'typescript',           // repo_map tool — 3.4MB, optional code analysis
+    'playwright',           // browser automation — 1.4MB, lazy loaded
+    'playwright-core',      // browser automation — 1.4MB, lazy loaded
+    '@libp2p/kad-dht',      // mesh networking — 387KB, only used in mesh commands
+    'libp2p',               // mesh networking
+    '@libp2p/tcp',
+    '@libp2p/websockets',
+    'libp2p-noise',
+    '@chainsafe/libp2p-yamux',
+  ],
   plugins: [
     {
-      name: 'stub-react-devtools',
+      name: 'stub-heavy-internals',
       setup(build) {
-        build.onResolve({ filter: /^react-devtools-core$/ }, () => ({
+        // Stub react-devtools-core (all import paths)
+        build.onResolve({ filter: /react-devtools-core/ }, () => ({
           path: 'react-devtools-core',
-          namespace: 'stub',
+          namespace: 'stub-empty',
         }));
-        build.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({
-          contents: 'export default null;',
+        build.onLoad({ filter: /.*/, namespace: 'stub-empty' }, () => ({
+          contents: 'export default null; export const connectToDevTools = () => {};',
           loader: 'js',
         }));
       },
     },
   ],
-  loader: { '.md': 'text', '.json': 'json' },
+  loader: { '.md': 'text' },
   logLevel: 'info',
 });
 

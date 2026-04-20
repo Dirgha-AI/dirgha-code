@@ -134,6 +134,12 @@ export function getCircuitSnapshot(): Record<ProviderId, {
   return snapshot;
 }
 
+/** Alias with underscore-normalized state names (for test compatibility) */
+export function getProviderState(provider: ProviderId): 'closed' | 'open' | 'half_open' {
+  const state = getCircuitState(provider);
+  return state === 'half-open' ? 'half_open' : state;
+}
+
 /** Testing hook - reset all circuits */
 export function _resetCircuits(): void {
   circuits.clear();

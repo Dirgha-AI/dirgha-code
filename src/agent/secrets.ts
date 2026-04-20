@@ -82,32 +82,3 @@ export function redactSecrets(text: string): string {
   for (const re of SECRET_PATTERNS) out = out.replace(re, '[REDACTED]');
   return out;
 }
-
-// Kimi K2 (NVIDIA NIM) sometimes hallucinates tool-call or message API JSON
-// as literal text output instead of using actual tool calls. Strip it.
-const HALLUCINATION_PATTERNS = [
-  // Python-dict style: [{'type': 'text', 'text': ...}]
-  /\[\s*\{'type'\s*:/g,
-  /\[\s*\{"type"\s*:/g,
-  // JSON blob: [{"type":"tool_use",...}] or [{"type":"text",...}]
-  /\[\s*\{\s*"type"\s*:\s*"(?:text|tool_use|thinking)"/g,
-  // Self-narration artifacts: PAUSE & RESET, SYSTEM ALERT CAUGHT
-  /PAUSE\s*[&+]\s*RESET\s*[—-]/g,
-  /SYSTEM\s+ALERT\s+CAUGHT\s*[—-]/g,
-  // Dispatcher meta messages that must not reach user output or history
-  /\[rate-limited\s*·/,
-  /\[admin\s*·\s*(?:429|rate-limited)/,
-  /\[fireworks\s*·.*rate-limited/,
-  /\[.*rate-limited\s*·\s*failing over/,
-  /\[connection resumed\s*·/,
-  /·\s*failing over to\s+\w+/,
-] as const;
-
-/** Strip model hallucination artifacts from streamed text. */
-export function cleanStreamOutput(text: string): string {
-  // If the chunk contains a hallucinated JSON block start, drop the whole chunk
-  for (const re of HALLUCINATION_PATTERNS) {
-    if (re.test(text)) return '';
-  }
-  return text;
-}

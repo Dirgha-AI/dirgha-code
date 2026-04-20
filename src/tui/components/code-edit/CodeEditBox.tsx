@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * CodeEditBox.tsx — Main container for code edit visualization
  */
@@ -13,7 +12,7 @@ export const CodeEditBox = memo(function CodeEditBox({
   edits,
   maxHeight = 20,
   showLineNumbers = true,
-}: CodeEditBoxProps): JSX.Element {
+}: CodeEditBoxProps): React.JSX.Element {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const visibleEdits = edits.slice(0, maxHeight);

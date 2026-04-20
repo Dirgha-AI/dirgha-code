@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * EditItem.tsx — Individual code edit item with expand/collapse
  */
@@ -25,7 +24,7 @@ export const EditItem = memo(function EditItem({
   return (
     <Box flexDirection="column" marginBottom={1}>
       {/* Header */}
-      <Box flexDirection="row" onPress={() => setExpanded(!expanded)}>
+      <Box flexDirection="row">
         <EditBadge type={edit.type} />
         <Box marginLeft={1} flexGrow={1}>
           <Text bold color={C.textPrimary}>{edit.path}</Text>

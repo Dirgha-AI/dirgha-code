@@ -3,10 +3,9 @@
  * @module commands/curate/vss-integration
  */
 import { isVssAvailable, createVssTable, upsertVssEmbedding } from '../../embeddings/vss.js';
-import type { Database } from '../../utils/sqlite.js';
 
 export async function storeInVss(
-  db: Database, 
+  db: import('better-sqlite3').Database,
   factId: string, 
   embedding: number[]
 ): Promise<boolean> {

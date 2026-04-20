@@ -1,13 +1,10 @@
 /**
- * providers/groq.ts — Groq LLM provider
- * Sprint 8: Add missing provider
+ * providers/groq.ts — Groq provider (OpenAI-compatible)
  */
-import { postJSON, streamJSON } from './http.js';
+import { postJSON, streamSSE } from './http.js';
 import { toOpenAITools } from './tools-format.js';
 import type { Message, ModelResponse, ContentBlock } from '../types.js';
 import { normaliseOpenAI } from './normalise.js';
-
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 export async function callGroq(
   messages: Message[],
@@ -15,31 +12,41 @@ export async function callGroq(
   model: string,
   onStream?: (text: string) => void,
 ): Promise<ModelResponse> {
-  const key = process.env['GROQ_API_KEY'];
-  if (!key) throw new Error('Missing GROQ_API_KEY env var');
+  const apiKey = process.env['GROQ_API_KEY']!;
 
   const payload = {
     model,
     messages: [{ role: 'system', content: systemPrompt }, ...messages],
+    max_tokens: 8192,
     tools: toOpenAITools(),
     tool_choice: 'auto',
-    temperature: 0.7,
-    max_tokens: 4096,
+  };
+
+  const headers = {
+    Authorization: `Bearer ${apiKey}`,
   };
 
   if (onStream) {
     let textAccum = '';
-    await streamJSON(
-      GROQ_API_URL,
-      { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      payload,
-      (text) => { textAccum += text; onStream(text); },
-    );
-    const content: ContentBlock[] = [];
-    if (textAccum) content.push({ type: 'text', text: textAccum });
-    return { content };
+    try {
+      const { toolUseBlocks, usage } = await streamSSE(
+        'https://api.groq.com/openai/v1/chat/completions',
+        headers,
+        payload,
+        (text) => { textAccum += text; onStream(text); },
+      );
+      const content: ContentBlock[] = [];
+      if (textAccum) content.push({ type: 'text', text: textAccum });
+      content.push(...toolUseBlocks);
+      return {
+        content,
+        usage: usage ? { input_tokens: usage.prompt_tokens, output_tokens: usage.completion_tokens } : undefined
+      };
+    } catch (e) {
+      // Fall through to non-streaming
+    }
   }
 
-  const data = await postJSON(GROQ_API_URL, { Authorization: `Bearer ${key}` }, payload);
+  const data = await postJSON('https://api.groq.com/openai/v1/chat/completions', headers, payload);
   return normaliseOpenAI(data);
 }

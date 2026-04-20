@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * patterns/index.ts — Language pattern registry
  */

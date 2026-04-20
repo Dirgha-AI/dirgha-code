@@ -23,7 +23,7 @@ describe('getActiveProvider', () => {
     delete process.env['ANTHROPIC_API_KEY'];
     const { getActiveProvider } = await import('./detection.js');
     const p = getActiveProvider();
-    expect(['fireworks', 'anthropic', 'openrouter', 'groq', 'mistral', 'gateway']).toContain(p);
+    expect(['fireworks', 'anthropic', 'openrouter', 'groq', 'mistral', 'gateway', 'nvidia']).toContain(p);
   });
 
   it('returns a valid provider string', async () => {

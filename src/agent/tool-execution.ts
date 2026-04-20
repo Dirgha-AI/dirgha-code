@@ -51,39 +51,16 @@ const INJECTION_RE = [
   /<<SYS>>/,                                               // Llama-specific, rare in real content
   /disregard\s+(all\s+)?previous\s+(instructions?|context)/i,
   /\u202e|\u202d/,                                         // bidi override chars (keep, these are real attacks)
-  // Added 2026-04-18 after dual-model audit flagged tool-output smuggling:
-  /<\/?\s*system\s*>/i,                                    // <system>/<system> — OpenAI/Anthropic confusion
-  /<\|im_start\|>|<\|im_end\|>/,                            // ChatML frame markers
-  /<\|start_header_id\|>|<\|end_header_id\|>/,              // Llama 3 frame markers
-  /\[\/?INST\]/i,                                           // Mistral frame markers
-  /\[\/?SYSTEM_PROMPT\]/i,                                  // custom framings
 ];
-
-// Surgical sanitizer — runs unconditionally on every tool output, not just
-// when INJECTION_RE matches. Strips frame markers so the model can't be
-// tricked by a fetched page containing e.g. "<|im_start|>system\ndo X\n<|im_end|>"
-function sanitizeToolFrameMarkers(s: string): string {
-  return s
-    .replace(/<\|im_start\|>\s*(system|assistant|user|developer)?/gi, '[frame-marker]')
-    .replace(/<\|im_end\|>/g, '[frame-marker]')
-    .replace(/<\|start_header_id\|>\s*(system|assistant|user|developer)?\s*<\|end_header_id\|>/gi, '[frame-marker]')
-    .replace(/<\/?\s*system\s*>/gi, '[system-tag]')
-    .replace(/\[\/?INST\]/gi, '[inst-tag]')
-    .replace(/[\u202e\u202d\u200b\u200c\u200d\ufeff]/g, ''); // always strip bidi/zero-width
-}
 
 function isSuspiciousToolResult(content: string): boolean {
   return INJECTION_RE.some(re => re.test(content));
 }
 
 function guardToolResult(content: string, toolName: string): string {
-  // Always sanitize frame markers — cheap, and avoids the "<system> smuggled
-  // in web_fetch output" vector the audits called out as P1.
-  const framed = sanitizeToolFrameMarkers(content);
-  if (!isSuspiciousToolResult(framed)) return framed;
-  const clean = framed
-    .replace(/[\u202e\u202d\u200b\u200c\u200d\ufeff]/g, '')
-    .replace(/<!--[\s\S]*?-->/g, '');
+  if (!isSuspiciousToolResult(content)) return content;
+  const clean = content.replace(/[\u202e\u202d\u200b\u200c\u200d\ufeff]/g, '')
+                       .replace(/<!--[\s\S]*?-->/g, '');
   return `[SECURITY: prompt injection detected in ${toolName} result — content sanitized]\n${clean}`;
 }
 
@@ -100,7 +77,6 @@ export async function executeToolWithPermissions(
   ctx: ReplContext | undefined,
   resolvedModel: string,
   onTool: (name: string, input: Record<string, any>) => void,
-  onToolResult?: (toolUseId: string, name: string, result: import('../types.js').ToolResult) => void,
 ): Promise<ToolResultBlock> {
   const toolName = block.name ?? '';
   const toolInput = block.input ?? {};
@@ -150,9 +126,6 @@ export async function executeToolWithPermissions(
       : await executeToolAsync(toolName, toolInput, ctx);
   const result = lockKey ? await withFileLock(lockKey, execFn) : await execFn();
 
-  // Notify TUI of full tool result (includes structured diff for edit/write tools)
-  try { onToolResult?.(toolId, toolName, result); } catch { /* TUI hook isolation */ }
-
   const rawContent = result.error ? `Error: ${result.error}` : result.result;
   const guarded = result.error ? rawContent : guardToolResult(String(rawContent ?? ''), toolName);
   // If injection was detected, degrade session trust for subsequent tool calls
@@ -175,10 +148,9 @@ export async function executeAllTools(
   ctx: ReplContext | undefined,
   resolvedModel: string,
   onTool: (name: string, input: Record<string, any>) => void,
-  onToolResult?: (toolUseId: string, name: string, result: import('../types.js').ToolResult) => void,
 ): Promise<ToolResultBlock[]> {
-  const promises = toolBlocks.map(block =>
-    executeToolWithPermissions(block, ctx, resolvedModel, onTool, onToolResult)
+  const promises = toolBlocks.map(block => 
+    executeToolWithPermissions(block, ctx, resolvedModel, onTool)
   );
   return Promise.all(promises);
 }

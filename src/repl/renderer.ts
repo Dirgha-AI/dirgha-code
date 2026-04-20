@@ -160,31 +160,51 @@ function processLine(line: string, state: RendererState, t = getTheme()): string
 }
 
 // ---------------------------------------------------------------------------
+// Partial line renderer (no state mutations — safe to call mid-line)
+// ---------------------------------------------------------------------------
+
+function renderPartialLine(text: string, state: RendererState, t = getTheme()): string {
+  if (state.inCodeBlock) return t.dim('│ ') + t.code(text);
+  return applyInline(text.trimEnd(), t);
+}
+
+// ---------------------------------------------------------------------------
 // Primary streaming renderer
 // ---------------------------------------------------------------------------
 
 export class StreamingRenderer {
   private state = createRendererState();
   private partial = '';
+  private partialOnScreen = false;
 
-  /**
-   * Feed a chunk of streamed text. Renders complete lines immediately.
-   * Returns any pending partial line (incomplete).
-   */
   feed(chunk: string): void {
     this.partial += chunk;
     const lines = this.partial.split('\n');
     this.partial = lines.pop() ?? '';
 
     for (const line of lines) {
+      if (this.partialOnScreen) {
+        process.stdout.write('\r\x1B[K');
+        this.partialOnScreen = false;
+      }
       const rendered = processLine(line, this.state);
       console.log(rendered);
     }
+
+    // Show partial in-place so tokens appear as they arrive, not in bursts
+    if (this.partial) {
+      const rendered = renderPartialLine(this.partial, this.state);
+      process.stdout.write('\r\x1B[K' + rendered);
+      this.partialOnScreen = true;
+    }
   }
 
-  /** Flush any remaining partial line at end of stream. */
   flush(): void {
     if (this.partial) {
+      if (this.partialOnScreen) {
+        process.stdout.write('\r\x1B[K');
+        this.partialOnScreen = false;
+      }
       console.log(processLine(this.partial, this.state));
       this.partial = '';
     }
@@ -193,6 +213,7 @@ export class StreamingRenderer {
   reset(): void {
     this.state = createRendererState();
     this.partial = '';
+    this.partialOnScreen = false;
   }
 }
 
@@ -207,9 +228,6 @@ export function renderMarkdown(text: string): void {
 // Gemini-style rounded tool box
 // ---------------------------------------------------------------------------
 
-const BOX_W = () => Math.min(process.stdout.columns ?? 80, 80);
-
-// Single-column BMP chars only — emoji have unpredictable terminal widths
 const TOOL_ICONS: Record<string, string> = {
   read_file: '▸', write_file: '◆', edit_file: '◆', edit_file_all: '◆',
   bash: '$', glob: '~', grep: '~', web_search: '@', web_fetch: '@',
@@ -217,56 +235,45 @@ const TOOL_ICONS: Record<string, string> = {
   read_memory: '◇', write_memory: '◇', list_dir: '▾',
 };
 
-/** Render a Gemini-style rounded box for a tool call.
- *  Thoughts appear outside; this box wraps commands/edits.
- *  @param elapsedMs elapsed milliseconds since last tool (0 to omit) */
+const PRIMARY_KEYS = ['path', 'command', 'pattern', 'query', 'url'];
+const TERM_W = () => process.stdout.columns ?? 80;
+
+function trunc(s: string, max: number): string {
+  return s.length > max ? s.slice(0, max) + '…' : s;
+}
+
+/** Claude Code-style single-line tool call with optional compact diff rows. */
 export function renderToolBox(
   name: string,
   input: Record<string, unknown>,
   elapsedMs = 0,
-  t = getTheme(),
+  _t = getTheme(),
 ): void {
-  const width = BOX_W();
-  const inner = width - 4; // 2 border + 2 padding
-
   const icon = TOOL_ICONS[name] ?? '◆';
   const label = name.replace(/_/g, ' ');
-  const elapsedLabel = elapsedMs > 0 ? `  ${elapsedMs}ms` : '';
-  const headerPlain = `${icon} ${label}${elapsedLabel}`;
 
-  // Top border: `╭─ ` (3) + header + ` ` (1) + fill + `╮` (1) = header + fill + 5
-  const fillLen = Math.max(0, width - headerPlain.length - 5);
-  const fill = '─'.repeat(fillLen);
-  process.stdout.write(chalk.cyan('╭─ ') + chalk.bold.cyan(icon) + ' ' + chalk.white(label) + chalk.dim(elapsedLabel) + ' ' + chalk.cyan(fill + '╮') + '\n');
+  // Find primary arg to show inline: first key from priority list that exists
+  const primaryKey = PRIMARY_KEYS.find(k => k in input);
+  const primaryVal = primaryKey ? trunc(String(input[primaryKey] ?? ''), 60) : '';
+  const elapsed = elapsedMs > 0 ? chalk.dim(`  ${elapsedMs}ms`) : '';
 
-  // Key fields to display
-  const SHOW_KEYS = ['path', 'command', 'pattern', 'query', 'url', 'old_string', 'new_string'];
-  for (const key of SHOW_KEYS) {
-    if (!(key in input)) continue;
-    const raw = String(input[key] ?? '');
+  const header = chalk.cyan(icon) + ' ' + chalk.white(label)
+    + (primaryVal ? chalk.dim('(') + chalk.dim(primaryVal) + chalk.dim(')') : '')
+    + elapsed;
+  process.stdout.write(header + '\n');
 
-    if (key === 'old_string' || key === 'new_string') {
-      const prefix = key === 'old_string' ? chalk.red('- ') : chalk.green('+ ');
-      const rawLines = raw.split('\n');
-      for (const line of rawLines.slice(0, 4)) {
-        const truncated = line.slice(0, inner - 4);
-        const pad = ' '.repeat(Math.max(0, inner - truncated.length - 2));
-        process.stdout.write(chalk.cyan('│ ') + prefix + truncated + pad + chalk.cyan(' │') + '\n');
+  // Compact diff rows for edit tools only
+  if ('old_string' in input || 'new_string' in input) {
+    const maxW = TERM_W() - 4;
+    if (input.old_string) {
+      for (const line of String(input.old_string).split('\n').slice(0, 3)) {
+        process.stdout.write(chalk.red('  - ') + chalk.dim(trunc(line, maxW)) + '\n');
       }
-      if (rawLines.length > 4) {
-        const more = `  … +${rawLines.length - 4} lines`;
-        const pad = ' '.repeat(Math.max(0, inner - more.length));
-        process.stdout.write(chalk.cyan('│ ') + chalk.dim(more) + pad + chalk.cyan(' │') + '\n');
+    }
+    if (input.new_string) {
+      for (const line of String(input.new_string).split('\n').slice(0, 3)) {
+        process.stdout.write(chalk.green('  + ') + trunc(line, maxW) + '\n');
       }
-    } else {
-      const valueMax = inner - key.length - 4; // "key: " + padding
-      const valueStr = raw.slice(0, Math.max(0, valueMax));
-      const visibleLen = key.length + 2 + valueStr.length; // "key: value"
-      const pad = ' '.repeat(Math.max(0, inner - visibleLen));
-      process.stdout.write(chalk.cyan('│ ') + chalk.dim(key + ': ') + chalk.white(valueStr) + pad + chalk.cyan(' │') + '\n');
     }
   }
-
-  void t; // theme reserved for future colour overrides
-  process.stdout.write(chalk.cyan('╰' + '─'.repeat(width - 2) + '╯') + '\n');
 }

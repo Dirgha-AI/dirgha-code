@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Authentication utilities for CLI
  */
@@ -39,13 +38,13 @@ export function saveDirghaToken(token: string): void {
     }
     
     const configPath = path.join(dirghaDir, 'config.json');
-    let config = {};
-    
+    let config: Record<string, unknown> = {};
+
     if (fs.existsSync(configPath)) {
-      config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      config = JSON.parse(fs.readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
     }
-    
-    config.token = token;
+
+    config['token'] = token;
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
   } catch (err) {
     console.error('Failed to save token:', err);

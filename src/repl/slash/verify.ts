@@ -132,15 +132,15 @@ async function runVerify(): Promise<string> {
   add('Builtin skills', missingSkills.length === 0 ? 'ok' : 'warn',
     `${foundSkills.length}/${BUILTIN_SKILLS.length} found${missingSkills.length ? ` · missing: ${missingSkills.slice(0, 3).join(', ')}` : ''}`);
 
-  // User skills in ~/.claude/skills
+  // User skills in ~/.dirgha/skills
   try {
-    const claudeSkillsDir = path.join(os.homedir(), '.claude/skills');
+    const claudeSkillsDir = path.join(os.homedir(), '.dirgha/skills');
     if (fs.existsSync(claudeSkillsDir)) {
       const entries = fs.readdirSync(claudeSkillsDir, { withFileTypes: true })
         .filter(e => e.isDirectory()).map(e => e.name);
-      add('User skills', 'ok', `${entries.length} in ~/.claude/skills: ${entries.slice(0, 4).join(', ')}`);
+      add('User skills', 'ok', `${entries.length} in ~/.dirgha/skills: ${entries.slice(0, 4).join(', ')}`);
     } else {
-      add('User skills', 'warn', '~/.claude/skills not found');
+      add('User skills', 'warn', '~/.dirgha/skills not found');
     }
   } catch {
     add('User skills', 'warn', 'could not read');

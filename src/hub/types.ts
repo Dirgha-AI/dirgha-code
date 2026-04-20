@@ -57,6 +57,7 @@ export interface RegistryEntry {
   description: string;
   author: string;
   categories: PluginCategory[];
+  keywords?: string[];
   downloads: number;
   rating: number;      // 0-5
   updatedAt: string;

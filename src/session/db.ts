@@ -197,12 +197,20 @@ export function searchMemory(query: string, limit = 10): Array<{ key: string; co
   }
 }
 
-/** Return all memories as a formatted string (for system prompt injection). */
+const MEMORY_INJECT_MAX_CHARS = 4000; // ~1000 tokens — enough context, not a budget drain
+
+/** Return recent memories as a formatted string for system prompt injection. Hard-capped to avoid token bloat. */
 export function readAllMemory(): string | null {
   const db = getDB();
-  const rows = db.prepare(`SELECT key, content FROM memories ORDER BY updated_at DESC LIMIT 200`).all() as Array<{ key: string; content: string }>;
+  const rows = db.prepare(`SELECT key, content FROM memories ORDER BY updated_at DESC LIMIT 20`).all() as Array<{ key: string; content: string }>;
   if (!rows.length) return null;
-  return rows.map(r => `- [${r.key}] ${r.content}`).join('\n');
+  let result = '';
+  for (const r of rows) {
+    const line = `- [${r.key}] ${r.content.slice(0, 300)}\n`;
+    if (result.length + line.length > MEMORY_INJECT_MAX_CHARS) break;
+    result += line;
+  }
+  return result.trim() || null;
 }
 
 // ---------------------------------------------------------------------------

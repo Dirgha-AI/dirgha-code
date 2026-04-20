@@ -46,16 +46,16 @@ export function executeTool(name: string, input: Record<string, any>, ctx?: Repl
     case 'write_file':    result = writeFileTool(input); break;
     case 'edit_file':     result = editFileTool(input); break;
     case 'edit_file_all': result = editFileAllTool(input); break;
-    // apply_patch spawns `patch`; moved to executeToolAsync so it can't wedge
-    // the event loop on slow patches. Emit a hint so callers migrate.
-    case 'apply_patch':   return { tool: 'apply_patch', result: '', error: 'apply_patch is async — call executeToolAsync' };
+    case 'apply_patch':   result = applyPatchTool(input); break;
     case 'make_dir':      result = makeDirTool(input); break;
     case 'delete_file':   result = deleteFileTool(input); break;
+    case 'search_files':  result = searchFilesTool(input); break;
     case 'list_files':    result = listFilesTool(input); break;
     case 'glob':          result = globTool(input); break;
     case 'repo_map':      result = repoMapTool(input); break;
     case 'search_knowledge':  result = searchKnowledgeTool(input); break;
     case 'index_files':       result = indexFilesTool(input); break;
+    case 'execute_code':      result = executeSandbox(input); break;
     case 'write_todos':       result = writeTodosTool(input, ctx); break;
     case 'read_memory':   result = readMemoryTool(); break;
     case 'session_search': result = sessionSearchTool(input); break;
@@ -81,9 +81,6 @@ export async function executeToolAsync(name: string, input: Record<string, any>,
   else if (name === 'git_stash')       result = await gitStashTool(input);
   else if (name === 'git_patch')       result = await gitPatchTool(input);
   else if (name === 'git_auto_message') result = await gitAutoMessageTool();
-  else if (name === 'search_files')     result = await searchFilesTool(input);
-  else if (name === 'execute_code')     result = await executeSandbox(input);
-  else if (name === 'apply_patch')      result = await applyPatchTool(input);
   // Other async tools
   else if (name === 'read_file') result = await readFileTool(input);
   else if (name === 'save_memory') result = await saveMemoryTool(input);

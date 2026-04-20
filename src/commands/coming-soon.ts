@@ -1,4 +1,3 @@
-// @ts-nocheck
 // SPDX-License-Identifier: MIT
 import { Command } from 'commander';
 import chalk from 'chalk';
@@ -44,12 +43,14 @@ export function registerComingSoonCommands(program: Command): void {
         console.log(chalk.gray(`Track development at https://dirgha.ai/${config.slug}\n`));
         
         const platform = process.platform;
-        const openCmd = platform === 'darwin' ? 'open' : 
-                       platform === 'win32' ? 'cmd /c start' : 
+        const openCmd = platform === 'darwin' ? 'open' :
+                       platform === 'win32' ? 'cmd' :
                        'xdg-open';
         
         try {
-          execCmd(`${openCmd} https://dirgha.ai/${config.slug}`);
+          const url = `https://dirgha.ai/${config.slug}`;
+          if (openCmd === 'cmd') execCmd('cmd', ['/c', 'start', url]);
+          else execCmd(openCmd, [url]);
         } catch {
           console.log(chalk.gray('Could not open browser automatically'));
         }

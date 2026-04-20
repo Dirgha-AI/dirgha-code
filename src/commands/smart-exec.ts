@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { executionController, ExecutionController, ExecutionProgress } from '../utils/execution-controller.js';
@@ -211,16 +210,17 @@ export function registerSmartExec(program: Command): void {
       console.log(chalk.dim(`Stuck threshold: ${(parseInt(options.timeout) / 1000).toFixed(0)}s`));
       console.log(chalk.dim('─'.repeat(56)));
 
-      health.on('healthCheck', ({ status, timeSinceOutput, memoryUsage, progress }) => {
-        const statusColor = {
+      health.on('healthCheck', ({ status, timeSinceOutput, memoryUsage, progress }: { status: string; timeSinceOutput: number; memoryUsage: number; progress: { lines: number } }) => {
+        const statusColor: Record<string, typeof chalk.green> = {
           healthy: chalk.green,
           warning: chalk.yellow,
           critical: chalk.red,
           stuck: chalk.red,
           dead: chalk.red,
-        }[status];
+        };
+        const colorFn = statusColor[status] ?? chalk.white;
 
-        const line = `${statusColor('●')} ${status.padEnd(8)} | Output: ${(timeSinceOutput / 1000).toFixed(1)}s | Memory: ${formatBytes(memoryUsage)} | Lines: ${progress.lines}`;
+        const line = `${colorFn('●')} ${status.padEnd(8)} | Output: ${(timeSinceOutput / 1000).toFixed(1)}s | Memory: ${formatBytes(memoryUsage)} | Lines: ${progress.lines}`;
         process.stdout.write(`\r${line.padEnd(70)}`);
       });
 

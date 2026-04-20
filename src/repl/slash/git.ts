@@ -18,14 +18,15 @@ export const gitCommands: SlashCommand[] = [
     args: '[--staged] [--stat] [-- path]',
     category: 'git',
     handler: async (args) => {
-      const { gitDiffTool } = await import('../../tools/git.js');
+      const { spawnSync } = await import('node:child_process');
       const parts = args.trim().split(/\s+/).filter(Boolean);
+      const gitArgs = ['diff'];
+      if (parts.includes('--staged') || parts.includes('--cached')) gitArgs.push('--cached');
+      if (parts.includes('--stat')) gitArgs.push('--stat');
       const dashIdx = parts.indexOf('--');
-      const r = await gitDiffTool({
-        staged: parts.includes('--staged') || parts.includes('--cached'),
-        path: dashIdx !== -1 ? parts[dashIdx + 1] : undefined,
-      });
-      return chalk.cyan(r.error ?? (r.result || '(no changes)'));
+      if (dashIdx !== -1 && parts[dashIdx + 1]) gitArgs.push('--', parts[dashIdx + 1]);
+      const out = spawnSync('git', gitArgs, { encoding: 'utf8', timeout: 8000 });
+      return chalk.cyan(out.stdout.trim() || '(no changes)');
     },
   },
   {
@@ -34,31 +35,41 @@ export const gitCommands: SlashCommand[] = [
     args: '[message] [--amend] [--push]',
     category: 'git',
     handler: async (args) => {
-      const { gitCommitTool, gitPushTool, gitAutoMessageTool } = await import('../../tools/git.js');
+      const { spawnSync } = await import('node:child_process');
       const parts = args.trim().split(/\s+/);
       const amend = parts.includes('--amend');
       const push = parts.includes('--push');
       const msgParts = parts.filter(p => p !== '--amend' && p !== '--push');
       let message = msgParts.join(' ').trim();
 
+      // Stage all
+      spawnSync('git', ['add', '-A'], { encoding: 'utf8', timeout: 10000 });
+
+      // AI auto-message if no message given or mode is 'auto'
       if (!message || _gitMode === 'auto') {
         try {
+          const { gitAutoMessageTool } = await import('../../tools/git.js');
           const r = await gitAutoMessageTool();
           if (r.result) message = r.result;
         } catch { /* fall through */ }
       }
+
       if (!message) return chalk.red('No message. Provide one or use /git-mode auto for AI messages.');
 
-      const r = await gitCommitTool({ message, amend });
-      if (r.error) return chalk.red(r.error.trim());
+      const commitArgs = amend
+        ? ['commit', '--amend', '-m', message]
+        : ['commit', '-m', message];
+
+      const out = spawnSync('git', commitArgs, { encoding: 'utf8', timeout: 15000 });
+      if (out.status !== 0) return chalk.red((out.stderr || out.stdout || 'commit failed').trim());
 
       let result = chalk.green(`✓ Committed: ${message}`);
 
       if (push) {
-        const p = await gitPushTool({});
-        result += p.error
-          ? chalk.red(`\n✗ Push failed: ${p.error.trim()}`)
-          : chalk.green('\n✓ Pushed');
+        const pushOut = spawnSync('git', ['push'], { encoding: 'utf8', timeout: 30000 });
+        result += pushOut.status === 0
+          ? chalk.green('\n✓ Pushed')
+          : chalk.red(`\n✗ Push failed: ${(pushOut.stderr || '').trim()}`);
       }
 
       return result;
@@ -97,24 +108,24 @@ export const gitCommands: SlashCommand[] = [
       const { gitStashTool } = await import('../../tools/git.js');
       const [sub, ...rest] = args.trim().split(/\s+/);
       if (!sub || sub === 'list') {
-        const r = await gitStashTool({ action: 'list' });
+        const r = gitStashTool({ action: 'list' });
         return chalk.cyan(r.error ?? (r.result || '(no stashes)'));
       }
       if (sub === 'pop') {
-        const r = await gitStashTool({ action: 'pop' });
+        const r = gitStashTool({ action: 'pop' });
         return r.error ? chalk.red(r.error) : chalk.green(r.result);
       }
       if (sub === 'apply') {
-        const r = await gitStashTool({ action: 'apply', index: rest[0] ? Number(rest[0]) : undefined });
+        const r = gitStashTool({ action: 'apply', index: rest[0] ? Number(rest[0]) : undefined });
         return r.error ? chalk.red(r.error) : chalk.green(r.result);
       }
       if (sub === 'drop') {
-        const r = await gitStashTool({ action: 'drop', index: rest[0] ? Number(rest[0]) : undefined });
+        const r = gitStashTool({ action: 'drop', index: rest[0] ? Number(rest[0]) : undefined });
         return r.error ? chalk.red(r.error) : chalk.green(r.result);
       }
       if (sub === 'save') {
         const { checkpointTool } = await import('../../tools/git.js');
-        const r = await checkpointTool({ description: rest.join(' ') || 'manual stash' });
+        const r = checkpointTool({ description: rest.join(' ') || 'manual stash' });
         return r.error ? chalk.red(r.error) : chalk.green(r.result);
       }
       return chalk.red('Usage: /stash [list|pop|apply <n>|drop <n>|save <msg>]');
@@ -131,7 +142,7 @@ export const gitCommands: SlashCommand[] = [
       const force = parts.includes('--force');
       const remoteIdx = parts.indexOf('--remote');
       const branchIdx = parts.indexOf('--branch');
-      const r = await gitPushTool({
+      const r = gitPushTool({
         force,
         remote: remoteIdx !== -1 ? parts[remoteIdx + 1] : undefined,
         branch: branchIdx !== -1 ? parts[branchIdx + 1] : undefined,
@@ -148,12 +159,12 @@ export const gitCommands: SlashCommand[] = [
       const { gitBranchTool } = await import('../../tools/git.js');
       const parts = args.trim().split(/\s+/).filter(Boolean);
       if (!parts.length) {
-        const r = await gitBranchTool({});
+        const r = gitBranchTool({});
         return chalk.cyan(r.error ?? r.result);
       }
       const checkout = parts.includes('-c') || parts.includes('--checkout');
       const name = parts.find(p => p !== '-c' && p !== '--checkout');
-      const r = await gitBranchTool({ name, checkout });
+      const r = gitBranchTool({ name, checkout });
       return r.error ? chalk.red(r.error) : chalk.green(r.result || `Branch ${name} created`);
     },
   },

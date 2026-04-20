@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * JitterFreeRenderer.tsx — Main component for jitter-free streaming output
  */
@@ -13,7 +12,7 @@ export const JitterFreeRenderer = memo(function JitterFreeRenderer({
   children,
   stableHeight = true,
   reducedMotion = false,
-}: JitterFreeRendererProps): JSX.Element {
+}: JitterFreeRendererProps): React.JSX.Element {
   const { front, back, swap } = useDoubleBuffer<React.ReactNode>(children);
 
   React.useEffect(() => {

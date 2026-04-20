@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Database } from '../utils/sqlite.js';
 import type { SyncResult, SyncStatus } from './types.js';
 import { KnowledgeAPIClient } from '../api/knowledge.js';
@@ -91,7 +90,7 @@ export class SyncEngine {
       const importFact = this.db.transaction((facts: typeof cloudFacts) => {
         for (const fact of facts) {
           const existing = this.db.prepare('SELECT updated_at FROM curated_facts WHERE id = ?').get(fact.id) as { updated_at: string } | undefined;
-          
+
           if (existing && new Date(existing.updated_at) > new Date(fact.updatedAt)) {
             result.conflicts++;
             continue;
@@ -110,7 +109,6 @@ export class SyncEngine {
           result.downloaded++;
         }
       });
-
       importFact(cloudFacts);
       this.updateLastSync(new Date().toISOString());
     } catch (error) {

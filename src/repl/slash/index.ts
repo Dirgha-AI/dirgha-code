@@ -28,6 +28,8 @@ import { localCommands } from './local.js';
 import { mcpCommands } from './mcp.js';
 import { verifyCommands } from './verify.js';
 import { sprintCommands } from './sprint.js';
+import { sideCommands } from './side.js';
+import { verboseCommands } from './verbose.js';
 import themeCommand from './theme.js';
 import chalk from 'chalk';
 import { getTheme } from '../themes.js';
@@ -59,6 +61,8 @@ const registry: SlashCommand[] = [
   ...mcpCommands,
   ...verifyCommands,
   ...sprintCommands,
+  ...sideCommands,
+  ...verboseCommands,
   themeCommand,
 ];
 
@@ -106,15 +110,6 @@ export function parseSlash(input: string): { name: string; args: string } {
 export async function handleSlash(input: string, ctx: ReplContext): Promise<boolean> {
   const { name, args } = parseSlash(input);
 
-  // Prefer the caller's stream for output (TUI pushes into the message list).
-  // Fall back to stdout for non-TUI callers (scripts, tests).
-  const emit = (text: string) => {
-    if (!text) return;
-    if (ctx.print) ctx.print(text);
-    else if (ctx.stream?.markdown) ctx.stream.markdown(text);
-    else process.stdout.write(text + '\n');
-  };
-
   const cmd = finalRegistry.find(c => c.name === name || c.aliases?.includes(name));
   if (!cmd) {
     // Recipe fallback
@@ -131,14 +126,14 @@ export async function handleSlash(input: string, ctx: ReplContext): Promise<bool
       }
       const model = ctx.model ?? 'auto';
       try {
-        await runRecipe(recipe, params, model, emit, () => {});
-        emit(chalk.dim(`Recipe '${name}' completed.`));
+        await runRecipe(recipe, params, model, (t) => process.stdout.write(t), () => {});
+        console.log(chalk.dim(`\nRecipe '${name}' completed.`));
       } catch (e: any) {
-        emit(chalk.red(e.message ?? String(e)));
+        console.log(chalk.red(e.message ?? String(e)));
       }
       return true;
     }
-    emit(chalk.red(`Unknown command: /${name}. Type /help for commands.`));
+    console.log(chalk.red(`Unknown command: /${name}. Type /help for commands.`));
     return true;
   }
 
@@ -146,7 +141,7 @@ export async function handleSlash(input: string, ctx: ReplContext): Promise<bool
     await cmd.execute(args, ctx as any);
   } else if (cmd.handler) {
     const result = await cmd.handler(args, ctx as any);
-    if (typeof result === 'string' && result) emit(result);
+    if (typeof result === 'string' && result) console.log(result);
   }
   return true;
 }
@@ -191,8 +186,10 @@ export type { SlashCommand, ReplContext } from './types.js';
 export { gitExtCommands } from './git-ext.js';
 export { contextCommands } from './context.js';
 export { searchCommands } from './search.js';
+export { orchestrationCommands } from './orchestration.js';
+// Re-exports of disabled modules kept for type-compatibility / tests only —
+// the commands themselves are NOT in the active registry above.
 export { screenCommands } from './screen.js';
 export { teamCommands } from './team.js';
 export { consensusCommands } from './consensus.js';
 export { agentDiscoveryCommands } from './agent-discovery.js';
-export { orchestrationCommands } from './orchestration.js';

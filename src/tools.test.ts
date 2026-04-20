@@ -142,27 +142,24 @@ describe('list_files', () => {
 // ── run_command ────────────────────────────────────────────────────────────
 
 describe('run_command', () => {
-  it('runs a simple command', () => {
-    const r = executeTool('run_command', { command: 'echo dirgha-ok' });
+  it('runs a simple command', async () => {
+    const r = await executeToolAsync('run_command', { command: 'echo dirgha-ok' });
     expect(r.error).toBeUndefined();
     expect(r.result.trim()).toBe('dirgha-ok');
   });
 
-  it('rejects shell injection attempts', () => {
-    // Attempt command injection - should be blocked
-    const r = executeTool('run_command', { command: 'echo hello; rm -rf /' });
-    // Should fail because 'rm' is a separate command, not argument
-    // With shell: false, this is safe - only 'echo' runs with args ['hello;', 'rm', '-rf', '/']
+  it('rejects shell injection attempts', async () => {
+    const r = await executeToolAsync('run_command', { command: 'echo hello; rm -rf /' });
     expect(r.result?.includes('hello') || r.error).toBeTruthy();
   });
 
-  it('blocks dangerous commands', () => {
-    const r = executeTool('run_command', { command: 'rm -rf /tmp/test' });
+  it('blocks dangerous commands', async () => {
+    const r = await executeToolAsync('run_command', { command: 'rm -rf /tmp/test' });
     expect(r.error).toContain('blocked');
   });
 
-  it('handles quoted arguments correctly', () => {
-    const r = executeTool('run_command', { command: 'echo "hello world"' });
+  it('handles quoted arguments correctly', async () => {
+    const r = await executeToolAsync('run_command', { command: 'echo "hello world"' });
     expect(r.error).toBeUndefined();
     expect(r.result?.trim()).toBe('hello world');
   });
@@ -180,25 +177,23 @@ describe('executeTool', () => {
 // ── git dispatcher ─────────────────────────────────────────────────────────
 
 describe('executeTool git_branch dispatch', () => {
-  it('routes git_branch to gitBranchTool', () => {
-    const r = executeTool('git_branch', {});
-    // git_branch with no args lists branches — may error outside git repo
+  it('routes git_branch to gitBranchTool', async () => {
+    const r = await executeToolAsync('git_branch', {});
     expect(r.tool).toBe('git_branch');
   });
 
-  it('routes git_stash to gitStashTool', () => {
-    const r = executeTool('git_stash', { action: 'list' });
+  it('routes git_stash to gitStashTool', async () => {
+    const r = await executeToolAsync('git_stash', { action: 'list' });
     expect(r.tool).toBe('git_stash');
   });
 
-  it('routes git_push to gitPushTool', () => {
-    const r = executeTool('git_push', {});
-    // May fail if no remote — just verify routing
+  it('routes git_push to gitPushTool', async () => {
+    const r = await executeToolAsync('git_push', {});
     expect(r.tool).toBe('git_push');
   });
 
-  it('routes git_patch returns error when no patch', () => {
-    const r = executeTool('git_patch', {});
+  it('routes git_patch returns error when no patch', async () => {
+    const r = await executeToolAsync('git_patch', {});
     expect(r.tool).toBe('git_patch');
     expect(r.error).toContain('patch is required');
   });

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * python.ts — Syntax highlighting patterns for Python
  */

@@ -1,68 +1,86 @@
-/**
- * StreamContainer.tsx — Clean streaming layout
- * 
- * Structure:
- * 1. Thinking stream (plain italic text, outside boxes)
- * 2. Tool call boxes (each tool in its own round-corner box)
- * 3. Final response (outside boxes, regular text)
- * 
- * NO pulsating borders. NO double showcase. Clean separation.
- */
+import * as React from 'react';
+import { Box, Text, useStdout } from 'ink';
+import { C } from '../../colors.js';
+import { ToolItem } from './ToolItem.js';
+import { StreamEvent } from './types.js';
 
-import React, { memo } from 'react';
-import { Box } from 'ink';
-import { ThinkingStream } from './ThinkingStream.js';
-import { ToolCallBox, type ToolCall } from './ToolCallBox.js';
+type Item =
+  | { kind: 'text'; content: string }
+  | { kind: 'thinking'; chars: number }
+  | { kind: 'tool'; tool: any; isDone: boolean; result?: string; isError?: boolean };
 
-export interface StreamEvent {
-  type: 'thought' | 'tool_start' | 'tool_end' | 'text';
-  id?: string;
-  content?: string;
-  tool?: ToolCall;
+/** Claude-grade streaming: renders events in chronological order (text ↔ tools ↔ text). */
+type Verbose = 'off' | 'new' | 'all' | 'verbose';
+function verboseLevel(): Verbose {
+  const v = (process.env['DIRGHA_VERBOSE'] ?? 'new').toLowerCase();
+  return (['off', 'new', 'all', 'verbose'].includes(v) ? v : 'new') as Verbose;
 }
 
-interface StreamContainerProps {
-  events: StreamEvent[];
-  isStreaming?: boolean;
-}
+export const StreamContainer = React.memo(({ events }: { events: StreamEvent[]; isStreaming?: boolean }) => {
+  const { stdout } = useStdout();
+  const cols = (stdout?.columns ?? 80) - 6;
+  const verbose = verboseLevel();
+  if (verbose === 'off') return null;
 
-export const StreamContainer = memo(function StreamContainer({
-  events,
-  isStreaming = false,
-}: StreamContainerProps) {
-  // Extract thoughts for the thinking stream
-  const thoughts = events
-    .filter(e => e.type === 'thought')
-    .map(e => e.content || '');
+  const items = React.useMemo<Item[]>(() => {
+    const out: Item[] = [];
+    const toolIdx = new Map<string, number>();
+    let textBuf = '';
+    let thinkingChars = 0;
 
-  // Extract tool calls
-  const toolMap = new Map<string, ToolCall>();
-  
-  events.forEach(event => {
-    if (event.type === 'tool_start' && event.tool) {
-      toolMap.set(event.tool.id, { ...event.tool, status: 'running' });
-    }
-    if (event.type === 'tool_end' && event.id) {
-      const existing = toolMap.get(event.id);
-      if (existing) {
-        toolMap.set(event.id, { ...existing, status: 'done' });
+    const flushText = () => {
+      if (textBuf) { out.push({ kind: 'text', content: textBuf }); textBuf = ''; }
+    };
+    const flushThinking = () => {
+      if (thinkingChars > 0) { out.push({ kind: 'thinking', chars: thinkingChars }); thinkingChars = 0; }
+    };
+
+    for (const ev of events) {
+      if (ev.type === 'text') {
+        flushThinking();
+        textBuf += ev.content ?? '';
+      } else if (ev.type === 'thought') {
+        thinkingChars += ev.content?.length || 0;
+      } else if (ev.type === 'tool_start' && ev.tool) {
+        flushThinking();
+        flushText();
+        const idx = out.push({ kind: 'tool', tool: ev.tool, isDone: false }) - 1;
+        toolIdx.set(ev.tool.id, idx);
+      } else if (ev.type === 'tool_end' && ev.toolId) {
+        const i = toolIdx.get(ev.toolId);
+        if (i != null) {
+          const item = out[i];
+          if (item && item.kind === 'tool') {
+            item.isDone = true;
+            item.result = ev.result;
+            item.isError = ev.isError;
+          }
+        }
       }
     }
-  });
+    flushThinking();
+    flushText();
+    return out;
+  }, [events]);
 
-  const tools = Array.from(toolMap.values());
+  if (items.length === 0) return null;
 
   return (
-    <Box flexDirection="column">
-      {/* Phase 1: Thinking stream (NO BOX) */}
-      <ThinkingStream thoughts={thoughts} isStreaming={isStreaming} />
-
-      {/* Phase 2: Tool call boxes (EACH IN OWN BOX) */}
-      {tools.map(tool => (
-        <ToolCallBox key={tool.id} tool={tool} />
-      ))}
+    <Box flexDirection="column" paddingLeft={2} marginBottom={1}>
+      {items.map((it, i) => {
+        if (it.kind === 'thinking') {
+          return <Text key={i} color={C.textMuted}>⠋ thinking… ({it.chars} chars)</Text>;
+        }
+        if (it.kind === 'tool') {
+          return <ToolItem key={i} tool={it.tool} isDone={it.isDone} result={it.result} isError={it.isError} />;
+        }
+        return (
+          <Box key={i} gap={2} width={cols}>
+            <Text color={C.brand}>✦</Text>
+            <Text color={C.textPrimary} wrap="wrap">{it.content}</Text>
+          </Box>
+        );
+      })}
     </Box>
   );
 });
-
-export default StreamContainer;

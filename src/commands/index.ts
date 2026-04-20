@@ -38,15 +38,14 @@ export { registerYoloCommand, isYoloEnabled } from './yolo.js';
 // Agent commands (Sprint 13)
 export { registerEnsembleCommand } from './ensemble.js';
 export { swarmCommands } from './agent-swarm.js';
-import { registerBuckyCommands } from './bucky.js';
-import { registerKnowledgeCommands } from './knowledge.js';
+export { registerBuckyCommands } from './bucky.js';
 
 // Tool commands (Sprint 13)
 export { registerBrowserCommand } from './browser-cmd.js';
 export { registerBrowserIntegration } from './browser-integration.js';
 export { registerBrowserCommands } from '../browser/commands.js';
 export { captureCommand, exportCommand } from './capture.js';
-export { default as registerConnectCommand } from "./connect.js";
+export { registerConnectCommand } from './connect.js';
 export { registerDataQueryCommand } from './data-query.js';
 export { registerScratchpadCommand, logExecution } from './scratchpad.js';
 export { scanCommand } from './scan.js';

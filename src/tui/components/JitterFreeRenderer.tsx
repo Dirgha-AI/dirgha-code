@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * JitterFreeRenderer.tsx — Eliminates UI flicker and jitter in streaming output
  * 
@@ -133,7 +132,7 @@ export const JitterFreeRenderer = memo(function JitterFreeRenderer({
   children,
   stableHeight = true,
   reducedMotion = false,
-}: JitterFreeRendererProps): JSX.Element {
+}: JitterFreeRendererProps): React.JSX.Element {
   const { stdout } = useStdout();
   const { stdin } = useStdin();
   const cols = stdout?.columns ?? 80;
@@ -213,7 +212,7 @@ export const StableScroll = memo(function StableScroll({
   maxHeight = 20,
   autoScroll = true,
   scrollSpeed = 'normal',
-}: StableScrollProps): JSX.Element {
+}: StableScrollProps): React.JSX.Element {
   const scrollRef = useRef<number>(0);
   const [visibleStart, setVisibleStart] = useState(0);
   const contentArray = React.Children.toArray(children);
@@ -275,7 +274,7 @@ export const StableCursor = memo(function StableCursor({
   blinkRate = 530,
   char = '█',
   color = C.accent,
-}: StableCursorProps): JSX.Element | null {
+}: StableCursorProps): React.JSX.Element | null {
   const [isVisible, setIsVisible] = useState(visible);
   const rafRef = useRef<number | null>(null);
   const lastToggle = useRef(0);
@@ -324,7 +323,7 @@ export const TextStream = memo(function TextStream({
   onComplete,
   charDelay = 10,
   chunkSize = 5,
-}: TextStreamProps): JSX.Element {
+}: TextStreamProps): React.JSX.Element {
   const [displayed, setDisplayed] = useState('');
   const indexRef = useRef(0);
   const rafRef = useRef<number | null>(null);
@@ -373,7 +372,7 @@ interface SmoothSpinnerProps {
 export const SmoothSpinner = memo(function SmoothSpinner({
   label = 'thinking',
   color = C.accent,
-}: SmoothSpinnerProps): JSX.Element {
+}: SmoothSpinnerProps): React.JSX.Element {
   const [frame, setFrame] = useState(0);
   const rafRef = useRef<number | null>(null);
   const lastUpdate = useRef(0);

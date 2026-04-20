@@ -19,6 +19,7 @@ const PRICING_TABLE: Record<string, [number, number]> = {
   'llama-v3p1-405b-instruct': [0.003, 0.003],
   // OpenRouter
   'openrouter/anthropic/claude-3.5-sonnet': [0.003, 0.015],
+  'openrouter/elephant-alpha': [0, 0],
   'openrouter/meta-llama/llama-3.1-70b-instruct': [0.00059, 0.00079],
   // Default fallback
   'default': [0.001, 0.003],

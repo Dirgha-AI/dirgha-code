@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Curate Command - Add knowledge to the graph
  * @module commands/curate

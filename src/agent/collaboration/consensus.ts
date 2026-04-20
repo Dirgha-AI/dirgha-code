@@ -123,7 +123,9 @@ export class ConsensusEngine {
       proposer,
       type: config.type || 'decision',
       description,
-      options: options.length > 0 ? options : ['yes', 'no', 'abstain'],
+      // Empty options = free-form mode: any string is accepted as a valid choice.
+      // Non-empty options = restricted mode: only listed values are accepted.
+      options,
       deadline,
       minVoters: config.minVoters || 2,
       status: 'open',
@@ -157,8 +159,8 @@ export class ConsensusEngine {
       return false;
     }
     
-    // Validate option
-    if (!proposal.options.includes(choice)) return false;
+    // Validate option: skip check in free-form mode (options is empty array)
+    if (proposal.options.length > 0 && !proposal.options.includes(choice)) return false;
     
     const vote: Vote = {
       proposalId,
@@ -349,11 +351,12 @@ export class ConsensusEngine {
         }
       });
       
-      // Simulate agent votes (in real use, agents vote via message bus)
+      // Stub: each agent votes for the first option as a neutral default.
+      // In real use, agents vote independently via the message bus.
       setTimeout(() => {
+        const defaultChoice = options[0] ?? 'yes';
         for (const agent of agents) {
-          const randomChoice = options[Math.floor(Math.random() * options.length)];
-          this.castVote(proposal.id, agent, randomChoice, 0.7);
+          this.castVote(proposal.id, agent, defaultChoice, 0.7);
         }
       }, 100);
     });

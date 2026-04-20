@@ -97,34 +97,26 @@ function searchFiles(cwd: string, query: string, extensions: string[] = ['.ts', 
   return results.sort((a, b) => b.score - a.score).slice(0, 20);
 }
 
-async function searchGrep(cwd: string, query: string): Promise<SearchResult[]> {
+function searchGrep(cwd: string, query: string): SearchResult[] {
   const results: SearchResult[] = [];
   
-  const run = (cmd: string, args: string[]) => new Promise<{ stdout: string; status: number | null }>((resolve) => {
-    const { spawn } = require('node:child_process');
-    const proc = spawn(cmd, args, { cwd });
-    let stdout = '';
-    proc.stdout.on("data", (d: Buffer) => { stdout += d.toString(); });
-    proc.on("close", (code: number | null) => { resolve({ stdout, status: code }); });
-  });
-
   // Try ripgrep first
-  let rgResult = await run('rg', [
+  let rgResult = spawnSync('rg', [
     '-n', '-C', '2',
     '--type', 'ts', '--type', 'js', '--type', 'tsx', '--type', 'jsx',
     '--type', 'json', '--type', 'md',
     '-i', query
-  ]);
+  ], { cwd, encoding: 'utf8' });
   
   // Fallback to grep
-  if (rgResult.status !== 0) {
-    rgResult = await run('grep', [
+  if (rgResult.error || rgResult.status !== 0) {
+    rgResult = spawnSync('grep', [
       '-rn', '-C', '2',
       '--include=*.ts', '--include=*.js',
       '--include=*.tsx', '--include=*.jsx',
       '--include=*.json', '--include=*.md',
       '-i', query, '.'
-    ]);
+    ], { cwd, encoding: 'utf8' });
   }
   
   if (rgResult.stdout) {
@@ -178,7 +170,7 @@ const whatCommand: SlashCommand = {
     const startTime = Date.now();
     
     // Try grep-based search first (faster for large repos)
-    let results = await searchGrep(cwd, query);
+    let results = searchGrep(cwd, query);
     
     // Fallback to manual walk if grep fails
     if (results.length === 0) {

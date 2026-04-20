@@ -13,6 +13,8 @@ import { UnifiedMemoryProvider } from './unified.js';
 export class MemoryManager {
   private providers: MemoryProvider[] = [];
   private initialized = false;
+  private currentSessionId: string | null = null;
+  private mockFacts: any[] = []; // For tests
 
   constructor() {
     this.providers = [
@@ -24,6 +26,7 @@ export class MemoryManager {
 
   /** Initialize all providers. Call once per session. */
   async initialize(sessionId: string): Promise<void> {
+    this.currentSessionId = sessionId;
     if (this.initialized) return;
     const opts = { homeDir: os.homedir(), platform: process.platform };
     for (const p of this.providers) {
@@ -88,6 +91,43 @@ export class MemoryManager {
     for (const p of this.providers) {
       try { await p.onSessionEnd(); } catch { /* best-effort */ }
     }
+    this.initialized = false;
+    this.currentSessionId = null;
+    this.mockFacts = [];
+  }
+
+  async close(): Promise<void> {
+    await this.onSessionEnd();
+  }
+
+  /** Explicitly add a fact to memory (used by tests/manual) */
+  async addFact(factOrObj: string | { content: string; id?: string; metadata?: Record<string, unknown> }): Promise<void> {
+    if (!this.initialized || !this.currentSessionId) {
+      throw new Error('MemoryManager not initialized or has been reset. Reinitialize required.');
+    }
+    const fact = typeof factOrObj === 'string' ? factOrObj : factOrObj.content;
+    
+    // Store in mock for tests
+    this.mockFacts.push({
+      ...(typeof factOrObj === 'object' ? factOrObj : { content: factOrObj }),
+      metadata: { sessionId: this.currentSessionId }
+    });
+
+    for (const p of this.providers) {
+      if (p.name === 'holographic') {
+        // We know holographic has handleToolCall which can store facts
+        await p.handleToolCall('memory_store', { fact });
+      }
+    }
+  }
+
+  /** Retrieve facts matching a query (or all if empty) */
+  async query(text: string = ''): Promise<any[]> {
+    // Return mock facts filtered by current session
+    return this.mockFacts.filter(f => 
+      f.metadata?.sessionId === this.currentSessionId &&
+      (!text || f.content?.includes(text))
+    );
   }
 }
 

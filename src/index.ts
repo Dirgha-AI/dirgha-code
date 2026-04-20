@@ -1,44 +1,3 @@
-// Build-injected version constant (replaced by esbuild define at build time)
-declare const __CLI_VERSION__: string;
-const _cliVersion = typeof __CLI_VERSION__ !== 'undefined' ? __CLI_VERSION__ : '0.0.0';
-
-// ── Fast-paths that exit before we import anything heavy.
-// The full command module tree (Ink, sqlite, libp2p, react) takes ~800ms to
-// cold-load. Users running `dirgha --version` in scripts or CI shouldn't wait
-// for that. Same for `dirgha agent ...` — that's the headless machine-readable
-// JSON mode, explicitly designed to bypass the TUI.
-{
-  const _argv = process.argv.slice(2);
-  if (_argv[0] === '--version' || _argv[0] === '-V') {
-    process.stdout.write(_cliVersion + '\n');
-    process.exit(0);
-  }
-  if (_argv[0] === 'agent') {
-    // Lazy-load only the agent-mode module graph. No Ink, no pickers.
-    // Load BYOK keys first so callNvidia / callFireworks / callAnthropic find
-    // their env vars — without this, `dirgha agent chat --model <nvidia model>`
-    // throws "NVIDIA_API_KEY not set" even when the key sits in ~/.dirgha/keys.json.
-    import('./utils/keys.js')
-      .then(({ loadKeysIntoEnv }) => loadKeysIntoEnv())
-      .then(() => import('./agent/index.js'))
-      .then(m => m.runAgentMode(_argv.slice(1)))
-      .then(code => process.exit(code))
-      .catch(err => {
-        process.stderr.write(`agent mode error: ${err?.message ?? err}\n`);
-        process.exit(1);
-      });
-    // Block event-loop drain while the promise runs. The rest of index.ts is
-    // guarded below by the same `_argv[0] === 'agent'` check so commander
-    // doesn't race the async import and bark "unknown command 'agent'".
-    setInterval(() => {}, 1 << 30);
-  }
-}
-
-// If the fast-path above claimed the 'agent' command, skip everything below —
-// commander would otherwise parse argv synchronously and fail before the lazy
-// import of agent/index.js resolves.
-const _fastPathClaimed = process.argv[2] === 'agent';
-
 import { Command } from 'commander';
 import chalk from 'chalk';
 import fs from 'fs';
@@ -48,6 +7,10 @@ import { execSync } from 'child_process';
 import { execCmd } from './utils/safe-exec.js';
 import { redactSecrets } from './agent/secrets.js';
 export { redactSecrets };
+
+// Build-injected version constant (replaced by esbuild define at build time)
+declare const __CLI_VERSION__: string;
+const _cliVersion = typeof __CLI_VERSION__ !== 'undefined' ? __CLI_VERSION__ : '0.0.0';
 
 // Stores a pending update nudge message — set by background check below
 let _updateNudge: string | undefined;
@@ -77,36 +40,7 @@ function writeCrashLog(err: unknown): void {
   } catch { /* ignore secondary failure */ }
 }
 
-/**
- * Restore terminal state on any exit path. Ink's InputBox enables bracketed-
- * paste mode (ESC[?2004h) when it mounts; without this handler, a crash,
- * SIGINT, or unclean exit leaves the user's shell wrapping every paste with
- * literal ESC[200~...ESC[201~ markers — which mangles subsequent paste-of
- * passwords into shell history. Registered once at module load.
- */
-function restoreTerminal() {
-  try {
-    process.stdout.write('\x1b[?2004l');     // disable bracketed paste
-    process.stdout.write('\x1b[?1004l');     // disable XTerm focus events (defensive — heals crashed prior sessions)
-    process.stdout.write('\x1b[?25h');       // show cursor
-  } catch { /* best effort */ }
-}
-// Run once on startup too, in case a prior crashed session left focus-events
-// (\x1b[?1004h) or bracketed-paste enabled — otherwise \x1b[I / \x1b[O bytes
-// leak into this process's stdin and show up as `[O[I` in the input buffer.
-try {
-  if (process.stdout.isTTY) {
-    process.stdout.write('\x1b[?1004l');
-    process.stdout.write('\x1b[?2004l');
-  }
-} catch { /* best effort */ }
-process.on('exit', restoreTerminal);
-process.on('SIGINT', () => { restoreTerminal(); process.exit(130); });
-process.on('SIGTERM', () => { restoreTerminal(); process.exit(143); });
-process.on('SIGHUP', () => { restoreTerminal(); process.exit(129); });
-
 process.on('uncaughtException', (err) => {
-  restoreTerminal();
   writeCrashLog(err);
   console.error(chalk.red(`\n✗ Unexpected error: ${err instanceof Error ? err.message : String(err)}`));
   console.error(chalk.dim('  Details saved to ~/.dirgha/crash.log\n'));
@@ -114,7 +48,6 @@ process.on('uncaughtException', (err) => {
 });
 
 process.on('unhandledRejection', (reason) => {
-  restoreTerminal();
   writeCrashLog(reason);
   console.error(chalk.red(`\n✗ Unhandled rejection: ${reason instanceof Error ? reason.message : String(reason)}`));
   console.error(chalk.dim('  Details saved to ~/.dirgha/crash.log\n'));
@@ -136,30 +69,29 @@ profiler.begin('load-keys');
 loadKeysIntoEnv();
 profiler.end();
 
-// ── Background version check — non-blocking, fire-and-forget ──────────────────
-// .unref() so this background check doesn't keep the event loop alive after
-// a short-lived subcommand (e.g. `dirgha status`) finishes printing. Without
-// this, short commands hang for up to 5s waiting for the npm timeout and got
-// reported as "stuck shells" when multiple were invoked in parallel.
-setTimeout(() => {
-  try {
-    const raw = execCmd('npm', ['view', 'dirgha-cli', 'version', '--json'], { timeout: 5000 });
-    const latest = raw.replace(/"/g, '').trim();
-    if (latest && latest !== _cliVersion) {
-      checkUpdateIntegrity()
-        .then(({ integrityOk }) => {
-          if (integrityOk) {
+// ── Background version check — registered later, only for TUI mode ────────────
+function _scheduleVersionCheck() {
+  const t = setTimeout(() => {
+    try {
+      const raw = execCmd('npm', ['view', 'dirgha-cli', 'version', '--json'], { timeout: 5000 });
+      const latest = raw.replace(/"/g, '').trim();
+      if (latest && latest !== _cliVersion) {
+        checkUpdateIntegrity()
+          .then(({ integrityOk }) => {
+            if (integrityOk) {
+              _updateNudge = chalk.dim('  Update available: ') + chalk.cyan(latest) + chalk.dim(' → run ') + chalk.white('dirgha update') + '\n';
+            } else {
+              process.stderr.write(chalk.red('[dirgha] WARNING: Update integrity check failed — do not update until resolved\n'));
+            }
+          })
+          .catch(() => {
             _updateNudge = chalk.dim('  Update available: ') + chalk.cyan(latest) + chalk.dim(' → run ') + chalk.white('dirgha update') + '\n';
-          } else {
-            process.stderr.write(chalk.red('[dirgha] WARNING: Update integrity check failed — do not update until resolved\n'));
-          }
-        })
-        .catch(() => { /* integrity fetch failed — show nudge anyway */
-          _updateNudge = chalk.dim('  Update available: ') + chalk.cyan(latest) + chalk.dim(' → run ') + chalk.white('dirgha update') + '\n';
-        });
-    }
-  } catch { /* offline or npm error — silently ignore */ }
-}, 0).unref();
+          });
+      }
+    } catch { /* offline or npm error — silently ignore */ }
+  }, 0);
+  t.unref();
+}
 
 import { registerModelCommands } from './commands/models.js';
 import { registerVoiceCommands } from './voice/commands.js';
@@ -178,16 +110,20 @@ import { statsCommand } from './commands/stats.js';
 import { captureCommand, exportCommand } from './commands/capture.js';
 import { doctorCommand } from './commands/doctor.js';
 import { updateCommand } from './commands/update.js';
-import { registerKnowledgeCommands } from './commands/knowledge.js';
+import { registerBuckyCommands } from './commands/bucky.js';
 import supportCommand from './commands/support.js';
+import { registerDAOCommands } from './commands/dao.js';
 import { registerMakeCommands } from './commands/make.js';
 import { registerCompactCommand } from './commands/compact.js';
-// Bucky / DAO / Mesh commands live in the separate @dirgha/bucky package.
-// The CLI reaches them dynamically once bucky is installed — no static
-// imports here so this build stays standalone.
+import { registerJoinMeshCommand } from './commands/join-mesh.js';
+import { registerMeshCommands } from './commands/mesh/index.js';
 import { registerAnalyticsCommands } from './commands/analytics.js';
 import { registerBrowserIntegration } from './commands/browser-integration.js';
 import { registerSmartExec } from './commands/smart-exec.js';
+import { registerAskCommand } from './commands/ask.js';
+import { registerHubCommands } from './hub/commands.js';
+import { registerFleetCommands } from './fleet/commands.js';
+import { installJsonCaptureIfEnabled } from './agent/output.js';
 
 // ---------------------------------------------------------------------------
 // Pre-parse: extract -e / --with-extension flags before routing
@@ -220,24 +156,28 @@ import { registerSmartExec } from './commands/smart-exec.js';
 
 const _args = process.argv.slice(2);
 const SUBCOMMANDS = [
-  'init', 'status', 'setup', 'auth', 'login', 'logout', 'chat', 'models', 'projects', 'session', 'run', 'keys',
+  'init', 'status', 'setup', 'auth', 'login', 'logout', 'signup', 'chat', 'models', 'projects', 'session', 'run', 'keys',
   'mcp', 'scan', 'curate', 'sync', 'query', 'eval', 'stats', 'capture', 'export', 'doctor', 'update',
-  'make', 'voice', 'voice-config', 'checkpoint', 'rollback', 'swarm', 'compact',
-  // 'bucky', 'dao', 'mesh', 'join-mesh' — ship in @dirgha/bucky (separate package)
-  'insights', 'project', 'browser', 'goto', 'extract', 'pdf', 'research', 'audit',
-  'knowledge', 'k',       // Knowledge Engine (dirgha knowledge sync|wiki|search|viz)
-  'recipe',               // recipe runner had the same fall-through bug
-  'remember', 'recall',   // legacy memory aliases
-  'hub',                  // CLI-Hub plugin registry (hub search|install|list|remove|info)
-  'agent',                // Headless agent-mode dispatcher (dirgha agent chat ...)
-  'contribute', 'support', // `dirgha contribute` (support is a legacy alias)
+  'dao', 'make', 'bucky', 'voice', 'voice-config', 'checkpoint', 'rollback', 'swarm', 'compact', 'mesh',
+  'insights', 'project', 'browser', 'goto', 'extract', 'pdf', 'research', 'audit', 'recipe',
+  // Unified memory commands (missing from list — caused them to route to TUI)
+  'remember', 'recall', 'session-start', 'session-end', 'session-status', 'memory-stats', 'ctx', 'context',
+  // Other missing commands
+  'sprint', 'connect', 'jobs', 'bounties', 'coming-soon', 'smart-exec',
+  // Headless agent mode
+  'ask',
+  // CLI-Hub plugin system
+  'hub',
+  // Parallel multi-agent
+  'fleet',
+  // Meta/tooling
+  '__dump_spec', 'eval',
   '--help', '-h', '--version', '-V',
 ];
 
 // Extract --resume / --session <id> before checking subcommands
 let _resumeSessionId: string | undefined;
 let _maxBudgetUsd: number | undefined;
-let _headlessPrompt: string | undefined; // -p / --print — one-shot, no Ink
 const _filteredArgs: string[] = [];
 for (let i = 0; i < _args.length; i++) {
   if (_args[i] === '--resume') {
@@ -257,8 +197,9 @@ for (let i = 0; i < _args.length; i++) {
   } else if (_args[i] === '--dangerously-skip-permissions' || _args[i] === '--yolo') {
     process.env['DIRGHA_SKIP_PERMISSIONS'] = '1';
     process.env['DIRGHA_YOLO'] = '1';
-  } else if ((_args[i] === '-p' || _args[i] === '--print') && _args[i + 1]) {
-    _headlessPrompt = _args[++i];
+  } else if (_args[i] === '--json') {
+    // Global flag: strip from arg list, set env so any command can read it
+    process.env['DIRGHA_JSON_OUTPUT'] = '1';
   } else {
     _filteredArgs.push(_args[i]!);
   }
@@ -270,65 +211,15 @@ if (_resumeSessionId === '__last__') {
 const _firstArg = _filteredArgs[0] ?? '';
 const _isSubcommand = SUBCOMMANDS.includes(_firstArg);
 
-async function _runHeadless(prompt: string, resumeId: string | undefined): Promise<never> {
-  try {
-    const { runAgentLoop } = await import('./agent/loop.js');
-    const { getDefaultModel } = await import('./agent/gateway.js');
-    const model = process.env['DIRGHA_MODEL'] ?? getDefaultModel();
-    const sessionId = resumeId ?? `headless_${Date.now()}`;
-    await runAgentLoop(
-      prompt,
-      [],
-      model,
-      (t) => process.stdout.write(t),
-      (name, input) => process.stderr.write(chalk.dim(`[tool] ${name} ${JSON.stringify(input).slice(0, 100)}\n`)),
-      undefined,
-      undefined,
-      { sessionId, maxTurns: parseInt(process.env['DIRGHA_MAX_TURNS'] ?? '20', 10) || 20 },
-    );
-    process.stdout.write('\n');
-    process.exit(0);
-  } catch (e: any) {
+if (_filteredArgs.length === 0 || !_isSubcommand) {
+  // Launch Ink TUI — background version check only needed in interactive sessions
+  _scheduleVersionCheck();
+  const _prompt = _filteredArgs.length > 0 ? _filteredArgs.join(' ') : undefined;
+  if (_updateNudge) process.stdout.write(_updateNudge);
+  import('./tui/index.js').then(m => m.startTUI(_prompt, _resumeSessionId, _maxBudgetUsd)).catch((e) => {
     console.error(chalk.red(`\n✗ ${e instanceof Error ? e.message : String(e)}\n`));
     process.exit(1);
-  }
-}
-const _headlessPromptFallback = (prompt: string, resumeId: string | undefined) => { void _runHeadless(prompt, resumeId); };
-
-if (_headlessPrompt !== undefined) {
-  // Explicit `-p` / `--print` flag — same code path as the no-TTY fallback.
-  _headlessPromptFallback(_headlessPrompt, _resumeSessionId);
-} else if (_filteredArgs.length === 0 || !_isSubcommand) {
-  // Ink needs a real TTY for raw-mode input. When run under a pipe or
-  // `</dev/null` (cron, tests, CI, SSH without -t) the TUI crashes with
-  // "Raw mode is not supported", leaves the process wedged, and was the
-  // source of the stuck-shell leaks we kept hitting. Detect the no-TTY case
-  // up-front and give useful output instead of launching Ink.
-  const isTTY = Boolean(process.stdin.isTTY && process.stdout.isTTY);
-  if (!isTTY) {
-    const prompt = _filteredArgs.length > 0 ? _filteredArgs.join(' ') : '';
-    if (prompt) {
-      // The user clearly wants the agent to do something but we have no
-      // interactive input surface. Route to the same non-Ink path as `-p`.
-      _headlessPromptFallback(prompt, _resumeSessionId);
-    } else {
-      // Truly empty invocation without a TTY — print usage and exit clean.
-      process.stderr.write(
-        'dirgha: no TTY detected. The interactive TUI requires a terminal.\n' +
-        '  - To run a one-shot prompt:  dirgha -p "your prompt"\n' +
-        '  - To see subcommands:        dirgha --help\n'
-      );
-      process.exit(0);
-    }
-  } else {
-    // Normal interactive launch: print update nudge once if available.
-    const _prompt = _filteredArgs.length > 0 ? _filteredArgs.join(' ') : undefined;
-    if (_updateNudge) process.stdout.write(_updateNudge);
-    import('./tui/index.js').then(m => m.startTUI(_prompt, _resumeSessionId, _maxBudgetUsd)).catch((e) => {
-      console.error(chalk.red(`\n✗ ${e instanceof Error ? e.message : String(e)}\n`));
-      process.exit(1);
-    });
-  }
+  });
 } else {
 
 // ---------------------------------------------------------------------------
@@ -341,17 +232,40 @@ program
   .name('dirgha')
   .description('Dirgha Code — AI coding agent by dirgha.ai')
   .version(_cliVersion, '-V, --version')
-  .hook('preAction', () => { if (_updateNudge) process.stdout.write(_updateNudge); });
+  .option('--json', 'Emit machine-readable JSON output where supported (CLI-Anything compliance)')
+  .hook('preAction', (thisCmd, actionCmd) => {
+    if (_updateNudge) process.stdout.write(_updateNudge);
+    const rootOpts = thisCmd.optsWithGlobals?.() ?? thisCmd.opts();
+    if (rootOpts.json) process.env['DIRGHA_JSON_OUTPUT'] = '1';
+    // Universal --json wrapper: works for every command, even those that
+    // don't use the emit() helper. Commands that emit natively can skip
+    // by setting globalThis.__DIRGHA_JSON_NATIVELY_EMITTED__ = true.
+    installJsonCaptureIfEnabled(actionCmd.name());
+  });
 
 program
   .command('login')
-  .description('Authenticate with your Dirgha account')
-  .option('--token <token>', 'Directly set auth token (headless / server use)')
-  .option('--email <email>', 'Email to store with token (used with --token)')
-  .option('--user-id <id>', 'User ID to store with token (used with --token)')
-  .action(async (opts: { token?: string; email?: string; userId?: string }) => {
+  .description('Sign in to Dirgha (device flow) or set a token (--token)')
+  .option('--token <token>', 'Use an API token from dirgha.ai/dashboard (headless)')
+  .option('--email <email>', 'Email to save with the token')
+  .option('--user-id <id>', 'User ID to save with the token')
+  .option('--browser', 'Auto-open the sign-in URL in your default browser')
+  .action(async (opts: { token?: string; email?: string; userId?: string; browser?: boolean }) => {
     const { loginCommand } = await import('./commands/login.js');
-    await loginCommand();
+    await loginCommand(opts);
+  });
+
+program
+  .command('signup')
+  .description('Create a new Dirgha account (opens browser)')
+  .action(async () => {
+    const { registerLoginCommand } = await import('./commands/login.js');
+    // registerLoginCommand also wires `signup`; run it via a throwaway commander.
+    const { Command } = await import('commander');
+    const p = new Command();
+    registerLoginCommand(p);
+    const sub = p.commands.find((c: any) => c.name() === 'signup');
+    if (sub) await (sub as any)._actionHandler([{}, p]);
   });
 
 program
@@ -456,6 +370,7 @@ registerRollbackCommand(program);
 registerSprintCommand(program);
 registerRunCommand(program);
 registerSandboxConnectCommand(program);
+registerDAOCommands(program);
 registerMakeCommands(program);
 registerBrowserIntegration(program);  // Browser automation (navigate, click, type, snapshot, goto, extract, pdf)
 
@@ -482,10 +397,15 @@ program.addCommand(scanCommand);
 program.addCommand(mcpCommand);
 program.addCommand(researchCommand);
 program.addCommand(auditCommand);
-registerKnowledgeCommands(program);
+registerBuckyCommands(program);
+registerJoinMeshCommand(program);
 registerCompactCommand(program);
+registerMeshCommands(program);
 registerAnalyticsCommands(program);
 registerSmartExec(program);
+registerAskCommand(program);
+registerHubCommands(program);
+registerFleetCommands(program);
 
 program
   .command('eval')
@@ -557,88 +477,41 @@ program
         (name) => console.error(chalk.dim(`[tool] ${name}`)),
       );
       console.log(chalk.dim(`\nTokens used: ${tokensUsed.toLocaleString()}`));
+      process.exit(0);
     } catch (e: any) {
       console.error(chalk.red(e.message ?? String(e)));
       process.exit(1);
     }
   });
 
-// ── CLI-Hub plugin commands ──────────────────────────────────────────────────
-const hubCmd = program
-  .command('hub')
-  .description('Plugin registry and management (CLI-Hub)');
-
-hubCmd
-  .command('search <query>')
-  .description('Search for plugins')
-  .option('-c, --category <cat>', 'Filter by category')
-  .action(async (query, opts) => {
-    const { hubSearch } = await import('./hub/commands.js');
-    const result = await hubSearch(query, opts.category);
-    console.log(result.text);
-    process.exit(result.exitCode);
+// __dump_spec — introspect commander tree for auto-SKILL.md generation
+if (_filteredArgs[0] === '__dump_spec') {
+  const walk = (c: any): any => ({
+    name: c.name(),
+    description: c.description(),
+    args: (c.registeredArguments ?? []).map((a: any) => ({
+      name: a.name(),
+      required: a.required,
+      type: 'string',
+    })),
+    flags: (c.options ?? []).map((o: any) => ({
+      name: o.long?.replace(/^--/, '') ?? o.short?.replace(/^-/, ''),
+      short: o.short?.replace(/^-/, ''),
+      type: o.flags.includes('<') ? 'string' : o.flags.includes('[') ? 'string' : 'boolean',
+      description: o.description,
+    })),
+    subcommands: (c.commands ?? []).map(walk),
   });
-
-hubCmd
-  .command('install <name>')
-  .description('Install a plugin')
-  .option('-v, --version <ver>', 'Specific version')
-  .option('-f, --force', 'Force reinstall')
-  .action(async (name, opts) => {
-    const { hubInstall } = await import('./hub/commands.js');
-    const result = await hubInstall(name, opts);
-    console.log(result.text);
-    process.exit(result.exitCode);
-  });
-
-hubCmd
-  .command('list')
-  .description('List available or installed plugins')
-  .option('-i, --installed', 'Show only installed plugins')
-  .action(async (opts) => {
-    const { hubList } = await import('./hub/commands.js');
-    const result = await hubList(opts.installed);
-    console.log(result.text);
-    process.exit(result.exitCode);
-  });
-
-hubCmd
-  .command('remove <name>')
-  .description('Remove an installed plugin')
-  .action(async (name) => {
-    const { hubRemove } = await import('./hub/commands.js');
-    const result = await hubRemove(name);
-    console.log(result.text);
-    process.exit(result.exitCode);
-  });
-
-hubCmd
-  .command('info <name>')
-  .description('Show plugin details')
-  .action(async (name) => {
-    const { hubInfo } = await import('./hub/commands.js');
-    const result = await hubInfo(name);
-    console.log(result.text);
-    process.exit(result.exitCode);
-  });
-
-// Subcommands register action callbacks that may return a promise. Commander
-// calls them then returns control here. Once all registered actions settle
-// we force-exit — many action callbacks print their output then would stall
-// for seconds waiting on long-lived timers (mesh heartbeats, bucky cron
-// registrations, update-verify HTTPS fetch, etc.) that were created at
-// module-load time and never meant to block exit. Short commands like
-// `dirgha status` used to hang for ~10s because of this.
-program.hook('postAction', async () => {
-  // setImmediate so any .then() continuations queued by the action have a
-  // chance to flush (e.g. final stdout writes).
-  setImmediate(() => process.exit(process.exitCode ?? 0));
-});
-if (!_fastPathClaimed) {
-  program.parseAsync(process.argv).catch((e) => {
-    console.error(chalk.red(`\n✗ ${e instanceof Error ? e.message : String(e)}\n`));
-    process.exit(1);
-  });
+  const spec = {
+    name: 'dirgha',
+    version: _cliVersion,
+    description: program.description(),
+    commands: program.commands.map(walk),
+  };
+  process.stdout.write(JSON.stringify(spec, null, 2));
+  process.exit(0);
 }
+
+program.parse(process.argv);
 
 } // end isSubcommand branch

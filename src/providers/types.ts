@@ -38,4 +38,6 @@ export interface CompletionResponse {
   };
 }
 
-export type SSEResult = { text: string | null; toolCall: { id: string; name: string; args: string } | null } | null;
+export type SSEResult =
+  | null
+  | { text: string | null; toolCall: { id: string; name: string; args: string } | null };

@@ -1,19 +1,5 @@
-// @ts-nocheck
 /**
- * tui/input/index.ts — Barrel exports for input system (split from InputBox).
+ * tui/input/index.ts — Input system barrel (pending split from InputBox)
+ * state.ts and display.ts are not yet extracted; nothing imports this file.
  */
-export {
-  initialState,
-  insertText,
-  moveLeft,
-  moveRight,
-  deleteBackward,
-  deleteForward,
-  historyUp,
-  historyDown,
-  addToHistory
-} from './state.js';
-
-export { renderInputLine, renderHint } from './display.js';
-
-export type { InputState, DisplayProps } from './state.js';
+export {};

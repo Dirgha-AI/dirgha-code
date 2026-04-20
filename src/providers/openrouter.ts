@@ -1,7 +1,7 @@
 /**
  * providers/openrouter.ts — OpenRouter provider (OpenAI-compatible, with streaming)
  */
-import { postJSON, streamJSON } from './http.js';
+import { postJSON, streamSSE } from './http.js';
 import { toOpenAITools } from './tools-format.js';
 import { toOpenAIMessages } from './messages.js';
 import type { Message, ModelResponse, ContentBlock } from '../types.js';
@@ -33,7 +33,7 @@ export async function callOpenRouter(
   if (onStream) {
     let textAccum = '';
     try {
-      await streamJSON(
+      const { toolUseBlocks, usage } = await streamSSE(
         'https://openrouter.ai/api/v1/chat/completions',
         headers,
         payload,
@@ -41,9 +41,13 @@ export async function callOpenRouter(
       );
       const content: ContentBlock[] = [];
       if (textAccum) content.push({ type: 'text', text: textAccum });
-      return { content };
-    } catch {
-      // Fall through to non-streaming on stream failure
+      content.push(...toolUseBlocks);
+      return { 
+        content,
+        usage: usage ? { input_tokens: usage.prompt_tokens, output_tokens: usage.completion_tokens } : undefined
+      };
+    } catch (e) {
+      // Fall through to non-streaming on stream failure (e.g. provider doesn't support streaming)
     }
   }
 

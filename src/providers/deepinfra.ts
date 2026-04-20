@@ -53,7 +53,6 @@ export const DEEPINFRA_MODELS = {
   'microsoft/WizardLM-2-8x22B': { context: 65536, description: 'Microsoft WizardLM 2' },
   'Qwen/Qwen2.5-72B-Instruct': { context: 32768, description: 'Qwen 2.5 72B' },
   'deepseek-ai/DeepSeek-R1': { context: 64000, description: 'DeepSeek R1' },
-  'NousResearch/Hermes-3-Llama-3.1-405B': { context: 128000, description: 'Nous Hermes 3 405B' },
   'nvidia/Llama-3.1-Nemotron-70B-Instruct': { context: 131072, description: 'NVIDIA Nemotron 70B' },
   '01-ai/Yi-34B-Chat': { context: 4096, description: '01.AI Yi 34B' },
 };

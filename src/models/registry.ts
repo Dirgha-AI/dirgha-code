@@ -191,7 +191,7 @@ export const MODEL_REGISTRY: ModelInfo[] = [
     capabilities: { vision: true, functionCalling: true, reasoning: true, streaming: true, maxTokens: 128000, contextWindow: 1000000 },
     pricing: { inputPer1k: 0.015, outputPer1k: 0.075 },
     tags: ['byok', 'premium'],
-    fallback: ['qwen/qwen3-coder:free'],
+    fallback: ['openrouter/elephant-alpha', 'qwen/qwen3-coder:free'],
   },
   {
     id: 'openai/gpt-5.4',
@@ -201,6 +201,16 @@ export const MODEL_REGISTRY: ModelInfo[] = [
     capabilities: { vision: true, functionCalling: true, reasoning: true, streaming: true, maxTokens: 32768, contextWindow: 400000 },
     pricing: { inputPer1k: 0.005, outputPer1k: 0.02 },
     tags: ['byok', 'premium'],
+    fallback: ['openrouter/elephant-alpha', 'qwen/qwen3-coder:free'],
+  },
+  {
+    id: 'openrouter/elephant-alpha',
+    name: 'Elephant Alpha (OpenRouter)',
+    provider: 'openrouter',
+    description: 'Extremely fast 100B stealth model optimized for coding',
+    capabilities: { vision: true, functionCalling: true, reasoning: true, streaming: true, maxTokens: 32768, contextWindow: 256000 },
+    pricing: { inputPer1k: 0, outputPer1k: 0 },
+    tags: ['free', 'coding', 'fast'],
     fallback: ['qwen/qwen3-coder:free'],
   },
   {

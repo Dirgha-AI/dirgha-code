@@ -1,9 +1,9 @@
 /**
  * providers/fireworks.ts — Fireworks AI provider (OpenAI-compatible)
  */
-import { postJSON } from './http.js';
+import { postJSON, streamSSE } from './http.js';
 import { toOpenAITools } from './tools-format.js';
-import type { Message, ModelResponse } from '../types.js';
+import type { Message, ModelResponse, ContentBlock } from '../types.js';
 import { normaliseOpenAI } from './normalise.js';
 
 /**
@@ -78,24 +78,44 @@ export async function callFireworks(
 ): Promise<ModelResponse> {
   const apiKey = process.env['FIREWORKS_API_KEY']!;
 
-  // Always use non-streaming so tool calls are properly normalised.
-  // The streaming path discards tool_call chunks, causing silent "no response".
-  const data = await postJSON('https://api.fireworks.ai/inference/v1/chat/completions', {
-    Authorization: `Bearer ${apiKey}`,
-  }, {
+  const payload = {
     model,
     messages: [{ role: 'system', content: systemPrompt }, ...toOpenAIMessages(messages)],
     max_tokens: 8192,
     tools: toOpenAITools(),
     tool_choice: 'auto',
-    stream: false,
-  });
+  };
 
+  const headers = {
+    Authorization: `Bearer ${apiKey}`,
+  };
+
+  if (onStream) {
+    let textAccum = '';
+    try {
+      const { toolUseBlocks, usage } = await streamSSE(
+        'https://api.fireworks.ai/inference/v1/chat/completions',
+        headers,
+        payload,
+        (text) => { textAccum += text; onStream(text); },
+      );
+      const content: ContentBlock[] = [];
+      if (textAccum) content.push({ type: 'text', text: textAccum });
+      content.push(...toolUseBlocks);
+      return {
+        content,
+        usage: usage ? { input_tokens: usage.prompt_tokens, output_tokens: usage.completion_tokens } : undefined
+      };
+    } catch (e) {
+      // Fall through to non-streaming on stream failure
+    }
+  }
+
+  const data = await postJSON('https://api.fireworks.ai/inference/v1/chat/completions', headers, payload);
   const response = normaliseOpenAI(data);
 
   // For pure-text responses, push text to the stream callback so the spinner
-  // stops and the REPL renders output (loop.ts only re-emits text when tool
-  // blocks are present, so there is no double-emission here).
+  // stops and the REPL renders output
   if (onStream) {
     const hasToolCalls = response.content.some(b => b.type === 'tool_use');
     if (!hasToolCalls) {

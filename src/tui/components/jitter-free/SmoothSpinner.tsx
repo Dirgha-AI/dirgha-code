@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * SmoothSpinner.tsx — 8fps smooth spinner (vs default 12.5fps)
  */
@@ -15,7 +14,7 @@ const FRAME_DELAY = 1000 / SMOOTH_FPS;
 export const SmoothSpinner = memo(function SmoothSpinner({
   text = 'Loading...',
   fps = SMOOTH_FPS,
-}: SmoothSpinnerProps): JSX.Element {
+}: SmoothSpinnerProps): React.JSX.Element {
   const [frame, setFrame] = useState(0);
 
   useEffect(() => {

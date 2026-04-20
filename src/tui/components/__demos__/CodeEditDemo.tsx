@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * CodeEditDemo.tsx — Demonstration of transparent code editing UI
  * 
@@ -90,7 +89,7 @@ export const logger = createLogger({
 ];
 
 // Demo component showing the Gemini-style interface
-function Demo(): JSX.Element {
+function Demo(): React.JSX.Element {
   return (
     <Box flexDirection="column" padding={1}>
       {/* Narrative/thoughts OUTSIDE round boxes */}

@@ -21,16 +21,14 @@ const ALLOWLISTS: Record<AgentType, string[]> = {
   custom:   [], // caller provides tools list
 };
 
-const TOOL_MANDATE = '\n\nCRITICAL: You MUST use your tools to act. Do NOT narrate what you plan to do, do NOT output JSON, do NOT output Python dicts. Call the tools directly. If you cannot call a tool, say so briefly and stop.';
-
 /** Per-type system prompts */
 const SYSTEM_PROMPTS: Record<AgentType, string> = {
-  explore:  'You are a codebase explorer. Search files, read code, and report findings. Do NOT modify any files.' + TOOL_MANDATE,
-  plan:     'You are a technical planner. Analyze the codebase and web resources, then produce a step-by-step implementation plan with file paths and specific changes needed.' + TOOL_MANDATE,
-  verify:   'You are a code verifier. Read the relevant code and run tests/checks to verify correctness. Report pass/fail with evidence.' + TOOL_MANDATE,
-  code:     'You are a coding agent. Implement the requested changes by reading, writing, and editing files. Run tests after changes. Be precise and minimal.' + TOOL_MANDATE,
-  research: 'You are a research agent. Search the web, browse pages, and read files to gather information. Summarize findings concisely.' + TOOL_MANDATE,
-  custom:   'You are a focused sub-agent. Complete the task using only your allowed tools.' + TOOL_MANDATE,
+  explore:  'You are a codebase explorer. Search files, read code, and report findings. Do NOT modify any files.',
+  plan:     'You are a technical planner. Analyze the codebase and web resources, then produce a step-by-step implementation plan with file paths and specific changes needed.',
+  verify:   'You are a code verifier. Read the relevant code and run tests/checks to verify correctness. Report pass/fail with evidence.',
+  code:     'You are a coding agent. Implement the requested changes by reading, writing, and editing files. Run tests after changes. Be precise and minimal.',
+  research: 'You are a research agent. Search the web, browse pages, and read files to gather information. Summarize findings concisely.',
+  custom:   'You are a focused sub-agent. Complete the task using only your allowed tools.',
 };
 
 const DEFAULT_MAX_ITERATIONS = 10;
@@ -43,14 +41,6 @@ export interface SpawnAgentInput {
   model?: string;
 }
 
-// Process-wide counter so we can bound the total number of live sub-agents.
-// `spawn_agent` itself is never on any allowlist, but a 'custom' sub-agent
-// with a caller-supplied `tools: ['spawn_agent']` could recurse. Combined
-// with DEPTH tracked via env var, this caps the damage.
-const MAX_CONCURRENT_AGENTS = 4;
-const MAX_SPAWN_DEPTH = 3;
-let liveAgents = 0;
-
 export async function spawnAgent(
   input: SpawnAgentInput,
   parentModel: string,
@@ -59,28 +49,8 @@ export async function spawnAgent(
   const { type = 'explore', task, tools, model } = input;
   if (!task) return { tool: 'spawn_agent', result: '', error: 'task is required' };
 
-  // Depth guard: the process-wide depth counter lives in DIRGHA_SPAWN_DEPTH
-  // so children inherit it through the env. First-level agent sees "1",
-  // second-level "2", etc. Reject past MAX_SPAWN_DEPTH to stop recursion.
-  const currentDepth = parseInt(process.env['DIRGHA_SPAWN_DEPTH'] ?? '0', 10) || 0;
-  if (currentDepth >= MAX_SPAWN_DEPTH) {
-    return { tool: 'spawn_agent', result: '', error: `spawn_agent depth limit reached (${MAX_SPAWN_DEPTH}). Refactor the task into fewer levels.` };
-  }
-  // Concurrent guard: even within one depth level, a parent could spawn 100
-  // children in a single turn. Cap it so we don't exhaust PIDs/sockets/tokens.
-  if (liveAgents >= MAX_CONCURRENT_AGENTS) {
-    return { tool: 'spawn_agent', result: '', error: `too many live sub-agents (${MAX_CONCURRENT_AGENTS}). Wait for one to finish.` };
-  }
-
-  // Never allow a sub-agent to spawn further sub-agents, regardless of type
-  // or caller-supplied allowlist — belt-and-braces against the recursion
-  // exploit the audits flagged as P0.
-  const safeAllowlist = (type === 'custom' ? (tools ?? []) : ALLOWLISTS[type])
-    .filter(t => t !== 'spawn_agent');
-  const allowlist = safeAllowlist;
+  const allowlist = type === 'custom' ? (tools ?? []) : ALLOWLISTS[type];
   const resolvedModel = model ?? parentModel;
-  liveAgents++;
-  process.env['DIRGHA_SPAWN_DEPTH'] = String(currentDepth + 1);
   const maxIter = type === 'code' ? CODE_MAX_ITERATIONS : DEFAULT_MAX_ITERATIONS;
 
   const systemPrompt = `${SYSTEM_PROMPTS[type]}
@@ -90,41 +60,34 @@ Do NOT use tools outside the allowed list.`;
   const history: Message[] = [{ role: 'user', content: task }];
   const output: string[] = [];
 
-  try {
-    for (let i = 0; i < maxIter; i++) {
-      let response: any;
-      try {
-        response = await callGateway(history, systemPrompt, resolvedModel, (t) => { output.push(t); });
-      } catch (err) {
-        return { tool: 'spawn_agent', result: output.join(''), error: String(err) };
-      }
-
-      const toolBlocks = response.content.filter((b: any) => b.type === 'tool_use');
-      const textBlocks = response.content.filter((b: any) => b.type === 'text');
-      for (const b of textBlocks) if (b.text) output.push(b.text);
-
-      if (toolBlocks.length === 0) break;
-      history.push({ role: 'assistant', content: response.content });
-
-      for (const block of toolBlocks) {
-        const name: string = block.name ?? '';
-        if (!allowlist.includes(name)) {
-          history.push({ role: 'tool', tool_call_id: block.id ?? '', content: `Tool '${name}' not permitted for ${type} agent.` });
-          continue;
-        }
-        onProgress?.(`[${type}] Using tool: ${name}`);
-        const result = await executeToolAsync(name, block.input ?? {});
-        history.push({ role: 'tool', tool_call_id: block.id ?? '', content: result.error ? `Error: ${result.error}` : result.result });
-      }
+  for (let i = 0; i < maxIter; i++) {
+    let response: any;
+    try {
+      response = await callGateway(history, systemPrompt, resolvedModel, (t) => { output.push(t); });
+    } catch (err) {
+      return { tool: 'spawn_agent', result: output.join(''), error: String(err) };
     }
 
-    return { tool: 'spawn_agent', result: output.join('\n') };
-  } finally {
-    // Always restore counters — a throw mid-iteration must not leak a slot
-    // or leave DIRGHA_SPAWN_DEPTH incremented for sibling calls.
-    liveAgents = Math.max(0, liveAgents - 1);
-    process.env['DIRGHA_SPAWN_DEPTH'] = String(currentDepth);
+    const toolBlocks = response.content.filter((b: any) => b.type === 'tool_use');
+    const textBlocks = response.content.filter((b: any) => b.type === 'text');
+    for (const b of textBlocks) if (b.text) output.push(b.text);
+
+    if (toolBlocks.length === 0) break;
+    history.push({ role: 'assistant', content: response.content });
+
+    for (const block of toolBlocks) {
+      const name: string = block.name ?? '';
+      if (!allowlist.includes(name)) {
+        history.push({ role: 'tool', tool_call_id: block.id ?? '', content: `Tool '${name}' not permitted for ${type} agent.` });
+        continue;
+      }
+      onProgress?.(`[${type}] Using tool: ${name}`);
+      const result = await executeToolAsync(name, block.input ?? {});
+      history.push({ role: 'tool', tool_call_id: block.id ?? '', content: result.error ? `Error: ${result.error}` : result.result });
+    }
   }
+
+  return { tool: 'spawn_agent', result: output.join('\n') };
 }
 
 /** Plan→Code→Verify pipeline (3-phase orchestration) */

@@ -3,13 +3,12 @@ import { readFileSync, writeFileSync, mkdirSync, unlinkSync, statSync } from 'no
 import { basename } from 'node:path';
 import { resolve, dirname } from 'node:path';
 import { fileTypeFromBuffer } from 'file-type';
-import { spawn } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import type { ToolResult } from '../types.js';
 import { fuzzyEditFileTool } from './patch.js';
 import { getCachedFile, setCachedFile, invalidateFileCache, recordWrite } from '../utils/session-cache.js';
 import { isReadOnlyPath } from '../permission/judge.js';
-import { computeLineDiff } from './diff-util.js';
 
 const LOCKFILES = new Set(['package-lock.json', 'pnpm-lock.yaml', 'yarn.lock', 'Cargo.lock', 'Gemfile.lock', 'poetry.lock', 'go.sum']);
 const HEAD_LINES = 120;
@@ -97,19 +96,10 @@ export function writeFileTool(input: Record<string, any>): ToolResult {
     if (guard) return { tool: 'write_file', result: '', error: guard };
     mkdirSync(dirname(abs), { recursive: true });
     const content = input['content'] as string;
-    let prior = '';
-    try { prior = readFileSync(abs, 'utf8'); } catch { /* new file */ }
     writeFileSync(abs, content, 'utf8');
     invalidateFileCache(abs);
     recordWrite(abs);
-    const { diff, added, removed } = computeLineDiff(prior, content);
-    return {
-      tool: 'write_file',
-      result: `Wrote ${Buffer.byteLength(content, 'utf8')} bytes to ${abs}`,
-      path: abs,
-      diff,
-      diffStats: { added, removed },
-    };
+    return { tool: 'write_file', result: `Wrote ${Buffer.byteLength(content, 'utf8')} bytes to ${abs}` };
   } catch (e) { return { tool: 'write_file', result: '', error: (e as Error).message }; }
 }
 
@@ -122,18 +112,10 @@ export function editFileTool(input: Record<string, any>): ToolResult {
     const oldStr = input['old_string'] as string;
     // Exact match first (fast path)
     if (original.includes(oldStr)) {
-      const updated = original.replace(oldStr, input['new_string'] as string);
-      writeFileSync(abs, updated, 'utf8');
+      writeFileSync(abs, original.replace(oldStr, input['new_string'] as string), 'utf8');
       invalidateFileCache(abs);
       recordWrite(abs);
-      const { diff, added, removed } = computeLineDiff(original, updated);
-      return {
-        tool: 'edit_file',
-        result: `Replaced 1 occurrence in ${abs}`,
-        path: abs,
-        diff,
-        diffStats: { added, removed },
-      };
+      return { tool: 'edit_file', result: `Replaced 1 occurrence in ${abs}` };
     }
     // Fall back to fuzzy matching
     const r = fuzzyEditFileTool(input);
@@ -151,41 +133,21 @@ export function editFileAllTool(input: Record<string, any>): ToolResult {
     const oldStr = input['old_string'] as string;
     const count = original.split(oldStr).length - 1;
     if (count === 0) return { tool: 'edit_file_all', result: '', error: 'old_string not found in file' };
-    const updated = original.split(oldStr).join(input['new_string'] as string);
-    writeFileSync(abs, updated, 'utf8');
+    writeFileSync(abs, original.split(oldStr).join(input['new_string'] as string), 'utf8');
     invalidateFileCache(abs);
     recordWrite(abs);
-    const { diff, added, removed } = computeLineDiff(original, updated);
-    return {
-      tool: 'edit_file_all',
-      result: `Replaced ${count} occurrence(s) in ${abs}`,
-      path: abs,
-      diff,
-      diffStats: { added, removed },
-    };
+    return { tool: 'edit_file_all', result: `Replaced ${count} occurrence(s) in ${abs}` };
   } catch (e) { return { tool: 'edit_file_all', result: '', error: (e as Error).message }; }
 }
 
-function runPatch(abs: string, patchFile: string, timeoutMs: number): Promise<{ code: number | null; stdout: string; stderr: string }> {
-  return new Promise((resolve) => {
-    const proc = spawn('patch', ['-p1', abs, patchFile], { stdio: ['ignore', 'pipe', 'pipe'] });
-    let stdout = ''; let stderr = '';
-    proc.stdout.on('data', (d: Buffer) => { stdout += d.toString(); });
-    proc.stderr.on('data', (d: Buffer) => { stderr += d.toString(); });
-    const timer = setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} }, timeoutMs);
-    proc.on('close', (code) => { clearTimeout(timer); resolve({ code, stdout, stderr }); });
-    proc.on('error', (e) => { clearTimeout(timer); resolve({ code: -1, stdout, stderr: stderr || String(e) }); });
-  });
-}
-
-export async function applyPatchTool(input: Record<string, any>): Promise<ToolResult> {
+export function applyPatchTool(input: Record<string, any>): ToolResult {
   try {
     const abs = resolve(input['path'] as string);
     const patchFile = `${tmpdir()}/dirgha_patch_${Date.now()}.patch`;
     writeFileSync(patchFile, input['patch'] as string, 'utf8');
-    const { code, stdout, stderr } = await runPatch(abs, patchFile, 10_000);
-    if (code === 0) return { tool: 'apply_patch', result: `Patch applied to ${abs}` };
-    return { tool: 'apply_patch', result: '', error: (stderr || stdout || 'patch failed').trim() };
+    const result = spawnSync('patch', ['-p1', abs, patchFile], { encoding: 'utf8', timeout: 10000 });
+    if (result.status === 0) return { tool: 'apply_patch', result: `Patch applied to ${abs}` };
+    return { tool: 'apply_patch', result: '', error: (result.stderr || result.stdout || 'patch failed').trim() };
   } catch (e) { return { tool: 'apply_patch', result: '', error: (e as Error).message }; }
 }
 

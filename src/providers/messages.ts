@@ -54,12 +54,33 @@ export function toOpenAIMessages(messages: Message[], systemPrompt: string): any
       const toolResults = blocks.filter(b => b.type === 'tool_result');
       if (toolResults.length > 0) {
         // Each tool_result → separate OpenAI 'tool' message
+        // Flatten array content to text since most OpenAI-compat APIs don't support
+        // multi-modal content in the 'tool' role.
         for (const tr of toolResults) {
-          out.push({ role: 'tool', tool_call_id: tr.tool_use_id, content: String(tr.content ?? '') });
+          let content: string;
+          if (Array.isArray(tr.content)) {
+            content = tr.content.filter((c: any) => c.type === 'text').map((c: any) => c.text).join('');
+          } else {
+            content = String(tr.content ?? '');
+          }
+          out.push({ role: 'tool', tool_call_id: tr.tool_use_id, content });
         }
       } else {
-        const text = blocks.filter(b => b.type === 'text').map(b => b.text).join('');
-        out.push({ role: 'user', content: text });
+        const hasImages = blocks.some(b => b.type === 'image');
+        if (hasImages) {
+          const parts: any[] = [];
+          for (const b of blocks) {
+            if (b.type === 'text') {
+              parts.push({ type: 'text', text: b.text });
+            } else if (b.type === 'image' && b.image) {
+              parts.push({ type: 'image_url', image_url: { url: `data:image/${b.image.format};base64,${b.image.data}` } });
+            }
+          }
+          out.push({ role: 'user', content: parts });
+        } else {
+          const text = blocks.filter(b => b.type === 'text').map(b => b.text).join('');
+          out.push({ role: 'user', content: text });
+        }
       }
       continue;
     }

@@ -35,7 +35,7 @@ export function SessionPicker({ sessions, onSelect, onCancel }: Props) {
   return (
     <Box flexDirection="column" borderStyle="single" borderColor={C.brand} paddingX={1} marginTop={1}>
       <Box paddingX={1} marginBottom={1}>
-        <Text color={C.brand} bold>◆ sessions</Text>
+        <Text color={C.brand} bold>* sessions</Text>
         <Text color={C.textDim}> ↑↓ navigate · Enter resume · Esc cancel</Text>
       </Box>
       {sessions.length === 0 && <Text color={C.textDim}>  (no saved sessions)</Text>}
@@ -45,13 +45,13 @@ export function SessionPicker({ sessions, onSelect, onCancel }: Props) {
         const date = s.updatedAt ? new Date(s.updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '';
         return (
           <Box key={s.id} gap={1}>
-            <Text color={active ? C.brand : C.textDim}>{active ? '▸' : ' '}</Text>
+            <Text color={active ? C.brand : C.textDim}>{active ? '>' : ' '}</Text>
             <Box flexDirection="column">
               <Text color={active ? C.textPrimary : C.textSecondary} bold={active}>
                 {s.title || s.id.slice(0, 8)}
               </Text>
               <Text color={C.textDim}>
-                {s.model.split('/').pop()?.slice(0, 20) ?? s.model}  ·  {tokStr} tok  ·  {date}
+                {s.model?.split('/').pop()?.slice(0, 20) ?? s.model ?? '—'}  ·  {tokStr} tok  ·  {date}
               </Text>
             </Box>
           </Box>

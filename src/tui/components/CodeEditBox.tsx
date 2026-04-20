@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * CodeEditBox.tsx — Transparent code editing visualization (Gemini-style)
  * 
@@ -180,7 +179,7 @@ interface SingleEditProps {
   index: number;
 }
 
-function SingleEdit({ edit, isExpanded, onToggle, showLineNumbers, index }: SingleEditProps): JSX.Element {
+function SingleEdit({ edit, isExpanded, onToggle, showLineNumbers, index }: SingleEditProps): React.JSX.Element {
   const { stdout } = useStdout();
   const cols = stdout?.columns ?? 80;
   const lang = edit.language || detectLanguage(edit.path);
@@ -241,7 +240,7 @@ function SingleEdit({ edit, isExpanded, onToggle, showLineNumbers, index }: Sing
                 {showLineNumbers && (
                   <Box marginRight={1}>
                     <Text color={C.textFaint} dimColor>
-                      {formatLineNumber((edit.lineStart || 1) + i, maxDigits)} │
+                      {formatLineNumber((edit.lineStart || 1) + i, maxDigits)} |
                     </Text>
                   </Box>
                 )}
@@ -280,7 +279,7 @@ export function CodeEditBox({
   maxHeight = 20,
   showLineNumbers = true,
   expandedByDefault = false 
-}: CodeEditBoxProps): JSX.Element | null {
+}: CodeEditBoxProps): React.JSX.Element | null {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => {
     if (expandedByDefault) return new Set(edits.map(e => e.id));
     return new Set();

@@ -1,4 +1,3 @@
-// @ts-nocheck
 // SPDX-License-Identifier: BUSL-1.1
 import { Command } from 'commander';
 import chalk from 'chalk';
@@ -29,8 +28,9 @@ export function registerBountiesCommand(program: Command): void {
         if (!res.ok) {
           console.log(chalk.yellow('Bounties backend unavailable — opening https://dirgha.ai/bounties'));
           const platform = process.platform;
-          const cmd = platform === 'darwin' ? 'open' : platform === 'win32' ? 'cmd /c start' : 'xdg-open';
-          execCmd(`${cmd} https://dirgha.ai/bounties`);
+          if (platform === 'darwin') execCmd('open', ['https://dirgha.ai/bounties']);
+          else if (platform === 'win32') execCmd('cmd', ['/c', 'start', 'https://dirgha.ai/bounties']);
+          else execCmd('xdg-open', ['https://dirgha.ai/bounties']);
           return;
         }
         
@@ -100,8 +100,9 @@ export function registerBountiesCommand(program: Command): void {
     .action((id) => {
       const url = `https://dirgha.ai/bounties/${id}`;
       const platform = process.platform;
-      const cmd = platform === 'darwin' ? 'open' : platform === 'win32' ? 'cmd /c start' : 'xdg-open';
-      execCmd(`${cmd} ${url}`);
+      if (platform === 'darwin') execCmd('open', [url]);
+      else if (platform === 'win32') execCmd('cmd', ['/c', 'start', url]);
+      else execCmd('xdg-open', [url]);
     });
 }
 

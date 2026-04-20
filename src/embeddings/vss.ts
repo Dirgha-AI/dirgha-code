@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * SQLite-VSS Integration
  * @module embeddings/vss
@@ -7,7 +6,7 @@
  * Zero-breaking-change: creates new vss_facts table, doesn't touch existing
  */
 
-import type { Database } from '../utils/sqlite.js';
+type Database = import('better-sqlite3').Database;
 
 let _vssLoaded = false;
 

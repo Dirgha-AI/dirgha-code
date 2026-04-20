@@ -18,7 +18,7 @@ describe('E2E: Provider & Model Detection', () => {
     const provider = getActiveProvider();
     const model = getDefaultModel();
     console.log(`  Provider: ${provider}, Model: ${model}`);
-    expect(['fireworks', 'anthropic', 'openrouter', 'groq', 'mistral', 'gateway']).toContain(provider);
+    expect(['fireworks', 'anthropic', 'openrouter', 'groq', 'mistral', 'gateway', 'nvidia']).toContain(provider);
     expect(model.length).toBeGreaterThan(0);
   });
 });

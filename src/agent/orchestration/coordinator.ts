@@ -138,11 +138,13 @@ export async function orchestrate(
       agentSlots[0]!.activeTasks++;
       onProgress?.(`  ▶ ${task.name} [${task.agentId ?? 'code'}]`);
 
+      const depContext = (task.dependsOn ?? [])
+        .map(id => outputs[id])
+        .filter(Boolean)
+        .join('\n\n---\n\n');
       const taskPrompt = [
         task.description,
-        outputs[task.dependsOn?.[0] ?? '']
-          ? `\n\nContext from previous step:\n${outputs[task.dependsOn[0]!]}`
-          : '',
+        depContext ? `\n\nContext from previous steps:\n${depContext}` : '',
       ].join('').trim();
 
       try {
@@ -167,21 +169,8 @@ export async function orchestrate(
       }
     };
 
-    // Kick off initial ready tasks
-    const initialReady = queue.getReady();
-    for (const task of sortByPriority(initialReady, tasks)) {
-      runTask(task);
-    }
-
-    // React to completed tasks → dispatch newly ready
-    queue.on('task:complete', () => {
-      for (const task of sortByPriority(queue.getReady(), tasks)) {
-        if (queue.getTask(task.id)?.status === 'pending') {
-          runTask(task);
-        }
-      }
-    });
-
+    // Bug 1 fix: register queue:done listener BEFORE dispatching any tasks so
+    // that fast/synchronous completions don't fire the event before we listen.
     queue.on('queue:done', () => {
       resolve({
         tasks: queue.getAllTasks(),
@@ -190,5 +179,23 @@ export async function orchestrate(
         durationMs: Date.now() - start,
       });
     });
+
+    // React to completed tasks → dispatch newly ready successors.
+    // Bug 4 fix: guard against tasks already transitioned out of 'pending'
+    // (e.g. started by a concurrent runTask call or cascade-cancelled).
+    queue.on('task:complete', () => {
+      for (const task of sortByPriority(queue.getReady(), tasks)) {
+        const status = queue.getTask(task.id)?.status;
+        if (status !== 'running' && status !== 'completed' && status !== 'failed' && status !== 'cancelled') {
+          runTask(task);
+        }
+      }
+    });
+
+    // Kick off initial ready tasks
+    const initialReady = queue.getReady();
+    for (const task of sortByPriority(initialReady, tasks)) {
+      runTask(task);
+    }
   });
 }

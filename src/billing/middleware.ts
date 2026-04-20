@@ -16,16 +16,42 @@ export interface BillingContext {
   userId: string;
   tier: string;
   sessionId: string;
+  recordUsage: (tokensOrObj: number | { tokens: number; costUsd?: number }) => void;
+  getTotalCost: () => number;
+  finalize: () => void;
 }
+
+const activeContexts = new Set<BillingContext>();
 
 export function createBillingContext(sessionId: string): BillingContext {
   const creds = readCredentials();
   const profile = readProfile();
-  return {
+  let totalCost = 0;
+
+  const ctx: BillingContext = {
     userId:   creds?.userId || 'local-user',
     tier:     profile?.tier || 'free',
     sessionId,
+    recordUsage: (tokensOrObj) => {
+      const cost = typeof tokensOrObj === 'object' ? (tokensOrObj.costUsd ?? 0) : 0;
+      totalCost += cost;
+      recordUsage(tokensOrObj, 0, profile?.tier || 'free');
+    },
+    getTotalCost: () => totalCost,
+    finalize: () => {
+      activeContexts.delete(ctx);
+    }
   };
+  activeContexts.add(ctx);
+  return ctx;
+}
+
+export function getAllActiveContexts(): BillingContext[] {
+  return Array.from(activeContexts);
+}
+
+export function onSessionEnd(ctx: BillingContext): void {
+  activeContexts.delete(ctx);
 }
 
 export async function preRequestCheck(

@@ -38,9 +38,7 @@ import { withModelFallback, isFallbackError } from './model-fallback.js';
 import { appendReflection, classifyTask, normalizeErrorSignature, type StepRecord } from './reflection.js';
 import { getSkillHints } from './skill-registry.js';
 import { logger } from '../utils/logger.js';
-import { redactSecrets, cleanStreamOutput } from './secrets.js';
-import { drainPendingUserMessages } from './pending-messages.js';
-import { setActiveSession, emitAgentEvent, finalizeAgentEvents } from './event-emit.js';
+import { redactSecrets } from './secrets.js';
 
 const MAX_ITERATIONS = 20;
 const REFLECTION_THRESHOLDS = [0.5, 0.8] as const; // inject reflection at 50% and 80%
@@ -69,27 +67,10 @@ export async function runAgentLoop(
   skillOverride?: string,
   options?: { maxTurns?: number; sessionId?: string; signal?: AbortSignal },
   onThinking?: (t: string) => void,
-  onToolResult?: (toolUseId: string, name: string, result: import('../types.js').ToolResult) => void,
+  onToolResult?: (toolUseId: string, name: string, result: string, isError: boolean) => void,
 ): Promise<{ messages: Message[]; tokensUsed: number; costUsd: number; traceLog: TraceEntry[] }> {
   // Initialize billing context
   const billing = createBillingContext(options?.sessionId ?? `session_${Date.now()}`);
-
-  // Live-stream agent events to the gateway so web clients can tail the
-  // session in real time. Session id is only set if the caller provided a
-  // UUID-shaped id; otherwise event posts would 404 on the server.
-  // Zero-metadata BYOK path: only stream events to the Dirgha gateway when
-  // the user is actually using Dirgha's gateway. BYOK sessions (user's own
-  // Anthropic/OpenAI/Fireworks key) must NOT ship prompts, tool calls, or
-  // thinking traces to api.dirgha.ai — it's their own data going to their
-  // own provider. Previously we emitted regardless of provider, which was
-  // a real privacy leak flagged in the security audit.
-  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  const { detectProvider } = await import('./gateway.js');
-  const activeProvider = detectProvider();
-  const usingGateway = activeProvider === 'gateway';
-  if (usingGateway && options?.sessionId && UUID_RE.test(options.sessionId)) {
-    setActiveSession(options.sessionId);
-  }
   
   // Pre-flight quota check
   const estimatedTokens = countTokensInMessages([...messages, { role: 'user', content: userInput }]);
@@ -131,13 +112,7 @@ export async function runAgentLoop(
   let tokensUsed = 0;
   let costUsdTotal = 0;
   const resolvedModel = model === 'auto' ? resolveModel(classifyQuery(userInput, messages)) : model;
-  // Defense-in-depth: redactSecrets strips API keys / tokens / private keys
-  // the user may have accidentally pasted into the prompt before the text
-  // goes to the LLM. Previously we only redacted outbound model text, not
-  // inbound user prompts — a leak if a user pasted a log containing their
-  // own Anthropic key while asking the agent to investigate.
-  const safeUserInput = redactSecrets(userInput);
-  const history: Message[] = [...messages, { role: 'user', content: safeUserInput }];
+  const history: Message[] = [...messages, { role: 'user', content: userInput }];
 
   // Reflection: track tool steps for self-improvement
   const reflectionSteps: StepRecord[] = [];
@@ -151,7 +126,6 @@ export async function runAgentLoop(
   let lastToolHadError = false;
   const _origOnTool = onTool;
   const reflectingOnTool = (name: string, input: Record<string, any>) => {
-    emitAgentEvent('tool_use', { name, input });
     _origOnTool(name, input);
     reflectionSteps.push({ tool: name, input, output: '', success: true, credit: 0, durationMs: 0 });
   };
@@ -161,23 +135,16 @@ export async function runAgentLoop(
   // Wrap onText to detect if streaming occurred (avoids double-emit for streaming providers)
   let textStreamedThisTurn = false;
   const trackingOnText = (t: string): void => {
-    const cleaned = cleanStreamOutput(redactSecrets(t));
-    if (!cleaned) return; // drop hallucinated JSON/narration artifacts
     textStreamedThisTurn = true;
-    emitAgentEvent('text', { text: cleaned });
-    onText(cleaned);
+    onText(redactSecrets(t));
   };
 
   const trackingOnThinking = (t: string): void => {
-    if (t) emitAgentEvent('thinking', { text: t });
     onThinking?.(t);
   };
 
   // Compact if too long (message count) or token-heavy
-  // Bursty-request: compact earlier (B3). 40 msgs / 60k tokens leaves
-  // headroom for this turn's tool outputs; waiting until 60 / 80k was
-  // cutting it close on turns with multiple long tool_results.
-  const compactionNeeded = history.length > 40 || countTokensInMessages(history) > 60_000;
+  const compactionNeeded = history.length > 60 || countTokensInMessages(history) > 80_000;
   if (compactionNeeded) {
     try {
       const { compactMessages } = await import('./compaction.js');
@@ -198,15 +165,6 @@ export async function runAgentLoop(
   for (let i = 0; i < maxIterations; i++) {
     // Check abort signal
     if (options?.signal?.aborted) { abortFired = true; break; }
-
-    // Drain any user messages sent while the previous turn was running. These
-    // arrive as fresh user turns so the model sees them on this very iteration.
-    // Messages are never queued for "later" — each one hits the next LLM call.
-    const pending = drainPendingUserMessages();
-    if (pending.length > 0) {
-      for (const msg of pending) history.push(msg);
-      onText(`\n[${pending.length} user message${pending.length > 1 ? 's' : ''} injected mid-flight]\n`);
-    }
 
     // Inject reflection prompt at 50% and 80% thresholds
     for (const threshold of REFLECTION_THRESHOLDS) {
@@ -301,68 +259,62 @@ export async function runAgentLoop(
     for (const block of toolBlocks) loopDetector.record(block.name ?? '', (block as any).input ?? {});
 
     // Execute all tools in parallel
-    const toolResultBlocks = await raceAbort(executeAllTools(toolBlocks, ctx, turnModel, onTool, onToolResult), options?.signal);
+    const toolResultBlocks = await raceAbort(executeAllTools(toolBlocks, ctx, turnModel, onTool), options?.signal);
 
-    // Update reflection steps with actual tool outputs and error status
+    // Process tool results: update reflection, trace log, and notify TUI (one pass)
     const toolResultArr = Array.isArray(toolResultBlocks) ? toolResultBlocks : [];
     for (const resultBlock of toolResultArr) {
       const rb = resultBlock as any;
-      if (rb?.type !== 'tool_result') continue;
-      // Find the matching step (last pushed step for this tool_use_id)
-      const step = reflectionSteps.slice().reverse().find(
-        s => !s.output && rb.tool_use_id && toolBlocks.some(b => (b as any).id === rb.tool_use_id && (b as any).name === s.tool)
-      );
-      if (step) {
-        const contentText = Array.isArray(rb.content)
-          ? rb.content.filter((c: any) => c.type === 'text').map((c: any) => c.text).join('').slice(0, 500)
-          : typeof rb.content === 'string' ? rb.content.slice(0, 500) : '';
-        step.output = contentText;
-        const isError = rb.is_error === true;
-        step.success = !isError;
-        if (isError) {
-          lastToolHadError = true;
-          step.credit = -1;
-          lastErrorText = contentText;
-        } else {
-          step.credit = 1;
-        }
-      }
-    }
-
-    // Append to trace log for replanning context
-    for (const toolResult of toolResultArr) {
-      const rb = toolResult as any;
       if (rb?.type !== 'tool_result') continue;
       const matchingBlock = toolBlocks.find((b: any) => b.id === rb.tool_use_id);
       const contentText: string = Array.isArray(rb.content)
         ? rb.content.filter((c: any) => c.type === 'text').map((c: any) => c.text).join('')
         : typeof rb.content === 'string' ? rb.content : '';
-      emitAgentEvent('tool_result', {
-        tool_use_id: rb.tool_use_id,
-        name: matchingBlock?.name ?? 'unknown',
-        is_error: rb.is_error === true,
-        output: contentText.slice(0, 4_000),
-      });
+      const isError = rb.is_error === true || contentText.startsWith('Error:') || contentText.includes('[BLOCKED');
+
+      // Notify TUI/caller once
+      onToolResult?.(rb.tool_use_id, matchingBlock?.name ?? 'unknown', contentText, isError);
+
+      // Update reflection step
+      const step = reflectionSteps.slice().reverse().find(
+        s => !s.output && rb.tool_use_id && toolBlocks.some(b => (b as any).id === rb.tool_use_id && (b as any).name === s.tool)
+      );
+      if (step) {
+        step.output = contentText.slice(0, 500);
+        step.success = !isError;
+        step.credit = isError ? -1 : 1;
+        if (isError) { lastToolHadError = true; lastErrorText = contentText; }
+      }
+
+      // Trace log
       traceLog.push({
         tool: matchingBlock?.name ?? 'unknown',
         inputSummary: JSON.stringify(matchingBlock?.input ?? {}).slice(0, 100),
         outputSummary: contentText.slice(0, 180),
-        success: !contentText.startsWith('Error:') && !contentText.includes('[BLOCKED'),
+        success: !isError,
         error: contentText.startsWith('Error:') ? contentText.slice(7, 200) : undefined,
       });
     }
 
     history.push({ role: 'user', content: toolResultBlocks });
+
+    // Checkpoint after every tool call — long-horizon tasks survive crashes/OOM/rate-limits
+    if (options?.sessionId) {
+      try {
+        const ckptDir = join(homedir(), '.dirgha', 'checkpoints');
+        mkdirSync(ckptDir, { recursive: true });
+        writeFileSync(
+          join(ckptDir, `${options.sessionId}.json`),
+          JSON.stringify({ userInput, messages: history, model: resolvedModel, ts: Date.now(), turn: i }, null, 2)
+        );
+      } catch { /* checkpoint save non-fatal */ }
+    }
   }
 
   // Detect if we exhausted iterations without natural end_turn
   if (lastStopReason !== 'end_turn' && reflectionSteps.length > 0 && !abortFired) {
     maxIterationsHit = true;
   }
-
-  // Drain any pending agent events to the gateway — emits a 'done' marker so
-  // web subscribers' SSE stream knows the session completed cleanly.
-  await finalizeAgentEvents();
 
   // Sync memory after loop
   await syncMemoryAfterLoop(history, userInput);

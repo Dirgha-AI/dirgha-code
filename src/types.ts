@@ -11,16 +11,6 @@ export interface ToolCall {
   function: { name: string; arguments: string };
 }
 
-export interface DiffLine {
-  /** ' ' = context, '+' = added, '-' = removed */
-  kind: ' ' | '+' | '-';
-  /** Line number in OLD file (undefined for added lines) */
-  oldNum?: number;
-  /** Line number in NEW file (undefined for removed lines) */
-  newNum?: number;
-  text: string;
-}
-
 export interface ToolResult {
   tool: string;
   result: string;
@@ -28,12 +18,6 @@ export interface ToolResult {
   success?: boolean;
   output?: string;
   error?: string;
-  /** Structured line diff for file-editing tools — rendered red/green in TUI */
-  diff?: DiffLine[];
-  /** Summary counts for diff header: "Added N, removed M" */
-  diffStats?: { added: number; removed: number };
-  /** Absolute path of the edited file (for the diff header) */
-  path?: string;
 }
 
 export interface ModelResponse {
@@ -172,6 +156,12 @@ export const consoleStream: ReplStream = {
   write: (text: string) => process.stdout.write(text),
 };
 
+export interface DirghaAppProps {
+  initialPrompt?: string;
+  resumeSessionId?: string;
+  maxBudgetUsd?: number;
+}
+
 // ── v2 REPL Context ───────────────────────────────────────────────────────
 export interface ReplContext {
   messages: Message[];
@@ -198,4 +188,11 @@ export interface ReplContext {
   systemOverrides?: string[];
   pendingTeleport?: string;
   subAgents?: Array<{ id: string; type: string; status: string }>;
+}
+
+export interface DiffLine {
+  kind: '+' | '-' | ' ';
+  text: string;
+  oldNum?: number;
+  newNum?: number;
 }

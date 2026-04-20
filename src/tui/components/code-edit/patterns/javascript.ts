@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * javascript.ts — Syntax highlighting patterns for JavaScript
  */

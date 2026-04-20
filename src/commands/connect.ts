@@ -6,7 +6,7 @@
  */
 import { intro, outro, text, spinner, note } from '@clack/prompts';
 import color from 'picocolors';
-import { getAuthToken, getConfig } from '../utils/config';
+import { getAuthToken, getConfig } from '../utils/config.js';
 import WebSocket from 'ws';
 
 interface ConnectOptions {
@@ -174,7 +174,7 @@ Available commands:
       }
     });
     
-    ws.on('error', (err) => {
+    ws.on('error', (err: Error) => {
       console.error(color.red(`WebSocket error: ${err.message}`));
       reject(err);
     });
@@ -186,4 +186,5 @@ Available commands:
   });
 }
 
+export { connect as registerConnectCommand };
 export default connect;

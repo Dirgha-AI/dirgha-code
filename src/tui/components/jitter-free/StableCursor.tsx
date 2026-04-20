@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * StableCursor.tsx — Cursor that maintains stable position during updates
  */
@@ -11,7 +10,7 @@ import { C } from '../../colors.js';
 export const StableCursor = memo(function StableCursor({
   children,
   preservePosition = true,
-}: StableCursorProps): JSX.Element {
+}: StableCursorProps): React.JSX.Element {
   if (!preservePosition) {
     return <>{children}</>;
   }

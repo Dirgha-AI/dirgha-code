@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * SQLite Utilities - Native node:sqlite (Node 22.5+)
  * Replacement for better-sqlite3
@@ -17,8 +16,7 @@ export class Database {
 
   constructor(path: string, options: SQLiteOptions = {}) {
     this.db = new DatabaseSync(path, {
-      open: options.readonly ? 0 : 1,
-      create: options.create ?? true,
+      open: !options.readonly,
     });
   }
 
@@ -35,16 +33,18 @@ export class Database {
     this.db.close();
   }
 
-  transaction<T>(fn: () => T): T {
-    this.db.exec('BEGIN');
-    try {
-      const result = fn();
-      this.db.exec('COMMIT');
-      return result;
-    } catch (error) {
-      this.db.exec('ROLLBACK');
-      throw error;
-    }
+  transaction<TArgs extends unknown[], TReturn>(fn: (...args: TArgs) => TReturn): (...args: TArgs) => TReturn {
+    return (...args: TArgs): TReturn => {
+      this.db.exec('BEGIN');
+      try {
+        const result = fn(...args);
+        this.db.exec('COMMIT');
+        return result;
+      } catch (error) {
+        this.db.exec('ROLLBACK');
+        throw error;
+      }
+    };
   }
 }
 
@@ -56,24 +56,23 @@ export class Statement {
   }
 
   run(...params: unknown[]): { lastInsertRowid: number | bigint; changes: number } {
-    const result = this.stmt.run(...params);
+    const result = this.stmt.run(...(params as any[]));
     return {
       lastInsertRowid: result.lastInsertRowid ?? 0,
-      changes: result.changes ?? 0,
+      changes: Number(result.changes ?? 0),
     };
   }
 
   get<T = unknown>(...params: unknown[]): T | undefined {
-    return this.stmt.get(...params) as T | undefined;
+    return this.stmt.get(...(params as any[])) as T | undefined;
   }
 
   all<T = unknown>(...params: unknown[]): T[] {
-    const results = this.stmt.all(...params);
-    return results as T[];
+    return this.stmt.all(...(params as any[])) as T[];
   }
 
   iterate<T = unknown>(...params: unknown[]): IterableIterator<T> {
-    return this.stmt.iterate(...params) as IterableIterator<T>;
+    return this.stmt.iterate(...(params as any[])) as IterableIterator<T>;
   }
 }
 

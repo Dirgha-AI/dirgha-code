@@ -1,22 +1,13 @@
 /**
  * providers/dispatch.ts — Single entry point for LLM calls.
  *
- * Routes to the right provider based on model-id prefix (or env override),
- * handles transient network errors with retry-and-resume, and performs
- * cross-provider failover on 429 rate limits so parallel agents keep flowing
- * instead of thundering-herd-retrying a single exhausted account.
+ * Routes to the right provider based on either:
+ *   - DIRGHA_PROVIDER env override, or
+ *   - model-id prefix inference (claude-*, accounts/fireworks/*, provider/model, etc.)
  *
- * NO CLIENT-SIDE RATE LIMITING. Providers enforce server-side and return 429
- * when the account-wide quota is hit. Our answer to that is to walk a
- * cross-provider chain (NVIDIA → OpenRouter → Anthropic) with an equivalent
- * model on each hop, because each account has its own independent quota.
- * Client throttling here only creates extra latency — it can't change an
- * account-level limit that's already hit server-side.
- *
- * NVIDIA NIM (MiniMax M2.7) is the primary provider as of 2026-04-18 after
- * Fireworks Firepass was terminated. Fireworks stays in the switch{} below
- * so a user who sets FIREWORKS_API_KEY and picks a Fireworks model can still
- * reach it, but no automatic chain routes there.
+ * Wraps all calls in retry-with-exponential-backoff for network errors,
+ * so dropped connections (WiFi flap, VPN reconnect) resume transparently
+ * without losing the session.
  */
 import type { Message, ModelResponse } from '../types.js';
 import { getActiveProvider } from './detection.js';
@@ -34,8 +25,9 @@ import { callPerplexity } from './perplexity.js';
 import { callTogetherAI } from './togetherai.js';
 import { callXAI } from './xai.js';
 import { callDirgha } from './dirgha.js';
+import { acquire as acquireRateLimit } from './rate-limit.js';
 import { recordSuccess, recordFailure, isProviderHealthy } from './circuit-breaker.js';
-import { isAdminMode, resolveModelId } from './detection.js';
+import { globalLimiter, recordProviderRetryAfter } from './unified-rate-limiter.js';
 
 export type ProviderId =
   | 'anthropic' | 'openai' | 'fireworks' | 'openrouter' | 'nvidia' | 'gemini'
@@ -46,25 +38,44 @@ export type ProviderId =
 export function providerFromModelId(id: string): ProviderId | null {
   if (!id) return null;
 
-  if (id.startsWith('dirgha:')) return 'gateway';
+  // Fireworks: accounts/fireworks/routers/... or accounts/fireworks/models/...
   if (id.startsWith('accounts/fireworks/')) return 'fireworks';
+  // Anthropic
   if (id.startsWith('claude-')) return 'anthropic';
+  // NVIDIA NIM hosted orgs: minimaxai/, moonshotai/, mistralai/ + meta/nvidia/ibm/etc
+  // Note: mistralai/ (NVIDIA-hosted org prefix) ≠ mistral- (native Mistral API)
   if (id.startsWith('minimaxai/') || id.startsWith('moonshotai/') || id.startsWith('mistralai/')) return 'nvidia';
   if (/^(meta|nvidia|ibm|microsoft|baichuan|writer)\//.test(id) && !id.includes(':')) return 'nvidia';
+  // xAI
   if (id.startsWith('grok-') || id.startsWith('xai/')) return 'xai';
+  // Gemini — handle new 3.x naming + legacy 2.x
   if (id.startsWith('gemini-') || id.startsWith('google/gemini')) return 'gemini';
+  // OpenAI direct — gpt-5.4, gpt-5, o3, o4-mini etc.
   if (/^(gpt-|o\d|text-|dall-e|whisper-)/.test(id)) return 'openai';
+  // Groq — versatile/instant suffixes + explicit groq models
   if ((id.endsWith('-versatile') || id.endsWith('-instant') || id.startsWith('qwen-qwen3-') || id.startsWith('meta-llama/llama-4-scout')) && !id.includes(':')) return 'groq';
+  // Mistral native
   if (id.startsWith('mistral-') || id.startsWith('codestral-') || id.startsWith('open-mistral')) return 'mistral';
+  // Perplexity
   if (id.startsWith('llama-3.1-sonar') || id.startsWith('sonar-')) return 'perplexity';
+  // Cohere
   if (id.startsWith('command-')) return 'cohere';
+  // Together AI
   if (id.startsWith('together/') || id.startsWith('togetherai/')) return 'togetherai';
+  // DeepInfra
   if (id.startsWith('deepinfra/')) return 'deepinfra';
+  // OpenRouter: "provider/model" or ":free"/":nitro" tag
   if (id.includes('/') || id.includes(':')) return 'openrouter';
   return null;
 }
 
-/** Pick provider. Model-id inference is authoritative. */
+/** Pick provider. Model-id inference is authoritative: `qwen/qwen3-coder:free`
+ *  must always go to OpenRouter even if DIRGHA_PROVIDER=fireworks, otherwise
+ *  cross-provider fallback routes to the wrong endpoint.
+ *  
+ *  FIX P0-ISSUE 1.1: Bare model IDs (e.g., "llama3") are now rejected with
+ *  helpful error instead of ambiguous routing.
+ */
 export function providerForModel(model: string): ProviderId {
   const inferred = providerFromModelId(model);
   if (inferred) return inferred;
@@ -73,191 +84,72 @@ export function providerForModel(model: string): ProviderId {
   return getActiveProvider() as ProviderId;
 }
 
-/** True transient network errors — per-connection, retry same provider. */
-const NETWORK_PATTERNS = [
+/** Errors that should be retried in place on the same provider/model.
+ *  429/503 included — Fireworks unlimited plan bursts can momentarily 429,
+ *  and the right response is wait-and-retry, not drop off Kimi. */
+const TRANSIENT_PATTERNS = [
   'econnreset', 'enotfound', 'etimedout', 'econnrefused', 'epipe',
   'fetch failed', 'network error', 'socket hang up', 'aborted',
   'und_err_socket', 'und_err_connect_timeout', 'und_err_headers_timeout',
-  '502', 'bad gateway', '503', 'service unavailable', 'overloaded', 'capacity',
+  '429', 'rate limit', 'rate_limit', 'too many requests',
+  '503', 'service unavailable', 'overloaded', 'capacity',
+  '502', 'bad gateway',
 ];
-const RATE_LIMIT_PATTERNS = ['429', 'rate limit', 'rate_limit', 'too many requests'];
 
-function msgOf(err: unknown): string {
-  return (err instanceof Error ? err.message : String(err)).toLowerCase();
+function isTransient(err: unknown): boolean {
+  const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  return TRANSIENT_PATTERNS.some(p => msg.includes(p));
 }
-function isNetworkTransient(err: unknown): boolean {
-  const m = msgOf(err);
-  return NETWORK_PATTERNS.some(p => m.includes(p));
-}
+
 function is429(err: unknown): boolean {
-  const m = msgOf(err);
-  return RATE_LIMIT_PATTERNS.some(p => m.includes(p));
+  const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  return msg.includes('429') || msg.includes('rate limit') || msg.includes('rate_limit') || msg.includes('too many requests');
 }
+
 function parseRetryAfterMs(msg: string): number | null {
   const m = /retry[-_ ]?after[:\s]+(\d+(?:\.\d+)?)/i.exec(msg);
   if (!m) return null;
   const seconds = parseFloat(m[1]!);
   if (!Number.isFinite(seconds) || seconds <= 0) return null;
-  return Math.min(seconds * 1000, 30_000);
-}
-const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
-
-/**
- * Cross-provider fallback chain keyed off model family. Each hop is an
- * independent billing account — walking the chain on 429 bypasses the
- * per-account quota without waiting. Only entries whose API key is
- * present in env are included.
- */
-function buildFallbackChain(requestedModel: string): Array<{ provider: ProviderId; model: string }> {
-  const chain: Array<{ provider: ProviderId; model: string }> = [];
-  // Resolve dirgha: aliases to real model IDs before building chain
-  const effectiveModel = resolveModelId(requestedModel);
-  const primary = { provider: providerForModel(effectiveModel), model: effectiveModel };
-  chain.push(primary);
-
-  const hasNV = !!process.env['NVIDIA_API_KEY'];
-  const hasOR = !!process.env['OPENROUTER_API_KEY'];
-  const hasAN = !!process.env['ANTHROPIC_API_KEY'] || !!process.env['CLAUDE_API_KEY'];
-
-  // Dedup by (provider, model) tuple so we can chain MULTIPLE NVIDIA models
-  // on the same key — e.g. MiniMax M2.7 primary → Kimi K2 fallback when M2.7
-  // is wedged server-side. Deduping by provider alone would collapse that.
-  const push = (provider: ProviderId, model: string) => {
-    if (chain.some(c => c.provider === provider && c.model === model)) return;
-    chain.push({ provider, model });
-  };
-
-  const m = effectiveModel.toLowerCase();
-
-  // ADMIN MODE still gets the in-provider fallback — Salik's MiniMax M2.7
-  // endpoint currently returns 502/timeouts, so we need Kimi K2 as the
-  // automatic next hop on the same NVIDIA key. Cross-provider is still off
-  // in admin mode (no OpenRouter/Anthropic hops), matching the "stay on
-  // primary" intent without trapping the CLI on a dead M2.7.
-  if (isAdminMode()) {
-    if (primary.provider === 'nvidia' && hasNV) {
-      if (m.includes('minimax')) push('nvidia', 'moonshotai/kimi-k2-instruct-0905');
-      else if (m.includes('kimi') || m.includes('moonshot')) push('nvidia', 'minimaxai/minimax-m2.5');
-    }
-    return chain;
-  }
-
-  // Kimi / MiniMax family — canonical chain:
-  //   NVIDIA M2.7 (user's preferred default)  →
-  //   NVIDIA Kimi K2 (same key, sub-second, picks up when M2.7 is down) →
-  //   NVIDIA M2.5 (MiniMax capability, different revision — in case Kimi is down too) →
-  //   OpenRouter Kimi → Anthropic
-  if (m.includes('kimi') || m.includes('moonshot') || m.includes('minimax') || m.includes('dirgha:kimi') || m.includes('dirgha:minimax')) {
-    if (hasNV) {
-      push('nvidia', 'minimaxai/minimax-m2.7');
-      push('nvidia', 'moonshotai/kimi-k2-instruct-0905');
-      push('nvidia', 'minimaxai/minimax-m2.5');
-    }
-    if (hasOR) push('openrouter', 'moonshotai/kimi-k2.5');
-    if (hasAN) push('anthropic', 'claude-sonnet-4-6');
-    return chain;
-  }
-
-  // Claude family: Anthropic → OpenRouter mirror → NVIDIA MiniMax M2.7 → Kimi K2
-  if (m.includes('claude') || primary.provider === 'anthropic') {
-    if (hasOR) push('openrouter', requestedModel.startsWith('anthropic/') ? requestedModel : `anthropic/${requestedModel}`);
-    if (hasNV) {
-      push('nvidia', 'minimaxai/minimax-m2.7');
-      push('nvidia', 'moonshotai/kimi-k2-instruct-0905');
-    }
-    return chain;
-  }
-
-  // NVIDIA-hosted primary (non-MiniMax/Kimi model like llama-4): try the
-  // primary model, then same-key MiniMax, then same-key Kimi, then OpenRouter.
-  if (primary.provider === 'nvidia') {
-    if (hasNV) {
-      push('nvidia', 'minimaxai/minimax-m2.7');
-      push('nvidia', 'moonshotai/kimi-k2-instruct-0905');
-    }
-    if (hasOR) push('openrouter', 'moonshotai/kimi-k2.5');
-    return chain;
-  }
-
-  // Generic: OpenRouter + NVIDIA M2.7 + NVIDIA Kimi K2. No Fireworks hop —
-  // Firepass is gone, other Fireworks models bill per-token.
-  if (hasOR && primary.provider !== 'openrouter') push('openrouter', requestedModel);
-  if (hasNV) {
-    push('nvidia', 'minimaxai/minimax-m2.7');
-    push('nvidia', 'moonshotai/kimi-k2-instruct-0905');
-  }
-
-  return chain;
+  return Math.min(seconds * 1000, 60_000); // cap at 60s
 }
 
-function callProvider(
+async function withNetworkRetry<T>(
+  fn: (attempt: number) => Promise<T>,
   provider: ProviderId,
-  model: string,
-  messages: Message[],
-  systemPrompt: string,
-  onStream?: (text: string) => void,
-  onThinking?: (text: string) => void,
-): Promise<ModelResponse> {
-  switch (provider) {
-    case 'anthropic':   return callAnthropic(messages, systemPrompt, model, onStream, onThinking);
-    case 'fireworks':   return callFireworks(messages, systemPrompt, model, onStream);
-    case 'openrouter':  return callOpenRouter(messages, systemPrompt, model, onStream);
-    case 'nvidia':      return callNvidia(messages, systemPrompt, model, onStream);
-    case 'gemini':      return callGemini(messages, systemPrompt, model, onStream);
-    case 'openai':      return callOpenAI(messages, systemPrompt, model, onStream);
-    case 'groq':        return callGroq(messages, systemPrompt, model, onStream);
-    case 'mistral':     return callMistral(messages, systemPrompt, model, onStream);
-    case 'cohere':      return callCohere(messages, systemPrompt, model, onStream);
-    case 'deepinfra':   return callDeepInfra(messages, systemPrompt, model, onStream);
-    case 'perplexity':  return callPerplexity(messages, systemPrompt, model, onStream);
-    case 'togetherai':  return callTogetherAI(messages, systemPrompt, model, onStream);
-    case 'xai':         return callXAI(messages, systemPrompt, model, onStream);
-    case 'gateway':     return callDirgha(messages, systemPrompt, model, onStream);
-    default:
-      throw new Error(`Unsupported provider '${provider}' for model '${model}'`);
-  }
-}
-
-/**
- * Retry pure-network drops (not 429) on the same provider, resuming stream
- * from where it broke. 429 is handled at the outer loop as a cross-provider
- * failover, not here — retrying 429 on the same account is a thundering herd.
- */
-async function withNetworkResume(
-  attemptCall: (attempt: number) => Promise<ModelResponse>,
-  _onStream?: (text: string) => void,
-  maxAttempts = isAdminMode() ? 30 : 4,
-): Promise<ModelResponse> {
-  const admin = isAdminMode();
+  attempts = 6,
+): Promise<T> {
   let lastErr: unknown;
-  for (let i = 0; i < maxAttempts; i++) {
-    try { return await attemptCall(i); }
+  for (let i = 0; i < attempts; i++) {
+    try { return await fn(i); }
     catch (err) {
       lastErr = err;
-      const shouldRetry = isNetworkTransient(err) || (admin && is429(err));
-      if (!shouldRetry || i === maxAttempts - 1) throw err;
-      const ra = parseRetryAfterMs(msgOf(err));
-      const base = ra ?? Math.min(1000 + Math.floor(i / 2) * 1000, 5_000);
-      const jitter = Math.floor(Math.random() * 300);
-      const waitMs = Math.min(base + jitter, 10_000);
-      // Silent retry — meta messages pollute the model output stream and get
-      // saved to history as if the assistant said them. Log for debugging only.
-      if (process.env['DIRGHA_DEBUG'] === '1') {
-        process.stderr.write(`[dispatch] 429 retry ${i+1}/${maxAttempts} wait=${waitMs}ms\n`);
+      if (!isTransient(err) || i === attempts - 1) throw err;
+      const msg = err instanceof Error ? err.message : String(err);
+      const ra = parseRetryAfterMs(msg);
+      let baseMs: number;
+      let jitter: number;
+      if (is429(err)) {
+        // 429: feed retry-after into unified limiter so death spiral detector has data
+        recordProviderRetryAfter(provider, ra ?? 60_000);
+        // flat 2s base + wide random spread so parallel agents don't
+        // all retry simultaneously and immediately re-collide (thundering herd)
+        baseMs = ra ?? 2000;
+        jitter = Math.floor(Math.random() * 3000); // 0-3s spread
+      } else {
+        // Network errors: exponential backoff
+        baseMs = ra ?? 1000 * Math.pow(2, i);
+        jitter = Math.floor(Math.random() * 1000);
       }
-      await sleep(waitMs);
+      await new Promise(r => setTimeout(r, Math.min(baseMs + jitter, 30_000)));
     }
   }
   throw lastErr;
 }
 
 /**
- * Main dispatcher with cross-provider 429 failover. For each hop in the chain:
- *   1. Skip if circuit breaker is open for that provider
- *   2. Try the call with network-resume (partial stream preserved on drop)
- *   3. If 429 → log and jump to next provider
- *   4. If network-retry exhausted → jump to next provider too
- *   5. If hard error (auth, context, 4xx non-429) → throw immediately
+ * Unified LLM dispatcher. Accepts the superset of per-provider args;
+ * providers that don't support streaming/thinking simply ignore those callbacks.
  */
 export async function callModel(
   messages: Message[],
@@ -266,80 +158,121 @@ export async function callModel(
   onStream?: (text: string) => void,
   onThinking?: (text: string) => void,
 ): Promise<ModelResponse> {
-  const chain = buildFallbackChain(model);
-  let lastErr: unknown;
+  const provider = providerForModel(model);
 
-  for (let hop = 0; hop < chain.length; hop++) {
-    const { provider, model: hopModel } = chain[hop]!;
-
-    if (!isProviderHealthy(provider)) {
-      lastErr = new Error(`Provider ${provider} circuit open`);
-      continue;
-    }
-
-    // Streaming resume state is per-hop: a 429 failover starts a fresh call
-    // on a different provider, so the partial text from the 429'd provider
-    // can't be resumed there.
-    let partial = '';
-    let resumed = false;
-
-    const wrappedStream = onStream
-      ? (t: string) => { partial += t; onStream(t); }
-      : undefined;
-
-    const attempt = async (attemptIdx: number): Promise<ModelResponse> => {
-      let effMsgs = messages;
-      if (attemptIdx > 0 && partial.length > 20) {
-        if (!resumed) resumed = true;
-        effMsgs = [
-          ...messages,
-          { role: 'assistant', content: partial },
-          { role: 'user', content: 'The connection dropped mid-response. Continue exactly where you stopped — do not repeat the text above, just continue the next token onward.' },
-        ];
-      }
-      return callProvider(provider, hopModel, effMsgs, systemPrompt, wrappedStream, onThinking);
-    };
-
-    try {
-      const response = await withNetworkResume(attempt, onStream);
-      recordSuccess(provider);
-
-      if (resumed && partial) {
-        const tail = response.content
-          .filter(b => b.type === 'text')
-          .map(b => (b as any).text ?? '')
-          .join('');
-        const nonText = response.content.filter(b => b.type !== 'text');
-        return { ...response, content: [{ type: 'text', text: partial + tail } as any, ...nonText] };
-      }
-      return response;
-    } catch (err) {
-      lastErr = err;
-
-      if (is429(err)) {
-        // 429 → jump to next provider. Meta messages go to stderr/log only,
-        // never to the model text stream (would pollute history + output).
-        if (process.env['DIRGHA_DEBUG'] === '1') {
-          const next = chain[hop + 1];
-          process.stderr.write(`[dispatch] ${provider} 429 → failover to ${next?.provider ?? 'nothing'}\n`);
-        }
-        continue;
-      }
-
-      if (isNetworkTransient(err)) {
-        if (process.env['DIRGHA_DEBUG'] === '1') {
-          const next = chain[hop + 1];
-          process.stderr.write(`[dispatch] ${provider} transient → failover to ${next?.provider ?? 'nothing'}\n`);
-        }
-        recordFailure(provider);
-        continue;
-      }
-
-      // Hard error (invalid key, context too long, model not found) — surface it.
-      recordFailure(provider);
-      throw err;
-    }
+  if (!isProviderHealthy(provider)) {
+    throw new Error(`Provider ${provider} circuit open — skipping`);
   }
 
-  throw lastErr ?? new Error(`All providers exhausted for model ${model}`);
+  // Death spiral guard: if 3+ providers are rate-limited for >5 min, surface immediately
+  if (globalLimiter.shouldAbortRouting([provider])) {
+    throw new Error(`Death spiral: ${provider} rate-limited for >5 min. Check API keys or wait.`);
+  }
+
+  const waitedMs = await acquireRateLimit(provider);
+  if (waitedMs > 500 && onStream) {
+    onStream(`\n[throttled ${(waitedMs / 1000).toFixed(1)}s to stay under ${provider} RPM cap]\n`);
+  }
+
+  // Streaming resume: capture partial text across attempts so a mid-stream
+  // network drop doesn't discard what was already received. On retry, inject
+  // the partial as an assistant-stub + ask the model to continue from there.
+  // Providers may not perfectly resume token-aligned, but for real-world
+  // WiFi/VPN flaps this loses at most a few tokens and preserves everything
+  // above. Clears on success.
+  let partialText = '';
+  let resumeNotified = false;
+  let resumeOverlapChecked = false;
+
+  // On the first chunk after a resume, check if the model repeated the tail of
+  // partialText (some models re-emit the last sentence despite the prompt).
+  // Compare the last OVERLAP_WINDOW chars of partialText against incoming text.
+  const OVERLAP_WINDOW = 40;
+  function dedupeResumeChunk(chunk: string): string {
+    if (resumeOverlapChecked || !partialText) return chunk;
+    resumeOverlapChecked = true;
+    const tail = partialText.slice(-OVERLAP_WINDOW);
+    const idx = chunk.indexOf(tail);
+    if (idx !== -1) return chunk.slice(idx + tail.length);
+    // Partial overlap: tail ends with the start of chunk
+    for (let len = Math.min(tail.length, chunk.length) - 1; len > 8; len--) {
+      if (tail.endsWith(chunk.slice(0, len))) return chunk.slice(len);
+    }
+    return chunk;
+  }
+
+  const wrappedOnStream = onStream
+    ? (chunk: string) => {
+        const deduped = resumeNotified ? dedupeResumeChunk(chunk) : chunk;
+        partialText += deduped;
+        if (deduped) onStream(deduped);
+      }
+    : undefined;
+
+  const callForAttempt = (attempt: number): Promise<ModelResponse> => {
+    // First attempt: normal call. Subsequent attempts after a disconnect with
+    // accumulated partial: inject the partial and a continuation nudge.
+    let effectiveMessages = messages;
+    let effectiveSystem = systemPrompt;
+    if (attempt > 0 && partialText.length > 20) {
+      if (!resumeNotified && onStream) {
+        onStream(`\n[connection resumed · continuing from ${partialText.length} chars received]\n`);
+        resumeNotified = true;
+        resumeOverlapChecked = false; // arm the dedup check for the next chunk
+      }
+      effectiveMessages = [
+        ...messages,
+        { role: 'assistant', content: partialText },
+        { role: 'user', content: 'The connection dropped mid-response. Continue exactly where you stopped — do not repeat the text above, do not re-introduce yourself, just continue the next token onward.' },
+      ];
+      effectiveSystem = systemPrompt;
+    }
+
+    switch (provider) {
+      case 'anthropic':   return callAnthropic(effectiveMessages, effectiveSystem, model, wrappedOnStream, onThinking);
+      case 'fireworks':   return callFireworks(effectiveMessages, effectiveSystem, model, wrappedOnStream);
+      case 'openrouter':  return callOpenRouter(effectiveMessages, effectiveSystem, model, wrappedOnStream);
+      case 'nvidia':      return callNvidia(effectiveMessages, effectiveSystem, model, wrappedOnStream, onThinking);
+      case 'gemini':      return callGemini(effectiveMessages, effectiveSystem, model, wrappedOnStream);
+      case 'openai':      return callOpenAI(effectiveMessages, effectiveSystem, model, wrappedOnStream);
+      case 'groq':        return callGroq(effectiveMessages, effectiveSystem, model, wrappedOnStream);
+      case 'mistral':     return callMistral(effectiveMessages, effectiveSystem, model, wrappedOnStream);
+      case 'cohere':      return callCohere(effectiveMessages, effectiveSystem, model, wrappedOnStream);
+      case 'deepinfra':   return callDeepInfra(effectiveMessages, effectiveSystem, model, wrappedOnStream);
+      case 'perplexity':  return callPerplexity(effectiveMessages, effectiveSystem, model, wrappedOnStream);
+      case 'togetherai':  return callTogetherAI(effectiveMessages, effectiveSystem, model, wrappedOnStream);
+      case 'xai':         return callXAI(effectiveMessages, effectiveSystem, model, wrappedOnStream);
+      case 'gateway':     return callDirgha(effectiveMessages, effectiveSystem, model, wrappedOnStream);
+      default:
+        throw new Error(`Unsupported provider '${provider}' for model '${model}'`);
+    }
+  };
+
+  let response: ModelResponse;
+  try {
+    response = await withNetworkRetry(callForAttempt, provider);
+    recordSuccess(provider);
+  } catch (err) {
+    // Only trip circuit on hard failures (5xx, network down), not rate limits (429)
+    const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+    const isRateLimit = msg.includes('429') || msg.includes('rate limit') || msg.includes('too many requests');
+    if (!isRateLimit) recordFailure(provider);
+    throw err;
+  }
+
+  // If we resumed after a drop, stitch partial + continuation into a single
+  // response so the caller's message history has one coherent assistant turn.
+  if (resumeNotified && partialText) {
+    const continuationText = response.content
+      .filter(b => b.type === 'text')
+      .map(b => (b as any).text ?? '')
+      .join('');
+    const stitched = partialText + continuationText;
+    const nonText = response.content.filter(b => b.type !== 'text');
+    return {
+      ...response,
+      content: [{ type: 'text', text: stitched } as any, ...nonText],
+    };
+  }
+  return response;
 }

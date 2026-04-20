@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * hub/registry.ts — Registry management for CLI-Hub.
  * Fetch, cache, and search plugin registry.
@@ -10,7 +9,7 @@ import type { Registry, RegistryEntry, PluginCategory } from './types.js';
 // Bundled registry — used as fallback when the remote registry is unreachable
 // (offline, pre-launch, or hub host 404). Keeps `hub list` / `hub search`
 // usable before the registry service exists. esbuild inlines this JSON.
-import bundledRegistry from './registry.json' assert { type: 'json' };
+import bundledRegistry from './registry.json' with { type: 'json' };
 
 const REGISTRY_URL = 'https://dirgha.ai/api/hub/registry.json';
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -74,7 +73,7 @@ export async function searchPlugins(query: string, category?: PluginCategory): P
     const matchesQuery = 
       p.name.toLowerCase().includes(q) ||
       p.description.toLowerCase().includes(q) ||
-      p.keywords?.some(k => k.toLowerCase().includes(q));
+      p.keywords?.some((k: string) => k.toLowerCase().includes(q));
     
     const matchesCategory = !category || p.categories.includes(category);
     

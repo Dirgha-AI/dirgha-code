@@ -1,5 +1,11 @@
 import { spawnSync, SpawnSyncOptions } from 'child_process';
 
+export interface ExecResult {
+  stdout: string;
+  stderr: string;
+  status: number | null;
+}
+
 /**
  * Execute a command via spawnSync with array arguments.
  * Array args prevent shell injection — no string concatenation in a shell.
@@ -21,8 +27,6 @@ export function execCmd(cmd: string, args: string[], options: SpawnSyncOptions =
 
   return (result.stdout as string || '').trim();
 }
-
-export type ExecResult = { stdout: string; stderr: string; exitCode: number };
 
 /**
  * Execute git with array arguments.

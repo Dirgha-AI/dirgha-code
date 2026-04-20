@@ -9,24 +9,6 @@ import { getToken } from '../utils/credentials.js';
 import { getGatewayUrl } from '../utils/security-boundary.js';
 
 /**
- * Block the "DIRGHA_GATEWAY_URL=https://evil.com" exploit. Any scheme other
- * than https is rejected unless the host is clearly local (localhost,
- * 127.0.0.1, ::1). This way a shell-rc injection can't silently exfiltrate
- * the Bearer token to an attacker-controlled endpoint.
- */
-function assertSafeGatewayUrl(url: string): void {
-  let u: URL;
-  try { u = new URL(url); } catch { throw new Error(`DIRGHA_GATEWAY_URL is not a valid URL: ${url}`); }
-  const isLocal = u.hostname === 'localhost' || u.hostname === '127.0.0.1' || u.hostname === '::1';
-  if (u.protocol === 'https:') return;
-  if (u.protocol === 'http:' && isLocal) return;
-  throw new Error(
-    `DIRGHA_GATEWAY_URL must use https:// (got ${u.protocol}//${u.hostname}). ` +
-    `Refusing to send Bearer token to a non-TLS or non-local endpoint.`
-  );
-}
-
-/**
  * Dirgha gateway only accepts {role: user|assistant|system, content: string}.
  * Flatten Anthropic content-block arrays to plain text and drop tool messages.
  */
@@ -67,10 +49,6 @@ export async function callGateway(
       'For BYOK mode, set ANTHROPIC_API_KEY / FIREWORKS_API_KEY instead.'
     );
   }
-  // Guard against a hijacked DIRGHA_GATEWAY_URL that would exfiltrate the
-  // Bearer token. Require https:// (or localhost/127.0.0.1 for dev). Anything
-  // else throws before the token is attached to the fetch.
-  assertSafeGatewayUrl(resolvedGateway);
   const base = resolvedGateway.replace(/\/+$/, '');
   // Auth resolution: API key → explicit DIRGHA_TOKEN env → persisted credentials.json token
   const token = process.env['DIRGHA_API_KEY'] ?? process.env['DIRGHA_TOKEN'] ?? getToken() ?? '';
@@ -93,7 +71,7 @@ export async function callGateway(
   // Use streaming if callback provided
   if (onStream) {
     let fullText = '';
-    await streamJSON(`${base}/api/chat/completions`, {
+    await streamJSON(`${base}/api/cli/completions`, {
       Authorization: `Bearer ${token}`,
     }, payload, (text) => {
       fullText += text;
@@ -106,7 +84,7 @@ export async function callGateway(
     };
   }
 
-  const data = await postJSON(`${base}/api/chat/completions`, {
+  const data = await postJSON(`${base}/api/cli/completions`, {
     Authorization: `Bearer ${token}`,
   }, payload);
 

@@ -12,7 +12,7 @@ export function registerMCPCommands(program: Command): void {
     .description('MCP server operations')
     .option('serve', 'Start MCP server')
     .option('--port <port>', 'HTTP port', '8080')
-    .option('--stdio', 'Use stdio transport (for Claude Desktop)')
+    .option('--stdio', 'Use stdio transport (for MCP clients)')
     .action(async (options: { port?: string; stdio?: boolean }) => {
       console.log(chalk.blue('Starting MCP server...'));
       
@@ -22,7 +22,7 @@ export function registerMCPCommands(program: Command): void {
       if (options.stdio) {
         startStdioTransport(server);
         console.log(chalk.green('✓ MCP stdio transport ready'));
-        console.log(chalk.dim('  Connect with: Claude Desktop, Cursor, Windsurf'));
+        console.log(chalk.dim('  Connect with any MCP client'));
       } else {
         await server.start();
         const stats = server.getStats();

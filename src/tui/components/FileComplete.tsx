@@ -31,7 +31,7 @@ export function FileComplete({ query, matches, onSelect, onCancel }: FileComplet
       <Text color={C.textDim}>@ {query || '(type to filter)'}</Text>
       {visible.map((f, i) => (
         <Text key={f} color={i === 0 ? C.accent : C.textMuted}>
-          {i === 0 ? '▸ ' : '  '}{f}
+          {i === 0 ? '> ' : '  '}{f}
         </Text>
       ))}
       <Text color={C.textDim} dimColor>Tab/Enter to insert · Esc to cancel</Text>

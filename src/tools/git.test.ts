@@ -3,7 +3,7 @@
  * Uses a temp git repo so tests are fully isolated.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { execSync, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -35,7 +35,7 @@ describe('gitStatusTool', () => {
     const origCwd = process.cwd();
     process.chdir(repoDir);
     const { gitStatusTool } = await import('./git.js');
-    const r = gitStatusTool();
+    const r = await gitStatusTool();
     process.chdir(origCwd);
     expect(r.tool).toBe('git_status');
     expect(r.result).toContain('main');
@@ -45,7 +45,7 @@ describe('gitStatusTool', () => {
     const origCwd = process.cwd();
     process.chdir(tmpdir());
     const { gitStatusTool } = await import('./git.js');
-    const r = gitStatusTool();
+    const r = await gitStatusTool();
     process.chdir(origCwd);
     // Either succeeds (parent is a git repo) or returns error — both valid
     expect(r.tool).toBe('git_status');
@@ -58,7 +58,7 @@ describe('gitDiffTool', () => {
     const origCwd = process.cwd();
     process.chdir(repoDir);
     const { gitDiffTool } = await import('./git.js');
-    const r = gitDiffTool({});
+    const r = await gitDiffTool({});
     process.chdir(origCwd);
     expect(r.result).toBe('(no changes)');
   });
@@ -68,7 +68,7 @@ describe('gitDiffTool', () => {
     process.chdir(repoDir);
     writeFileSync(join(repoDir, 'README.md'), '# modified\n');
     const { gitDiffTool } = await import('./git.js');
-    const r = gitDiffTool({});
+    const r = await gitDiffTool({});
     // Restore
     spawnSync('git', ['checkout', '--', 'README.md'], { cwd: repoDir });
     process.chdir(origCwd);
@@ -81,7 +81,7 @@ describe('gitDiffTool', () => {
     writeFileSync(join(repoDir, 'staged.txt'), 'staged content\n');
     spawnSync('git', ['add', 'staged.txt'], { cwd: repoDir });
     const { gitDiffTool } = await import('./git.js');
-    const r = gitDiffTool({ staged: true });
+    const r = await gitDiffTool({ staged: true });
     // Restore
     spawnSync('git', ['rm', '--cached', 'staged.txt'], { cwd: repoDir });
     rmSync(join(repoDir, 'staged.txt'));
@@ -96,7 +96,7 @@ describe('gitLogTool', () => {
     const origCwd = process.cwd();
     process.chdir(repoDir);
     const { gitLogTool } = await import('./git.js');
-    const r = gitLogTool({});
+    const r = await gitLogTool({});
     process.chdir(origCwd);
     expect(r.result).toContain('init');
   });
@@ -105,7 +105,7 @@ describe('gitLogTool', () => {
     const origCwd = process.cwd();
     process.chdir(repoDir);
     const { gitLogTool } = await import('./git.js');
-    const r = gitLogTool({ n: 1 });
+    const r = await gitLogTool({ n: 1 });
     process.chdir(origCwd);
     expect(r.result.split('\n').length).toBeLessThanOrEqual(1);
   });
@@ -117,7 +117,7 @@ describe('gitBranchTool', () => {
     const origCwd = process.cwd();
     process.chdir(repoDir);
     const { gitBranchTool } = await import('./git.js');
-    const r = gitBranchTool({});
+    const r = await gitBranchTool({});
     process.chdir(origCwd);
     expect(r.result).toContain('main');
   });
@@ -126,7 +126,7 @@ describe('gitBranchTool', () => {
     const origCwd = process.cwd();
     process.chdir(repoDir);
     const { gitBranchTool } = await import('./git.js');
-    const r = gitBranchTool({ name: 'test-branch-x' });
+    const r = await gitBranchTool({ name: 'test-branch-x' });
     process.chdir(origCwd);
     expect(r.error).toBeUndefined();
     // Verify branch exists
@@ -139,7 +139,7 @@ describe('gitBranchTool', () => {
     const origCwd = process.cwd();
     process.chdir(repoDir);
     const { gitBranchTool } = await import('./git.js');
-    const r = gitBranchTool({ name: 'test-branch-x' }); // already deleted or re-creates
+    const r = await gitBranchTool({ name: 'test-branch-x' }); // already deleted or re-creates
     process.chdir(origCwd);
     // May or may not error depending on state — just check tool name
     expect(r.tool).toBe('git_branch');
@@ -152,7 +152,7 @@ describe('gitStashTool', () => {
     const origCwd = process.cwd();
     process.chdir(repoDir);
     const { gitStashTool } = await import('./git.js');
-    const r = gitStashTool({ action: 'list' });
+    const r = await gitStashTool({ action: 'list' });
     process.chdir(origCwd);
     expect(r.tool).toBe('git_stash');
   });
@@ -161,7 +161,7 @@ describe('gitStashTool', () => {
     const origCwd = process.cwd();
     process.chdir(repoDir);
     const { gitStashTool } = await import('./git.js');
-    const r = gitStashTool({});
+    const r = await gitStashTool({});
     process.chdir(origCwd);
     expect(r.tool).toBe('git_stash');
   });
@@ -171,7 +171,7 @@ describe('gitStashTool', () => {
 describe('gitPatchTool', () => {
   it('returns error if patch is missing', async () => {
     const { gitPatchTool } = await import('./git.js');
-    const r = gitPatchTool({});
+    const r = await gitPatchTool({});
     expect(r.error).toContain('patch is required');
   });
 
@@ -187,7 +187,7 @@ describe('gitPatchTool', () => {
     // Reset
     spawnSync('git', ['checkout', '--', 'patch-target.txt'], { cwd: repoDir });
     const { gitPatchTool } = await import('./git.js');
-    const r = gitPatchTool({ patch: diff });
+    const r = await gitPatchTool({ patch: diff });
     // Clean up
     spawnSync('git', ['checkout', '--', 'patch-target.txt'], { cwd: repoDir });
     process.chdir(origCwd);
@@ -203,7 +203,7 @@ describe('checkpointTool', () => {
     writeFileSync(join(repoDir, 'checkpoint-test.txt'), 'dirty\n');
     spawnSync('git', ['add', 'checkpoint-test.txt'], { cwd: repoDir });
     const { checkpointTool } = await import('./git.js');
-    const r = checkpointTool({ description: 'my checkpoint' });
+    const r = await checkpointTool({ description: 'my checkpoint' });
     process.chdir(origCwd);
     // Either stashed or no changes to stash — both valid
     expect(r.tool).toBe('checkpoint');

@@ -9,20 +9,22 @@
   },
   "scripts": {
     "build": "node build.mjs",
+    "postbuild": "node scripts/gen-skill-md.mjs || echo '[skill-md] skipped'",
+    "skill:gen": "node scripts/gen-skill-md.mjs",
+    "build:public": "DIRGHA_BUILD_TYPE=public node build.mjs",
+    "build:private": "DIRGHA_BUILD_TYPE=private node build.mjs",
     "build:dev": "node build.mjs --dev",
     "build:analyze": "node build.mjs --analyze",
     "dev": "tsx --watch src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit",
-    "prepublishOnly": "node build.mjs"
+    "prepublishOnly": "DIRGHA_BUILD_TYPE=public node build.mjs"
   },
   "files": [
     "dist/dirgha.mjs",
     "README.md",
-    "LICENSE",
-    "CLA.md",
-    "CONTRIBUTING.md"
+    "LICENSE"
   ],
   "publishConfig": {
     "access": "public",
@@ -30,15 +32,17 @@
   },
   "private": false,
   "engines": {
-    "node": ">=22.5.0"
+    "node": ">=22.5.0",
+    "pnpm": ">=8.0.0"
   },
+  "packageManager": "pnpm@9.0.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dirghaai/dirgha-code.git"
+    "url": "git+https://github.com/dirgha-ai/cli.git"
   },
   "homepage": "https://dirgha.ai",
   "bugs": {
-    "url": "https://github.com/dirghaai/dirgha-code/issues"
+    "url": "https://github.com/dirgha-ai/cli/issues"
   },
   "keywords": [
     "ai",
@@ -52,19 +56,23 @@
     "chatbot"
   ],
   "author": "Dirgha AI <team@dirgha.ai>",
-  "license": "SEE LICENSE IN LICENSE",
-  "description": "Dirgha Code — AI coding agent for the terminal. Multi-provider LLM support, secure execution, browser automation, and persistent sessions.",
+  "license": "MIT",
+  "description": "Dirgha CLI — AI coding agent for the terminal. Multi-provider LLM support, secure execution, browser automation, and persistent sessions.",
   "dependencies": {
-    "@clack/prompts": "^1.2.0",
     "@commander-js/extra-typings": "^14.0.0",
     "@inkjs/ui": "^2.0.0",
-    "@types/better-sqlite3": "^7.6.13",
-    "@types/ws": "^8.18.1",
+    "@libp2p/gossipsub": "^15.0.17",
+    "@libp2p/kad-dht": "^16.2.0",
+    "@libp2p/mplex": "^12.0.16",
+    "@libp2p/noise": "^1.0.1",
+    "@libp2p/tcp": "^11.0.15",
+    "@libp2p/webrtc": "^6.0.16",
+    "@libp2p/websockets": "^10.1.8",
+    "@types/node": "^25.2.3",
     "better-sqlite3": "^12.9.0",
     "chalk": "^5.6.2",
     "cli-table3": "^0.6.5",
     "commander": "^14.0.0",
-    "diff": "^5.2.0",
     "file-type": "^21.3.4",
     "glob": "^11.0.0",
     "ink": "^6.8.0",
@@ -72,23 +80,26 @@
     "ink-text-input": "^6.0.0",
     "inquirer": "12.1.0",
     "js-yaml": "^4.1.1",
+    "libp2p": "2.2.1",
     "magika": "^1.0.0",
     "marked": "^17.0.5",
     "marked-terminal": "^7.3.0",
     "ora": "^9.3.0",
     "qrcode-terminal": "^0.12.0",
     "react": "^19.2.4",
-    "yaml": "^2.3.4"
+    "typescript": "^5.9.3",
+    "yaml": "^2.3.4",
+    "rxjs": "^7.8.0"
   },
   "devDependencies": {
-    "@types/diff": "^5.2.3",
     "@types/inquirer": "^9.0.9",
-    "@types/node": "^25.2.3",
     "@types/qrcode-terminal": "^0.12.2",
     "@types/react": "^19.2.14",
     "esbuild": "^0.24.2",
     "tsx": "^4.0.0",
-    "typescript": "^5.9.3",
     "vitest": "^4.1.2"
+  },
+  "optionalDependencies": {
+    "playwright": "^1.47.0"
   }
 }

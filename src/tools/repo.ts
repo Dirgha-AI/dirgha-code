@@ -1,8 +1,14 @@
 /** tools/repo.ts — AST-aware repo map */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { resolve, join, basename } from 'node:path';
-import ts from 'typescript';
 import type { ToolResult } from '../types.js';
+
+// TypeScript is an optional external dep (saves 3.4MB in bundle) — sync require check
+let ts: typeof import('typescript') | null = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  ts = require('typescript');
+} catch { /* TypeScript not installed — fall back to regex extraction */ }
 
 const CODE_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.py', '.rs', '.go', '.java', '.kt']);
 
@@ -11,45 +17,54 @@ const IGNORE = new Set([
   '.venv', 'target', '.cache', 'coverage', '.turbo', 'out',
 ]);
 
-/** Extract symbols using TypeScript AST for JS/TS files */
+/** Extract symbols using TypeScript AST for JS/TS files (falls back to regex if ts not available) */
 function extractTsSymbols(content: string, fileName: string): string[] {
-  const sourceFile = ts.createSourceFile(
-    fileName,
-    content,
-    ts.ScriptTarget.Latest,
-    true
-  );
+  if (!ts) return extractRegexSymbolsTs(content);
 
+  const sourceFile = ts.createSourceFile(fileName, content, (ts as any).ScriptTarget.Latest, true);
   const symbols: string[] = [];
 
-  function visit(node: ts.Node) {
-    if (ts.isFunctionDeclaration(node) && node.name) {
-      const params = node.parameters.map(p => p.name.getText(sourceFile)).join(', ');
+  function visit(node: any) {
+    if (ts!.isFunctionDeclaration(node) && node.name) {
+      const params = node.parameters.map((p: any) => p.name.getText(sourceFile)).join(', ');
       symbols.push(`fn ${node.name.text}(${params})`);
-    } else if (ts.isClassDeclaration(node) && node.name) {
+    } else if (ts!.isClassDeclaration(node) && node.name) {
       const methods: string[] = [];
-      node.members.forEach(m => {
-        if (ts.isMethodDeclaration(m) && m.name) {
-          methods.push(m.name.getText(sourceFile));
-        }
+      node.members.forEach((m: any) => {
+        if (ts!.isMethodDeclaration(m) && m.name) methods.push(m.name.getText(sourceFile));
       });
       symbols.push(`class ${node.name.text}${methods.length ? ` { ${methods.join(', ')} }` : ''}`);
-    } else if (ts.isInterfaceDeclaration(node) && node.name) {
+    } else if (ts!.isInterfaceDeclaration(node) && node.name) {
       symbols.push(`interface ${node.name.text}`);
-    } else if (ts.isTypeAliasDeclaration(node) && node.name) {
+    } else if (ts!.isTypeAliasDeclaration(node) && node.name) {
       symbols.push(`type ${node.name.text}`);
-    } else if (ts.isVariableDeclaration(node) && node.name && ts.isSourceFile(node.parent.parent.parent)) {
-      // Only top-level exported constants
-      if (ts.getCombinedModifierFlags(node as any) & ts.ModifierFlags.Export) {
+    } else if (ts!.isVariableDeclaration(node) && node.name && ts!.isSourceFile(node.parent?.parent?.parent)) {
+      if (ts!.getCombinedModifierFlags(node as any) & (ts as any).ModifierFlags.Export) {
         symbols.push(`const ${node.name.getText(sourceFile)}`);
       }
     }
-
-    ts.forEachChild(node, visit);
+    ts!.forEachChild(node, visit);
   }
 
   visit(sourceFile);
   return symbols;
+}
+
+/** Regex-based symbol extraction for TS/JS when typescript package is not available */
+function extractRegexSymbolsTs(content: string): string[] {
+  const syms: string[] = [];
+  for (const line of content.split('\n')) {
+    const fn = line.match(/^(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*\(([^)]*)\)/);
+    if (fn?.[1]) { syms.push(`fn ${fn[1]}(${fn[2] ?? ''})`); continue; }
+    const cls = line.match(/^(?:export\s+)?class\s+(\w+)/);
+    if (cls?.[1]) { syms.push(`class ${cls[1]}`); continue; }
+    const iface = line.match(/^(?:export\s+)?interface\s+(\w+)/);
+    if (iface?.[1]) { syms.push(`interface ${iface[1]}`); continue; }
+    const typ = line.match(/^(?:export\s+)?type\s+(\w+)/);
+    if (typ?.[1]) { syms.push(`type ${typ[1]}`); }
+    if (syms.length >= 20) break;
+  }
+  return syms;
 }
 
 /** Fallback regex-based extraction for other languages */

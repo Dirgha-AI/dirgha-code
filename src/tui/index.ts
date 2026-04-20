@@ -1,6 +1,7 @@
 /**
  * tui/index.ts — Entry point for Ink TUI
  */
+import './polyfill.js';
 import React from 'react';
 import { render } from 'ink';
 import { DirghaApp } from './App.js';
@@ -17,7 +18,7 @@ export async function startTUI(initialPrompt?: string, resumeSessionId?: string,
     React.createElement(DirghaApp, { initialPrompt, resumeSessionId, maxBudgetUsd }),
     {
       exitOnCtrlC: true,
-      patchConsole: false,
+      patchConsole: true,
     }
   );
 
