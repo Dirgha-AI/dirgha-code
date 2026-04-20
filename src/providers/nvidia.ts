@@ -22,6 +22,18 @@ const MODEL_PARAMS: Record<string, ModelParams> = {
   'moonshotai/kimi-k2-instruct-0905':    { temperature: 0.6, top_p: 0.9,  max_tokens: 4096 },
   'mistralai/mistral-nemotron':          { temperature: 0.6, top_p: 0.7,  max_tokens: 4096 },
 };
+
+// Only these models accept the OpenAI tool-calling schema on NVIDIA NIM.
+// Sending tools/tool_choice to others (e.g. minimax-m2.7, mistral-nemotron) returns 400.
+const TOOLS_SUPPORTED = new Set([
+  'meta/llama-3.1-8b-instruct',
+  'meta/llama-3.1-70b-instruct',
+  'meta/llama-3.1-405b-instruct',
+  'meta/llama-3.3-70b-instruct',
+  'meta/llama-4-maverick-17b-128e-instruct',
+  'meta/llama-4-scout-17b-16e-instruct',
+  'moonshotai/kimi-k2-instruct-0905',
+]);
 const DEFAULT_PARAMS: ModelParams = { temperature: 0.6, top_p: 0.9, max_tokens: 4096 };
 
 export async function callNvidia(
@@ -36,12 +48,12 @@ export async function callNvidia(
 
   const headers = { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' };
   const params = MODEL_PARAMS[model] ?? DEFAULT_PARAMS;
+  const supportsTools = TOOLS_SUPPORTED.has(model);
   const payload = {
     model,
     messages: toOpenAIMessages(messages, systemPrompt),
     ...params,
-    tools: toOpenAITools(),
-    tool_choice: 'auto',
+    ...(supportsTools ? { tools: toOpenAITools(), tool_choice: 'auto' } : {}),
   };
 
   if (onStream) {
