@@ -3,8 +3,6 @@ import { Box, Text } from 'ink';
 import { C } from '../colors.js';
 import type { StreamEvent } from './stream/types.js';
 
-const SPIN = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-
 const TOOL_SHORT: Record<string, string> = {
   read_file: 'Reading', write_file: 'Writing', edit_file: 'Editing',
   edit_file_all: 'Editing', apply_patch: 'Patching', delete_file: 'Deleting',
@@ -26,14 +24,14 @@ function elapsed(startMs: number): string {
 }
 
 export function ActivitySummary({ busy, taskStartedAt, streamEvents }: Props) {
-  const [frame, setFrame] = useState(0);
+  const [dim, setDim] = useState(false);
   const [, tick] = useState(0);
 
   useEffect(() => {
     if (!busy) return;
-    const spinner = setInterval(() => setFrame(f => (f + 1) % SPIN.length), 80);
-    const clock   = setInterval(() => tick(n => n + 1), 1000);
-    return () => { clearInterval(spinner); clearInterval(clock); };
+    const pulse = setInterval(() => setDim(d => !d), 2000);
+    const clock = setInterval(() => tick(n => n + 1), 1000);
+    return () => { clearInterval(pulse); clearInterval(clock); };
   }, [busy]);
 
   if (!busy) return null;
@@ -67,7 +65,7 @@ export function ActivitySummary({ busy, taskStartedAt, streamEvents }: Props) {
 
   return (
     <Box paddingX={2} marginBottom={1} gap={1}>
-      <Text color={C.accent}>{SPIN[frame]}</Text>
+      <Text color={dim ? C.textDim : C.brand} dimColor={dim}>⊙</Text>
       <Text color={C.textSecondary}>{verb}</Text>
       {detail && <Text color={C.textDim}>{detail}</Text>}
       <Text color={C.textDim}>· {elapsed(taskStartedAt)}</Text>
