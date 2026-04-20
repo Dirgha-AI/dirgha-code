@@ -51,6 +51,7 @@ import { FileComplete } from './components/FileComplete.js';
 import { SessionPicker, type SessionEntry } from './components/SessionPicker.js';
 import { ScrollView } from './components/ScrollView.js';
 import { InputBox } from './components/InputBox.js';
+import { ActivitySummary } from './components/ActivitySummary.js';
 import { TaskQueue, type QueuedTask, initTaskQueue } from './TaskQueue.js';
 import type { ActiveTurn } from './tui-types.js';
 
@@ -685,6 +686,7 @@ export function DirghaApp({ initialPrompt, resumeSessionId, maxBudgetUsd }: { in
               onCancel={() => { setFileMatches([]); setAtQuery(''); }}
             />
           )}
+          <ActivitySummary busy={busy} taskStartedAt={taskStartedAt} streamEvents={streamEvents} />
           <SlashHint input={input} />
           <InputBox
             value={input}
