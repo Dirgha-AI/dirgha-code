@@ -242,7 +242,7 @@ function trunc(s: string, max: number): string {
   return s.length > max ? s.slice(0, max) + '…' : s;
 }
 
-/** Claude Code-style single-line tool call with optional compact diff rows. */
+/** Single-line tool call display — icon, label, primary arg, optional diff summary. */
 export function renderToolBox(
   name: string,
   input: Record<string, unknown>,
@@ -252,28 +252,22 @@ export function renderToolBox(
   const icon = TOOL_ICONS[name] ?? '◆';
   const label = name.replace(/_/g, ' ');
 
-  // Find primary arg to show inline: first key from priority list that exists
   const primaryKey = PRIMARY_KEYS.find(k => k in input);
   const primaryVal = primaryKey ? trunc(String(input[primaryKey] ?? ''), 60) : '';
   const elapsed = elapsedMs > 0 ? chalk.dim(`  ${elapsedMs}ms`) : '';
 
-  const header = chalk.cyan(icon) + ' ' + chalk.white(label)
-    + (primaryVal ? chalk.dim('(') + chalk.dim(primaryVal) + chalk.dim(')') : '')
-    + elapsed;
-  process.stdout.write(header + '\n');
-
-  // Compact diff rows for edit tools only
+  // For edit tools show ±line counts instead of raw content
+  let diffHint = '';
   if ('old_string' in input || 'new_string' in input) {
-    const maxW = TERM_W() - 4;
-    if (input.old_string) {
-      for (const line of String(input.old_string).split('\n').slice(0, 3)) {
-        process.stdout.write(chalk.red('  - ') + chalk.dim(trunc(line, maxW)) + '\n');
-      }
-    }
-    if (input.new_string) {
-      for (const line of String(input.new_string).split('\n').slice(0, 3)) {
-        process.stdout.write(chalk.green('  + ') + trunc(line, maxW) + '\n');
-      }
-    }
+    const removed = input.old_string ? String(input.old_string).split('\n').length : 0;
+    const added   = input.new_string ? String(input.new_string).split('\n').length : 0;
+    if (removed > 0) diffHint += chalk.red(` -${removed}`);
+    if (added   > 0) diffHint += chalk.green(` +${added}`);
   }
+
+  const line = chalk.cyan(icon) + ' ' + chalk.white(label)
+    + (primaryVal ? chalk.dim('(') + chalk.dim(primaryVal) + chalk.dim(')') : '')
+    + diffHint
+    + elapsed;
+  process.stdout.write(line + '\n');
 }
