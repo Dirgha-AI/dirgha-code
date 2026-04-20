@@ -29,7 +29,7 @@ const accountCommand: SlashCommand = {
       return [
         chalk.yellow('  Not signed in.'),
         '',
-        chalk.dim('  Sign up:  ') + chalk.cyan('/signup') + chalk.dim('   (free · 100k tokens/day)'),
+        chalk.dim('  Sign up:  ') + chalk.cyan('/signup') + chalk.dim('   (create an account)'),
         chalk.dim('  Sign in:  ') + chalk.cyan('/login') + chalk.dim('    (existing account)'),
         chalk.dim('  BYOK:     ') + chalk.cyan('/keys') + chalk.dim('     (bring a provider key)'),
         '',

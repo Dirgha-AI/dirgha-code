@@ -1,7 +1,7 @@
 // packages/cli/src/utils/update-verify.ts
 
 const MANIFEST_URL = 'https://dirgha.ai/.well-known/cli-versions.json';
-const NPM_REGISTRY_URL = 'https://registry.npmjs.org/dirgha-cli/latest';
+const NPM_REGISTRY_URL = 'https://registry.npmjs.org/@dirgha%2Fcode/latest';
 const TIMEOUT_MS = 5000;
 const FALLBACK_VERSION = '2.0.0';
 

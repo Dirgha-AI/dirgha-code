@@ -49,9 +49,6 @@ export function getDefaultModel(): string {
     case 'groq':       return 'llama-3.3-70b-versatile';
     case 'mistral':    return 'mistral-large-2';
     case 'ollama':     return 'llama3.2:3b';
-    // Subscription users (no BYOK) hit api.dirgha.ai gateway; Kimi is
-    // the subscription default — the gateway routes this to its org-level
-    // Fireworks key (never a personal user key).
     case 'gateway':    return 'minimax-m2';
     default:           return 'claude-sonnet-4-6';
   }

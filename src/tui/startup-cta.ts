@@ -87,7 +87,7 @@ export function buildStartupCta(opts: { model?: string; fleetActive?: number } =
       state,
       lines: [
         '  Get started in 10 seconds:',
-        '    /signup    create a free Dirgha account · 100k tokens/day',
+        '    /signup    create a Dirgha account',
         '    /login     already have an account',
         '    /keys      bring your own provider key · 14 supported',
         '',

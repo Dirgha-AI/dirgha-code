@@ -40,7 +40,7 @@ function spawnProc(cfg: ExtensionConfig) {
   return spawn(cmd!, args, { env: { ...process.env, ...cfg.env }, stdio: ['pipe', 'pipe', 'pipe'] });
 }
 
-const INIT_PARAMS = { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'dirgha-cli', version: '1.0' } };
+const INIT_PARAMS = { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'dirgha-code', version: '1.0' } };
 
 export async function discoverStdioTools(cfg: ExtensionConfig): Promise<MCPTool[]> {
   const proc = spawnProc(cfg);

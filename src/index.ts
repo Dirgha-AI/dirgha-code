@@ -73,7 +73,7 @@ profiler.end();
 function _scheduleVersionCheck() {
   const t = setTimeout(() => {
     try {
-      const raw = execCmd('npm', ['view', 'dirgha-cli', 'version', '--json'], { timeout: 5000 });
+      const raw = execCmd('npm', ['view', '@dirgha/code', 'version', '--json'], { timeout: 5000 });
       const latest = raw.replace(/"/g, '').trim();
       if (latest && latest !== _cliVersion) {
         checkUpdateIntegrity()

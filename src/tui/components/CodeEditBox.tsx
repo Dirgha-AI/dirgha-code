@@ -1,5 +1,5 @@
 /**
- * CodeEditBox.tsx — Transparent code editing visualization (Gemini-style)
+ * CodeEditBox.tsx — Transparent code editing visualization
  * 
  * Shows code edits in round-corner boxes with:
  * - File path header with pill-shaped badge

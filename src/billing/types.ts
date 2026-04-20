@@ -56,7 +56,7 @@ export interface ModelPricing {
 }
 
 export const QUOTA_LIMITS: Record<string, { daily: number; monthly: number }> = {
-  free: { daily: 100_000, monthly: 1_000_000 },
+  free: { daily: 0, monthly: 0 },
   pro: { daily: 500_000, monthly: 10_000_000 },
   team: { daily: 2_000_000, monthly: 100_000_000 },
 };

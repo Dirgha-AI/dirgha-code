@@ -17,7 +17,7 @@ let lastToolStart = 0;
 export function checkForUpdates(current: string): void {
   setTimeout(() => {
     try {
-      const result = execSync('npm view dirgha-cli version --json 2>/dev/null', { timeout: 3000, encoding: 'utf-8' });
+      const result = execSync('npm view @dirgha/code version --json 2>/dev/null', { timeout: 3000, encoding: 'utf-8' });
       const latest = result.trim().replace(/^"|"$/g, '');
       if (latest && latest !== current) {
         process.stdout.write(chalk.dim(`\n  Update available: ${latest} → run dirgha update\n`));

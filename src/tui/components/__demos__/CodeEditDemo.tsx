@@ -88,7 +88,7 @@ export const logger = createLogger({
   ),
 ];
 
-// Demo component showing the Gemini-style interface
+// Demo component showing the transparent code editing interface
 function Demo(): React.JSX.Element {
   return (
     <Box flexDirection="column" padding={1}>
@@ -167,7 +167,7 @@ function Demo(): React.JSX.Element {
 
 // Run the demo
 console.clear();
-console.log('CodeEditBox Demo - Gemini-style transparent code editing\n');
+console.log('CodeEditBox Demo - transparent code editing\n');
 console.log('Features:');
 console.log('  • Round-corner boxes for all code edits');
 console.log('  • Pill-shaped type badges (NEW/EDIT/DEL/PATCH)');

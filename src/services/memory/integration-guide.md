@@ -4,7 +4,7 @@
 
 ### Step 1: Add Wrapper Import to holographic.ts
 
-**File:** `apps/dirgha-cli/src/services/holographic.ts`
+**File:** `src/services/holographic.ts`
 
 Add at the top:
 ```typescript

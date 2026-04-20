@@ -11,7 +11,13 @@ function git(args: string[], timeoutMs = 15_000): Promise<{ out: string; err: st
   return new Promise((resolve) => {
     const proc = spawn('git', args, {
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }, // never hang waiting for credentials
+      env: {
+        ...process.env,
+        GIT_TERMINAL_PROMPT: '0',
+        GIT_ASKPASS: 'echo',
+        SSH_ASKPASS: 'echo',
+        GIT_SSH_COMMAND: 'ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new',
+      },
     });
 
     let out = '';

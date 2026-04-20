@@ -37,7 +37,7 @@ export interface SessionPayload {
   session_id: string;
   model: string;
   tokens: number;
-  source: 'dirgha-cli';
+  source: 'dirgha-code';
   messages: Message[];
   created_at: string;
 }
@@ -51,7 +51,7 @@ export function buildSessionPayload(
     session_id: crypto.randomUUID(),
     model,
     tokens,
-    source: 'dirgha-cli',
+    source: 'dirgha-code',
     messages,
     created_at: new Date().toISOString(),
   };
@@ -89,7 +89,7 @@ export async function syncSession(
         model,
         tokens_used: tokens,
         cost_usd: costUsd ?? 0,
-        source: 'dirgha-cli',
+        source: 'dirgha-code',
         session_id: payload.session_id,
       }),
     }) : Promise.resolve(),

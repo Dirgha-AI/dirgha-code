@@ -137,7 +137,7 @@ export async function authCommand(): Promise<void> {
       choices: [
         { name: 'Dirgha VPS / LiteLLM (recommended)', value: 'litellm' },
         { name: 'Anthropic API Key (Claude)', value: 'anthropic' },
-        { name: 'NVIDIA NIM API Key (free tier — Llama, Nemotron)', value: 'nvidia' },
+        { name: 'NVIDIA NIM API Key', value: 'nvidia' },
         { name: 'OpenRouter API Key', value: 'openrouter' },
         { name: 'Skip', value: 'skip' },
       ],

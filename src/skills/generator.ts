@@ -55,7 +55,7 @@ export function writeSkillFile(skill: SkillDef, outDir: string): string {
 /** Build skill def from command registry (for Dirgha CLI). */
 export function buildDirghaSkill(): SkillDef {
   return {
-    name: 'dirgha-cli',
+    name: 'dirgha-code',
     version: '2.0.0',
     description: 'AI-powered coding assistant CLI with chat, knowledge graph, and code execution',
     commands: [

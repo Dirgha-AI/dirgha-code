@@ -1,8 +1,3 @@
-# GitHub's native "Sponsor this project" button.
-# Renders at the top of the repo page and on every issue/PR sidebar.
-# Users who click land on https://dirgha.ai/contribute which shows all four
-# rails (Razorpay, Stripe, Bitcoin on-chain rotating, Lightning BOLT12).
-
 github: [dirghaai]
 custom:
   - https://dirgha.ai/contribute

@@ -11,6 +11,7 @@
  */
 import type { AgentOutput } from '../types.js';
 import { callModel } from '../../providers/dispatch.js';
+import { getDefaultModel } from '../../providers/detection.js';
 import type { Message } from '../../types.js';
 
 export interface ChatArgs {
@@ -23,11 +24,6 @@ export interface ChatFlags {
   'no-stream'?: boolean;
 }
 
-// Default for headless `dirgha agent chat` — NVIDIA MiniMax M2.7 via BYOK.
-// Salik wants M2.7 as the default; when it's unhealthy (seen 502/timeout on
-// 2026-04-18) dispatch.ts fails over to Kimi K2 on the same NVIDIA key, then
-// to OpenRouter. Override per-call with `--model <id>`.
-const DEFAULT_MODEL = 'minimaxai/minimax-m2.7';
 
 export async function chatHeadless(
   args: unknown,
@@ -40,7 +36,7 @@ export async function chatHeadless(
   //   dirgha agent chat --message "hi"
   //   dirgha agent chat "hi"
   const message = String(a.message ?? f.message ?? '');
-  const model = String(f.model ?? DEFAULT_MODEL);
+  const model = String(f.model ?? getDefaultModel());
   const stream = !f['no-stream'];
 
   if (!message.trim()) {

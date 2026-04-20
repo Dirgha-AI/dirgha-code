@@ -54,7 +54,7 @@ async function loginWithDeviceFlow(opts: LoginOptions): Promise<void> {
   const res = await fetch(`${API}/api/auth/device/request`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ client_id: 'dirgha-cli' }),
+    body: JSON.stringify({ client_id: 'dirgha-code' }),
   });
   if (!res.ok) throw new Error('Failed to initiate device flow');
 

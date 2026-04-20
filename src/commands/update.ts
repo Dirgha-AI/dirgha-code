@@ -1,7 +1,7 @@
 /**
  * commands/update.ts — `dirgha update`
  *
- * Checks npm for the latest version of @dirgha-ai/cli and self-updates.
+ * Checks npm for the latest version of @dirgha/code and self-updates.
  */
 import { Command } from 'commander';
 import chalk from 'chalk';
@@ -9,11 +9,11 @@ import { execSync } from 'child_process';
 import { execCmd } from '../utils/safe-exec.js';
 
 declare const __CLI_VERSION__: string;
-const PKG = 'dirgha-cli';
+const PKG = '@dirgha/code';
 const CURRENT: string = (typeof __CLI_VERSION__ !== 'undefined') ? __CLI_VERSION__ : '1.0.0';
 
 export const updateCommand = new Command('update')
-  .description('Check for updates and install the latest @dirgha-ai/cli')
+  .description('Check for updates and install the latest @dirgha/code')
   .option('--check', 'Only check for updates, do not install')
   .action(async (opts: { check?: boolean }) => {
     console.log(chalk.dim('\n  Checking for updates…'));

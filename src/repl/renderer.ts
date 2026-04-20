@@ -225,7 +225,7 @@ export function renderMarkdown(text: string): void {
 }
 
 // ---------------------------------------------------------------------------
-// Gemini-style rounded tool box
+// Rounded tool box
 // ---------------------------------------------------------------------------
 
 const TOOL_ICONS: Record<string, string> = {

@@ -53,7 +53,7 @@ dirgha                             # launch the TUI
 ```
 
 Signs you in to the Dirgha Gateway — cross-provider failover, managed
-quotas, zero key management. Free tier includes 100k tokens/day.
+quotas, zero key management.
 
 ### 2. BYOK (sovereign — recommended for serious work)
 
@@ -62,7 +62,7 @@ Bring any one provider key:
 ```bash
 dirgha keys set NVIDIA_API_KEY nvapi-…      # MiniMax M2.7, Kimi K2, Llama 4
 dirgha keys set ANTHROPIC_API_KEY sk-ant-…  # Claude
-dirgha keys set OPENROUTER_API_KEY sk-or-…  # 300+ models, free tier
+dirgha keys set OPENROUTER_API_KEY sk-or-…  # 300+ models
 # …or 11 others — see "Providers" below
 
 dirgha
@@ -290,7 +290,7 @@ work offline.
 
 | Provider | Env var | Notes |
 |---|---|---|
-| **NVIDIA NIM** | `NVIDIA_API_KEY` | MiniMax M2.7, Kimi K2, Llama 4, Mistral Nemotron — generous free tier, 60s per-call timeout guard |
+| **NVIDIA NIM** | `NVIDIA_API_KEY` | MiniMax M2.7, Kimi K2, Llama 4, Mistral Nemotron — 60s per-call timeout guard |
 | **Anthropic** | `ANTHROPIC_API_KEY` | Claude Opus 4.7, Sonnet 4.6, Haiku 4.5 — extended thinking supported |
 | **OpenAI** | `OPENAI_API_KEY` | GPT-5.4 family, o-series reasoning models |
 | **OpenRouter** | `OPENROUTER_API_KEY` | 300+ models, unified billing, global routing |
