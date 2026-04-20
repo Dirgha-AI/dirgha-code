@@ -1,9 +1,10 @@
 # Dirgha Code
 
-**A terminal-native AI coding agent. Sovereign by default. Bring-your-own-key.**
+**A terminal-native AI coding agent. Sovereign by default. Parallel by design. Bring-your-own-key.**
 
 [![npm](https://img.shields.io/npm/v/@dirgha/code?style=flat-square&color=000)](https://www.npmjs.com/package/@dirgha/code)
 [![License: FSL-1.1-MIT](https://img.shields.io/badge/license-FSL--1.1--MIT-blue?style=flat-square)](./LICENSE)
+[![CLI-Anything compliant](https://img.shields.io/badge/CLI--Anything-compliant-10b981?style=flat-square)](https://github.com/HKUDS/CLI-Anything)
 [![Sponsor](https://img.shields.io/badge/sponsor-%E2%99%A1-ec4899?style=flat-square)](https://dirgha.ai/contribute)
 
 ---
@@ -11,24 +12,25 @@
 ```
 ◈ Dirgha Code · dirgha.ai · 0.1.0 · nvidia/minimax-m2.7
 ──────────────────────────────────────────────────────────
-❯ refactor this module to use the builder pattern
-  ∇ thinking…
+❯ dirgha fleet launch "migrate auth to JWT + add rate limiter"
+  ∇ decomposing goal into parallel streams…
 
-  ∴ read_file    src/order.ts (143 lines)
-  ∴ repo_map     src/**.ts · 34 symbols
-  ⊕ edit_file    src/order.ts  +18 −42
-  ∂ run_command  npm test      24 passed · 1.3s
-  ≡ git_commit   refactor(order): extract OrderBuilder
+  fleet × 3
+  ⠙ auth-middleware        fleet/auth-middleware        12s
+  ⠹ jwt-service            fleet/jwt-service             9s
+  · rate-limiter           fleet/rate-limiter            5s — done
 
-  Done. OrderBuilder now composes validation, pricing, and
-  persistence. Tests green. Diff available via /scroll.
+  ✓ 3/3 agents completed in 47s · review with `git diff`
 ```
 
-Dirgha Code writes, edits, runs, and verifies code from your terminal. It
-ships with 43 built-in tools, a dispatcher that speaks to 14 LLM providers,
-a multi-tier memory system, persistent sessions, a sandboxed runtime for
-user code, and a plugin registry. It is entirely one binary you install
-from npm. No Electron, no cloud dependency if you BYOK, no telemetry.
+Dirgha Code writes, edits, runs, and verifies code from your terminal —
+alone or as a **fleet of parallel agents** working in isolated git
+worktrees. It ships with 43 built-in tools, a dispatcher that speaks to
+14 LLM providers with automatic failover, a multi-tier memory system,
+persistent sessions, a sandboxed runtime for user code, and a plugin
+registry. It is entirely one binary you install from npm. No Electron,
+no cloud dependency if you BYOK, no telemetry, full CLI-Anything
+compliance (`--json` on every command).
 
 ## Install
 
@@ -36,28 +38,73 @@ from npm. No Electron, no cloud dependency if you BYOK, no telemetry.
 npm install -g @dirgha/code        # or: pnpm add -g @dirgha/code
 ```
 
-Requires Node 22.5+. Binary installs as both `dirgha` and `d`.
+Requires Node 20+. Binary installs as both `dirgha` and `d`.
 
 ## Start in 30 seconds
+
+Pick one of three on-ramps. You can change your mind later without
+reinstalling.
+
+### 1. Hosted (recommended for trial)
+
+```bash
+dirgha login                       # device-flow browser handshake
+dirgha                             # launch the TUI
+```
+
+Signs you in to the Dirgha Gateway — cross-provider failover, managed
+quotas, zero key management. Free tier includes 100k tokens/day.
+
+### 2. BYOK (sovereign — recommended for serious work)
 
 Bring any one provider key:
 
 ```bash
-export NVIDIA_API_KEY=nvapi-…        # MiniMax M2.7 + Kimi K2 (recommended)
-export ANTHROPIC_API_KEY=sk-ant-…    # Claude
-export OPENROUTER_API_KEY=sk-or-…    # 300+ models
-# ... or 11 others — see "Providers" below
+dirgha keys set NVIDIA_API_KEY nvapi-…      # MiniMax M2.7, Kimi K2, Llama 4
+dirgha keys set ANTHROPIC_API_KEY sk-ant-…  # Claude
+dirgha keys set OPENROUTER_API_KEY sk-or-…  # 300+ models, free tier
+# …or 11 others — see "Providers" below
 
 dirgha
 ```
 
-Or sign in to the hosted Dirgha Gateway (cross-provider failover, managed
-quotas, zero key management):
+Keys are stored at `~/.dirgha/keys.json` (mode 0600), auto-loaded into
+env at boot. No telemetry, no gateway round-trip.
+
+### 3. Headless (CI / scripting)
 
 ```bash
-dirgha login
-dirgha
+# Single-turn
+dirgha ask "summarise the failing tests" --json
+
+# Parallel fleet in git worktrees
+dirgha fleet launch "refactor auth + add tests" --concurrency 3
+
+# Generate a signup link for new accounts
+dirgha signup
 ```
+
+Every command supports `--json` — parseable envelope with `data`, `text`,
+`exitCode`, `timestamp`, and `meta.durationMs` (CLI-Anything spec).
+
+---
+
+## What's new in 0.1.0 — `fleet`
+
+The headline feature of 0.1.0 is **parallel multi-agent execution in git
+worktrees**. One command decomposes a goal into independent streams,
+spawns N agents concurrently, and lets you review their diffs before
+anything touches your working tree.
+
+```bash
+dirgha fleet launch "add rate limiting"        # 2-5 subtasks in parallel worktrees
+dirgha fleet triple "refactor the auth loop"   # 3 variants + judge picks winner
+dirgha fleet list                              # show all active worktrees
+dirgha fleet merge <agent-id>                  # 3-way apply-back to your branch
+dirgha fleet cleanup                           # tear down worktrees + branches
+```
+
+Full guide: [`docs/FLEET.md`](./docs/FLEET.md).
 
 ## Why this exists
 
@@ -338,49 +385,71 @@ trusted environments.
 `security/capabilityTokens.ts` — short-lived HMAC-signed tokens for
 delegating tool access to sub-agents, scoped to specific paths / capabilities.
 
-## Headless agent mode
+## Headless & machine-readable — `--json` on every command
 
-Every interactive flow has a machine-readable counterpart. `dirgha agent …`
-dispatches to the agent-mode runner (`agent/index.ts`, `agent/parser.ts`,
-`agent/executor.ts`) that returns a stable JSON shape:
+Every Dirgha command emits machine-readable JSON when `--json` is passed
+(either at the root — `dirgha --json <cmd>` — or at the subcommand —
+`dirgha <cmd> --json`). This is the CLI-Anything contract. Two-tier
+implementation:
+
+1. **Universal capture** — stdout is intercepted for any command and
+   wrapped in the standard envelope on exit. Zero per-command changes.
+2. **Native emit** — commands that want to expose structured `data`
+   fields (like `dirgha hub list`, `dirgha fleet launch`) use the
+   `emit()` helper and set the natively-emitted flag so the wrapper
+   skips.
 
 ```bash
-dirgha agent chat --message "summarise CHANGELOG.md" --json
+dirgha status --json         # account, quota, sessions
+dirgha fleet list --json     # all active worktrees + branches
+dirgha hub search ollama --json
+dirgha ask "explain this repo" --json
 ```
+
+The envelope shape:
 
 ```json
 {
-  "data": { "response": "v0.1.0 adds multi-provider dispatch, …", "model": "minimaxai/minimax-m2.7" },
-  "text": "v0.1.0 adds multi-provider dispatch, …",
+  "data":   { "…": "command-specific structured payload" },
+  "text":   "human-readable output (ANSI-stripped)",
   "exitCode": 0,
-  "command": "chat",
-  "timestamp": "2026-04-18T11:23:07.701Z",
-  "suggestions": ["Use --model to specify a different model"],
-  "meta": { "durationMs": 2043, "tokensUsed": 312, "model": "minimaxai/minimax-m2.7" }
+  "command":  "fleet launch",
+  "timestamp": "2026-04-20T07:45:22.118Z",
+  "meta":     { "durationMs": 27 }
 }
 ```
 
-This is how you drive Dirgha from CI, other agents, IDE extensions, or shell
-scripts. Every command in the registry (`agent/index.ts`) follows the same
-contract.
+This is how you drive Dirgha from CI, other agents, IDE extensions, or
+shell scripts. `dirgha __dump_spec` returns the full commander tree as
+JSON for tooling/automation.
 
-## Slash commands (30 built-in)
+## Slash commands (80+ in the TUI)
 
-Available inside the interactive TUI. Full list in `src/repl/slash/`:
+Available inside the interactive TUI. Open the modal help (`/help` —
+type to filter, ↑↓ to scroll, `Esc` to close) or see
+[`docs/COMMANDS.md`](./docs/COMMANDS.md) for the full reference. Grouped:
 
-- **Navigation** — `/model`, `/keys`, `/provider`, `/login`, `/logout`
-- **Session** — `/session`, `/sessions`, `/resume`, `/fork`, `/compact`,
-  `/checkpoint`, `/rollback`
-- **Tools** — `/tools`, `/mcp`, `/hub`, `/skill`, `/ask`, `/scroll`
-- **Knowledge** — `/memory`, `/remember`, `/recall`, `/knowledge`,
-  `/search`, `/context`, `/wiki`
-- **Workflow** — `/sprint`, `/recipe`, `/team`, `/orchestrate`,
-  `/consensus`, `/agent`
-- **Dev** — `/dev`, `/screen`, `/theme`, `/verify`, `/hermes`, `/cron`
-- **Safety** — `/security`, `/safety`
-- **Meta** — `/help`, `/status`, `/voice`, `/fs`, `/net`, `/git`
+- **Session** — `/help`, `/status`, `/clear`, `/compact`, `/save`,
+  `/resume`, `/export`, `/summary`, `/cost`, `/tokens`, `/usage`
+- **Auth & config** — `/login`, `/logout`, `/setup`, `/model`, `/keys`,
+  `/config`, `/theme`, `/soul`
+- **Dev workflow** — `/spec`, `/plan`, `/review`, `/qa`, `/fix`,
+  `/refactor`, `/scaffold`, `/changes`, `/fast`, `/verbose`
+- **Git** — `/diff`, `/commit`, `/stash`, `/push`, `/branch`, `/checkout`
+- **Memory & knowledge** — `/memory`, `/remember`, `/recall`, `/curate`
+- **Safety** — `/checkpoint`, `/rollback`, `/permissions`, `/yolo`,
+  `/approvals`, `/btw`
+- **Skills & tools** — `/skills`, `/init`, `/scan`, `/secrets`
+- **System** — `/verify`, `/doctor`
+- **Integrations** — `/mcp`, `/voice`, `/cron`, `/net`, `/fs`, `/team`,
+  `/consensus`, `/screen`, `/drop`, `/undo`
+- **Sprint engine** — `/sprint`, `/run`
+- **Multi-agent** — `/side` (ephemeral sub-agent fork), `/orchestrate`
 
-Auto-complete on partial entry — `/hel` expands to `/help`, `/sta` to `/status`.
+Auto-complete on partial entry — `/hel` expands to `/help`, `/sta` to
+`/status`. `/side <prompt>` runs an isolated sub-agent that does NOT
+pollute the main conversation history (Codex pattern, useful for quick
+tangents).
 
 ## Configuration surface
 
