@@ -30,6 +30,7 @@ import { verifyCommands } from './verify.js';
 import { sprintCommands } from './sprint.js';
 import { sideCommands } from './side.js';
 import { verboseCommands } from './verbose.js';
+import { accountCommands } from './account.js';
 import themeCommand from './theme.js';
 import chalk from 'chalk';
 import { getTheme } from '../themes.js';
@@ -63,6 +64,7 @@ const registry: SlashCommand[] = [
   ...sprintCommands,
   ...sideCommands,
   ...verboseCommands,
+  ...accountCommands,
   themeCommand,
 ];
 

@@ -189,23 +189,26 @@ export function DirghaApp({ initialPrompt, resumeSessionId, maxBudgetUsd }: { in
       }
     }
 
-    if (!isConfigured()) {
-      push({ role: 'system', content: '  ⊙  Welcome to Dirgha! Choose a provider to get started.', isDim: true });
-      push({ role: 'system', content: '     Tip: run  dirgha setup  for the full onboarding wizard.', isDim: true });
-      const t = setTimeout(() => setShowKeys(true), 200);
-      timeoutsRef.current.push(t);
-    } else if (!isLoggedIn()) {
-      if (!isProjectInitialized()) {
-        push({ role: 'system', content: `  ∎  ${modelLabel(defModel)} · ${provLabel(provider)} · ready (local mode)`, isDim: true });
-      } else {
-        push({ role: 'system', content: `  ∎  ${modelLabel(defModel)} · ${provLabel(provider)} · ready`, isDim: true });
+    // Startup CTA banner (option A minimal, option B first-run invitational)
+    // — see src/tui/startup-cta.ts for the state machine.
+    import('./startup-cta.js').then(({ buildStartupCta }) => {
+      const cta = buildStartupCta({ model: defModel });
+      for (const line of cta.lines) {
+        push({ role: 'system', content: line, isDim: true });
       }
-    } else if (!isProjectInitialized()) {
+      // On genuine first-run with no config, still open the keys picker as before
+      if (cta.invitational && !isConfigured()) {
+        const t = setTimeout(() => setShowKeys(true), 600);
+        timeoutsRef.current.push(t);
+      } else if (isLoggedIn() && isProjectInitialized()) {
+        // nothing extra to say
+      } else if (isConfigured() && !isProjectInitialized()) {
+        push({ role: 'system', content: '  ○  New project — run /init to scan this directory', isDim: true });
+      }
+    }).catch(() => {
+      // Fallback to the old one-liner if startup-cta fails
       push({ role: 'system', content: `  ∎  ${modelLabel(defModel)} · ${provLabel(provider)} · ready`, isDim: true });
-      push({ role: 'system', content: '  ○  New project — run /init to scan this directory', isDim: true });
-    } else {
-      push({ role: 'system', content: `  ∎  ${modelLabel(defModel)} · ${provLabel(provider)} · ready`, isDim: true });
-    }
+    });
     
     // Track initial prompt timeout for cleanup
     let initialPromptTimeout: NodeJS.Timeout | null = null;

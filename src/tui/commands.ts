@@ -34,8 +34,11 @@ export const SLASH_COMMAND_SPEC: SlashCommandSpec[] = [
   { name: '/usage',      description: 'Billing usage bars',            group: 'session' },
 
   // auth + config
+  { name: '/signup',     description: 'Create a Dirgha account',       group: 'auth' },
   { name: '/login',      description: 'Sign in to Dirgha',             group: 'auth' },
   { name: '/logout',     description: 'Clear credentials',             group: 'auth' },
+  { name: '/account',    description: 'Account info + quota',          group: 'auth' },
+  { name: '/upgrade',    description: 'Open pricing page',             group: 'auth' },
   { name: '/setup',      description: 'Onboarding wizard',             group: 'auth' },
   { name: '/local',      description: 'Local llama.cpp status',        group: 'auth' },
   { name: '/model',      description: 'Switch model / provider',       group: 'auth' },
