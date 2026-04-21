@@ -1,41 +1,44 @@
+# Temporary: uses @salikshah until @dirghaai/maintainers team is created on GitHub.
+# When teams exist, sed -i 's#@salikshah#@dirghaai/maintainers#' then commit.
+
 # Dirgha Code — code owners
 # GitHub uses this to auto-request reviews on PRs.
 # Order matters: later patterns override earlier ones for overlapping paths.
 
 # Default owner for everything not matched below
-*                               @dirghaai/maintainers
+*                               @salikshah
 
 # Provider layer — keep routing logic stable
-/src/providers/                 @dirghaai/maintainers
-/src/providers/dispatch.ts      @dirghaai/maintainers
-/src/providers/detection.ts     @dirghaai/maintainers
-/src/providers/http.ts          @dirghaai/maintainers
+/src/providers/                 @salikshah
+/src/providers/dispatch.ts      @salikshah
+/src/providers/detection.ts     @salikshah
+/src/providers/http.ts          @salikshah
 
 # Agent loop — high blast radius
-/src/agent/                     @dirghaai/maintainers
-/src/agent/loop.ts              @dirghaai/maintainers
-/src/agent/context.ts           @dirghaai/maintainers
-/src/agent/tool-execution.ts    @dirghaai/maintainers
-/src/agent/model-fallback.ts    @dirghaai/maintainers
+/src/agent/                     @salikshah
+/src/agent/loop.ts              @salikshah
+/src/agent/context.ts           @salikshah
+/src/agent/tool-execution.ts    @salikshah
+/src/agent/model-fallback.ts    @salikshah
 
 # TUI — App.tsx is off-limits to mechanical refactors (see feedback memory)
-/src/tui/                       @dirghaai/maintainers
-/src/tui/App.tsx                @dirghaai/maintainers
+/src/tui/                       @salikshah
+/src/tui/App.tsx                @salikshah
 
 # Tools layer
-/src/tools/                     @dirghaai/maintainers
+/src/tools/                     @salikshah
 
 # Billing + security-sensitive
-/src/billing/                   @dirghaai/maintainers
-/src/permission/                @dirghaai/maintainers
-/src/security/                  @dirghaai/maintainers
+/src/billing/                   @salikshah
+/src/permission/                @salikshah
+/src/security/                  @salikshah
 
 # CI and release
-/.github/workflows/             @dirghaai/maintainers
-/build.mjs                      @dirghaai/maintainers
-/package.json                   @dirghaai/maintainers
+/.github/workflows/             @salikshah
+/build.mjs                      @salikshah
+/package.json                   @salikshah
 
 # Docs are lower barrier — drive-by fixes welcome
-/docs/                          @dirghaai/docs
-/README.md                      @dirghaai/docs
-/CONTRIBUTING.md                @dirghaai/docs
+/docs/                          @salikshah
+/README.md                      @salikshah
+/CONTRIBUTING.md                @salikshah
