@@ -32,17 +32,17 @@
   },
   "private": false,
   "engines": {
-    "node": ">=22.5.0",
+    "node": ">=20.0.0",
     "pnpm": ">=8.0.0"
   },
   "packageManager": "pnpm@9.0.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dirgha-ai/cli.git"
+    "url": "git+https://github.com/dirghaai/dirgha-code.git"
   },
   "homepage": "https://dirgha.ai",
   "bugs": {
-    "url": "https://github.com/dirgha-ai/cli/issues"
+    "url": "https://github.com/dirghaai/dirgha-code/issues"
   },
   "keywords": [
     "ai",
@@ -55,9 +55,9 @@
     "code-generation",
     "chatbot"
   ],
-  "author": "Dirgha AI <team@dirgha.ai>",
-  "license": "MIT",
-  "description": "Dirgha CLI — AI coding agent for the terminal. Multi-provider LLM support, secure execution, browser automation, and persistent sessions.",
+  "author": "Salik Shah <salik@dirgha.ai>",
+  "license": "FSL-1.1-MIT",
+  "description": "Dirgha CLI \u2014 AI coding agent for the terminal. Multi-provider LLM support, secure execution, browser automation, and persistent sessions.",
   "dependencies": {
     "@commander-js/extra-typings": "^14.0.0",
     "@inkjs/ui": "^2.0.0",
