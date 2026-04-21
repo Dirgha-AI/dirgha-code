@@ -561,61 +561,61 @@ src/
 59 test files ship alongside the source. Build is `esbuild`, single-file
 output to `dist/dirgha.mjs` (~7.3 MB minified).
 
+## Sister projects in the Dirgha OS
+
+This repo is one of five that make up the open-source surface of the Dirgha OS. Each repo stands on its own; together they compose a full stack for builders.
+
+| Repo | What it does | License |
+|---|---|---|
+| [`creator-studio`](https://github.com/dirghaai/creator-studio) | Backend API for the creator economy. Monetization, campaigns, memberships, social integrations. | Apache-2.0 |
+| [`writer-studio`](https://github.com/dirghaai/writer-studio) | Backend API for writing — science, fiction, screenplays, research. Binder + AI research + RAG. | Apache-2.0 |
+| [`abundance-protocol`](https://github.com/dirghaai/abundance-protocol) | DePIN for distributed AI inference. Peer-to-peer compute, Lightning settlement, on-chain governance. | Apache-2.0 |
+| [`arniko`](https://github.com/dirghaai/arniko) | AI security scanning. 36 scanner adapters unified into one stream of typed findings. | Apache-2.0 |
+
+Visit the umbrella org at [github.com/dirghaai](https://github.com/dirghaai) or the product site at [dirgha.ai](https://dirgha.ai).
+
 ## License
 
-**FSL-1.1-MIT** (Functional Source License, MIT Future).
+The Dirgha Code CLI is source-available under **FSL-1.1-MIT** and converts to **MIT** two years after each release. In practice: you can install, use, fork, modify, redistribute, and package it for your team or company today. The one restriction — no competing hosted service — expires automatically. Full rationale in [`LICENSING.md`](./LICENSING.md); quick summary at [dirgha.ai/license](https://dirgha.ai/license).
 
-- Free for any non-competing use — personal, research, education,
-  professional services, internal company use.
-- You cannot take this code, rebrand it, and sell a competing product.
-- Each release converts to pure MIT automatically **two years after**
-  release. The community gets the long tail; the project is protected in
-  the present.
+**Dirgha LLC owns the “Dirgha” name, logo, and product family** as registered trademarks. The code is open — the brand isn't. Forks of this repository must rename the product and remove Dirgha branding before distribution. Reasonable nominative use (“a fork of Dirgha Code”) is fine.
 
-Full text in [`LICENSE`](./LICENSE). Plain-English summary at
-<https://fsl.software>.
+See [`LICENSE`](./LICENSE) and [`NOTICE.md`](./NOTICE.md) for the full legal text. Related documents:
 
-## Contributing
+- [`SECURITY.md`](./SECURITY.md) — vulnerability disclosure policy.
+- [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md) — Contributor Covenant 2.1.
+- [`SUPPORT.md`](./SUPPORT.md) — where to ask for help.
+- [`CONTRIBUTING.md`](./CONTRIBUTING.md) — how to send a PR.
+- [`LICENSING.md`](./LICENSING.md) — honest rationale for the FSL choice (why not pure MIT? bootstrapped, not VC-funded).
 
-Read [`CONTRIBUTING.md`](./CONTRIBUTING.md) and sign the [CLA](./CLA.md).
-Contributions are assigned to Dirgha LLC so the project stays coherent and
-relicensable as it grows. Standard for commercial open-source.
+## Contribute
 
-## Trademark
+- **Code** — fork, branch, PR against `main`. Recipes in [`CONTRIBUTING.md`](./CONTRIBUTING.md).
+- **Bugs** — file an issue using the [bug template](https://github.com/dirghaai/dirgha-code/issues/new?template=bug.md).
+- **Features** — file an issue using the [feature template](https://github.com/dirghaai/dirgha-code/issues/new?template=feature.md).
+- **Questions** — open a [Discussion](https://github.com/dirghaai/dirgha-code/discussions) rather than an issue.
+- **Security** — email `security@dirgha.ai`. Do NOT file a public issue for vulnerabilities.
+- **Sponsor** — [dirgha.ai/contribute](https://dirgha.ai/contribute) · Lightning, GitHub Sponsors, OpenCollective.
 
-"Dirgha" and "Dirgha Code" are trademarks of Dirgha LLC. The FSL license
-does not grant rights to the Dirgha name, logo, or branding.
-
-## Support the project ♡
-
-Dirgha Code is independent and unfunded. If it saves you time, help keep it
-going:
-
-- <https://dirgha.ai/contribute> — Bitcoin, Lightning, UPI, card
-- [GitHub Sponsors](https://github.com/sponsors/dirghaai)
-- [Open Collective](https://opencollective.com/dirgha)
-
-From the CLI:
-
-```bash
-dirgha contribute
-```
-
-## Related reading
-
-- **[CREDITS.md](./CREDITS.md)** — inspirations, dependencies, acknowledgements
-- **[alternatives/](./alternatives/)** — honest comparison with 9 other AI coding CLIs (Claude Code, Gemini CLI, Codex, OpenCode, Aider, Hermes, Cline, CLI-Anything, Continue)
-- **[docs/](./docs/)** — getting started, BYOK, fleet, commands
 
 ## Links
 
-- Website — <https://dirgha.ai>
-- Issues — <https://github.com/dirghaai/dirgha-code/issues>
-- Email — team@dirgha.ai
-- X / Twitter — [@salik](https://x.com/salik) · [@DirghaAI](https://x.com/DirghaAI)
+| | |
+|---|---|
+| Website | [https://dirgha.ai](https://dirgha.ai) |
+| Repository | [github.com/dirghaai/dirgha-code](https://github.com/dirghaai/dirgha-code) |
+| Issues | [github.com/dirghaai/dirgha-code/issues](https://github.com/dirghaai/dirgha-code/issues) |
+| Discussions | [github.com/dirghaai/dirgha-code/discussions](https://github.com/dirghaai/dirgha-code/discussions) |
+| Security | `security@dirgha.ai` |
+| Enterprise | `enterprise@dirgha.ai` |
+| Press / general | `hello@dirgha.ai` |
 
 ---
 
-Built in India. Open to the world.
+**Dirgha Code** is part of the Dirgha OS — open-source infrastructure for builders, shipped by a small bootstrapped team.
 
-Copyright © 2026 Dirgha LLC.
+Named for the Sanskrit *dīrgha* — “long-horizon.” The agent is built for work that spans hours, not turns.
+
+Built by [Dirgha LLC](https://dirgha.ai) in India. Open to the world.
+
+Released under **FSL-1.1-MIT** · Copyright © 2026 Dirgha LLC · All third-party trademarks are property of their owners.
