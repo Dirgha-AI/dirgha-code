@@ -1,0 +1,41 @@
+# Dirgha Code — code owners
+# GitHub uses this to auto-request reviews on PRs.
+# Order matters: later patterns override earlier ones for overlapping paths.
+
+# Default owner for everything not matched below
+*                               @dirghaai/maintainers
+
+# Provider layer — keep routing logic stable
+/src/providers/                 @dirghaai/maintainers
+/src/providers/dispatch.ts      @dirghaai/maintainers
+/src/providers/detection.ts     @dirghaai/maintainers
+/src/providers/http.ts          @dirghaai/maintainers
+
+# Agent loop — high blast radius
+/src/agent/                     @dirghaai/maintainers
+/src/agent/loop.ts              @dirghaai/maintainers
+/src/agent/context.ts           @dirghaai/maintainers
+/src/agent/tool-execution.ts    @dirghaai/maintainers
+/src/agent/model-fallback.ts    @dirghaai/maintainers
+
+# TUI — App.tsx is off-limits to mechanical refactors (see feedback memory)
+/src/tui/                       @dirghaai/maintainers
+/src/tui/App.tsx                @dirghaai/maintainers
+
+# Tools layer
+/src/tools/                     @dirghaai/maintainers
+
+# Billing + security-sensitive
+/src/billing/                   @dirghaai/maintainers
+/src/permission/                @dirghaai/maintainers
+/src/security/                  @dirghaai/maintainers
+
+# CI and release
+/.github/workflows/             @dirghaai/maintainers
+/build.mjs                      @dirghaai/maintainers
+/package.json                   @dirghaai/maintainers
+
+# Docs are lower barrier — drive-by fixes welcome
+/docs/                          @dirghaai/docs
+/README.md                      @dirghaai/docs
+/CONTRIBUTING.md                @dirghaai/docs

@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Q&A and ideas
+    url: https://github.com/dirghaai/dirgha-code/discussions
+    about: For open-ended questions and brainstorming, use Discussions.
+  - name: Security vulnerability
+    url: https://github.com/dirghaai/dirgha-code/security/policy
+    about: Please do not file public issues for security reports. See SECURITY.md.
+  - name: Commercial support
+    url: mailto:enterprise@dirgha.ai
+    about: On-prem deployment, SLAs, custom tooling.
