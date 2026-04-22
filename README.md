@@ -619,3 +619,25 @@ Named for the Sanskrit *dīrgha* — “long-horizon.” The agent is built for 
 Built by [Dirgha LLC](https://dirgha.ai) in India. Open to the world.
 
 Released under **FSL-1.1-MIT** · Copyright © 2026 Dirgha LLC · All third-party trademarks are property of their owners.
+
+---
+
+## 🌐 The Dirgha Ecosystem
+
+**[Dirgha AI OS](https://github.com/Dirgha-AI/Rama-I-Dirgha-AI-OS)** — the agentic operating system. *Accelerate Abundance.*
+
+| Repo | What it does |
+|---|---|
+| [Rama-I-Dirgha-AI-OS](https://github.com/Dirgha-AI/Rama-I-Dirgha-AI-OS) | Vision, architecture, and the Rama I sovereign compute challenge |
+| [abundance-protocol](https://github.com/Dirgha-AI/abundance-protocol) | P2P compute mesh for distributed AI inference |
+| [arniko](https://github.com/Dirgha-AI/arniko) | Security scanner and red-teaming agent |
+| [dirgha-code](https://github.com/Dirgha-AI/dirgha-code) | Autonomous software engineering CLI (`@dirgha/cli`) |
+| [creator-studio](https://github.com/Dirgha-AI/creator-studio) | AI-native media production workspace |
+| [writer-studio](https://github.com/Dirgha-AI/writer-studio) | AI-native document workspace |
+| [.github](https://github.com/Dirgha-AI/.github) | Org profile and community configuration |
+
+- **Live platform:** [dirgha.ai/app](https://dirgha.ai/app) — chat, IDE, writer, research, library, marketplace, creator, education, manufacturing
+- **Organization:** [github.com/Dirgha-AI](https://github.com/Dirgha-AI)
+- **Partnerships:** [partner@dirgha.ai](mailto:partner@dirgha.ai)
+
+*Dirgha — Accelerate Abundance. Built in India, for the world.*
