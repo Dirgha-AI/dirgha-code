@@ -27,10 +27,15 @@ describe('E2E: Billing & Quota', () => {
   it('checks local quota without error', async () => {
     const { checkQuota, canMakeRequest } = await import('./billing/quota.js');
     const { getDB } = await import('./session/db.js');
-    // Clear quota before test to ensure clean state
-    try { getDB().prepare('DELETE FROM daily_usage').run(); } catch {}
+    // Clear both daily + monthly usage so inherited state from a
+    // previous test run doesn't trip the exceeded flag. Run each in
+    // its own try so a missing table doesn't skip the other clear.
+    const db = getDB();
+    try { db.prepare('DELETE FROM daily_usage').run(); } catch { /* table may not exist yet */ }
+    try { db.prepare('DELETE FROM monthly_usage').run(); } catch { /* same */ }
     const quota = checkQuota('free');
     expect(quota.dailyLimit).toBe(100_000);
+    expect(quota.monthlyLimit).toBe(1_000_000);
     expect(quota.exceeded).toBe(false);
     const can = canMakeRequest(500, 'free');
     expect(can.allowed).toBe(true);
