@@ -29,7 +29,7 @@ const DANGEROUS_PATTERNS = [
   /\breboot\b/i,
   /\bsystemctl\s+(stop|disable|mask)\s/i,
   // Git dangerous (force operations)
-  /\bgit\s+(push\s+.*--force|reset\s+--hard|clean\s+.*-f|branch\s+.*-D)\b/i,
+  /\bgit\s+(push\s+.*--force|reset\s+--hard|clean\s+-[a-z]*f|branch\s+-[a-z]*D)/i,
   // SQL dangerous
   /\b(DROP|TRUNCATE)\s+(TABLE|DATABASE)\b/i,
   /\bDELETE\s+FROM\s+\w+\s*(;|\s*$)/i,
