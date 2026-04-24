@@ -1,0 +1,105 @@
+{
+  "name": "dirgha-code-vscode",
+  "displayName": "Dirgha Code",
+  "description": "Ask the Dirgha Code agent from VS Code. Uses your local @dirgha/code CLI.",
+  "version": "0.1.0",
+  "publisher": "dirgha",
+  "private": true,
+  "license": "FSL-1.1-MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "AI",
+    "Programming Languages",
+    "Other"
+  ],
+  "keywords": [
+    "ai",
+    "agent",
+    "dirgha",
+    "coding",
+    "cli"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "dirgha.ask",
+        "title": "Dirgha: Ask about current file",
+        "category": "Dirgha"
+      },
+      {
+        "command": "dirgha.askSelection",
+        "title": "Dirgha: Ask about selection",
+        "category": "Dirgha"
+      },
+      {
+        "command": "dirgha.openRepl",
+        "title": "Dirgha: Open REPL in integrated terminal",
+        "category": "Dirgha"
+      },
+      {
+        "command": "dirgha.status",
+        "title": "Dirgha: Show account status",
+        "category": "Dirgha"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "dirgha.askSelection",
+        "key": "ctrl+k ctrl+d",
+        "mac": "cmd+k cmd+d",
+        "when": "editorHasSelection"
+      },
+      {
+        "command": "dirgha.openRepl",
+        "key": "ctrl+k ctrl+r",
+        "mac": "cmd+k cmd+r"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "dirgha.askSelection",
+          "group": "dirgha@1",
+          "when": "editorHasSelection"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Dirgha",
+      "properties": {
+        "dirgha.binaryPath": {
+          "type": "string",
+          "default": "dirgha",
+          "description": "Path to the dirgha CLI binary. Leave as 'dirgha' to use the globally-installed version."
+        },
+        "dirgha.defaultModel": {
+          "type": "string",
+          "default": "",
+          "description": "Override DIRGHA_CODE_MODEL for this workspace. Empty = CLI default."
+        },
+        "dirgha.showOutput": {
+          "type": "string",
+          "enum": ["panel", "terminal"],
+          "default": "panel",
+          "description": "Where to show agent responses — the Dirgha output panel or an integrated terminal."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.90.0",
+    "typescript": "^5.9.3"
+  }
+}

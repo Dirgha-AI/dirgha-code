@@ -14,6 +14,7 @@ import { runCommandTool } from './shell.js';
 import { gitStatusTool, gitDiffTool, gitLogTool, gitCommitTool, checkpointTool, gitBranchTool, gitPushTool, gitStashTool, gitPatchTool, gitAutoMessageTool } from './git.js';
 import { searchFilesTool, listFilesTool, globTool, webFetchTool, webSearchTool, qmdSearchTool, searchKnowledgeTool, indexFilesTool } from './search.js';
 import { repoMapTool } from './repo.js';
+import { symbolGraphTool } from './symbol-graph.js';
 import { saveMemoryTool, readMemoryTool, writeTodosTool, askUserTool } from './memory.js';
 import { executeSandbox } from './sandbox.js';
 import { browserTool } from './browser.js';
@@ -53,6 +54,7 @@ export function executeTool(name: string, input: Record<string, any>, ctx?: Repl
     case 'list_files':    result = listFilesTool(input); break;
     case 'glob':          result = globTool(input); break;
     case 'repo_map':      result = repoMapTool(input); break;
+    case 'symbol_graph':  result = symbolGraphTool(input); break;
     case 'search_knowledge':  result = searchKnowledgeTool(input); break;
     case 'index_files':       result = indexFilesTool(input); break;
     case 'execute_code':      result = executeSandbox(input); break;
@@ -88,7 +90,7 @@ export async function executeToolAsync(name: string, input: Record<string, any>,
   else if (name === 'web_search')  result = await webSearchTool(input);
   else if (name === 'web_fetch')   result = await webFetchTool(input);
   else if (name === 'qmd_search')  result = await qmdSearchTool(input);
-  else if (name === 'browser')    result = browserTool(input);
+  else if (name === 'browser')    result = await browserTool(input);
   else if (name === 'spawn_agent') {
     const { spawnAgent } = await import('../agent/spawn-agent.js');
     result = await spawnAgent(input as any, ctx?.model ?? 'auto');

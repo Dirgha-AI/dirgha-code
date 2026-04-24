@@ -11,38 +11,38 @@ describe('browserTool', () => {
   afterEach(() => { vi.restoreAllMocks(); });
 
   describe('validation', () => {
-    it('navigate requires url', () => {
-      expect(browserTool({ action: 'navigate' }).error).toContain('url required');
+    it('navigate requires url', async () => {
+      expect((await browserTool({ action: 'navigate' })).error).toContain('url required');
     });
 
-    it('click requires selector', () => {
-      expect(browserTool({ action: 'click' }).error).toContain('selector required');
+    it('click requires selector', async () => {
+      expect((await browserTool({ action: 'click' })).error).toContain('selector required');
     });
 
-    it('type requires both fields', () => {
-      expect(browserTool({ action: 'type', selector: '@e1' }).error).toContain('required');
-      expect(browserTool({ action: 'type', text: 'hi' }).error).toContain('required');
+    it('type requires both fields', async () => {
+      expect((await browserTool({ action: 'type', selector: '@e1' })).error).toContain('required');
+      expect((await browserTool({ action: 'type', text: 'hi' })).error).toContain('required');
     });
 
-    it('fill requires both fields', () => {
-      expect(browserTool({ action: 'fill', selector: '@e1' }).error).toContain('required');
-      expect(browserTool({ action: 'fill', text: 'hi' }).error).toContain('required');
+    it('fill requires both fields', async () => {
+      expect((await browserTool({ action: 'fill', selector: '@e1' })).error).toContain('required');
+      expect((await browserTool({ action: 'fill', text: 'hi' })).error).toContain('required');
     });
 
-    it('find requires role', () => {
-      expect(browserTool({ action: 'find' }).error).toContain('role required');
+    it('find requires role', async () => {
+      expect((await browserTool({ action: 'find' })).error).toContain('role required');
     });
 
-    it('get requires info', () => {
-      expect(browserTool({ action: 'get' }).error).toContain('info required');
+    it('get requires info', async () => {
+      expect((await browserTool({ action: 'get' })).error).toContain('info required');
     });
 
-    it('eval requires js', () => {
-      expect(browserTool({ action: 'eval' }).error).toContain('js required');
+    it('eval requires js', async () => {
+      expect((await browserTool({ action: 'eval' })).error).toContain('js required');
     });
 
-    it('batch requires commands', () => {
-      expect(browserTool({ action: 'batch' }).error).toContain('commands array required');
+    it('batch requires commands', async () => {
+      expect((await browserTool({ action: 'batch' })).error).toContain('commands array required');
     });
   });
 
@@ -60,54 +60,54 @@ describe('browserTool', () => {
       vi.spyOn(agent, 'batchAgent').mockReturnValue({ tool: 'browser', result: 'ok' });
     });
 
-    it('delegates navigate to agent', () => {
-      browserTool({ action: 'navigate', url: 'https://example.com' });
+    it('delegates navigate to agent', async () => {
+      await browserTool({ action: 'navigate', url: 'https://example.com' });
       expect(agent.navigateAgent).toHaveBeenCalledWith('https://example.com');
     });
 
-    it('delegates snapshot with options', () => {
-      browserTool({ action: 'snapshot', interactive: true, compact: true, depth: 3 });
+    it('delegates snapshot with options', async () => {
+      await browserTool({ action: 'snapshot', interactive: true, compact: true, depth: 3 });
       expect(agent.snapshotAgent).toHaveBeenCalledWith(expect.objectContaining({ interactive: true, compact: true, depth: 3 }));
     });
 
-    it('delegates click to agent', () => {
-      browserTool({ action: 'click', selector: '@e1' });
+    it('delegates click to agent', async () => {
+      await browserTool({ action: 'click', selector: '@e1' });
       expect(agent.clickAgent).toHaveBeenCalledWith('@e1');
     });
 
-    it('delegates type to agent', () => {
-      browserTool({ action: 'type', selector: '@e2', text: 'hello' });
+    it('delegates type to agent', async () => {
+      await browserTool({ action: 'type', selector: '@e2', text: 'hello' });
       expect(agent.typeAgent).toHaveBeenCalledWith('@e2', 'hello');
     });
 
-    it('delegates fill to agent', () => {
-      browserTool({ action: 'fill', selector: '@e3', text: 'pass' });
+    it('delegates fill to agent', async () => {
+      await browserTool({ action: 'fill', selector: '@e3', text: 'pass' });
       expect(agent.fillAgent).toHaveBeenCalledWith('@e3', 'pass');
     });
 
-    it('delegates screenshot to agent', () => {
-      browserTool({ action: 'screenshot', path: '/tmp/shot.png', annotate: true });
+    it('delegates screenshot to agent', async () => {
+      await browserTool({ action: 'screenshot', path: '/tmp/shot.png', annotate: true });
       expect(agent.screenshotAgent).toHaveBeenCalledWith('/tmp/shot.png', true);
     });
 
-    it('delegates find to agent', () => {
-      browserTool({ action: 'find', role: 'button', findAction: 'click', name: 'Submit' });
+    it('delegates find to agent', async () => {
+      await browserTool({ action: 'find', role: 'button', findAction: 'click', name: 'Submit' });
       expect(agent.findAgent).toHaveBeenCalledWith('button', 'click', 'Submit');
     });
 
-    it('delegates get to agent', () => {
-      browserTool({ action: 'get', info: 'title', selector: 'h1' });
+    it('delegates get to agent', async () => {
+      await browserTool({ action: 'get', info: 'title', selector: 'h1' });
       expect(agent.getAgent).toHaveBeenCalledWith('title', 'h1');
     });
 
-    it('delegates eval to agent', () => {
-      browserTool({ action: 'eval', js: 'document.title' });
+    it('delegates eval to agent', async () => {
+      await browserTool({ action: 'eval', js: 'document.title' });
       expect(agent.evalAgent).toHaveBeenCalledWith('document.title');
     });
 
-    it('delegates batch to agent', () => {
+    it('delegates batch to agent', async () => {
       const cmds = [['open', 'example.com'], ['click', '@e1']];
-      browserTool({ action: 'batch', commands: cmds });
+      await browserTool({ action: 'batch', commands: cmds });
       expect(agent.batchAgent).toHaveBeenCalledWith(cmds);
     });
   });
@@ -117,20 +117,20 @@ describe('browserTool', () => {
       vi.spyOn(utils, 'isAgentBrowserInstalled').mockReturnValue(false);
     });
 
-    it('uses legacy navigate', { timeout: 30000 }, () => {
-      const r = browserTool({ action: 'navigate', url: 'https://example.com' });
+    it('uses legacy navigate', { timeout: 30000 }, async () => {
+      const r = await browserTool({ action: 'navigate', url: 'https://example.com' });
       expect(r.result).toContain('Fallback');
     });
 
-    it('returns error for screenshot without agent-browser', () => {
-      const r = browserTool({ action: 'screenshot', url: 'https://example.com' });
+    it('returns error for screenshot without agent-browser', async () => {
+      const r = await browserTool({ action: 'screenshot', url: 'https://example.com' });
       expect(r.error).toContain('agent-browser');
     });
   });
 
   describe('unknown action', () => {
-    it('returns error for unknown action', () => {
-      const r = browserTool({ action: 'unknown' });
+    it('returns error for unknown action', async () => {
+      const r = await browserTool({ action: 'unknown' });
       expect(r.error).toContain('Unknown action');
     });
   });

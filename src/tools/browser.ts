@@ -7,12 +7,18 @@ import type { ToolResult } from '../types.js';
 import { isAgentBrowserInstalled, truncateOutput, MAX_OUTPUT } from './browser/utils.js';
 import { navigateAgent, snapshotAgent, clickAgent, typeAgent, fillAgent, screenshotAgent, findAgent, getAgent, batchAgent, evalAgent } from './browser/agent.js';
 import { navigateLegacy, extractLegacy, searchLegacy } from './browser/legacy.js';
+import { visionAction } from './browser/vision.js';
 
-export function browserTool(input: Record<string, any>): ToolResult {
+export async function browserTool(input: Record<string, any>): Promise<ToolResult> {
   try {
     const action = input['action'] as string;
     const hasAgentBrowser = isAgentBrowserInstalled();
-    
+
+    // Vision runs regardless of action-path — it needs only a screenshot
+    // and a vision-capable LLM, which don't live under the agent-browser
+    // safe set.
+    if (action === 'vision') return visionAction(input);
+
     if (hasAgentBrowser) {
       switch (action) {
         case 'navigate': {

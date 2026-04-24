@@ -21,7 +21,7 @@ export const browseCommand: SlashCommand = {
     }
 
     const { browserTool } = await import('../tools/browser.js');
-    const result = browserTool({ action: 'navigate', url });
+    const result = await browserTool({ action: 'navigate', url });
 
     if (result.error) {
       return chalk.red(`❌ ${result.error}`);
@@ -47,7 +47,7 @@ export const screenshotCommand: SlashCommand = {
     }
 
     const { browserTool } = await import('../tools/browser.js');
-    const result = browserTool({ action: 'screenshot', url });
+    const result = await browserTool({ action: 'screenshot', url });
 
     if (result.error) {
       let out = chalk.red(`❌ ${result.error}`) + '\n';
