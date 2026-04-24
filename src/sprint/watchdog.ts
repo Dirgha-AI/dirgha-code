@@ -45,10 +45,12 @@ export async function startWatchdog(sprintId: string, manifestPath: string): Pro
       quoteShell(nodePath),
       '--name',
       processName,
-      '--restart-delay',
-      '5000',
-      '--max-restarts',
-      '20',
+      // no-autorestart: clean exit = done. Without this PM2 restarts the
+      // daemon on every successful completion, firing sprint_started ×
+      // sprint_completed forever until max-restarts is hit. Crashes are
+      // human-reviewable rather than silently retried, which is the
+      // correct default for a sprint engine.
+      '--no-autorestart',
       '--',
       quoteShell(cliEntry),
       'sprint',
