@@ -6,11 +6,11 @@
  *   dirgha models info <model>      # Show model details
  *   dirgha models switch <model>    # Set default model
  *   dirgha models recommend       # Get recommendation for task
- *   dirgha models health          # Check LiteLLM proxy health
+ *   dirgha models health          # Check provider gateway health
  *   dirgha models pool add        # Add credential pool
  *   dirgha models pool status     # Check credential pool status
  */
-import { ModelRegistry, createModelRouter } from '../models/index.js';
+import { ModelRegistry } from '../models/index.js';
 import { getCredentialPoolManager } from '../models/index.js';
 import chalk from 'chalk';
 
@@ -143,28 +143,24 @@ export function registerModelCommands(program: any): void {
       console.log(chalk.dim(`\nUse: dirgha models switch ${modelId}`));
     });
 
-  // Health check
+  // Health check — Gateway only. Providers enforce their own quotas server-side.
   models
     .command('health')
-    .description('Check LiteLLM proxy health and available models')
+    .description('Check provider gateway health')
     .action(async () => {
-      const router = createModelRouter();
-      
-      console.log(chalk.bold('\n🏥 LiteLLM Health Check\n'));
-      
+      const gatewayUrl = process.env['DIRGHA_API_URL'] || 'https://api.dirgha.ai';
+      console.log(chalk.bold('\nGateway health\n'));
       try {
-        const health = await router.healthCheck();
-        
-        if (health.healthy) {
-          console.log(`${chalk.green('✅')} Proxy:     ${chalk.green('Healthy')}`);
-          console.log(`${chalk.green('✅')} Models:    ${health.models} models available`);
-          console.log(`${chalk.green('✅')} Latency:   ${health.latency}ms`);
+        const started = Date.now();
+        const res = await fetch(`${gatewayUrl}/health`);
+        const latency = Date.now() - started;
+        if (res.ok) {
+          console.log(`${chalk.green('✓')} ${gatewayUrl}  ${chalk.dim(`${latency}ms`)}`);
         } else {
-          console.log(`${chalk.red('❌')} Proxy:     ${chalk.red('Unhealthy')}`);
-          console.log(chalk.yellow('   Is LiteLLM running? Run: pm2 logs dirgha-litellm'));
+          console.log(`${chalk.red('✗')} ${gatewayUrl}  ${chalk.red(`HTTP ${res.status}`)}`);
         }
       } catch (err) {
-        console.log(`${chalk.red('❌')} Error: ${(err as Error).message}`);
+        console.log(`${chalk.red('✗')} ${gatewayUrl}  ${chalk.red((err as Error).message)}`);
       }
       console.log();
     });

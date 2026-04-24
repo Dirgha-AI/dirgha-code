@@ -21,22 +21,31 @@ export async function ensureShadowRepo(projectPath: string): Promise<string> {
   return shadowPath;
 }
 
-export function createCommit(shadowPath: string, name: string): string {
-  execSync('git add -A', { cwd: shadowPath });
-  execSync(`git commit -m "checkpoint: ${name}" --allow-empty`, { cwd: shadowPath });
-  return execSync('git rev-parse HEAD', { cwd: shadowPath }).toString().trim();
+/**
+ * The shadow repo is a BARE git dir (no work tree of its own). To index
+ * files from the project we point git at the project as the work tree
+ * via GIT_WORK_TREE + GIT_DIR env vars, then commit into the bare shadow.
+ */
+export function createCommit(shadowPath: string, name: string, projectRoot: string): string {
+  const env = { ...process.env, GIT_DIR: shadowPath, GIT_WORK_TREE: projectRoot };
+  execSync('git add -A', { cwd: projectRoot, env });
+  execSync(`git commit -m "checkpoint: ${name}" --allow-empty`, { cwd: projectRoot, env });
+  return execSync('git rev-parse HEAD', { cwd: projectRoot, env }).toString().trim();
 }
 
 export function restoreCommit(shadowRepoPath: string, hash: string, projectRoot: string): string[] {
+  const env = { ...process.env, GIT_DIR: shadowRepoPath, GIT_WORK_TREE: projectRoot };
   // List files in snapshot (exclude directory entries)
   const fileList = execSync(`git archive ${hash} --format=tar | tar -t`, {
-    cwd: shadowRepoPath,
+    cwd: projectRoot,
+    env,
     encoding: 'utf8',
   }).trim().split('\n').filter(f => f && !f.endsWith('/'));
 
   // Extract to project root
   execSync(`git archive "${hash}" | tar -x -C "${projectRoot}"`, {
-    cwd: shadowRepoPath,
+    cwd: projectRoot,
+    env,
   });
 
   return fileList;

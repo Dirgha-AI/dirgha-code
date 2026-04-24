@@ -2,7 +2,7 @@
  * providers/messages.ts — Message format conversion
  *
  * Internal canonical format: Anthropic (most expressive).
- * OpenAI-compat providers (Fireworks, OpenRouter, NVIDIA, LiteLLM, Dirgha, OpenAI)
+ * OpenAI-compat providers (Fireworks, OpenRouter, NVIDIA, Dirgha, OpenAI)
  * call toOpenAIMessages() before sending.
  *
  * Anthropic assistant tool_use:

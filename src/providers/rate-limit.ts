@@ -16,7 +16,7 @@
  */
 
 import type { ProviderId } from './dispatch.js';
-import { PROVIDER_RATE_LIMITS } from '@dirgha/types';
+import { PROVIDER_RATE_LIMITS } from '../config/rate-limits.js';
 
 interface Bucket {
   rpm: number;          // effective requests per minute; 0 = disabled

@@ -39,7 +39,7 @@ export function registerEnsembleCommand(program: Command): void {
         const rolePrompt = getAgentPrompt(agent, query);
         const response = await client.execute({
           messages: [{ role: 'user', content: rolePrompt }],
-          model: 'claude-3-haiku-20240307',
+          model: 'claude-haiku-4-5',
           ephemeral: true,
         });
         

@@ -2,7 +2,7 @@
  * billing/ratelimit.ts — Rate limiting with sliding window
  */
 import type { RateLimitStatus } from './types.js';
-import { API_RATE_LIMITS } from '@dirgha/types';
+import { API_RATE_LIMITS } from '../config/rate-limits.js';
 
 interface WindowEntry {
   count: number;

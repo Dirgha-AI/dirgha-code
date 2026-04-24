@@ -74,9 +74,9 @@ describe('createDefaultConfig', () => {
     expect(cfg.project.name).toBe(basename(tmpDir));
   });
 
-  it('sets default provider to litellm', () => {
+  it('sets default provider to gateway', () => {
     const cfg = createDefaultConfig();
-    expect(cfg.preferences.defaultProvider).toBe('litellm');
+    expect(cfg.preferences.defaultProvider).toBe('gateway');
   });
 
   it('includes node_modules in ignored patterns', () => {

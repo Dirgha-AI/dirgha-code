@@ -45,7 +45,7 @@ export interface ProjectConfig {
   context: ProjectContext;
   preferences: {
     defaultModel: string;
-    defaultProvider: 'gateway' | 'litellm' | 'anthropic' | 'openrouter' | 'nvidia';
+    defaultProvider: 'gateway' | 'anthropic' | 'openrouter' | 'nvidia';
     autoApply: boolean;
     verbose: boolean;
     theme?: ThemeName;

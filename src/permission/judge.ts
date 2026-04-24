@@ -20,7 +20,7 @@ export function classifyTool(toolName: string): ToolClass {
 // ---------------------------------------------------------------------------
 
 const DANGEROUS_PATTERNS: Array<{ pattern: RegExp; description: string }> = [
-  { pattern: /rm\s+(-rf?|--recursive)\s/i, description: 'recursive file deletion' },
+  { pattern: /rm\s+(-rf?|--recursive|-[a-z]*r[a-z]*f[a-z]*|-[a-z]*f[a-z]*r[a-z]*)\s/i, description: 'recursive file deletion' },
   { pattern: /rm\s+-[a-z]*f/i, description: 'forced file deletion' },
   { pattern: /rmdir\s/i, description: 'directory removal' },
   { pattern: /mkfs\b/i, description: 'filesystem format' },

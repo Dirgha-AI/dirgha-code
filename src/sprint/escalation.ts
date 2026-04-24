@@ -92,10 +92,16 @@ export function checkEscalation(
 
 export function sendNotification(sprintId: string, reason: string, options?: { whatsapp?: boolean }): void {
   if (options?.whatsapp !== false) {
+    // Notifications are opt-in via DIRGHA_NOTIFY_SCRIPT — any executable
+    // that accepts the message as $1. Unset by default so a generic CLI
+    // install doesn't try to shell out to a path that only exists on
+    // the author's machine.
+    const script = process.env['DIRGHA_NOTIFY_SCRIPT'];
+    if (!script) return;
     try {
       const message = `Sprint ${sprintId} paused: ${reason.slice(0, 200)}`;
       execSync(
-        `bash /root/dirgha-ai/scripts/notify-whatsapp.sh "${message.replace(/"/g, '\\"')}"`,
+        `${script} "${message.replace(/"/g, '\\"')}"`,
         { timeout: 10000, stdio: 'ignore' }
       );
     } catch {

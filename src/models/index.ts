@@ -23,13 +23,6 @@ export type {
 // Model Registry
 export { ModelRegistry, MODEL_REGISTRY } from './registry.js';
 
-// Router (main entry point)
-export { ModelRouter, createModelRouter } from './router.js';
-export type { RouterConfig, RouterStats } from './router.js';
-
-// Providers
-export { LiteLLMUnifiedProvider, createLiteLLMProvider } from './providers/litellm-unified.js';
-
 // Credential Management
 export { CredentialPoolManager, getCredentialPoolManager } from './credential-pool.js';
 

@@ -7,3 +7,10 @@ node_modules/
 coverage/
 .DS_Store
 *.swp
+*.swo
+.idea/
+.vscode/
+
+# Source maps: regenerated on build, never tracked
+dist/*.map
+dist/**/*.map

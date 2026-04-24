@@ -6,15 +6,20 @@ import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
 
+// vi.mock is hoisted above const declarations. Compute the sandbox
+// path inside the factory so we don't reference an outer constant
+// during the TDZ.
 vi.mock('os', async (importOriginal) => {
   const actual = await importOriginal<typeof os>();
+  const tmp = actual.tmpdir();
+  const p = require('path') as typeof path;
   return {
     ...actual,
-    homedir: () => '/root/dirgha-ai/domains/10-computer/cli/.test-context-sandbox',
+    homedir: () => p.join(tmp, 'dirgha-context-sandbox-' + process.pid),
   };
 });
 
-const SANDBOX_ROOT = '/root/dirgha-ai/domains/10-computer/cli/.test-context-sandbox';
+const SANDBOX_ROOT = path.join(os.tmpdir(), 'dirgha-context-sandbox-' + process.pid);
 
 import { ContextManager } from '../context.js';
 

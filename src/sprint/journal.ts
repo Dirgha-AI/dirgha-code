@@ -88,8 +88,11 @@ export class SprintJournal {
     let taskIds: string[] = [];
     try {
       const manifest = yaml.load(manifestYaml) as any;
-      if (manifest && Array.isArray(manifest.tasks)) {
-        taskIds = manifest.tasks.map((t: any) => t.id).filter((id: any) => typeof id === 'string');
+      // Canonical schema nests under `sprint:`; accept a flat fallback so
+      // hand-written examples that skip the wrapper still work.
+      const tasks = manifest?.sprint?.tasks ?? manifest?.tasks;
+      if (Array.isArray(tasks)) {
+        taskIds = tasks.map((t: any) => t.id).filter((id: any) => typeof id === 'string');
       }
     } catch (e) {
       console.warn('Failed to parse manifest YAML for task extraction:', e);
@@ -143,10 +146,23 @@ export class SprintJournal {
   }
 
   private deserializeTaskState(row: any): TaskStateRow {
+    // SQLite gives us snake_case columns; the TaskStateRow contract is
+    // camelCase. Convert explicitly — spreading the raw row and casting
+    // would silently leave consumers reading undefined for every
+    // camelCase field (row.taskId is undefined when SQLite column is
+    // task_id).
     return {
-      ...row,
-      verifyLog: row.verify_log ? JSON.parse(row.verify_log) as VerificationResult[] : undefined
-    } as TaskStateRow;
+      taskId: row.task_id,
+      sprintId: row.sprint_id,
+      status: row.status,
+      attempts: row.attempts,
+      startedAt: row.started_at ?? undefined,
+      completedAt: row.completed_at ?? undefined,
+      gitSha: row.git_sha ?? undefined,
+      verifyLog: row.verify_log ? JSON.parse(row.verify_log) as VerificationResult[] : undefined,
+      agentOutput: row.agent_output ?? undefined,
+      errorLog: row.error_log ?? undefined,
+    };
   }
 
   setTaskStatus(
@@ -222,13 +238,38 @@ export class SprintJournal {
   }
 
   getProgress(): SprintProgress {
-    const meta = this.db.prepare('SELECT * FROM sprint_meta WHERE sprint_id = ?').get(this.sprintId);
+    const meta = this.db.prepare('SELECT * FROM sprint_meta WHERE sprint_id = ?').get(this.sprintId) as any;
     if (!meta) {
       throw new Error(`Sprint ${this.sprintId} not found`);
     }
-    
-    const tasks = this.getAllTaskStates();
-    
+
+    const taskStates = this.getAllTaskStates();
+
+    // Decorate with title + estimatedMinutes from the stored manifest YAML
+    // so CLI output can show something useful; status command doesn't have
+    // the manifest in hand.
+    const titleById = new Map<string, { title: string; estimatedMinutes: number }>();
+    try {
+      const manifest = yaml.load(meta.manifest_yaml) as any;
+      const tasks = manifest?.sprint?.tasks ?? manifest?.tasks;
+      if (Array.isArray(tasks)) {
+        for (const t of tasks) {
+          if (t && typeof t.id === 'string') {
+            titleById.set(t.id, {
+              title: t.title ?? t.id,
+              estimatedMinutes: t.estimated_minutes ?? 0,
+            });
+          }
+        }
+      }
+    } catch { /* fall through with empty titles */ }
+
+    const tasks = taskStates.map(s => ({
+      ...s,
+      title: titleById.get(s.taskId)?.title ?? s.taskId,
+      estimatedMinutes: titleById.get(s.taskId)?.estimatedMinutes ?? 0,
+    }));
+
     const startedAt = meta.created_at as string | undefined;
     const elapsedMs = startedAt ? Date.now() - new Date(startedAt).getTime() : 0;
     return {

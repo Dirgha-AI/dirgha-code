@@ -273,10 +273,24 @@ export function registerSprintCommand(program: Command): void {
         const absolutePath = path.resolve(manifestPath);
         const manifest = await parseManifest(absolutePath);
         const journal = new SprintJournal(id);
+
+        const existing = journal.getAllTaskStates();
+        if (existing.length > 0) {
+          const allDone = existing.every(s =>
+            s.status === 'completed' || s.status === 'skipped' || s.status === 'failed'
+          );
+          if (allDone) {
+            console.log(chalk.gray(`Sprint ${id} already finished; daemon exiting.`));
+            process.exit(0);
+          }
+        }
+
         journal.setSprintStatus(id, 'running');
         await runSprint(manifest, journal, { verbose: true });
+        process.exit(0);
       } catch (err) {
         console.error(chalk.red(`Daemon error: ${err instanceof Error ? err.message : err}`));
+        if (err instanceof Error && err.stack) console.error(err.stack);
         process.exit(1);
       }
     });

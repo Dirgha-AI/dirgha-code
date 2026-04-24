@@ -86,7 +86,7 @@ export function registerAskCommand(program: Command): void {
           },
           undefined,
           undefined,
-          { maxTurns, sessionId, signal: abortController.signal },
+          { maxTurns, sessionId, signal: abortController.signal, disableTools: opts.tools === false },
           (thought) => {
             if (!quiet && process.env['DIRGHA_DEBUG'] === '1') {
               process.stderr.write(chalk.dim(`<think>${thought}</think>\n`));

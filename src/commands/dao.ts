@@ -8,8 +8,12 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { commitProposal, commitVote } from '../../../../../apps/bucky/src/dao/commit-reveal.js';
-// Stubs for unavailable packages (experimental DAO commands)
+// Experimental DAO command — backend is not yet vendored. These stubs
+// keep the build self-contained; real DAO flows live in the Bucky
+// service and will be surfaced via a stable API before this command
+// exits experimental.
+const commitProposal: any = async () => { throw new Error('DAO backend not available in this build'); };
+const commitVote: any = async () => { throw new Error('DAO backend not available in this build'); };
 const DAOFactory: any = class {};
 const DAOConfig: any = {};
 const BudgetEnforcer: any = class {};

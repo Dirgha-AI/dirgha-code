@@ -16,7 +16,7 @@ export function registerCompactCommand(program: Command): void {
     .command('compact')
     .description('Compact context to free tokens')
     .option('--aggressive', 'More aggressive compaction')
-    .option('-m, --model <model>', 'Model for summarization', 'claude-3-haiku-20240307')
+    .option('-m, --model <model>', 'Model for summarization', 'claude-haiku-4-5')
     .action(async (options: { aggressive?: boolean; model?: string }) => {
       // Note: In real implementation, get messages from session
       const messages: Message[] = []; // Placeholder
@@ -35,7 +35,7 @@ export function registerCompactCommand(program: Command): void {
       }
       
       // Phase 4: Summarize
-      const summary = await summarizeWithLLM(candidates, options.model || 'claude-3-haiku-20240307');
+      const summary = await summarizeWithLLM(candidates, options.model || 'claude-haiku-4-5');
       
       // Phase 5: Update
       const compacted = updateContext(protected_, summary, candidates);

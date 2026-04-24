@@ -55,8 +55,14 @@ export interface ModelPricing {
   outputPricePer1k: number; // USD per 1K tokens
 }
 
+/**
+ * Token quotas per plan. Local client-side cap, informational mostly —
+ * the gateway enforces its own server-side limits. Set high enough that
+ * the local guard never trips for a paying user in a normal day, but
+ * not Infinity so the status command can render a progress bar.
+ */
 export const QUOTA_LIMITS: Record<string, { daily: number; monthly: number }> = {
-  free: { daily: 0, monthly: 0 },
+  free: { daily: 100_000, monthly: 1_000_000 },
   pro: { daily: 500_000, monthly: 10_000_000 },
   team: { daily: 2_000_000, monthly: 100_000_000 },
 };

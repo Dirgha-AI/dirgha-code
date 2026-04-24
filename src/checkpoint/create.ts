@@ -39,7 +39,7 @@ export async function createCheckpoint(
 ): Promise<Checkpoint> {
   const files = await getFiles(projectPath, projectPath);
   const shadowPath = await ensureShadowRepo(projectPath);
-  const commitHash = createCommit(shadowPath, name);
+  const commitHash = createCommit(shadowPath, name, projectPath);
   
   return {
     id: `cp-${Date.now()}`,

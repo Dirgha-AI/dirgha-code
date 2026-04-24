@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * runtime/index.ts — Runtime execution environment
  * 
@@ -17,13 +16,13 @@ export { networkController, isUrlAllowed, createAgentNetworkController } from '.
 export type { NetworkRule, NetworkRuleAction, NetworkDecision } from './network-control.js';
 
 export { wasmExecutor, wasm, pipeline, WASM_COMMANDS } from './wasm-commands.js';
-export type { WasmCommand, WasmCommandOptions } from './wasm-commands.js';
+export type { WasmCommand, ExecuteOptions } from './wasm-commands.js';
 
 export { TranscriptBuilder, loadTranscript, replayTranscript, exportAsMarkdown } from './transcript.js';
 export type { Transcript, TranscriptEvent, TranscriptEventType } from './transcript.js';
 
-export { IsolateRuntime, IsolateSandbox } from './isolate.js';
-export type { IsolateContext, IsolateResult } from './isolate.js';
+export { IsolateRunner, isolateRunner, runInIsolate, isFastIsolateAvailable } from './isolate.js';
+export type { IsolateOptions, IsolateResult } from './isolate.js';
 
 export { MultiplayerManager, createTeamSession, createPairSession, renderSessionStatus } from './multiplayer.js';
 export type { Participant, ParticipantRole, MultiplayerSession, MultiplayerEvent } from './multiplayer.js';

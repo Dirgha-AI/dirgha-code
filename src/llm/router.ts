@@ -5,7 +5,7 @@ import type { ModelDefinition, RoutingDecision } from './types.js';
 
 export const MODEL_REGISTRY: ModelDefinition[] = [
   {
-    name: 'claude-3-haiku-20240307',
+    name: 'claude-haiku-4-5',
     provider: 'anthropic',
     costPer1KTokens: 0.5,
     maxTokens: 4096,
@@ -54,7 +54,7 @@ export function routeModel(query: string, contextSize: number): RoutingDecision 
   // Short simple queries → cheap model
   if (shouldUseCheapModel(query)) {
     return {
-      model: 'claude-3-haiku-20240307',
+      model: 'claude-haiku-4-5',
       reason: 'short_query',
       estimatedCost: (query.length / 4) * 0.0005
     };

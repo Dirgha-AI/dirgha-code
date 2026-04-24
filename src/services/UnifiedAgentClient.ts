@@ -1,7 +1,7 @@
 // @ts-nocheck
 /**
  * UnifiedAgentClient - CLI access to full Agent-Server capabilities
- * Replaces LiteLLM direct calls with Gateway-mediated execution
+ * All model traffic is Gateway-mediated (api.dirgha.ai) rather than direct-to-provider.
  */
 
 // Stub for missing credentials module

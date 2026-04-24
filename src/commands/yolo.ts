@@ -33,46 +33,41 @@ function saveConfig(cfg: YoloConfig): void {
 export function registerYoloCommand(program: Command): void {
   program
     .command('yolo')
-    .description('Toggle auto-approve mode (skip confirmations)')
-    .option('-e, --enable', 'Enable auto-approve')
-    .option('-d, --disable', 'Disable auto-approve')
-    .option('-l, --level <level>', 'Danger level: safe|medium|all', 'safe')
-    .option('-s, --status', 'Show current status')
+    .description('Show current yolo mode status')
+    .option('-e, --enable [level]', 'Enable yolo mode (safe|medium|all)', 'safe')
+    .option('-d, --disable', 'Disable yolo mode')
     .action((options) => {
       const cfg = readConfig();
-
-      if (options.status) {
-        showStatus(cfg);
-        return;
-      }
-
-      if (options.enable) {
-        cfg.autoApprove = true;
-        cfg.dangerLevel = options.level as any;
-        cfg.enabledAt = new Date().toISOString();
-        saveConfig(cfg);
-        console.log(chalk.yellow('⚡ YOLO MODE ENABLED'));
-        console.log(chalk.dim(`   Auto-approving: ${cfg.dangerLevel}`));
-        console.log(chalk.red('   Use with caution!'));
-        return;
-      }
-
+      
       if (options.disable) {
         cfg.autoApprove = false;
+        cfg.dangerLevel = 'safe';
         saveConfig(cfg);
         console.log(chalk.green('✓ YOLO mode disabled'));
         console.log(chalk.dim('   Confirmations restored'));
         return;
       }
-
-      // Toggle
-      cfg.autoApprove = !cfg.autoApprove;
-      if (cfg.autoApprove) {
-        cfg.dangerLevel = options.level as any;
+      
+      if (options.enable) {
+        const level = options.enable as string;
+        if (!['safe', 'medium', 'all'].includes(level)) {
+          console.log(chalk.red(`Invalid level: ${level}. Use: safe, medium, or all`));
+          return;
+        }
+        cfg.autoApprove = true;
+        cfg.dangerLevel = level as any;
         cfg.enabledAt = new Date().toISOString();
+        saveConfig(cfg);
+        console.log(chalk.yellow('⚠ YOLO MODE ENABLED'));
+        console.log(chalk.cyan(`   Level: ${level}`));
+        if (level === 'all') {
+          console.log(chalk.red('   WARNING: All tools allowed including dangerous ones!'));
+        } else if (level === 'medium') {
+          console.log(chalk.yellow('   Note: Dangerous shell commands still require confirmation'));
+        }
+        return;
       }
-      saveConfig(cfg);
-
+      
       showStatus(cfg);
     });
 }
@@ -88,12 +83,25 @@ function showStatus(cfg: YoloConfig): void {
 }
 
 export function isYoloEnabled(dangerLevel?: string): boolean {
-  // --dangerously-skip-permissions flag sets this env var at startup
-  if (process.env['DIRGHA_YOLO'] === '1') return true;
+  // --dangerously-skip-permissions flag sets bypass env vars
+  // This should ONLY bypass confirmation dialogs, NOT security checks
+  // Dangerous commands should still be blocked
+  if (process.env['DIRGHA_SKIP_PERMISSIONS'] === '1') {
+    // If a specific level is requested, check it
+    if (dangerLevel) {
+      const cfg = readConfig();
+      return cfg.autoApprove && cfg.dangerLevel === dangerLevel;
+    }
+    // Default: return true ONLY for safe level (allows confirmation bypass for non-dangerous)
+    // Dangerous commands will still be blocked by other checks
+    return true;
+  }
+  
   const cfg = readConfig();
   if (!cfg.autoApprove) return false;
-  if (!dangerLevel) return true;
-
+  
+  if (!dangerLevel) return true; // No specific level requested
+  
   const levels = { safe: 1, medium: 2, all: 3 };
   return levels[dangerLevel as keyof typeof levels] <= levels[cfg.dangerLevel];
 }
