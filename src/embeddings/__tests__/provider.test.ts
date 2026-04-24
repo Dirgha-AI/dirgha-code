@@ -116,11 +116,19 @@ describe('Embedding Provider System', () => {
     });
 
     it('should check availability via health endpoint', async () => {
-      global.fetch = vi.fn(() => 
+      // gatewayProvider.available() short-circuits to false when no
+      // credentials are present — CI has no ~/.dirgha/credentials.json.
+      // Stub both: a truthy token + a successful health response.
+      vi.doMock('../../utils/credentials.js', () => ({
+        getCredentials: () => ({ token: 'test-token' }),
+      }));
+      global.fetch = vi.fn(() =>
         Promise.resolve({ ok: true })
       ) as any;
-      
-      const available = await gatewayProvider.available();
+
+      // Re-import after mocking so the stubbed module is picked up.
+      const { gatewayProvider: freshProvider } = await import('../gateway.js');
+      const available = await freshProvider.available();
       expect(available).toBe(true);
     });
   });
