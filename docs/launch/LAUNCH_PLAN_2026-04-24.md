@@ -148,5 +148,5 @@ Keep `dist/dirgha.mjs` tracked for now (unbundle decision is Sprint 4).
 | S2 Security | complete | 2026-04-24 | 2026-04-24 | 7.4 |
 | S3 Architecture | complete | 2026-04-24 | 2026-04-24 | 8.3 |
 | S4 Deps + CI | complete | 2026-04-24 | 2026-04-24 | 8.9 |
-| S5 Docs | pending | — | — | 9.1 |
+| S5 Docs | complete | 2026-04-24 | 2026-04-24 | 9.1 |
 | S6 Tests | pending | — | — | 9.5 |
