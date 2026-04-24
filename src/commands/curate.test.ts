@@ -4,7 +4,7 @@
  * commands/curate.test.ts - Tests for curate and query commands
  * Sprint 7: Knowledge Graph Foundation
  */
-import { describe, it, expect, beforeEach, beforeAll } from 'vitest';
+import { describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest';
 import { getDB } from '../session/db.js';
 import { randomUUID } from 'crypto';
 

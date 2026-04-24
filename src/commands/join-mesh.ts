@@ -85,9 +85,12 @@ export function registerJoinMeshCommand(program: Command): void {
       const usePM2 = process.env.USE_PM2 !== 'false';
 
       if (usePM2) {
-        // Start via PM2 ecosystem
+        // PM2 mode assumes the user runs this from inside a repo with
+        // an ecosystem.config.cjs that defines `dirgha-bucky`. Falls
+        // back to the current working directory rather than an
+        // author-specific absolute path.
         const pm2Spawn = spawn('pm2', ['start', 'ecosystem.config.cjs', '--only', 'dirgha-bucky'], {
-          cwd: '/root/dirgha-ai',
+          cwd: process.env['DIRGHA_BUCKY_ROOT'] ?? process.cwd(),
           env,
           detached: true,
           stdio: 'ignore',

@@ -3,20 +3,22 @@
 /**
  * project-session/__tests__/integration.test.ts — End-to-end integration tests
  */
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
 import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
 
 vi.mock('os', async (importOriginal) => {
   const actual = await importOriginal<typeof os>();
+  const tmp = actual.tmpdir();
+  const p = require('path') as typeof path;
   return {
     ...actual,
-    homedir: () => '/root/dirgha-ai/domains/10-computer/cli/.test-integration-sandbox',
+    homedir: () => p.join(tmp, 'dirgha-integration-sandbox-' + process.pid),
   };
 });
 
-const SANDBOX_ROOT = '/root/dirgha-ai/domains/10-computer/cli/.test-integration-sandbox';
+const SANDBOX_ROOT = path.join(os.tmpdir(), 'dirgha-integration-sandbox-' + process.pid);
 
 import { ProjectManager } from '../project.js';
 import { SessionManager } from '../session.js';
