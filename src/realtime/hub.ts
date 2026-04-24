@@ -1,6 +1,5 @@
 /**
  * Realtime Hub — WebSocket-based realtime updates
- * Inspired by multica's hub.go (server/internal/realtime/hub.go)
  * Supports: scoped subscriptions, event deduplication, reconnection
  */
 import type { WebSocket } from "ws";
@@ -35,10 +34,10 @@ interface Subscriber {
   clientId: string;
   ws: WebSocket;
   scopes: ScopePattern[];
-  seenEvents: Set<string>; // Deduplication (from multica's seen event IDs)
+  seenEvents: Set<string>; // Deduplication set for replayed events
 }
 
-// In-memory implementation (multica uses Redis for multi-instance)
+// In-memory implementation (swap for Redis for multi-instance deployments)
 const subscribers = new Map<string, Subscriber>();
 const recentEvents = new Map<string, number>(); // eventId -> timestamp for dedup
 const EVENT_TTL = 60_000; // 60 seconds
@@ -130,7 +129,7 @@ export const InMemoryRealtimeHub: RealtimeHub = {
       // Check if client is interested in this scope
       if (!matchesScope(eventScope, sub.scopes)) continue;
 
-      // Check deduplication (from multica's pattern)
+      // Check deduplication
       if (sub.seenEvents.has(event.id)) continue;
       sub.seenEvents.add(event.id);
 
@@ -184,7 +183,7 @@ export function createEvent(
 }
 
 /**
- * Common event types (from multica's patterns)
+ * Common event types
  */
 export const EventType = {
   // Task events

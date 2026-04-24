@@ -1,6 +1,5 @@
 /**
  * Skills System — Reusable agent skills
- * Inspired by multica's skill system (local_skills.go, skill.sql)
  * Supports SKILL.md format with YAML frontmatter
  */
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -81,7 +80,7 @@ export const InMemorySkillRegistry: SkillRegistry = {
   },
 
   discoverLocal(provider) {
-    // Map providers to their local skills directories (from multica's local_skills.go)
+    // Map providers to their local skills directories
     const skillDirs: Record<string, string> = {
       claude: join(process.env.HOME || "~", ".claude", "skills"),
       codex: join(process.env.HOME || "~", ".codex", "skills"),
@@ -159,7 +158,7 @@ export function removeSkillFromAgent(agentId: string, skillId: string): void {
   agentSkills.get(agentId)?.delete(skillId);
 }
 
-/** Load skills for task execution (from multica's LoadAgentSkills pattern) */
+/** Load skills for task execution */
 export function loadSkillsForTask(task: {
   agentId?: string;
   workspaceId: string;

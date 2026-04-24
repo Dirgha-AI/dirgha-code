@@ -1,6 +1,5 @@
 /**
  * Workspace Isolation — Multi-tenant workspace support
- * Inspired by multica's workspace pattern
  * Each workspace has isolated: data, UI state, navigation
  */
 export interface Workspace {
@@ -161,7 +160,7 @@ export const InMemoryWorkspaceStore: WorkspaceStore = {
 };
 
 /**
- * Create workspace-aware storage (from multica's createWorkspaceAwareStorage pattern)
+ * Create workspace-aware storage
  * Used in UI state management (Zustand, React Query)
  */
 export function createWorkspaceAwareStorage<T extends Record<string, any>>(

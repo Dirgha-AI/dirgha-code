@@ -1,6 +1,5 @@
 /**
  * Task Queue — Task lifecycle management with state machine
- * Inspired by multica's agent_task_queue table
  * States: queued → dispatched → running → completed/failed/cancelled
  */
 import type { Message } from "../types.js";
@@ -61,7 +60,7 @@ export interface TaskQueue {
   listByAgent(agentId: string): Promise<Task[]>;
 }
 
-// In-memory implementation (can be replaced with SQLite/PostgreSQL like multica)
+// In-memory implementation (swap for SQLite/PostgreSQL in production)
 const taskStore = new Map<string, Task>();
 let taskCounter = 0;
 
