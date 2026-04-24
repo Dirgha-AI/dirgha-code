@@ -224,7 +224,7 @@ export async function runCommandTool(
     return {
       tool: "run_command",
       result: "",
-      error: `Command '${baseCmd}' is not in the safelist. Allowed: Array.from(SAFE_COMMAND_BASES).slice(0, 10).join(", ")}...`,
+      error: `Command '${baseCmd}' is blocked — not in safelist. Allowed (first 10): ${Array.from(SAFE_COMMAND_BASES).slice(0, 10).join(", ")}...`,
     };
   }
 

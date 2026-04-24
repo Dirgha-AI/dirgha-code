@@ -27,7 +27,7 @@ export const MODELS = [
 export const PROV_COLORS: Record<string, string> = {
   fireworks:  '#FF6B35', anthropic:  '#CC785C', openai:     '#10A37F',
   gemini:     '#4285F4', openrouter: '#4A9EFF', nvidia:     '#76B900',
-  litellm:    '#A78BFA', gateway:    '#22C55E',
+  gateway:    '#22C55E',
 };
 
 export const TAG_COLORS: Record<string, string> = {

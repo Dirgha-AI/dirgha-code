@@ -105,7 +105,7 @@ async function sectionPreferences() {
       name: 'provider',
       message: 'Default AI Provider:',
       default: current.preferences?.defaultProvider || 'gateway',
-      choices: ['gateway', 'anthropic', 'openrouter', 'nvidia', 'litellm']
+      choices: ['gateway', 'anthropic', 'openrouter', 'nvidia']
     },
     {
       type: 'list',

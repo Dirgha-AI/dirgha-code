@@ -23,7 +23,7 @@ function alreadySet(key: string): boolean {
 // ---------------------------------------------------------------------------
 
 function saveProviderToGlobalConfig(
-  provider: 'litellm' | 'anthropic' | 'openrouter' | 'nvidia' | 'gateway',
+  provider: 'anthropic' | 'openrouter' | 'nvidia' | 'gateway',
 ): void {
   const existing = readGlobalConfig() ?? {};
   const existingPrefs = (existing.preferences ?? {}) as Partial<ProjectConfig['preferences']>;
@@ -42,32 +42,6 @@ function saveProviderToGlobalConfig(
 // ---------------------------------------------------------------------------
 // Sub-flows
 // ---------------------------------------------------------------------------
-
-async function setupLiteLLM(): Promise<void> {
-  const { vpsUrl } = await inquirer.prompt<{ vpsUrl: string }>([
-    {
-      type: 'input',
-      name: 'vpsUrl',
-      message: 'VPS / LiteLLM base URL (e.g. http://31.97.239.223:4000):',
-      validate: (v: string) => v.trim().length > 0 || 'URL is required',
-    },
-  ]);
-
-  const { apiKey } = await inquirer.prompt<{ apiKey: string }>([
-    {
-      type: 'password',
-      name: 'apiKey',
-      message: 'API key (leave blank if none):',
-      mask: '*',
-    },
-  ]);
-
-  writeEnvVar('LITELLM_BASE_URL', vpsUrl.trim());
-  if (apiKey.trim()) writeEnvVar('LITELLM_API_KEY', apiKey.trim());
-
-  saveProviderToGlobalConfig('litellm');
-  console.log(chalk.green('✔ VPS / LiteLLM configured'));
-}
 
 async function setupAnthropic(): Promise<void> {
   const existing = alreadySet('ANTHROPIC_API_KEY');
@@ -127,7 +101,7 @@ export async function authCommand(): Promise<void> {
   console.log(chalk.dim(`Currently: ${current}`));
   console.log();
 
-  type Choice = 'litellm' | 'anthropic' | 'openrouter' | 'nvidia' | 'skip';
+  type Choice = 'anthropic' | 'openrouter' | 'nvidia' | 'skip';
 
   const { choice } = await inquirer.prompt<{ choice: Choice }>([
     {
@@ -135,7 +109,6 @@ export async function authCommand(): Promise<void> {
       name: 'choice',
       message: 'Choose auth provider:',
       choices: [
-        { name: 'Dirgha VPS / LiteLLM (recommended)', value: 'litellm' },
         { name: 'Anthropic API Key (Claude)', value: 'anthropic' },
         { name: 'NVIDIA NIM API Key', value: 'nvidia' },
         { name: 'OpenRouter API Key', value: 'openrouter' },
@@ -145,7 +118,6 @@ export async function authCommand(): Promise<void> {
   ]);
 
   switch (choice) {
-    case 'litellm':    await setupLiteLLM();    break;
     case 'anthropic':  await setupAnthropic();  break;
     case 'nvidia':     await setupNvidia();     break;
     case 'openrouter': await setupOpenRouter(); break;

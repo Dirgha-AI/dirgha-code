@@ -96,7 +96,7 @@ export function createDefaultConfig(root?: string): ProjectConfig {
     context: emptyContext,
     preferences: {
       defaultModel: 'nemotron-3-nano-4b',
-      defaultProvider: 'litellm',
+      defaultProvider: 'gateway',
       autoApply: false,
       verbose: false,
     },

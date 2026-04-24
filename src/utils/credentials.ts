@@ -7,7 +7,6 @@ export interface Credentials {
   userId: string;
   email: string;
   expiresAt: string; // ISO timestamp
-  litellmKey?: string; // LiteLLM virtual key (scoped per-user for credit tracking)
 }
 
 function credentialsPath(): string {
@@ -73,7 +72,7 @@ export function isConfigured(): boolean {
   const BYOK_VARS = [
     'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'OPENROUTER_API_KEY',
     'FIREWORKS_API_KEY', 'NVIDIA_API_KEY', 'GROQ_API_KEY',
-    'GEMINI_API_KEY', 'MISTRAL_API_KEY', 'LITELLM_BASE_URL',
+    'GEMINI_API_KEY', 'MISTRAL_API_KEY',
     'DIRGHA_GATEWAY_URL', 'DIRGHA_API_KEY',
   ];
   return BYOK_VARS.some(k => !!process.env[k]);
