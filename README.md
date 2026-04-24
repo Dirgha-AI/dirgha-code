@@ -667,7 +667,7 @@ Released under **FSL-1.1-MIT** · Copyright © 2026 Dirgha LLC · All third-part
 | [writer-studio](https://github.com/Dirgha-AI/writer-studio) | AI-native document workspace |
 | [.github](https://github.com/Dirgha-AI/.github) | Org profile and community configuration |
 
-- **Live platform:** [dirgha.ai/app](https://dirgha.ai/app) — chat, IDE, writer, research, library, marketplace, creator, education, manufacturing
+- **Live platform:** [dirgha.ai](https://dirgha.ai) — chat, IDE, writer, research, library, marketplace, creator, education, manufacturing
 - **Organization:** [github.com/Dirgha-AI](https://github.com/Dirgha-AI)
 - **Partnerships:** [partner@dirgha.ai](mailto:partner@dirgha.ai)
 
