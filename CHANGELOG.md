@@ -2,7 +2,63 @@
 
 Versioning: **semver 0.x** during rapid iteration. Breaking → `0.2.0`. Patches → `0.1.1`, `0.1.2`, … First stable release will be `1.0.0`.
 
-## 0.1.0 (2026-04-20) — first public release
+## 0.1.0 (2026-04-24) — public-OSS cut
+
+Output of the six-sprint launch plan (`docs/launch/LAUNCH_PLAN_2026-04-24.md`).
+From internal-alpha (4.0/10) to public-OSS quality (~9.5/10) in one
+coordinated pass. Highlights below; full breakdown in the launch plan.
+
+### Security
+
+- **Symlink sandbox escape closed** (S1.1). `sandboxPath()` now realpath's the deepest extant ancestor; rejects symlinks that resolve outside the workspace. Covered by a 21-case property test (`src/tools/file.sandbox.test.ts`).
+- **Real tool allowlist** (PR #1). Replaced the `isToolAllowed = () => true` stub with a per-trust-level `TOOL_ALLOWLIST`. Tools not on the list for the current trust level return a blocked marker instead of executing.
+- **`rm -fr` and `git clean -fd` regex gaps** (S2.1, S2.5) — both now flagged dangerous. Closed with 91-case permission-judge suite and 45-case shell-guard suite.
+- **LiteLLM fully stripped** (S1.7). 14 files cleaned; default provider is now `gateway`.
+- **`multica` inline references** removed from source comments before first push; prior-art citation in `docs/FLEET.md` kept.
+
+### Added (docs and infra)
+
+- `docs/ARCHITECTURE.md` — directory-level contract for every top-level `src/` dir.
+- `docs/USAGE.md` — 10 worked examples.
+- `docs/PROVIDERS.md` — 16-provider matrix with env vars, URLs, quirks.
+- `docs/SECURITY.md` — technical threat model and sandbox guarantees.
+- `docs/launch/LAUNCH_PLAN_2026-04-24.md` — the full six-sprint plan this release executes against.
+- `.github/workflows/ci.yml` — Node 20 + 22 matrix, lint/test/build/smoke + experimental-gate leak check.
+- `.github/workflows/publish.yml` — on tag push, `npm publish --provenance`.
+- `src/experimental/README.md` — graduation checklist for experimental surfaces.
+- Root README troubleshooting section.
+
+### Changed
+
+- **Command surface**: 59 → 51 in default `--help`. Experimental commands (`mesh`, `swarm`, `voice`, `dao`, `make`, `bucky`, `join-mesh`) gated behind `DIRGHA_EXPERIMENTAL=1`.
+- **Top-level `src/` dirs**: 60 → 54. Removed zero-importer dirs (`recipes`, `business`, `search`, `cost`, `evals`, `styles`).
+- **`libp2p`** and 7 `@libp2p/*` submodules moved to `optionalDependencies`. Default install no longer pays the mesh-feature cost.
+- **`marked`** aligned to `^15` (matching `marked-terminal@7`'s peer). Fresh `npm ci` works without `--legacy-peer-deps`.
+- **`dist/dirgha.mjs.map`** (28.5MB) untracked. Regenerated at build time, not shipped.
+- **`@ts-nocheck` count**: 85 → 81. All four files in `src/runtime/` are now type-checked (the isolate sandbox and host-tool registry — type safety here was load-bearing).
+
+### Tests
+
+- **From 456 → 767 passing.** +205 new tests across:
+  - `src/permission/judge.test.ts` — 91 cases
+  - `src/utils/unified-memory.test.ts` — 22 cases
+  - `src/agent/tool-execution.test.ts` — 26 cases
+  - `src/tools/file.sandbox.test.ts` — 21 cases
+  - `src/tools/shell-guards.spec.ts` — 45 cases
+  - `src/providers/normalise.test.ts` — 10 cases
+- Pre-existing 6 failures → 5 (S1.7 fixed one shell-template bug as drive-by).
+
+### Fixed
+
+- **`npm ci && npm run build:public` on a fresh clone** (S1.2). Three compound issues — missing `@libp2p/*` externals, unresolved `@dirgha/types` workspace-only import, relative bucky import — all fixed.
+- **`dirgha recall <q>`** no longer crashes (S1.4). Sync stub + defensive `Array.isArray` at caller.
+- **`/yolo` module was syntactically invalid** (PR #1). ~30 lines of orphaned handler code deleted.
+- **`TOOL_ALLOWLIST` TDZ** (PR #1). `WRITE_TOOLS` hoisted above the spread that referenced it.
+- **Broken template literal** in `src/tools/shell.ts` error message (S1.7). The `Allowed: Array.from(...)` block was missing its `${...}` wrap.
+
+---
+
+## 0.1.0-pre (2026-04-20) — internal alpha (historical)
 
 **Initial ship.** All surface stable; 27 slash command modules active, 85 user-facing slash commands, universal `--json` output, parallel multi-agent fleet.
 
