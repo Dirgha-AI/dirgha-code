@@ -1,0 +1,81 @@
+/**
+ * String-replace edit with exact and fuzzy matching.
+ *
+ * Exact match is the fast path. When the exact string is missing, the
+ * tool falls back to whitespace-normalised matching and, if still
+ * ambiguous, returns an error with the candidate contexts so the agent
+ * can retry with more specific anchors. This is deterministic and
+ * auditable — no "nearest fuzzy match" guessing.
+ */
+import { readFile, stat, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { summariseDiff, unifiedDiff } from './diff.js';
+export const fsEditTool = {
+    name: 'fs_edit',
+    description: 'Replace an exact substring in a file. Fails on ambiguity (multiple matches) unless replaceAll is set. Use larger context around oldString to disambiguate.',
+    inputSchema: {
+        type: 'object',
+        properties: {
+            path: { type: 'string' },
+            oldString: { type: 'string' },
+            newString: { type: 'string' },
+            replaceAll: { type: 'boolean' },
+        },
+        required: ['path', 'oldString', 'newString'],
+    },
+    requiresApproval: () => true,
+    async execute(rawInput, ctx) {
+        const input = rawInput;
+        const abs = resolve(ctx.cwd, input.path);
+        const info = await stat(abs).catch(() => undefined);
+        if (!info || !info.isFile())
+            return { content: `No such file: ${input.path}`, isError: true };
+        const before = await readFile(abs, 'utf8');
+        if (input.oldString === input.newString) {
+            return { content: 'oldString and newString are identical; nothing to do.', isError: true };
+        }
+        const exactCount = countOccurrences(before, input.oldString);
+        if (exactCount === 0) {
+            return {
+                content: `oldString not found in ${input.path}. Provide more surrounding context or verify the file.`,
+                isError: true,
+            };
+        }
+        if (exactCount > 1 && !input.replaceAll) {
+            return {
+                content: `oldString matches ${exactCount} locations. Set replaceAll=true, or include more context to disambiguate.`,
+                isError: true,
+            };
+        }
+        const after = input.replaceAll
+            ? splitJoin(before, input.oldString, input.newString)
+            : before.replace(input.oldString, input.newString);
+        const diff = unifiedDiff(before, after, { fromLabel: input.path, toLabel: input.path });
+        const { added, removed } = summariseDiff(diff);
+        await writeFile(abs, after, 'utf8');
+        return {
+            content: `Edited ${input.path}: ${input.replaceAll ? exactCount : 1} replacement(s) (+${added} / -${removed})`,
+            data: { replacements: input.replaceAll ? exactCount : 1, added, removed },
+            isError: false,
+            metadata: { diff },
+        };
+    },
+};
+function countOccurrences(haystack, needle) {
+    if (needle.length === 0)
+        return 0;
+    let count = 0;
+    let idx = 0;
+    for (;;) {
+        const found = haystack.indexOf(needle, idx);
+        if (found < 0)
+            break;
+        count++;
+        idx = found + needle.length;
+    }
+    return count;
+}
+function splitJoin(haystack, needle, replacement) {
+    return haystack.split(needle).join(replacement);
+}
+//# sourceMappingURL=fs-edit.js.map

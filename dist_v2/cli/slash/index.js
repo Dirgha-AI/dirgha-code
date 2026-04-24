@@ -1,0 +1,52 @@
+/**
+ * Barrel for the built-in slash command set. The consuming integration
+ * (typically in `../slash.ts` or `../interactive.ts`) should call
+ * `registerHelpSource(builtinSlashCommands)` once, then bulk-register
+ * each command against a `SlashRegistry` via its `execute` handler.
+ */
+import { accountCommand } from './account.js';
+import { clearCommand } from './clear.js';
+import { compactCommand } from './compact.js';
+import { configCommand } from './config.js';
+import { exitCommand } from './exit.js';
+import { fleetCommand } from './fleet.js';
+import { helpCommand, registerHelpSource } from './help.js';
+import { historyCommand } from './history.js';
+import { initCommand } from './init.js';
+import { keysCommand } from './keys.js';
+import { loginCommand } from './login.js';
+import { memoryCommand } from './memory.js';
+import { modeCommand } from './mode.js';
+import { modelsCommand } from './models.js';
+import { resumeCommand } from './resume.js';
+import { sessionCommand } from './session.js';
+import { setupCommand } from './setup.js';
+import { statusCommand } from './status.js';
+import { themeCommand } from './theme.js';
+import { upgradeCommand } from './upgrade.js';
+export const builtinSlashCommands = [
+    initCommand,
+    keysCommand,
+    modelsCommand,
+    helpCommand,
+    clearCommand,
+    loginCommand,
+    setupCommand,
+    statusCommand,
+    memoryCommand,
+    compactCommand,
+    modeCommand,
+    exitCommand,
+    historyCommand,
+    resumeCommand,
+    sessionCommand,
+    themeCommand,
+    fleetCommand,
+    accountCommand,
+    upgradeCommand,
+    configCommand,
+];
+// Wire /help so it can introspect the full list without a circular import.
+registerHelpSource(builtinSlashCommands);
+export { accountCommand, clearCommand, compactCommand, configCommand, exitCommand, fleetCommand, helpCommand, historyCommand, initCommand, keysCommand, loginCommand, memoryCommand, modeCommand, modelsCommand, resumeCommand, sessionCommand, setupCommand, statusCommand, themeCommand, upgradeCommand, };
+//# sourceMappingURL=index.js.map

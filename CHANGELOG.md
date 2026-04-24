@@ -2,6 +2,86 @@
 
 Versioning: **semver 0.x** during rapid iteration. Breaking → `0.2.0`. Patches → `0.1.1`, `0.1.2`, … First stable release will be `1.0.0`.
 
+## 0.2.0-beta.1 (2026-04-24) — new v2 core shipped as `dirgha-v2` side-binary
+
+**Second-generation CLI core** under `src_v2/`, now bundled alongside the
+existing `dirgha` binary as `dirgha-v2`. Users on `latest` keep v1.
+Opt in with `npm i -g @dirgha/code@beta`.
+
+### Why
+
+The 2026-04-23 CLI 360° audit flagged 12+ P0/P1 architectural issues in
+v1: fragmented memory (5 overlapping stores), `@ts-nocheck` debt
+through core paths, dual REPL+TUI stacks, hot-context token bloat,
+string-matching error handling. These can't be patched out. v2 is
+Opus 4.7's layered rewrite per `docs/dirgha-code/2026-04-23/`.
+
+### Added — v2 core (feature-parity in progress)
+
+- **Layered architecture** — kernel (agent loop + event stream + message
+  assembly) · providers (one canonical `streamSSE` owns all SSE
+  headers, one adapter per provider) · tools (typed registry with
+  per-model sanitisation) · context (file-backed memory, JSONL
+  sessions, automatic compaction) · extensions (skills, MCP client,
+  subagent pool) · safety (policy, approval bus, sandbox adapters) ·
+  intelligence (smart router, error classifier, cost tracker).
+- **Providers** — NVIDIA NIM, OpenRouter (incl. `inclusionai/ling-2.6-1t:free`),
+  OpenAI, Anthropic (native Messages API), Google Gemini, Ollama,
+  Fireworks shim. All share one `streamSSE` helper that fixes the NIM
+  stutter structurally.
+- **Built-in tools** — `fs_read`, `fs_write`, `fs_edit`, `fs_ls` (with
+  HUGE_ROOTS guardrail), `shell`, `search_grep`, `search_glob`, `git`,
+  `browser` (Playwright, 5 actions), `checkpoint` (save/restore/list/
+  delete), `cron` (CRUD — daemon out of scope), `multimodal` (describe/
+  transcribe; generate stubs to 0.1.x).
+- **Fleet** — port of the headline feature: `runFleet` spawns parallel
+  agents each in its own `git worktree`, merges back via 3-way/merge/
+  cherry-pick; `runTripleshot` spawns 3 variants + LLM judge. Runs
+  in-process (no more `spawn node dirgha ask` subprocess), so tokens
+  and events flow through one shared stream.
+- **Slash commands** — 20 ported: `/init /keys /models /help /clear
+  /login /setup /status /memory /compact /mode /exit /history /resume
+  /session /theme /fleet /account /upgrade /config`. Seven stub to the
+  CLI equivalent (`login`, `mode`, `theme`, `fleet`, `account`,
+  `upgrade`, `session branch`) pending module wiring.
+- **Ink TUI** — new renderer at `src_v2/tui/ink/`. Logo · streaming
+  transcript · tool boxes · thinking blocks · status bar · input. Not
+  yet ported from v1: model picker modal, session picker, help
+  overlay, vim mode, paste-collapse, fuzzy `@file` completion.
+- **Billing + device auth** — `src_v2/integrations/{device-auth,billing}.ts`
+  with preflight quota, usage recording, token storage at
+  `~/.dirgha/credentials.json` (mode 0600).
+- **Memory unification** — single `KeyedMemoryStore` contract in
+  `src_v2/context/memory.ts`, replacing v1's 5 fragmented paths
+  (`memory/builtin`, `memory/graph`, `memory/unified`, `embeddings/*`,
+  `utils/unified-memory`). FTS5 via better-sqlite3 with graceful
+  fallback to substring scan when the native binary isn't available.
+- **Parity + eval harness** — scripted streaming / tool-call / unicode
+  scenarios with a pluggable mock SSE server; SWE-Bench + Terminal-Bench
+  stubs.
+
+### Fixed (structural)
+
+- **NVIDIA NIM streaming stutter** — `providers/http.ts` uses
+  `Accept: text/event-stream` for SSE and `application/json` for
+  JSON-RPC; `extraHeaders` explicitly rejects overrides on either.
+  The class of bug cannot recur.
+
+### Policy
+
+- No source file, comment, identifier, or string literal in `src_v2/`
+  references any competing coding-agent CLI by name. Competitor
+  architectures are discussed only in internal design docs under
+  `docs/dirgha-code/2026-04-23/`.
+
+### Known stubs (track toward 0.2.0)
+
+- `/login`, `/account`, `/upgrade` slash commands need REPL auth wiring.
+- `multimodal generate_image` — always returns "use 0.1.x".
+- `cron run_now` — marks `lastRunAt` only; scheduler is a daemon.
+- Model picker modal, help overlay, vim mode in Ink TUI.
+- Slash-commands remaining from v1 (77 more, not urgent).
+
 ## 0.1.1 (2026-04-24) — NVIDIA streaming stutter + root-scan guardrail
 
 ### Fixed

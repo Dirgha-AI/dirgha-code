@@ -1,17 +1,20 @@
 {
   "name": "@dirgha/code",
-  "version": "0.1.1",
+  "version": "0.2.0-beta.1",
   "type": "module",
   "main": "dist/dirgha.mjs",
   "bin": {
     "dirgha": "dist/dirgha.mjs",
-    "d": "dist/dirgha.mjs"
+    "d": "dist/dirgha.mjs",
+    "dirgha-v2": "dist_v2/cli/main.js"
   },
   "scripts": {
-    "build": "node build.mjs",
+    "build": "node build.mjs && npm run build:v2",
+    "build:v1": "node build.mjs",
+    "build:v2": "tsc -p tsconfig.v2.json",
     "postbuild": "node scripts/gen-skill-md.mjs || echo '[skill-md] skipped'",
     "skill:gen": "node scripts/gen-skill-md.mjs",
-    "build:public": "DIRGHA_BUILD_TYPE=public node build.mjs",
+    "build:public": "DIRGHA_BUILD_TYPE=public node build.mjs && npm run build:v2",
     "build:private": "DIRGHA_BUILD_TYPE=private node build.mjs",
     "build:dev": "node build.mjs --dev",
     "build:analyze": "node build.mjs --analyze",
@@ -19,10 +22,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit",
-    "prepublishOnly": "DIRGHA_BUILD_TYPE=public node build.mjs"
+    "typecheck:v2": "tsc -p tsconfig.v2.json --noEmit",
+    "prepublishOnly": "DIRGHA_BUILD_TYPE=public node build.mjs && npm run build:v2"
   },
   "files": [
     "dist/dirgha.mjs",
+    "dist_v2/**/*.js",
+    "dist_v2/**/*.d.ts",
     "README.md",
     "LICENSE"
   ],
