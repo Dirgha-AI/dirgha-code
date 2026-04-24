@@ -34,7 +34,7 @@ export function getWorkspaceRoot(): string {
 }
 
 // Resolve path within workspace sandbox
-function sandboxPath(inputPath: string): string {
+export function sandboxPath(inputPath: string): string {
   const resolved = resolve(getWorkspaceRoot(), inputPath);
   const normalized = normalize(resolved);
   const root = getWorkspaceRoot();
