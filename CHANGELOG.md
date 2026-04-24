@@ -1,8 +1,8 @@
 # Dirgha CLI — Changelog
 
-Versioning: **semver 0.x** during rapid iteration. Breaking → `0.2.0`. Patches → `0.1.1`, `0.1.2`, … First stable release will be `1.0.0`.
+Versioning: **semver**. `1.x` is the first stable line; `0.1.x` was the initial public preview. Pre-`1.0` entries (`0.1.1`, `0.2.0-beta.1`, `0.2.0-beta.2`) are kept below for history.
 
-## 0.2.0 (2026-04-24) — v2 is now the default
+## 1.2.0 (2026-04-24) — v2 is now the default
 
 The clean-architecture v2 core, previously shipped as the `dirgha-v2`
 side-binary in `0.2.0-beta.1` + `beta.2`, now **is** `dirgha`. The old

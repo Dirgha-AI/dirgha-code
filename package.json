@@ -1,6 +1,6 @@
 {
   "name": "@dirgha/code",
-  "version": "0.2.0",
+  "version": "1.2.0",
   "type": "module",
   "main": "dist_v2/index.js",
   "bin": {
