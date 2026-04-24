@@ -42,6 +42,10 @@ const __dirname = __banner_dirname(__filename);`,
     'libp2p',               // mesh networking
     '@libp2p/tcp',
     '@libp2p/websockets',
+    '@libp2p/mplex',
+    '@libp2p/noise',
+    '@libp2p/gossipsub',
+    '@libp2p/interface',    // peer-id subpath too
     'libp2p-noise',
     '@chainsafe/libp2p-yamux',
   ],
