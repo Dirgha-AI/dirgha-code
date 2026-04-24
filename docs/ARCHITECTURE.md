@@ -12,7 +12,7 @@ This doc is the contract for the top-level shape of the codebase. If a new direc
 
 ## Core (stable surface)
 
-These directories ship in 0.1.x and follow semver on their public exports.
+These directories ship in 1.x and follow semver on their public exports.
 
 | Dir | Role |
 |---|---|

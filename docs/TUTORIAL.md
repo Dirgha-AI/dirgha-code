@@ -9,7 +9,7 @@ commands.
 
 ```sh
 npm install -g @dirgha/code
-dirgha --version     # 0.1.0 (or newer)
+dirgha --version     # 1.2.0 (or newer)
 ```
 
 Requires Node 20+. Windows: use WSL.

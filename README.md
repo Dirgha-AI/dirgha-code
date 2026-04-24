@@ -10,7 +10,7 @@
 ---
 
 ```
-◈ Dirgha Code · dirgha.ai · 0.1.0 · nvidia/minimax-m2.7
+◈ Dirgha Code · dirgha.ai · 1.2.0 · nvidia/minimax-m2.7
 ──────────────────────────────────────────────────────────
 ❯ dirgha fleet launch "migrate auth to JWT + add rate limiter"
   ∇ decomposing goal into parallel streams…
@@ -89,9 +89,9 @@ Every command supports `--json` — parseable envelope with `data`, `text`,
 
 ---
 
-## What's new in 0.1.0 — `fleet`
+## What's new in 1.2.0 — `fleet`
 
-The headline feature of 0.1.0 is **parallel multi-agent execution in git
+The headline feature of 1.2.0 is **parallel multi-agent execution in git
 worktrees**. One command decomposes a goal into independent streams,
 spawns N agents concurrently, and lets you review their diffs before
 anything touches your working tree.
