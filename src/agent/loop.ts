@@ -65,7 +65,7 @@ export async function runAgentLoop(
   onTool: (name: string, input: Record<string, any>) => void,
   ctx?: import('../types.js').ReplContext,
   skillOverride?: string,
-  options?: { maxTurns?: number; sessionId?: string; signal?: AbortSignal },
+  options?: { maxTurns?: number; sessionId?: string; signal?: AbortSignal; disableTools?: boolean },
   onThinking?: (t: string) => void,
   onToolResult?: (toolUseId: string, name: string, result: string, isError: boolean) => void,
 ): Promise<{ messages: Message[]; tokensUsed: number; costUsd: number; traceLog: TraceEntry[] }> {
@@ -107,6 +107,20 @@ export async function runAgentLoop(
   }
   try { systemPrompt += getSkillHints(userInput); } catch (err) {
     logger.warn('Failed to get skill hints', { error: err instanceof Error ? err.message : String(err) });
+  }
+
+  // --no-tools / disableTools: hard-block tool calls at two layers.
+  // 1. System prompt gets a prepended instruction so compliant models
+  //    don't even try.
+  // 2. Tool execution (below) returns an empty block set immediately
+  //    when a model ignores the instruction, preventing runaway loops.
+  const disableTools = options?.disableTools === true;
+  if (disableTools) {
+    systemPrompt =
+      'You are in pure-chat mode. You MUST NOT use any tools. ' +
+      'Answer directly from your own knowledge. ' +
+      'If a request genuinely requires a tool, say so and stop.\n\n' +
+      systemPrompt;
   }
 
   let tokensUsed = 0;
@@ -238,7 +252,7 @@ export async function runAgentLoop(
     }
 
     const textBlocks = response.content.filter(b => b.type === 'text');
-    const toolBlocks = response.content.filter(b => b.type === 'tool_use') as Array<ContentBlock & { type: 'tool_use' }>;
+    let toolBlocks = response.content.filter(b => b.type === 'tool_use') as Array<ContentBlock & { type: 'tool_use' }>;
 
     // Emit text for non-streaming responses (skip if already streamed to avoid double-emit)
     if (!textStreamedThisTurn) {
@@ -251,6 +265,16 @@ export async function runAgentLoop(
     lastStopReason = (response as any).stop_reason ?? undefined;
 
     history.push({ role: 'assistant', content: response.content });
+
+    // Hard-block tool execution when disableTools is set. We drop the
+    // tool-use blocks and break out immediately. The user already got
+    // whatever text the model produced (if any); further tool attempts
+    // are a loop bait with no upside.
+    if (disableTools && toolBlocks.length > 0) {
+      onText('\n[tools disabled — dropping ' + toolBlocks.length + ' tool call(s) and exiting]');
+      toolBlocks = [];
+      break;
+    }
 
     // No tools - we're done
     if (toolBlocks.length === 0) break;
