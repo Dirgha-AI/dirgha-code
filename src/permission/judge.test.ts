@@ -104,6 +104,10 @@ describe('isDangerousCommand', () => {
 });
 
 describe('isReadOnlyPath', () => {
+  // ~/.ssh test needs to use the actual $HOME (CI runs as /home/runner,
+  // local dev often /root). Construct the path at test time so the
+  // assertion stays portable.
+  const HOME = process.env['HOME'] ?? '/root';
   const PROTECTED = [
     ['node_modules/foo/bar.js', 'node_modules'],
     ['.git/config', '.git'],
@@ -111,7 +115,7 @@ describe('isReadOnlyPath', () => {
     ['build/output.js', 'build'],
     ['project/package-lock.json', 'package-lock.json'],
     ['foo/bar.lock', '*.lock'],
-    ['/root/.ssh/authorized_keys', '~/.ssh'],
+    [`${HOME}/.ssh/authorized_keys`, '~/.ssh'],
     ['.env', '.env'],
     ['.env.local', '.env.local'],
   ] as const;
