@@ -117,6 +117,7 @@ import { registerMakeCommands } from './commands/make.js';
 import { registerCompactCommand } from './commands/compact.js';
 import { registerJoinMeshCommand } from './commands/join-mesh.js';
 import { registerMeshCommands } from './commands/mesh/index.js';
+import { registerIfExperimental } from './utils/experimental.js';
 import { registerAnalyticsCommands } from './commands/analytics.js';
 import { registerBrowserIntegration } from './commands/browser-integration.js';
 import { registerSmartExec } from './commands/smart-exec.js';
@@ -363,15 +364,15 @@ registerQueryCommand(program);       // Legacy: use 'recall' instead
 registerSyncCommands(program);
 registerProjectCommands(program);
 registerUnifiedMemoryCommands(program);  // New: remember, recall, session-*, context
-registerSwarmCommands(program);
+registerIfExperimental('swarm', () => registerSwarmCommands(program));
 registerVoiceCommands(program);
 registerCheckpointCommand(program);
 registerRollbackCommand(program);
 registerSprintCommand(program);
 registerRunCommand(program);
 registerSandboxConnectCommand(program);
-registerDAOCommands(program);
-registerMakeCommands(program);
+registerIfExperimental('dao', () => registerDAOCommands(program));
+registerIfExperimental('make', () => registerMakeCommands(program));
 registerBrowserIntegration(program);  // Browser automation (navigate, click, type, snapshot, goto, extract, pdf)
 
 program
@@ -397,10 +398,10 @@ program.addCommand(scanCommand);
 program.addCommand(mcpCommand);
 program.addCommand(researchCommand);
 program.addCommand(auditCommand);
-registerBuckyCommands(program);
-registerJoinMeshCommand(program);
+registerIfExperimental('bucky', () => registerBuckyCommands(program));
+registerIfExperimental('join-mesh', () => registerJoinMeshCommand(program));
 registerCompactCommand(program);
-registerMeshCommands(program);
+registerIfExperimental('mesh', () => registerMeshCommands(program));
 registerAnalyticsCommands(program);
 registerSmartExec(program);
 registerAskCommand(program);
