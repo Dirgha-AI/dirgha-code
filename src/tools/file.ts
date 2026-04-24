@@ -5,6 +5,7 @@ import {
   mkdirSync,
   unlinkSync,
   statSync,
+  realpathSync,
 } from "node:fs";
 import { basename } from "node:path";
 import { resolve, dirname, normalize, sep } from "node:path";
@@ -33,11 +34,14 @@ export function getWorkspaceRoot(): string {
   return _workspaceRoot ?? process.cwd();
 }
 
-// Resolve path within workspace sandbox
+// Resolve path within workspace sandbox.
+// Guards against: absolute path escapes, `..` traversal, and symlink escapes
+// (a symlink inside the workspace pointing outside it).
 export function sandboxPath(inputPath: string): string {
   const resolved = resolve(getWorkspaceRoot(), inputPath);
   const normalized = normalize(resolved);
   const root = getWorkspaceRoot();
+  const rootReal = resolvePathOrSelf(root);
 
   // Block absolute paths that try to escape workspace
   if (
@@ -54,12 +58,48 @@ export function sandboxPath(inputPath: string): string {
     throw new Error(`Path '${inputPath}' contains disallowed '..' traversal`);
   }
 
-  // Ensure final path is within workspace
+  // Ensure lexical path is within workspace
   if (!normalized.startsWith(root + sep) && normalized !== root) {
     throw new Error(`Path '${inputPath}' is outside workspace root '${root}'`);
   }
 
+  // Symlink-escape guard: resolve the deepest existing ancestor through
+  // realpath and verify it still falls inside the workspace's real path.
+  // For new files we walk up to the first extant parent; for existing paths
+  // we realpath the path itself.
+  const real = resolveDeepestReal(normalized);
+  if (!real.startsWith(rootReal + sep) && real !== rootReal) {
+    throw new Error(
+      `Path '${inputPath}' resolves through a symlink outside workspace root`,
+    );
+  }
+
   return normalized;
+}
+
+// realpathSync on the deepest ancestor that exists. Used for symlink
+// escape checks — a path may not exist yet (file creation), but some parent
+// must, and that parent's realpath determines where the write actually
+// lands on disk.
+function resolveDeepestReal(p: string): string {
+  let cur = p;
+  while (true) {
+    try {
+      return realpathSync(cur);
+    } catch {
+      const parent = dirname(cur);
+      if (parent === cur) return cur;
+      cur = parent;
+    }
+  }
+}
+
+function resolvePathOrSelf(p: string): string {
+  try {
+    return realpathSync(p);
+  } catch {
+    return p;
+  }
 }
 
 const LOCKFILES = new Set([
