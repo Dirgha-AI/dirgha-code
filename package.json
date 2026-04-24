@@ -61,13 +61,6 @@
   "dependencies": {
     "@commander-js/extra-typings": "^14.0.0",
     "@inkjs/ui": "^2.0.0",
-    "@libp2p/gossipsub": "^15.0.17",
-    "@libp2p/kad-dht": "^16.2.0",
-    "@libp2p/mplex": "^12.0.16",
-    "@libp2p/noise": "^1.0.1",
-    "@libp2p/tcp": "^11.0.15",
-    "@libp2p/webrtc": "^6.0.16",
-    "@libp2p/websockets": "^10.1.8",
     "@types/node": "^25.2.3",
     "better-sqlite3": "^12.9.0",
     "chalk": "^5.6.2",
@@ -80,9 +73,8 @@
     "ink-text-input": "^6.0.0",
     "inquirer": "12.1.0",
     "js-yaml": "^4.1.1",
-    "libp2p": "2.2.1",
     "magika": "^1.0.0",
-    "marked": "^17.0.5",
+    "marked": "^15.0.12",
     "marked-terminal": "^7.3.0",
     "ora": "^9.3.0",
     "qrcode-terminal": "^0.12.0",
@@ -102,6 +94,14 @@
     "vitest": "^4.1.2"
   },
   "optionalDependencies": {
-    "playwright": "^1.47.0"
+    "playwright": "^1.47.0",
+    "libp2p": "2.2.1",
+    "@libp2p/gossipsub": "^15.0.17",
+    "@libp2p/kad-dht": "^16.2.0",
+    "@libp2p/mplex": "^12.0.16",
+    "@libp2p/noise": "^1.0.1",
+    "@libp2p/tcp": "^11.0.15",
+    "@libp2p/webrtc": "^6.0.16",
+    "@libp2p/websockets": "^10.1.8"
   }
 }
