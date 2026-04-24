@@ -408,34 +408,9 @@ registerAskCommand(program);
 registerHubCommands(program);
 registerFleetCommands(program);
 
-program
-  .command('eval')
-  .description('Run the built-in eval suite against the active provider')
-  .option('-m, --model <model>', 'Override model for evals')
-  .option('--ids <ids>', 'Comma-separated task IDs to run (default: all 20)')
-  .option('--json', 'Output results as JSON')
-  .action(async (opts: { model?: string; ids?: string; json?: boolean }) => {
-    const { runEvals, TASK_SUITE } = await import('./evals/harness.js');
-    const { getDefaultModel } = await import('./providers/detection.js');
-    const model = opts.model ?? getDefaultModel();
-    const tasks = opts.ids
-      ? TASK_SUITE.filter(t => opts.ids!.split(',').map(s => s.trim()).includes(t.id))
-      : TASK_SUITE;
-    console.log(chalk.bold(`\nRunning ${tasks.length} eval tasks against ${chalk.cyan(model)}...\n`));
-    const summary = await runEvals(tasks, model);
-    if (opts.json) {
-      console.log(JSON.stringify(summary, null, 2));
-    } else {
-      const pct = ((summary.passed / tasks.length) * 100).toFixed(0);
-      console.log(chalk.bold(`\nResults: ${summary.passed}/${tasks.length} passed (${pct}%) — avg score ${summary.avgScore.toFixed(2)} — ${summary.totalMs}ms`));
-      for (const r of summary.results) {
-        const icon = r.passed ? chalk.green('✓') : chalk.red('✗');
-        const score = r.passed ? '' : chalk.red(` [${r.failReason}]`);
-        console.log(`  ${icon} ${r.id.padEnd(20)} ${r.durationMs}ms${score}`);
-      }
-      console.log();
-    }
-  });
+// eval command removed in Sprint 3.2 — the in-tree evals/ harness was
+// never run in CI and duplicated the tests/ directory's role. When a
+// real eval suite returns, land it under src/experimental/evals/.
 
 program
   .command('stats')
@@ -448,42 +423,9 @@ program.addCommand(doctorCommand);
 program.addCommand(updateCommand);
 supportCommand(program);
 
-program
-  .command('recipe')
-  .description('Run a recipe file')
-  .requiredOption('--recipe <path>', 'Path to a .yaml or .recipe.yaml recipe file')
-  .option('--param <kv>', 'Pass a parameter as key=value (repeatable)', (v, acc: string[]) => [...acc, v], [] as string[])
-  .action(async (opts: { recipe: string; param: string[] }) => {
-    const { loadRecipeFromPath } = await import('./recipes/loader.js');
-    const { runRecipe } = await import('./recipes/runner.js');
-    const recipe = loadRecipeFromPath(opts.recipe);
-    if (!recipe) {
-      console.error(chalk.red(`Could not load recipe: ${opts.recipe}`));
-      process.exit(1);
-    }
-    const params: Record<string, string> = {};
-    for (const pair of opts.param) {
-      const eqIdx = pair.indexOf('=');
-      if (eqIdx !== -1) params[pair.slice(0, eqIdx)] = pair.slice(eqIdx + 1);
-      else console.warn(chalk.yellow(`Ignoring invalid --param (expected key=value): ${pair}`));
-    }
-    const { getDefaultModel } = await import('./agent/gateway.js');
-    const model = process.env['DIRGHA_MODEL'] ?? getDefaultModel();
-    try {
-      const { tokensUsed } = await runRecipe(
-        recipe,
-        params,
-        model,
-        (t) => process.stdout.write(t),
-        (name) => console.error(chalk.dim(`[tool] ${name}`)),
-      );
-      console.log(chalk.dim(`\nTokens used: ${tokensUsed.toLocaleString()}`));
-      process.exit(0);
-    } catch (e: any) {
-      console.error(chalk.red(e.message ?? String(e)));
-      process.exit(1);
-    }
-  });
+// recipes/ was removed in Sprint 3.2 (never used by anyone). If a recipe
+// runner returns, gate it behind DIRGHA_EXPERIMENTAL and keep the
+// loader in src/experimental/recipes/.
 
 // __dump_spec — introspect commander tree for auto-SKILL.md generation
 if (_filteredArgs[0] === '__dump_spec') {

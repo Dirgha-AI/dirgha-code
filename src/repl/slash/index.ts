@@ -114,27 +114,6 @@ export async function handleSlash(input: string, ctx: ReplContext): Promise<bool
 
   const cmd = finalRegistry.find(c => c.name === name || c.aliases?.includes(name));
   if (!cmd) {
-    // Recipe fallback
-    const { loadRecipe } = await import('../../recipes/loader.js');
-    const { runRecipe } = await import('../../recipes/runner.js');
-    const recipe = loadRecipe(name);
-    if (recipe) {
-      const params: Record<string, string> = {};
-      if (args.trim()) {
-        for (const pair of args.trim().split(/\s+/)) {
-          const eqIdx = pair.indexOf('=');
-          if (eqIdx !== -1) params[pair.slice(0, eqIdx)] = pair.slice(eqIdx + 1);
-        }
-      }
-      const model = ctx.model ?? 'auto';
-      try {
-        await runRecipe(recipe, params, model, (t) => process.stdout.write(t), () => {});
-        console.log(chalk.dim(`\nRecipe '${name}' completed.`));
-      } catch (e: any) {
-        console.log(chalk.red(e.message ?? String(e)));
-      }
-      return true;
-    }
     console.log(chalk.red(`Unknown command: /${name}. Type /help for commands.`));
     return true;
   }
