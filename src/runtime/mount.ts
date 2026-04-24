@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * rivet/mount.ts — Filesystem mount abstraction for flexible storage backends
  * 
@@ -237,7 +236,7 @@ class LocalFS implements MountedFS {
     if (this.config.readonly) {
       throw new Error('Filesystem is read-only');
     }
-    return fs.mkdir(join(this.config.mountPoint, path), { recursive: true });
+    await fs.mkdir(join(this.config.mountPoint, path), { recursive: true });
   }
 
   async delete(path: string): Promise<void> {
@@ -247,7 +246,7 @@ class LocalFS implements MountedFS {
     const fullPath = join(this.config.mountPoint, path);
     const stats = await fs.stat(fullPath);
     if (stats.isDirectory()) {
-      await fs.rmdir(fullPath, { recursive: true });
+      await fs.rm(fullPath, { recursive: true, force: true });
     } else {
       await fs.unlink(fullPath);
     }

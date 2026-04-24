@@ -1,4 +1,3 @@
-// @ts-nocheck
 
 /**
  * rivet/wasm-commands.test.ts — Tests for WASM command execution

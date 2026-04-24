@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * rivet/host-tools.ts — Host-defined tool execution pattern
  * 
@@ -12,7 +11,14 @@ import { spawnSync } from 'node:child_process';
 import { writeFileSync, readFileSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { ToolResult } from '../types.js';
+// Runtime host tools use a local result shape (success/output/error)
+// distinct from the agent-layer ToolResult (tool/result/error). Keep
+// them separate so the two subsystems don't couple on a shared type.
+interface ToolResult {
+  success: boolean;
+  output: string;
+  error?: string;
+}
 
 /** Tool permission levels */
 export type ToolPermission = 'none' | 'read' | 'write' | 'execute' | 'full';
