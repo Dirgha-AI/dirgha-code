@@ -6,7 +6,8 @@ class UnifiedMemory {
 
   async store(_k: string, _v: any) {}
   async retrieve(_k: string) { return null; }
-  async search(_q: string) { return []; }
+  search(_q: string, _opts?: any): any[] { return []; }
+  recall(_opts?: any): any[] { return []; }
   resumeSession(id: string) { this._sessionId = id; }
   async getContext(_opts?: any) { return []; }
 

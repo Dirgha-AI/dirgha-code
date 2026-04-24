@@ -26,9 +26,9 @@ export function registerRecallCommand(program: Command): void {
       const limit = parseInt(opts.limit, 10);
 
       try {
-        const results = query
-          ? mem.search(query, { tags, limit })
-          : mem.recall({
+        const raw = query
+          ? await mem.search(query, { tags, limit })
+          : await mem.recall({
               layer: opts.layer,
               type: opts.type,
               tags,
@@ -37,6 +37,7 @@ export function registerRecallCommand(program: Command): void {
               limit,
               includeTiers: opts.hotOnly ? ['hot'] : ['hot', 'warm', 'cold'],
             });
+        const results: any[] = Array.isArray(raw) ? raw : [];
 
         if (results.length === 0) {
           console.log(chalk.yellow('No memories found'));
