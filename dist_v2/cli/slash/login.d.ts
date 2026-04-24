@@ -1,8 +1,10 @@
 /**
- * /login — trigger the device-code flow. Device-auth isn't ported into
- * v2 yet (integrations/auth.ts exists but is stubbed), so this prints
- * the out-of-band command and documents BYOK as the alternative.
- * STUB: when auth is wired, switch to calling createAuthClient().login.
+ * /login — device-code flow inside the REPL.
+ *
+ * Kicks off `/api/auth/device/start`, shows the user code + verification
+ * URL, then polls in the background so the REPL stays interactive. On
+ * success, saves the token and swaps it into `SlashContext` so
+ * subsequent billing / entitlement calls pick it up immediately.
  */
 import type { SlashCommand } from './types.js';
 export declare const loginCommand: SlashCommand;

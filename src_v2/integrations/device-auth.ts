@@ -1,15 +1,19 @@
 /**
  * Device-code OAuth flow for the Dirgha gateway.
  *
- * Companion to `auth.ts` (which uses `~/.dirgha/auth.json` + the `/api/auth/cli/*`
- * routes). This module implements the legacy v1 token shape used by the rest
- * of the billing stack: `~/.dirgha/credentials.json` + `/api/auth/device/*`.
+ * Canonical auth module. Stores tokens at `~/.dirgha/credentials.json`
+ * (0600) and drives the `/api/auth/device/*` endpoints. The older
+ * `integrations/auth.ts` is now a compatibility shim that delegates
+ * here so the billing + entitlements stack has exactly one source of
+ * truth for the active token.
  *
- * The slash commands `login`, `account`, `upgrade` call this module. Keep the
- * public surface stable.
+ * Callers:
+ *   - Slash commands (`/login`, `/account`, `/upgrade`) via `loadToken()`.
+ *   - CLI subcommands (`dirgha login`, `dirgha logout`).
+ *   - Billing preflight (`preRequestCheck` reads the bearer).
  */
 
-import { chmod, mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -176,6 +180,43 @@ export async function loadToken(): Promise<Token | null> {
 export async function clearToken(): Promise<void> {
   const path = credentialsPath();
   await unlink(path).catch(() => undefined);
+}
+
+/**
+ * One-shot migration from the legacy `~/.dirgha/auth.json` format
+ * (`integrations/auth.ts`) to the canonical `credentials.json`. Safe to
+ * call on every CLI start — returns `false` fast when nothing to do.
+ *
+ * Logs a single line to stderr on a successful move. Silent on no-op.
+ */
+export async function migrateLegacyAuth(): Promise<boolean> {
+  const legacyPath = join(homedir(), '.dirgha', 'auth.json');
+  const targetPath = credentialsPath();
+
+  const legacyInfo = await stat(legacyPath).catch(() => undefined);
+  if (!legacyInfo || !legacyInfo.isFile() || legacyInfo.size === 0) return false;
+  const targetInfo = await stat(targetPath).catch(() => undefined);
+  if (targetInfo && targetInfo.size > 0) return false;
+
+  const text = await readFile(legacyPath, 'utf8').catch(() => undefined);
+  if (!text) return false;
+
+  let parsed: { jwt?: string; userId?: string; expiresAt?: string } | undefined;
+  try { parsed = JSON.parse(text) as { jwt?: string; userId?: string; expiresAt?: string }; } catch { return false; }
+  if (!parsed || !parsed.jwt) return false;
+
+  await mkdir(dirname(targetPath), { recursive: true });
+  const payload: Token = {
+    token: parsed.jwt,
+    userId: parsed.userId ?? 'unknown',
+    email: 'unknown',
+    expiresAt: parsed.expiresAt ?? new Date(Date.now() + TOKEN_TTL_MS).toISOString(),
+  };
+  await writeFile(targetPath, JSON.stringify(payload, null, 2), 'utf8');
+  try { await chmod(targetPath, 0o600); } catch { /* non-POSIX */ }
+  await rename(legacyPath, `${legacyPath}.migrated`).catch(() => undefined);
+  process.stderr.write('[auth] migrated legacy credentials\n');
+  return true;
 }
 
 function sleep(ms: number): Promise<void> {

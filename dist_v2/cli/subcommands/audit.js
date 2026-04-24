@@ -1,0 +1,128 @@
+/**
+ * `dirgha audit` — read the local audit log.
+ *
+ * The audit log lives at `~/.dirgha/audit/events.jsonl` (append-only
+ * JSONL). Other parts of the CLI (tool approval, destructive actions,
+ * auth) are expected to append records here; this command is read-only.
+ *
+ * Subcommands:
+ *   list [N]          Show the last N entries (default 20).
+ *   tail              Follow the log (blocks, prints new entries live).
+ *   search <query>    Print entries whose JSON includes `query`.
+ * `--json` emits structured output instead of the table renderer.
+ */
+import { mkdir, readFile, stat } from 'node:fs/promises';
+import { watch } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { stdout, stderr } from 'node:process';
+import { style, defaultTheme } from '../../tui/theme.js';
+function auditDir() { return join(homedir(), '.dirgha', 'audit'); }
+function auditPath() { return join(auditDir(), 'events.jsonl'); }
+async function ensureLog() {
+    await mkdir(auditDir(), { recursive: true });
+}
+async function readEntries() {
+    await ensureLog();
+    const text = await readFile(auditPath(), 'utf8').catch(() => '');
+    const out = [];
+    for (const line of text.split('\n')) {
+        if (!line.trim())
+            continue;
+        try {
+            out.push(JSON.parse(line));
+        }
+        catch { /* skip malformed */ }
+    }
+    return out;
+}
+function formatEntry(entry) {
+    const ts = String(entry.ts ?? '').slice(0, 19);
+    const kind = String(entry.kind ?? 'event').padEnd(14);
+    const actor = entry.actor ? ` ${style(defaultTheme.muted, `(${String(entry.actor)})`)}` : '';
+    const summary = entry.summary ? String(entry.summary) : JSON.stringify({ ...entry, ts: undefined, kind: undefined });
+    return `${style(defaultTheme.muted, ts)}  ${style(defaultTheme.accent, kind)}${actor}  ${summary}`;
+}
+function emit(entries, json) {
+    if (json) {
+        for (const e of entries)
+            stdout.write(`${JSON.stringify(e)}\n`);
+        return;
+    }
+    if (entries.length === 0) {
+        stdout.write(style(defaultTheme.muted, '(no audit entries yet)\n'));
+        return;
+    }
+    for (const e of entries)
+        stdout.write(`${formatEntry(e)}\n`);
+}
+function usage() {
+    return [
+        'usage:',
+        '  dirgha audit list [N]       Last N entries (default 20)',
+        '  dirgha audit tail           Follow the log',
+        '  dirgha audit search <q>     Entries containing q',
+        '  dirgha audit [--json]       JSON output',
+    ].join('\n');
+}
+async function runTail(json) {
+    await ensureLog();
+    const path = auditPath();
+    const initial = await readEntries();
+    emit(initial.slice(-20), json);
+    let lastSize = (await stat(path).catch(() => undefined))?.size ?? 0;
+    stderr.write(style(defaultTheme.muted, '\n(following — Ctrl-C to stop)\n'));
+    return new Promise(resolve => {
+        const watcher = watch(path, { persistent: true }, async () => {
+            const st = await stat(path).catch(() => undefined);
+            if (!st || st.size <= lastSize)
+                return;
+            const fh = await readFile(path, 'utf8').catch(() => '');
+            const newText = fh.slice(lastSize);
+            lastSize = st.size;
+            for (const line of newText.split('\n')) {
+                if (!line.trim())
+                    continue;
+                try {
+                    emit([JSON.parse(line)], json);
+                }
+                catch { /* skip */ }
+            }
+        });
+        process.on('SIGINT', () => {
+            watcher.close();
+            resolve(0);
+        });
+    });
+}
+export const auditSubcommand = {
+    name: 'audit',
+    description: 'Read the local audit log (list / tail / search)',
+    async run(argv) {
+        const json = argv.includes('--json');
+        const args = argv.filter(a => a !== '--json');
+        const op = args[0] ?? 'list';
+        if (op === 'list') {
+            const n = Number.parseInt(args[1] ?? '20', 10);
+            const entries = await readEntries();
+            emit(entries.slice(-n), json);
+            return 0;
+        }
+        if (op === 'tail')
+            return runTail(json);
+        if (op === 'search') {
+            const query = args[1];
+            if (!query) {
+                stderr.write(`${usage()}\n`);
+                return 1;
+            }
+            const entries = await readEntries();
+            const needle = query.toLowerCase();
+            emit(entries.filter(e => JSON.stringify(e).toLowerCase().includes(needle)), json);
+            return 0;
+        }
+        stderr.write(`unknown subcommand "${op}"\n${usage()}\n`);
+        return 1;
+    },
+};
+//# sourceMappingURL=audit.js.map

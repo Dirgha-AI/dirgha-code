@@ -18,8 +18,9 @@ import { defaultTheme, style } from '../tui/theme.js';
 import { createTuiApprovalBus } from '../tui/approval.js';
 import type { SessionStore, Session } from '../context/session.js';
 import { maybeCompact } from '../context/compaction.js';
-import { createDefaultSlashRegistry, registerBuiltinSlashCommands } from './slash.js';
+import { createDefaultSlashRegistry, registerBuiltinSlashCommands, type SlashContext } from './slash.js';
 import type { DirghaConfig } from './config.js';
+import { loadToken, migrateLegacyAuth, type Token } from '../integrations/device-auth.js';
 
 export interface InteractiveOptions {
   registry: ToolRegistry;
@@ -54,6 +55,11 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
     }
   });
 
+  // Canonical auth lives in device-auth.ts. Migrate any legacy blob
+  // synchronously-before-REPL-start, then prime the slash-command token.
+  await migrateLegacyAuth().catch(() => undefined);
+  let currentToken: Token | null = await loadToken();
+
   process.stdout.write(style(defaultTheme.accent, '\ndirgha-cli interactive mode.  /help for commands.\n\n'));
 
   const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: true, prompt: style(defaultTheme.userPrompt, '❯ ') });
@@ -61,6 +67,11 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
 
   rl.on('line', line => { void handleLine(line); });
   rl.on('close', () => process.exit(0));
+
+  const emitStatus = (message: string): void => {
+    process.stdout.write(style(defaultTheme.muted, `\n${message}\n`));
+    rl.prompt();
+  };
 
   const handleLine = async (raw: string): Promise<void> => {
     const line = raw.trim();
@@ -70,7 +81,10 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
       const ctx = buildSlashCtx(session, opts, {
         get model() { return currentModel; },
         set model(v) { currentModel = v; },
-      }, totals, () => history.length = 0, () => rl.close());
+      }, totals, () => history.length = 0, () => rl.close(), {
+        get token() { return currentToken; },
+        set token(v) { currentToken = v; },
+      }, emitStatus);
       const result = await slash.dispatch(line, ctx);
       if (result.output) process.stdout.write(`${result.output}\n`);
       rl.prompt();
@@ -121,7 +135,14 @@ function buildSlashCtx(
   totals: UsageTotal,
   clearHistory: () => void,
   exit: () => void,
-) {
+  tokenRef: { token: Token | null },
+  status: (message: string) => void,
+): SlashContext {
+  const apiBase = (): string =>
+    process.env.DIRGHA_API_BASE ?? process.env.DIRGHA_GATEWAY_URL ?? 'https://api.dirgha.ai';
+  const upgradeUrl = (): string =>
+    process.env.DIRGHA_UPGRADE_URL ?? 'https://dirgha.ai/billing/upgrade';
+
   return {
     get model() { return modelRef.model; },
     get sessionId() { return session.id; },
@@ -137,6 +158,9 @@ function buildSlashCtx(
         '  /session load <id> Load a session',
         '  /skills            List skills available for this turn',
         '  /cost              Show cumulative usage',
+        '  /login             Sign in via device-code flow',
+        '  /account           Show billing tier, balance, limits',
+        '  /upgrade           Upgrade to a paid tier',
         '  /exit, /quit       Exit',
       ].join('\n');
     },
@@ -163,5 +187,10 @@ function buildSlashCtx(
       return `tokens in=${totals.inputTokens} out=${totals.outputTokens} cached=${totals.cachedTokens} cost=$${totals.costUsd.toFixed(4)}`;
     },
     exit(code = 0): void { exit(); process.exit(code); },
+    getToken(): Token | null { return tokenRef.token; },
+    setToken(value: Token | null): void { tokenRef.token = value; },
+    apiBase,
+    upgradeUrl,
+    status,
   };
 }

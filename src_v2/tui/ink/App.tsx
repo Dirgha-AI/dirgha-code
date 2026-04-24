@@ -7,13 +7,15 @@
  *   3. LiveTurn (the currently streaming turn, if any)
  *   4. InputBox
  *   5. StatusBar
+ *   6. Optional overlay (ModelPicker / HelpOverlay / AtFileComplete)
  *
- * Event → transcript projection lives in `use-event-projection.ts` so
- * this component stays focused on layout and lifecycle.
+ * Event → transcript projection lives in `use-event-projection.ts`;
+ * overlay state lives in `use-overlays.ts`. This component stays
+ * focused on layout and lifecycle.
  */
 
 import * as React from 'react';
-import { Box, Static, Text, useApp } from 'ink';
+import { Box, Static, Text, useApp, useInput } from 'ink';
 import { randomUUID } from 'node:crypto';
 import type { Message } from '../../kernel/types.js';
 import type { EventStream } from '../../kernel/event-stream.js';
@@ -24,13 +26,18 @@ import { createToolExecutor } from '../../tools/exec.js';
 import { createTuiApprovalBus } from '../approval.js';
 import type { SessionStore } from '../../context/session.js';
 import type { DirghaConfig } from '../../cli/config.js';
+import { PRICES } from '../../intelligence/prices.js';
 import { Logo } from './components/Logo.js';
 import { StatusBar } from './components/StatusBar.js';
 import { StreamingText } from './components/StreamingText.js';
 import { ThinkingBlock } from './components/ThinkingBlock.js';
 import { ToolBox } from './components/ToolBox.js';
 import { InputBox } from './components/InputBox.js';
+import { ModelPicker, type ModelEntry } from './components/ModelPicker.js';
+import { HelpOverlay, type HelpSlashCommand } from './components/HelpOverlay.js';
+import { AtFileComplete } from './components/AtFileComplete.js';
 import { useEventProjection, type TranscriptItem } from './use-event-projection.js';
+import { useOverlays } from './use-overlays.js';
 
 const VERSION = '0.2.0';
 
@@ -43,6 +50,10 @@ export interface AppProps {
   cwd: string;
   systemPrompt?: string;
   initialMessages?: Message[];
+  /** Slash commands to render in the help overlay. Defaults to []. */
+  slashCommands?: HelpSlashCommand[];
+  /** Model catalogue. Defaults to the prices registry. */
+  models?: ModelEntry[];
 }
 
 export function App(props: AppProps): React.JSX.Element {
@@ -56,11 +67,10 @@ export function App(props: AppProps): React.JSX.Element {
   const [busy, setBusy] = React.useState(false);
   const [currentModel, setCurrentModel] = React.useState(props.config.model);
   const projection = useEventProjection(props.events);
+  const overlays = useOverlays();
 
-  // When a turn ends and agent_end fires, we don't commit here —
-  // commitLive runs in runTurn's finally so we also capture any
-  // fatal errors appended by the catch block.
-  void setCurrentModel;
+  const models = React.useMemo<ModelEntry[]>(() => props.models ?? defaultModelCatalogue(), [props.models]);
+  const slashCommands = props.slashCommands ?? [];
 
   const handleSubmit = React.useCallback((raw: string): void => {
     const value = raw.trim();
@@ -77,13 +87,31 @@ export function App(props: AppProps): React.JSX.Element {
       projection.clear();
       return;
     }
+    // `/model` with no args opens the picker; `/model <id>` sets directly.
+    if (value === '/model' || value === '/models') {
+      overlays.openOverlay('models');
+      return;
+    }
+    if (value.startsWith('/model ')) {
+      const id = value.slice('/model '.length).trim();
+      if (id !== '') {
+        setCurrentModel(id);
+        const note: TranscriptItem = { kind: 'notice', id: randomUUID(), text: `Model set to ${id}` };
+        setTranscript(prev => [...prev, note]);
+      }
+      return;
+    }
+    if (value === '/help' || value === '/?') {
+      overlays.openOverlay('help');
+      return;
+    }
 
     const userItem: TranscriptItem = { kind: 'user', id: randomUUID(), text: value };
     setTranscript(prev => [...prev, userItem]);
     historyRef.current.push({ role: 'user', content: value });
 
     void runTurn();
-  }, [busy, exit, props, projection]);
+  }, [busy, exit, props, projection, overlays]);
 
   const runTurn = async (): Promise<void> => {
     setBusy(true);
@@ -124,6 +152,30 @@ export function App(props: AppProps): React.JSX.Element {
     }
   };
 
+  // Overlay-level keybindings: Esc closes when one is up. Ctrl+M and
+  // Ctrl+H are captured here only while an overlay is absent;
+  // InputBox handles them while focused.
+  useInput((_ch, key) => {
+    if (overlays.active !== null && overlays.active !== 'atfile') {
+      if (key.escape) overlays.closeOverlay();
+    }
+  }, { isActive: overlays.active !== null && overlays.active !== 'atfile' });
+
+  const handleModelPick = React.useCallback((id: string): void => {
+    setCurrentModel(id);
+    overlays.closeOverlay();
+    const note: TranscriptItem = { kind: 'notice', id: randomUUID(), text: `Model set to ${id}` };
+    setTranscript(prev => [...prev, note]);
+  }, [overlays]);
+
+  const handleAtPick = React.useCallback((path: string): void => {
+    setInput(current => overlays.spliceAtSelection(current, path));
+    overlays.setAtQuery(null);
+    overlays.setActive(null);
+  }, [overlays]);
+
+  const inputFocus = overlays.active === null || overlays.active === 'atfile';
+
   return (
     <Box flexDirection="column">
       <Static items={[{ key: 'logo' }]}>
@@ -142,7 +194,33 @@ export function App(props: AppProps): React.JSX.Element {
         onChange={setInput}
         onSubmit={handleSubmit}
         busy={busy}
+        vimMode={props.config.vimMode === true}
+        onAtQueryChange={overlays.setAtQuery}
+        onRequestOverlay={overlays.openOverlay}
+        inputFocus={inputFocus && !busy}
       />
+      {overlays.active === 'atfile' && overlays.atQuery !== null && (
+        <AtFileComplete
+          cwd={props.cwd}
+          query={overlays.atQuery}
+          onPick={handleAtPick}
+          onCancel={(): void => { overlays.setAtQuery(null); overlays.setActive(null); }}
+        />
+      )}
+      {overlays.active === 'models' && (
+        <ModelPicker
+          models={models}
+          current={currentModel}
+          onPick={handleModelPick}
+          onCancel={overlays.closeOverlay}
+        />
+      )}
+      {overlays.active === 'help' && (
+        <HelpOverlay
+          slashCommands={slashCommands}
+          onClose={overlays.closeOverlay}
+        />
+      )}
       <StatusBar
         model={currentModel}
         provider={providerIdForModel(currentModel)}
@@ -213,4 +291,19 @@ function providerIdForModel(model: string): string {
   if (model.includes('fireworks')) return 'fireworks';
   if (model.includes('/')) return 'openrouter';
   return 'local';
+}
+
+function defaultModelCatalogue(): ModelEntry[] {
+  return PRICES.map(p => ({
+    id: p.model,
+    provider: p.provider,
+    tier: tierFromPrice(p.inputPerM),
+  }));
+}
+
+function tierFromPrice(inputPerM: number): ModelEntry['tier'] {
+  if (inputPerM === 0) return 'free';
+  if (inputPerM < 0.5) return 'basic';
+  if (inputPerM < 5) return 'pro';
+  return 'premium';
 }

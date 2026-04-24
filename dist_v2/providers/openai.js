@@ -3,8 +3,11 @@
  * Thin wrapper; most logic lives in the shared openai-compat adapter.
  */
 import { ProviderError } from './iface.js';
+import { postJSON } from './http.js';
 import { streamChatCompletions } from './openai-compat.js';
 const DEFAULT_BASE = 'https://api.openai.com/v1';
+const DEFAULT_IMAGE_MODEL = 'dall-e-3';
+const IMAGE_GEN_TIMEOUT_MS = 30_000;
 const REASONING_PREFIXES = ['o1', 'o3', 'o4'];
 export class OpenAIProvider {
     id = 'openai';
@@ -48,5 +51,57 @@ export class OpenAIProvider {
             extraHeaders,
         });
     }
+    async generateImage(req, signal) {
+        const model = normalizeImageModel(req.model) ?? DEFAULT_IMAGE_MODEL;
+        const size = pickDalleSize(req.width ?? 1024, req.height ?? 1024);
+        const body = {
+            model,
+            prompt: req.prompt,
+            n: 1,
+            size,
+            response_format: 'b64_json',
+        };
+        const extraHeaders = {};
+        if (this.organization)
+            extraHeaders['OpenAI-Organization'] = this.organization;
+        const parsed = await postJSON({
+            url: `${this.baseUrl}/images/generations`,
+            apiKey: this.apiKey,
+            body,
+            providerName: this.id,
+            signal,
+            timeoutMs: IMAGE_GEN_TIMEOUT_MS,
+            extraHeaders: Object.keys(extraHeaders).length > 0 ? extraHeaders : undefined,
+        });
+        const base64 = parsed.data?.[0]?.b64_json;
+        if (!base64) {
+            throw new ProviderError('OpenAI image response missing b64_json payload', this.id);
+        }
+        return { base64, mimeType: 'image/png', model };
+    }
+}
+function normalizeImageModel(input) {
+    if (!input)
+        return undefined;
+    const lower = input.toLowerCase().replace(/^openai\//, '');
+    if (lower === 'dalle' || lower === 'dall-e' || lower === 'dall-e-3')
+        return 'dall-e-3';
+    if (lower === 'dall-e-2')
+        return 'dall-e-2';
+    return input;
+}
+/**
+ * DALL-E 3 accepts exactly: 1024x1024, 1792x1024, 1024x1792. Map (w,h)
+ * to the nearest landscape/portrait/square based on aspect ratio.
+ */
+function pickDalleSize(width, height) {
+    if (width <= 0 || height <= 0)
+        return '1024x1024';
+    const ratio = width / height;
+    if (ratio > 1.2)
+        return '1792x1024';
+    if (ratio < 0.83)
+        return '1024x1792';
+    return '1024x1024';
 }
 //# sourceMappingURL=openai.js.map

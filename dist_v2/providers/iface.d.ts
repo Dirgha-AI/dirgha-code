@@ -3,7 +3,7 @@
  * (all layers need it). This module adds the runtime-only pieces:
  * configuration objects and the typed error class.
  */
-export type { Provider, StreamRequest } from '../kernel/types.js';
+export type { Provider, StreamRequest, ImageGenRequest, ImageGenResult, } from '../kernel/types.js';
 export interface ProviderConfig {
     apiKey?: string;
     baseUrl?: string;

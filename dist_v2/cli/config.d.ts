@@ -25,6 +25,12 @@ export interface DirghaConfig {
     telemetry: {
         enabled: boolean;
     };
+    /**
+     * When true, InputBox honours vim-style NORMAL / INSERT modes. Esc
+     * enters NORMAL; `i` returns to INSERT. Defaults to false so the
+     * stock experience is unchanged.
+     */
+    vimMode?: boolean;
 }
 export declare const DEFAULT_CONFIG: DirghaConfig;
 export declare function loadConfig(cwd?: string): Promise<DirghaConfig>;

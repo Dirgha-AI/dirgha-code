@@ -106,11 +106,27 @@ export interface StreamRequest {
   signal?: AbortSignal;
 }
 
+export interface ImageGenRequest {
+  prompt: string;
+  model?: string;
+  width?: number;
+  height?: number;
+  seed?: number;
+  steps?: number;
+}
+
+export interface ImageGenResult {
+  base64: string;
+  mimeType: string;
+  model: string;
+}
+
 export interface Provider {
   readonly id: string;
   supportsTools(modelId: string): boolean;
   supportsThinking(modelId: string): boolean;
   stream(req: StreamRequest): AsyncIterable<AgentEvent>;
+  generateImage?(req: ImageGenRequest, signal?: AbortSignal): Promise<ImageGenResult>;
 }
 
 export interface ToolExecutor {

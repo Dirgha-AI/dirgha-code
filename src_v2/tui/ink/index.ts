@@ -23,6 +23,13 @@ export { StreamingText } from './components/StreamingText.js';
 export { ToolBox } from './components/ToolBox.js';
 export { ThinkingBlock } from './components/ThinkingBlock.js';
 export { InputBox } from './components/InputBox.js';
+export { ModelPicker, type ModelEntry } from './components/ModelPicker.js';
+export { HelpOverlay, type HelpSlashCommand } from './components/HelpOverlay.js';
+export { AtFileComplete } from './components/AtFileComplete.js';
+export { PasteCollapseView, detectPaste } from './components/PasteCollapse.js';
+export { applyVimKey, createVimState, type VimMode, type VimState } from './components/vim-bindings.js';
+
+import type { HelpSlashCommand, ModelEntry } from './index.js';
 
 export interface RunInkTUIOptions {
   registry: ToolRegistry;
@@ -32,6 +39,10 @@ export interface RunInkTUIOptions {
   cwd: string;
   systemPrompt?: string;
   initialMessages?: Message[];
+  /** Slash command list forwarded to the help overlay. */
+  slashCommands?: HelpSlashCommand[];
+  /** Model catalogue forwarded to the model picker. */
+  models?: ModelEntry[];
 }
 
 export async function runInkTUI(opts: RunInkTUIOptions): Promise<void> {
@@ -44,6 +55,8 @@ export async function runInkTUI(opts: RunInkTUIOptions): Promise<void> {
     config: opts.config,
     cwd: opts.cwd,
     ...(opts.systemPrompt !== undefined ? { systemPrompt: opts.systemPrompt } : {}),
+    ...(opts.slashCommands !== undefined ? { slashCommands: opts.slashCommands } : {}),
+    ...(opts.models !== undefined ? { models: opts.models } : {}),
   });
   const instance = render(element, {
     exitOnCtrlC: false,

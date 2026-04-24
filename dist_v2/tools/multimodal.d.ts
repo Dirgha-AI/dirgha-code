@@ -12,15 +12,15 @@
  *     "provider lacks multimodal capability" result. They are NOT stubs —
  *     they will do real work on capable providers (Gemini, Claude vision,
  *     OpenAI gpt-4o) — but they can fail politely elsewhere.
- *   - generate_image: always a stub in this beta. The 0.1.x line shipped
- *     image generation via a separate provider surface; that wiring has
- *     not been ported to v2 yet. The tool returns a plain directive
- *     pointing the user at `@dirgha/code 0.1.x` rather than failing.
+ *   - generate_image: real. Routes through the active provider's
+ *     optional `generateImage()` method (NVIDIA Flux Schnell by default,
+ *     OpenAI DALL-E 3 as fallback when NVIDIA is unavailable and
+ *     OPENAI_API_KEY is set). The decoded PNG is written to disk and
+ *     the tool returns the absolute path.
  *
- * This file depends only on public types from `kernel/types.ts` and the
- * `Tool` contract — it deliberately does not import provider internals
- * so it can be registered without dragging a specific provider stack
- * into the tool set.
+ * This file imports two provider classes lazily for fallback construction
+ * when the active provider doesn't expose `generateImage`. It does not
+ * pull in any streaming/chat-completions internals.
  */
 import type { Tool } from './registry.js';
 import type { Provider } from '../kernel/types.js';

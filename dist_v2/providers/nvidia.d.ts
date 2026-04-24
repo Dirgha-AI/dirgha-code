@@ -13,7 +13,7 @@
  *      the caller opts in.
  */
 import type { AgentEvent } from '../kernel/types.js';
-import type { Provider, StreamRequest, ProviderConfig } from './iface.js';
+import type { Provider, StreamRequest, ProviderConfig, ImageGenRequest, ImageGenResult } from './iface.js';
 export declare class NvidiaProvider implements Provider {
     readonly id = "nvidia";
     private readonly apiKey;
@@ -23,4 +23,5 @@ export declare class NvidiaProvider implements Provider {
     supportsTools(modelId: string): boolean;
     supportsThinking(modelId: string): boolean;
     stream(req: StreamRequest): AsyncIterable<AgentEvent>;
+    generateImage(req: ImageGenRequest, signal?: AbortSignal): Promise<ImageGenResult>;
 }

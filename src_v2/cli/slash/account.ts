@@ -1,57 +1,62 @@
 /**
- * /account — show billing + quota. Reads a cached whoami from
- * ~/.dirgha/auth.json if it exists, otherwise falls back to a
- * "not signed in" hint. Full billing integration depends on
- * integrations/auth.ts + entitlements.ts, neither of which is wired
- * to an authenticated client in the REPL. STUB.
+ * /account — billing + entitlements snapshot.
+ *
+ * Requires an active token (loaded from `credentials.json` at REPL
+ * start). Calls `/api/billing/account` for tier + balance + limits and
+ * `/api/billing/entitlements` (via `checkEntitlement`) to show whether
+ * Fleet is unlocked.
  */
 
-import { readFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { getAccountStatus, type AccountStatus } from '../../integrations/billing.js';
+import { checkEntitlement } from '../../integrations/entitlements.js';
+import { loadToken } from '../../integrations/device-auth.js';
 import type { SlashCommand } from './types.js';
 
-interface CachedAuth {
-  userId?: string;
-  scope?: string[];
-  expiresAt?: string;
-  tier?: string;
+function fmtUsd(n: number): string {
+  return `$${n.toFixed(2)}`;
 }
 
-async function readAuth(): Promise<CachedAuth | undefined> {
-  const path = join(homedir(), '.dirgha', 'auth.json');
-  const text = await readFile(path, 'utf8').catch(() => '');
-  if (!text) return undefined;
-  try { return JSON.parse(text) as CachedAuth; } catch { return undefined; }
+function fmtTokens(used: number, limit: number): string {
+  if (!limit) return `${used.toLocaleString()}`;
+  return `${used.toLocaleString()} / ${limit.toLocaleString()}`;
+}
+
+function render(status: AccountStatus, fleet: boolean): string {
+  return [
+    'Account:',
+    `  user      : ${status.email} (${status.userId})`,
+    `  tier      : ${status.tier}`,
+    `  balance   : ${fmtUsd(status.balanceUsd)}`,
+    `  daily     : ${fmtTokens(status.limits.dailyTokensUsed, status.limits.dailyTokens)} tokens`,
+    `  monthly   : ${fmtTokens(status.limits.monthlyTokensUsed, status.limits.monthlyTokens)} tokens`,
+    `  resets at : ${status.resetAt || 'unknown'}`,
+    '',
+    `  Fleet access: ${fleet ? '✓' : '✗'}`,
+  ].join('\n');
 }
 
 export const accountCommand: SlashCommand = {
   name: 'account',
-  description: 'Show billing tier, scope, and quota',
+  description: 'Show billing tier, balance, and limits',
   async execute(_args, ctx) {
-    const auth = await readAuth();
-    if (!auth || !auth.userId) {
-      return [
-        'Not signed in.',
-        '',
-        'Sign in with `dirgha auth login`, or run dirgha with BYOK keys',
-        '(see `/keys` or `/setup`).',
-        '',
-        `Current model: ${ctx.model}`,
-        `Current usage: ${ctx.showCost()}`,
-      ].join('\n');
+    // Fall back to re-reading in case another REPL shell signed in.
+    let token = ctx.getToken();
+    if (!token) {
+      token = await loadToken();
+      if (token) ctx.setToken(token);
     }
-    return [
-      'Account:',
-      `  user      : ${auth.userId}`,
-      `  tier      : ${auth.tier ?? 'unknown (quota check not yet wired)'}`,
-      `  scope     : ${(auth.scope ?? []).join(', ') || '(none)'}`,
-      `  expires   : ${auth.expiresAt ?? 'unknown'}`,
-      '',
-      `  model     : ${ctx.model}`,
-      `  usage     : ${ctx.showCost()}`,
-      '',
-      '(Full billing detail lives at https://dirgha.ai/app/account. STUB.)',
-    ].join('\n');
+    if (!token) {
+      return 'Not signed in. Run /login first.';
+    }
+
+    try {
+      const [status, fleet] = await Promise.all([
+        getAccountStatus(token.token, ctx.apiBase()),
+        checkEntitlement(token.token, 'fleet', { baseUrl: ctx.apiBase() }),
+      ]);
+      return render(status, fleet);
+    } catch (err) {
+      return `Account lookup failed: ${err instanceof Error ? err.message : String(err)}`;
+    }
   },
 };

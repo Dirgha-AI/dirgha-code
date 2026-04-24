@@ -16,6 +16,11 @@ export { StreamingText } from './components/StreamingText.js';
 export { ToolBox } from './components/ToolBox.js';
 export { ThinkingBlock } from './components/ThinkingBlock.js';
 export { InputBox } from './components/InputBox.js';
+export { ModelPicker } from './components/ModelPicker.js';
+export { HelpOverlay } from './components/HelpOverlay.js';
+export { AtFileComplete } from './components/AtFileComplete.js';
+export { PasteCollapseView, detectPaste } from './components/PasteCollapse.js';
+export { applyVimKey, createVimState } from './components/vim-bindings.js';
 export async function runInkTUI(opts) {
     const events = createEventStream();
     const element = React.createElement(App, {
@@ -26,6 +31,8 @@ export async function runInkTUI(opts) {
         config: opts.config,
         cwd: opts.cwd,
         ...(opts.systemPrompt !== undefined ? { systemPrompt: opts.systemPrompt } : {}),
+        ...(opts.slashCommands !== undefined ? { slashCommands: opts.slashCommands } : {}),
+        ...(opts.models !== undefined ? { models: opts.models } : {}),
     });
     const instance = render(element, {
         exitOnCtrlC: false,

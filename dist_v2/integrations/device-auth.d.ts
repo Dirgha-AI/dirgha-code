@@ -1,12 +1,16 @@
 /**
  * Device-code OAuth flow for the Dirgha gateway.
  *
- * Companion to `auth.ts` (which uses `~/.dirgha/auth.json` + the `/api/auth/cli/*`
- * routes). This module implements the legacy v1 token shape used by the rest
- * of the billing stack: `~/.dirgha/credentials.json` + `/api/auth/device/*`.
+ * Canonical auth module. Stores tokens at `~/.dirgha/credentials.json`
+ * (0600) and drives the `/api/auth/device/*` endpoints. The older
+ * `integrations/auth.ts` is now a compatibility shim that delegates
+ * here so the billing + entitlements stack has exactly one source of
+ * truth for the active token.
  *
- * The slash commands `login`, `account`, `upgrade` call this module. Keep the
- * public surface stable.
+ * Callers:
+ *   - Slash commands (`/login`, `/account`, `/upgrade`) via `loadToken()`.
+ *   - CLI subcommands (`dirgha login`, `dirgha logout`).
+ *   - Billing preflight (`preRequestCheck` reads the bearer).
  */
 export interface DeviceAuthStart {
     userCode: string;
@@ -34,3 +38,11 @@ export declare function pollDeviceAuth(deviceCode: string, apiBase?: string, opt
 export declare function saveToken(token: string, userId: string, email: string): Promise<void>;
 export declare function loadToken(): Promise<Token | null>;
 export declare function clearToken(): Promise<void>;
+/**
+ * One-shot migration from the legacy `~/.dirgha/auth.json` format
+ * (`integrations/auth.ts`) to the canonical `credentials.json`. Safe to
+ * call on every CLI start — returns `false` fast when nothing to do.
+ *
+ * Logs a single line to stderr on a successful move. Silent on no-op.
+ */
+export declare function migrateLegacyAuth(): Promise<boolean>;

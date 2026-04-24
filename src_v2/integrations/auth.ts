@@ -1,13 +1,32 @@
 /**
- * Device-code authentication flow for the gateway-issued JWT. The token
- * is stored at `~/.dirgha/auth.json` with 0600 permissions and cached
- * in memory for the lifetime of the process.
+ * @deprecated Compatibility shim. Use `./device-auth.js` directly.
+ *
+ * Earlier revisions of the CLI shipped two parallel auth modules: this
+ * file (storing `~/.dirgha/auth.json` behind `/api/auth/cli/*`) and
+ * `device-auth.ts` (storing `~/.dirgha/credentials.json` behind
+ * `/api/auth/device/*`). The device-code flow is the spec-aligned one
+ * and is now the canonical implementation. This shim preserves the
+ * historical `AuthClient` surface so a small number of in-tree callers
+ * (`cli/auth-cmd.ts`, `cli/flows/full-cycle.ts`) keep compiling while
+ * they migrate.
+ *
+ * On first use we silently migrate any pre-existing `auth.json` payload
+ * into `credentials.json` (see `device-auth.migrateLegacyAuth`).
  */
 
-import { chmod, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
-import { homedir } from 'node:os';
+import {
+  clearToken,
+  loadToken,
+  migrateLegacyAuth,
+  pollDeviceAuth,
+  saveToken,
+  startDeviceAuth,
+  type Token,
+} from './device-auth.js';
 
+/**
+ * @deprecated Use `Token` from `./device-auth.js`. Retained for back-compat.
+ */
 export interface AuthToken {
   jwt: string;
   scope: string[];
@@ -15,12 +34,14 @@ export interface AuthToken {
   userId: string;
 }
 
+/** @deprecated Use the functional API in `./device-auth.js`. */
 export interface AuthClient {
   currentToken(): Promise<AuthToken | undefined>;
   login(): Promise<AuthToken>;
   logout(): Promise<void>;
 }
 
+/** @deprecated Use `startDeviceAuth` / `pollDeviceAuth` arguments instead. */
 export interface AuthClientOptions {
   gatewayUrl?: string;
   tokenPath?: string;
@@ -29,76 +50,41 @@ export interface AuthClientOptions {
   openBrowser?: (url: string) => void;
 }
 
+function toAuthToken(tok: Token): AuthToken {
+  return { jwt: tok.token, scope: [], expiresAt: tok.expiresAt, userId: tok.userId };
+}
+
+/**
+ * @deprecated Prefer the functional API in `./device-auth.js`
+ *             (`startDeviceAuth`, `pollDeviceAuth`, `saveToken`,
+ *             `loadToken`, `clearToken`). This helper exists only so
+ *             legacy callers keep compiling.
+ */
 export function createAuthClient(opts: AuthClientOptions = {}): AuthClient {
-  const gateway = (opts.gatewayUrl ?? process.env.DIRGHA_GATEWAY_URL ?? 'https://api.dirgha.ai').replace(/\/+$/, '');
-  const tokenPath = opts.tokenPath ?? join(homedir(), '.dirgha', 'auth.json');
-  const pollInterval = opts.pollIntervalMs ?? 2000;
-  const pollTimeout = opts.pollTimeoutMs ?? 10 * 60 * 1000;
   const openBrowser = opts.openBrowser ?? ((url: string) => { process.stdout.write(`Open in a browser to continue:\n${url}\n`); });
+  const apiBase = opts.gatewayUrl;
 
   return {
-    async currentToken() {
-      const text = await readFile(tokenPath, 'utf8').catch(() => undefined);
-      if (!text) return undefined;
-      try {
-        const parsed = JSON.parse(text) as AuthToken;
-        if (!parsed.jwt || !parsed.expiresAt) return undefined;
-        if (Date.parse(parsed.expiresAt) <= Date.now()) return undefined;
-        return parsed;
-      } catch { return undefined; }
+    async currentToken(): Promise<AuthToken | undefined> {
+      await migrateLegacyAuth().catch(() => undefined);
+      const tok = await loadToken();
+      return tok ? toAuthToken(tok) : undefined;
     },
-    async login() {
-      const { deviceCode, verifyUrl, interval } = await requestDeviceCode(gateway);
-      openBrowser(verifyUrl);
-      const token = await pollForToken(gateway, deviceCode, interval ?? pollInterval, pollTimeout);
-      await persistToken(tokenPath, token);
-      return token;
+    async login(): Promise<AuthToken> {
+      await migrateLegacyAuth().catch(() => undefined);
+      const start = await startDeviceAuth(apiBase);
+      openBrowser(start.verifyUri);
+      const result = await pollDeviceAuth(start.deviceCode, apiBase, {
+        intervalMs: opts.pollIntervalMs ?? start.interval,
+        timeoutMs: opts.pollTimeoutMs,
+      });
+      await saveToken(result.token, result.userId, result.email);
+      const stored = await loadToken();
+      if (!stored) throw new Error('login succeeded but token failed to persist');
+      return toAuthToken(stored);
     },
-    async logout() {
-      const info = await stat(tokenPath).catch(() => undefined);
-      if (!info) return;
-      await writeFile(tokenPath, '', 'utf8');
+    async logout(): Promise<void> {
+      await clearToken();
     },
   };
-}
-
-interface DeviceCodeResponse {
-  device_code: string;
-  user_code?: string;
-  verification_url: string;
-  interval?: number;
-}
-
-async function requestDeviceCode(gateway: string): Promise<{ deviceCode: string; verifyUrl: string; interval?: number }> {
-  const response = await fetch(`${gateway}/api/auth/cli/start`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ client: 'dirgha-cli' }),
-  });
-  if (!response.ok) throw new Error(`Device code request failed: HTTP ${response.status}`);
-  const data = await response.json() as DeviceCodeResponse;
-  return { deviceCode: data.device_code, verifyUrl: data.verification_url, interval: data.interval };
-}
-
-async function pollForToken(gateway: string, deviceCode: string, intervalMs: number, timeoutMs: number): Promise<AuthToken> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const response = await fetch(`${gateway}/api/auth/cli/token/${encodeURIComponent(deviceCode)}`, { method: 'GET' });
-    if (response.ok) {
-      return await response.json() as AuthToken;
-    }
-    if (response.status === 428 || response.status === 425 || response.status === 202) {
-      await new Promise(resolve => setTimeout(resolve, intervalMs));
-      continue;
-    }
-    if (response.status === 410) throw new Error('Device code expired. Please retry `dirgha auth login`.');
-    throw new Error(`Token poll failed: HTTP ${response.status}`);
-  }
-  throw new Error('Device code poll timed out');
-}
-
-async function persistToken(path: string, token: AuthToken): Promise<void> {
-  await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, JSON.stringify(token, null, 2), 'utf8');
-  try { await chmod(path, 0o600); } catch { /* chmod may fail on Windows; ignore */ }
 }

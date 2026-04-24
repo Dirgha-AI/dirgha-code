@@ -14,11 +14,21 @@
  */
 
 import type { AgentEvent } from '../kernel/types.js';
-import type { Provider, StreamRequest, ProviderConfig } from './iface.js';
+import type {
+  Provider,
+  StreamRequest,
+  ProviderConfig,
+  ImageGenRequest,
+  ImageGenResult,
+} from './iface.js';
 import { ProviderError } from './iface.js';
+import { postJSON } from './http.js';
 import { streamChatCompletions } from './openai-compat.js';
 
 const DEFAULT_BASE = 'https://integrate.api.nvidia.com/v1';
+const IMAGE_GEN_BASE = 'https://ai.api.nvidia.com/v1/genai';
+const DEFAULT_IMAGE_MODEL = 'black-forest-labs/flux.1-schnell';
+const IMAGE_GEN_TIMEOUT_MS = 30_000;
 
 const TOOLS_SUPPORTED = new Set<string>([
   'moonshotai/kimi-k2-instruct',
@@ -96,4 +106,62 @@ export class NvidiaProvider implements Provider {
       extraBody: Object.keys(extraBody).length > 0 ? extraBody : undefined,
     });
   }
+
+  async generateImage(req: ImageGenRequest, signal?: AbortSignal): Promise<ImageGenResult> {
+    const model = normalizeImageModel(req.model) ?? DEFAULT_IMAGE_MODEL;
+    const width = req.width ?? 1024;
+    const height = req.height ?? 1024;
+    const body: Record<string, unknown> = {
+      prompt: req.prompt,
+      width,
+      height,
+      sampling_steps: req.steps ?? 4,
+      cfg_scale: 0,
+      seed: req.seed ?? Math.floor(Math.random() * 2_147_483_647),
+    };
+
+    const parsed = await postJSON<NvidiaImageResponse>({
+      url: `${IMAGE_GEN_BASE}/${model}`,
+      apiKey: this.apiKey,
+      body,
+      providerName: this.id,
+      signal,
+      timeoutMs: IMAGE_GEN_TIMEOUT_MS,
+    });
+
+    const base64 = extractBase64(parsed);
+    if (!base64) {
+      throw new ProviderError('NVIDIA image response missing base64 payload', this.id);
+    }
+    return { base64, mimeType: 'image/png', model };
+  }
+}
+
+interface NvidiaImageResponse {
+  artifacts?: Array<{ base64?: string; b64_json?: string }>;
+  image?: string;
+  images?: string[];
+}
+
+function extractBase64(resp: NvidiaImageResponse): string | undefined {
+  const first = resp.artifacts?.[0];
+  if (first) {
+    if (typeof first.base64 === 'string' && first.base64.length > 0) return first.base64;
+    if (typeof first.b64_json === 'string' && first.b64_json.length > 0) return first.b64_json;
+  }
+  if (typeof resp.image === 'string' && resp.image.length > 0) return resp.image;
+  if (Array.isArray(resp.images) && typeof resp.images[0] === 'string' && resp.images[0].length > 0) {
+    return resp.images[0];
+  }
+  return undefined;
+}
+
+function normalizeImageModel(input: string | undefined): string | undefined {
+  if (!input) return undefined;
+  const lower = input.toLowerCase();
+  if (lower === 'flux.1-schnell' || lower === 'flux-schnell' || lower === 'nvidia/flux'
+      || lower === 'flux' || lower === 'black-forest-labs/flux.1-schnell') {
+    return DEFAULT_IMAGE_MODEL;
+  }
+  return input;
 }

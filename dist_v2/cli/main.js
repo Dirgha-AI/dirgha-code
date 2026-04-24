@@ -20,6 +20,7 @@ import { runInkTUI } from '../tui/ink/index.js';
 import { renderStreamingEvents } from '../tui/renderer.js';
 import { createSessionStore } from '../context/session.js';
 import { runSubmitPaper } from './submit-paper.js';
+import { runLogin, runLogout, runSetup, findSubcommand } from './subcommands/index.js';
 async function main() {
     const { flags, positionals } = parseFlags(argv.slice(2));
     if (flags.help || flags.h) {
@@ -35,6 +36,30 @@ async function main() {
         }
         const code = await runSubmitPaper({ doi, openPr: flags['open-pr'] === true });
         exit(code);
+    }
+    if (positionals[0] === 'login')
+        exit(await runLogin(positionals.slice(1)));
+    if (positionals[0] === 'logout')
+        exit(await runLogout(positionals.slice(1)));
+    if (positionals[0] === 'setup')
+        exit(await runSetup(positionals.slice(1)));
+    // Generic subcommand dispatch. Covers: doctor, audit, stats, status,
+    // init, keys, models, chat, ask, compact, export-session,
+    // import-session (plus anything the auth agent adds to the barrel).
+    //
+    // We pass the raw argv tail (unparsed) so each subcommand can re-run
+    // parseFlags with its own conventions. The tail starts after the
+    // first occurrence of the verb in argv.
+    {
+        const verb = positionals[0];
+        const cmd = verb ? findSubcommand(verb) : undefined;
+        if (cmd) {
+            const rawArgs = argv.slice(2);
+            const verbIdx = rawArgs.indexOf(verb);
+            const tail = verbIdx >= 0 ? rawArgs.slice(verbIdx + 1) : positionals.slice(1);
+            const code = await cmd.run(tail, { cwd: cwd() });
+            exit(code);
+        }
     }
     const config = await loadConfig(cwd());
     const model = (typeof flags.model === 'string' ? flags.model : (typeof flags.m === 'string' ? flags.m : config.model));
@@ -106,11 +131,25 @@ function printHelp() {
 
 Usage:
   dirgha                              Interactive REPL
-  dirgha "prompt"                     One-shot non-interactive
+  dirgha "prompt"                     One-shot non-interactive (equivalent to dirgha ask)
   echo prompt | dirgha --print        Stdin prompt → stdout answer
   dirgha --json "prompt"              NDJSON event stream
-  dirgha submit-paper <doi>           Fetch Crossref metadata, emit JSON
-                                      (optionally open PR to dirgha-org-site)
+
+Subcommands:
+  ask "<prompt>"                      Headless agent (tools, --max-turns 30 default)
+  chat "<prompt>"                     Pure LLM call, no tools
+  doctor [--json]                     Environment diagnostics
+  status [--json]                     Account / model / providers / sessions
+  stats [today|week|month|all]        Usage aggregates
+  audit [list|tail|search <q>]        Local audit log
+  init [path] [--force]               Scaffold DIRGHA.md
+  keys <list|set|get|clear> ...       BYOK key store (~/.dirgha/keys.json)
+  models <list|default|info> ...      Model catalogue + default
+  compact [sessionId]                 Force-compact a session on disk
+  export-session <id> [path|-]        Dump session JSON
+  import-session <path>               Load session JSON into the store
+  login / logout / setup              Auth + first-run wizard
+  submit-paper <doi>                  Fetch Crossref metadata, emit JSON
 
 Options:
   -m, --model <id>                    Model id (default from config)

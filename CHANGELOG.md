@@ -2,6 +2,82 @@
 
 Versioning: **semver 0.x** during rapid iteration. Breaking → `0.2.0`. Patches → `0.1.1`, `0.1.2`, … First stable release will be `1.0.0`.
 
+## 0.2.0-beta.2 (2026-04-24) — remaining feature debt closed
+
+Follow-up to `beta.1` that closes the ported-but-stubbed debt. Four
+parallel-agent sprints completed in one pass. All additive; no breaking
+changes from `beta.1`.
+
+### Added
+
+- **Real auth in the REPL.** `/login` runs the device-code flow and
+  polls in the background so the prompt never blocks. `/account`
+  renders a tier / balance / limits table with a ✓/✗ next to Fleet
+  access. `/upgrade` prints the current plan + an upgrade URL with a
+  referral code when the account has one.
+- **Login / logout / setup as CLI subcommands.** `dirgha login` runs
+  the device flow non-interactively. `dirgha logout` clears the token.
+  `dirgha setup` is a BYOK key wizard that writes
+  `~/.dirgha/keys.json` (mode 0600).
+- **Auth module reconciliation.** `integrations/auth.ts` is now a
+  `@deprecated` shim that delegates to `integrations/device-auth.ts`
+  — one canonical module, one storage path
+  (`~/.dirgha/credentials.json`). `migrateLegacyAuth()` silently
+  moves `~/.dirgha/auth.json` on first load.
+- **Ink TUI polish (all five deferred features).**
+  - **Model picker modal** (Ctrl+M or `/model` with no args) — grouped
+    by provider, arrow-key navigation, 1–9 quick-pick.
+  - **Help overlay** (`?` on an empty buffer, or Ctrl+H) auto-generated
+    from the slash registry; grouped by category, type-to-filter,
+    shows keyboard shortcuts.
+  - **Vim mode** — `h` `l` `0` `$` `w` `b` `x` `dd` `dw` `yy` `p` `i`
+    `:q` on a single-line buffer, with `[INSERT]` / `[NORMAL]`
+    indicator. Off by default; enable via `vimMode: true` in
+    `DIRGHA.md` config.
+  - **Paste-collapse** — pastes ≥4 lines or ≥200 chars in a single
+    tick render as `[N lines pasted, X chars]`. Ctrl+E toggles full
+    expansion. The full content still submits verbatim on Enter.
+  - **Fuzzy `@file` completion** — subsequence matcher over cwd files
+    (ignoring the standard IGNORED_DIRS list), top-8 results, Tab or
+    Enter to pick.
+- **Twelve CLI subcommands ported from v1.**
+  - `dirgha doctor [--json]` — environment diagnostics (node version,
+    git repo, `~/.dirgha/` present, reachability of each provider
+    endpoint).
+  - `dirgha status [--json]` — account, model, providers, sessions.
+  - `dirgha stats [today|week|month|all] [--json]` — usage aggregates
+    from session JSONL logs (tokens by model, cost by day).
+  - `dirgha audit [list|tail|search <q>] [--json]` — local audit log.
+  - `dirgha init [path] [--force]` — scaffold `DIRGHA.md`.
+  - `dirgha keys <list|set|get|clear> ...` — BYOK key store.
+  - `dirgha models <list|default|info> ...` — model catalogue with
+    pricing.
+  - `dirgha chat "<prompt>"` — pure LLM call, no tools, no agent loop.
+  - `dirgha ask "<prompt>"` — headless agent with `--max-turns 30`
+    default; equivalent to `dirgha "prompt"`.
+  - `dirgha compact [sessionId]` — force-compact a session on disk.
+  - `dirgha export-session <id> [path|-]` — dump session JSON.
+  - `dirgha import-session <path>` — load session JSON into the store.
+  - All expose `--json` where it makes sense; `main.ts` gained a
+    generic `findSubcommand` dispatcher so future additions only need
+    a file + a barrel entry.
+- **`multimodal generate_image` wired to real providers.** NVIDIA Flux
+  Schnell via `ai.api.nvidia.com/v1/genai/black-forest-labs/flux.1-schnell`
+  is the default; OpenAI DALL-E 3 is the fallback when
+  `OPENAI_API_KEY` is set and NVIDIA isn't. Base64 response decoded to
+  disk at `outputPath` (default `./dirgha-image-<ts>.png`). Model can
+  be forced via `input.model` (`flux.1-schnell` / `dall-e-3`).
+- **Provider interface gains an optional `generateImage()` method.**
+  Other providers (Anthropic, Gemini, Ollama, …) leave it undefined
+  and are skipped by the multimodal dispatch.
+
+### Notes
+
+- No kernel or transport changes in this beta. `streamSSE` stutter fix
+  and root-scan guardrail from `beta.1` are unchanged.
+- `dist_v2/` includes the new subcommand JS + Ink component JS, so the
+  npm package carries the features by default.
+
 ## 0.2.0-beta.1 (2026-04-24) — new v2 core shipped as `dirgha-v2` side-binary
 
 **Second-generation CLI core** under `src_v2/`, now bundled alongside the

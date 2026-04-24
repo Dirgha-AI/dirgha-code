@@ -3,7 +3,7 @@
  * Thin wrapper; most logic lives in the shared openai-compat adapter.
  */
 import type { AgentEvent } from '../kernel/types.js';
-import type { Provider, StreamRequest, ProviderConfig } from './iface.js';
+import type { Provider, StreamRequest, ProviderConfig, ImageGenRequest, ImageGenResult } from './iface.js';
 export declare class OpenAIProvider implements Provider {
     readonly id = "openai";
     private readonly apiKey;
@@ -16,4 +16,5 @@ export declare class OpenAIProvider implements Provider {
     supportsTools(modelId: string): boolean;
     supportsThinking(modelId: string): boolean;
     stream(req: StreamRequest): AsyncIterable<AgentEvent>;
+    generateImage(req: ImageGenRequest, signal?: AbortSignal): Promise<ImageGenResult>;
 }
