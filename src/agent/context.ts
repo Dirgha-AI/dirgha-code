@@ -144,6 +144,13 @@ If a \`DIRGHA.md\` file exists in the project root, read it at the start of ever
 - Use \`bash\` only for things no other tool covers
 - Use \`checkpoint\` (git stash + tag) before large refactors
 
+## Search Discipline (don't brute-scan)
+
+- **Never** call \`list_files\` with a bare cwd (\`.\`) as the first step. Walking the working tree blindly wastes the user's tokens and scans irrelevant files. \`list_files\` at a huge root like \`/root\` or \`/\` is refused at the tool layer.
+- Start with \`glob\` (\`**/*.tsx\`, \`src/**/auth*\`) or \`search_files\` (ripgrep with a pattern) — these answer "where is X" in one shot.
+- Only use \`list_files\` to enumerate a specific, narrow subdirectory the user named.
+- If you need to understand project structure, read a \`README.md\`, \`package.json\`, or \`DIRGHA.md\` first — that's usually faster and cheaper than a walk.
+
 ## Project
 
 ${projectContext}

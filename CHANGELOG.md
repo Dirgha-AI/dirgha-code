@@ -2,6 +2,33 @@
 
 Versioning: **semver 0.x** during rapid iteration. Breaking → `0.2.0`. Patches → `0.1.1`, `0.1.2`, … First stable release will be `1.0.0`.
 
+## 0.1.1 (2026-04-24) — NVIDIA streaming stutter + root-scan guardrail
+
+### Fixed
+
+- **NVIDIA NIM streaming stutter.** `streamSSE` in `src/providers/http.ts`
+  now sends `Accept: text/event-stream` by default and `Content-Type:
+  application/json` only for the request body. Providers no longer need
+  to set `Accept` ad-hoc; `src/providers/nvidia.ts` drops the explicit
+  `Accept: application/json` that was overriding the correct SSE
+  negotiation on streaming calls. First-byte latency on MiniMax/Kimi on
+  NIM drops back to normal; partial/truncated chunks on long responses
+  stop.
+
+### Added
+
+- **Root-scan guardrail for `list_files`.** The tool now skips
+  `node_modules`, `.git`, `dist`, `.bun`, and other cache/build
+  directories during its walk (and all dot-prefixed entries), and
+  refuses to brute-walk absurdly large roots (`/`, `/root`, `/home`,
+  `/tmp`, `/Users`, `/var`) with a message pointing the model at
+  `glob` or `search_files` with a targeted pattern.
+- **System-prompt "Search Discipline" block.** Tells the agent to start
+  with `glob`/`search_files` instead of `list_files .`, and to read
+  `README.md`/`package.json`/`DIRGHA.md` before scanning. Stops the
+  "agent starts working immediately scanning all files and folders"
+  behavior on large monorepos.
+
 ## 0.1.0 (2026-04-24) — public-OSS cut
 
 Output of the six-sprint launch plan (`docs/launch/LAUNCH_PLAN_2026-04-24.md`).

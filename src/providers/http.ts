@@ -100,7 +100,12 @@ export async function streamSSE(
   try {
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...headers },
+      // Accept declares what the SERVER should send — text/event-stream for SSE.
+      // Content-Type declares what the CLIENT is sending — application/json (body).
+      // Passing Accept: application/json on a streaming NIM request breaks SSE
+      // negotiation and produces stutter. Caller can override by supplying
+      // its own Accept, but the default here matches the channel.
+      headers: { Accept: 'text/event-stream', 'Content-Type': 'application/json', ...headers },
       body: JSON.stringify({ ...(body as object), stream: true }),
       signal: controller.signal,
     });

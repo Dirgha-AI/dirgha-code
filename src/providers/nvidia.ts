@@ -46,7 +46,10 @@ export async function callNvidia(
   const apiKey = process.env['NVIDIA_API_KEY'];
   if (!apiKey) throw new Error('NVIDIA_API_KEY not set. Get a key at integrate.api.nvidia.com');
 
-  const headers = { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' };
+  // Don't set Accept here — let streamSSE choose text/event-stream and
+  // postJSON fall back to application/json. Setting Accept: application/json
+  // globally was the source of the NIM streaming stutter.
+  const headers = { Authorization: `Bearer ${apiKey}` };
   const params = MODEL_PARAMS[model] ?? DEFAULT_PARAMS;
   const supportsTools = TOOLS_SUPPORTED.has(model);
   const payload = {

@@ -6,6 +6,19 @@ import { glob as globFn } from 'glob';
 import type { ToolResult } from '../types.js';
 import { searchFiles, searchMemory, indexFile } from '../session/db.js';
 
+// Directories never worth descending into during a file walk.
+const IGNORED_DIRS = new Set([
+  'node_modules', '.git', 'dist', 'build', '.next', '__pycache__',
+  '.turbo', 'coverage', '.cache', 'out', 'target', '.venv', 'venv',
+  '.bun', '.npm', '.cursor', '.vscode', '.idea', '.pnpm-store', '.yarn',
+  'bun.lockb.d', '.rollup.cache', '.parcel-cache',
+]);
+
+// Directories where a brute list_files walk is almost never what the user
+// wants. Typing `list_files .` from here would iterate over hundreds of
+// unrelated repositories. The model must narrow down with a pattern.
+const HUGE_ROOTS = new Set(['/', '/root', '/home', '/tmp', '/Users', '/var']);
+
 export function searchFilesTool(input: Record<string, any>): ToolResult {
   try {
     const pattern = input['pattern'] as string;
@@ -26,6 +39,9 @@ function walkDir(dir: string, results: string[], limit: number): void {
   try { entries = readdirSync(dir); } catch { return; }
   for (const entry of entries) {
     if (results.length >= limit) break;
+    // Skip ignored dirs and dot-prefixed entries — saves walking into
+    // .git, node_modules, caches, and half a gigabyte of nothing useful.
+    if (IGNORED_DIRS.has(entry) || entry.startsWith('.')) continue;
     const full = join(dir, entry);
     try {
       const st = lstatSync(full);
@@ -42,6 +58,19 @@ export function listFilesTool(input: Record<string, any>): ToolResult {
     const cwd = process.cwd();
     const cwdSep = cwd.endsWith(sep) ? cwd : cwd + sep;
     if (base !== cwd && !base.startsWith(cwdSep)) return { tool: 'list_files', result: '', error: 'Path outside cwd' };
+
+    // Refuse brute walks of gigantic roots. Typing `list_files .` at /root
+    // produces hundreds of unrelated repositories' worth of output — almost
+    // never what the user wants. Force the model to use a concrete subpath
+    // or a glob pattern instead.
+    if (HUGE_ROOTS.has(base)) {
+      return {
+        tool: 'list_files',
+        result: '',
+        error: `Refusing to brute-walk ${base}. Supply a narrower path or use glob/search_files with a targeted pattern.`,
+      };
+    }
+
     const results: string[] = [];
     walkDir(base, results, 100);
     return { tool: 'list_files', result: results.join('\n') || 'No files found' };
