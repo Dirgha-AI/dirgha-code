@@ -158,11 +158,11 @@ const INJECTION_RE = [
   /\u202e|\u202d/, // bidi override chars (keep, these are real attacks)
 ];
 
-function isSuspiciousToolResult(content: string): boolean {
+export function isSuspiciousToolResult(content: string): boolean {
   return INJECTION_RE.some((re) => re.test(content));
 }
 
-function guardToolResult(content: string, toolName: string): string {
+export function guardToolResult(content: string, toolName: string): string {
   if (!isSuspiciousToolResult(content)) return content;
   const clean = content
     .replace(/[\u202e\u202d\u200b\u200c\u200d\ufeff]/g, "")
