@@ -1,7 +1,13 @@
 // @ts-nocheck
 /**
  * voice/index.ts — Voice typing main interface
- * 
+ *
+ * EXPERIMENTAL — hidden behind DIRGHA_EXPERIMENTAL=1 (see S2.7 launch
+ * plan). The voice module ships without type checking because its
+ * transport layer (desktop mic, mobile bridge, browser extension) is
+ * still stabilizing. When voice graduates, strip @ts-nocheck file by
+ * file and remove the experimental gate in src/index.ts.
+ *
  * Unified API for all voice modes:
  * - Desktop: Native microphone + Whisper
  * - Mobile: Phone bridge via QR

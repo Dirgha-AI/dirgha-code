@@ -365,7 +365,7 @@ registerSyncCommands(program);
 registerProjectCommands(program);
 registerUnifiedMemoryCommands(program);  // New: remember, recall, session-*, context
 registerIfExperimental('swarm', () => registerSwarmCommands(program));
-registerVoiceCommands(program);
+registerIfExperimental('voice', () => registerVoiceCommands(program));
 registerCheckpointCommand(program);
 registerRollbackCommand(program);
 registerSprintCommand(program);
