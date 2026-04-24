@@ -26,7 +26,7 @@
 Dirgha Code writes, edits, runs, and verifies code from your terminal —
 alone or as a **fleet of parallel agents** working in isolated git
 worktrees. It ships with 43 built-in tools, a dispatcher that speaks to
-14 LLM providers with automatic failover, a multi-tier memory system,
+16 LLM providers with automatic failover, a multi-tier memory system,
 persistent sessions, a sandboxed runtime for user code, and a plugin
 registry. It is entirely one binary you install from npm. No Electron,
 no cloud dependency if you BYOK, no telemetry, full CLI-Anything
@@ -536,7 +536,7 @@ src/
 ├── commands/          # 80 commander.js subcommand handlers
 ├── repl/              # TUI REPL shell, slash commands (30 files)
 ├── tui/               # Ink/React 19 components (58 files)
-├── providers/         # 14 LLM adapters + dispatcher + circuit breaker
+├── providers/         # 16 LLM adapters + dispatcher + circuit breaker
 ├── tools/             # 43 built-in tool implementations
 ├── runtime/           # Sandbox: VM, mounts, network control, transcripts
 ├── memory/            # 4-tier memory: builtin, holographic, GEPA, graph
@@ -587,6 +587,37 @@ See [`LICENSE`](./LICENSE) and [`NOTICE.md`](./NOTICE.md) for the full legal tex
 - [`SUPPORT.md`](./SUPPORT.md) — where to ask for help.
 - [`CONTRIBUTING.md`](./CONTRIBUTING.md) — how to send a PR.
 - [`LICENSING.md`](./LICENSING.md) — honest rationale for the FSL choice (why not pure MIT? bootstrapped, not VC-funded).
+
+## Troubleshooting
+
+**`npm install` fails with peer-dep errors.** We align `marked` to the
+major version `marked-terminal` accepts on every release — if you see
+a conflict, you're probably on an older release. Either upgrade or
+pass `--legacy-peer-deps` as a one-off.
+
+**`dirgha` command not found after `npm install -g`.** Your npm global
+`bin` path isn't on `PATH`. Check `npm bin -g` and either add that
+directory to `PATH` or install with pnpm (`pnpm add -g @dirgha/code`).
+
+**`better-sqlite3` build fails on Apple Silicon or Linux ARM.** You
+need Xcode Command Line Tools (macOS) or `build-essential` + `python3`
+(Linux). Then `npm rebuild better-sqlite3`.
+
+**`dirgha` crashes with `Cannot find package 'libp2p'`.** libp2p is an
+optional dep that only the experimental `mesh` command needs. Run
+`npm install libp2p @libp2p/{tcp,noise,mplex,gossipsub}` if you're on
+the experimental track; otherwise ignore.
+
+**Node version warnings.** Minimum is Node 20. We run CI against 20
+and 22. Earlier versions will not work.
+
+**Commands like `dao`, `make`, `mesh` aren't in `--help`.** These are
+experimental — run with `DIRGHA_EXPERIMENTAL=1` set.
+
+**Seeing "models health" errors about unreachable gateway.** The
+public gateway is at `https://api.dirgha.ai`. If you're offline or
+behind a proxy, set `DIRGHA_API_URL` to a reachable endpoint or run
+entirely in BYOK mode.
 
 ## Contribute
 
