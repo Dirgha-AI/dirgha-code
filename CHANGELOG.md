@@ -2,6 +2,99 @@
 
 Versioning: **semver 0.x** during rapid iteration. Breaking → `0.2.0`. Patches → `0.1.1`, `0.1.2`, … First stable release will be `1.0.0`.
 
+## 0.2.0 (2026-04-24) — v2 is now the default
+
+The clean-architecture v2 core, previously shipped as the `dirgha-v2`
+side-binary in `0.2.0-beta.1` + `beta.2`, now **is** `dirgha`. The old
+v1 binary is still available as `dirgha-v1` so anyone who needs it
+during the transition can keep running it in the same install.
+
+### Breaking changes
+
+- **`dirgha` now runs v2.** The CLI is a complete rewrite — kernel,
+  providers, tools, TUI, slash commands. Behaviourally most things
+  are the same or better; visually the TUI is different (cleaner
+  event projection, fewer render hacks). If you depend on v1
+  behaviour, switch your scripts to call `dirgha-v1` explicitly.
+- **Fireworks provider marked deprecated.** The v2 `fireworks.ts`
+  adapter still exists but the fallback chains no longer route
+  through it. Setting `FIREWORKS_API_KEY` is a no-op unless you pass
+  `--provider fireworks` explicitly.
+- **`~/.dirgha/auth.json` is auto-migrated** to
+  `~/.dirgha/credentials.json` on first launch. The old file is
+  renamed to `auth.json.migrated` for a recovery trail.
+
+### Promoted from beta to stable
+
+Everything that landed in `0.2.0-beta.1` and `0.2.0-beta.2` is
+included and considered stable:
+
+- **New layered core** (kernel / providers / tools / context /
+  extensions / safety / intelligence). One canonical `streamSSE` in
+  `providers/http.ts` owns all SSE headers — NIM stutter cannot recur.
+- **Fleet** — in-process parallel worktree multi-agent, 3-way
+  apply-back, tripleshot + LLM judge.
+- **12 built-in tools** — `fs_read`, `fs_write`, `fs_edit`, `fs_ls`
+  (with HUGE_ROOTS refusal), `shell`, `search_grep`, `search_glob`,
+  `git`, `browser` (Playwright, 5 actions), `checkpoint`, `cron`,
+  `multimodal` (describe / transcribe / **generate_image** via NVIDIA
+  Flux Schnell default + OpenAI DALL-E 3 fallback).
+- **15 CLI subcommands** — `login`, `logout`, `setup`, `doctor`,
+  `audit`, `stats`, `status`, `init`, `keys`, `models`, `chat`, `ask`,
+  `compact`, `export-session`, `import-session`, `submit-paper`. All
+  with `--json` where applicable.
+- **Ink TUI** — logo, streaming transcript, tool boxes, thinking
+  blocks, status bar, input box, **model picker modal** (Ctrl+M),
+  **help overlay** (?), **vim mode** (single-line, off by default),
+  **paste-collapse** (Ctrl+E to expand), **fuzzy `@file` completion**.
+- **20 slash commands** — all real, no stubs: `/init`, `/keys`,
+  `/models`, `/help`, `/clear`, `/login`, `/setup`, `/status`,
+  `/memory`, `/compact`, `/mode`, `/exit`, `/history`, `/resume`,
+  `/session` (list / load / rename / **branch**), `/theme` (dark /
+  light / none), `/fleet`, `/account`, `/upgrade`, `/config`.
+- **Real auth in REPL and CLI** — device-code flow, quota preflight,
+  usage recording, entitlements (including `fleet`/`tripleshot`).
+- **Memory unified** — one `KeyedMemoryStore` contract, FTS5-backed
+  via better-sqlite3 with substring fallback. Wiki-style knowledge
+  base. v1's five overlapping memory paths are deprecated.
+
+### New in `0.2.0` (not in any beta)
+
+- **`/mode` is now real.** `plan` / `act` / `verify` each prepend a
+  short preamble to the system prompt of every subsequent turn.
+  `plan` is read-only (no writes or shells), `verify` is read-only
+  audit, `act` is normal execution. Preference persists in
+  `~/.dirgha/config.json`; `DIRGHA_MODE` env overrides per-session.
+- **`/theme` is live.** Three palettes (`dark` / `light` / `none`)
+  registered in `tui/theme.ts`. Readline REPL prompts flip
+  immediately; Ink TUI picks up the new theme on restart. Preference
+  persists.
+- **`/session branch <name>` works.** Wires to the existing
+  `context/branch.ts` via a provider pointer exposed on the slash
+  context. Summarises the parent transcript into the child session
+  so the new session inherits context without carrying the full
+  history.
+- **`auth.ts` reconciliation finalised.** Legacy `auth.ts` is a
+  thin `@deprecated` shim over `device-auth.ts`; all new code uses
+  the canonical module.
+
+### Not included (out of scope for 0.2.0)
+
+- Cron scheduler daemon — `cron` tool stores job declarations; a
+  separate long-running process is required to execute them.
+- Advanced vim motions (visual mode, search, buffers) — single-line
+  scope only.
+- Slash-command alias registry beyond what each command exposes.
+
+### Install
+
+```
+npm install -g @dirgha/code
+dirgha login       # or set any provider key
+dirgha             # launch
+dirgha-v1          # fall back to the old binary if you need to
+```
+
 ## 0.2.0-beta.2 (2026-04-24) — remaining feature debt closed
 
 Follow-up to `beta.1` that closes the ported-but-stubbed debt. Four

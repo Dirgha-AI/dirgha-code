@@ -5,6 +5,10 @@
  * output directly.
  */
 import type { Token } from '../integrations/device-auth.js';
+import type { Mode } from '../context/mode.js';
+import type { ThemeName } from '../tui/theme.js';
+import type { Session, SessionStore } from '../context/session.js';
+import type { Provider } from '../kernel/types.js';
 export interface SlashContext {
     model: string;
     sessionId: string;
@@ -27,6 +31,22 @@ export interface SlashContext {
     upgradeUrl(): string;
     /** Emit a transient status line above the next prompt. */
     status(message: string): void;
+    /** Active execution mode (plan / act / verify). */
+    getMode(): Mode;
+    /** Swap the mode live — the next turn's system prompt picks it up. */
+    setMode(mode: Mode): void;
+    /** Current theme name. */
+    getTheme(): ThemeName;
+    /** Swap the theme — readline REPL applies live; Ink requires restart. */
+    setTheme(name: ThemeName): void;
+    /** Active session (null in headless contexts). */
+    getSession(): Session | null;
+    /** Session store for creating branches / loading siblings. */
+    getSessionStore(): SessionStore | null;
+    /** Provider bound to the current model — used by /session branch. */
+    getProvider(): Provider | null;
+    /** Model used for background summaries (e.g. branch summarisation). */
+    getSummaryModel(): string;
 }
 export type SlashHandler = (args: string[], ctx: SlashContext) => Promise<string | undefined> | string | undefined;
 export declare class SlashRegistry {

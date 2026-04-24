@@ -1,13 +1,13 @@
 /**
- * /session — list sessions, rename one, or branch from the current
- * session. The core SlashContext has list/load helpers; rename and
- * branch are handled at the file-system level (rename) or via a
- * stub message (branch, because branching needs a provider pointer
- * that we don't have access to here).
+ * /session — list sessions, load, rename, or branch. Branching is
+ * wired through `context/branch.ts`, which takes a provider pointer +
+ * a summary model; the SlashContext exposes `getProvider()` +
+ * `getSummaryModel()` + `getSession()` + `getSessionStore()` for this.
  */
 import { rename, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { branchSession } from '../../context/branch.js';
 function sessionPath(id) {
     return join(homedir(), '.dirgha', 'sessions', `${id}.jsonl`);
 }
@@ -17,7 +17,7 @@ function usage() {
         '  /session list                  List saved sessions',
         '  /session load <id>             Resume a session',
         '  /session rename <old> <new>    Rename a session file',
-        '  /session branch <name>         Branch the current session (stub)',
+        '  /session branch <name>         Branch the current session with a summary',
     ].join('\n');
 }
 export const sessionCommand = {
@@ -48,11 +48,24 @@ export const sessionCommand = {
             const name = args.slice(1).join('-');
             if (!name)
                 return `Missing branch name.\n${usage()}`;
+            const parent = ctx.getSession();
+            const store = ctx.getSessionStore();
+            const provider = ctx.getProvider();
+            const summaryModel = ctx.getSummaryModel();
+            if (!parent || !store)
+                return 'No active session to branch from.';
+            if (!provider)
+                return 'No provider configured — cannot summarise parent context.';
+            const { child, summary } = await branchSession(parent, store, {
+                name,
+                summarizer: provider,
+                summaryModel,
+            });
             return [
-                `Branching from ${ctx.sessionId} with name "${name}" is not yet wired into the`,
-                'REPL — branchSession() requires provider access that the REPL context',
-                'does not expose. Run it via `dirgha session branch` on the CLI once',
-                'that command lands. STUB.',
+                `Branched → ${child.id}`,
+                '',
+                'Summary carried into child:',
+                summary.split('\n').map(l => `  ${l}`).join('\n'),
             ].join('\n');
         }
         return `Unknown subcommand "${op}".\n${usage()}`;

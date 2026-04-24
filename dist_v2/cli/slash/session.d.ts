@@ -1,9 +1,8 @@
 /**
- * /session — list sessions, rename one, or branch from the current
- * session. The core SlashContext has list/load helpers; rename and
- * branch are handled at the file-system level (rename) or via a
- * stub message (branch, because branching needs a provider pointer
- * that we don't have access to here).
+ * /session — list sessions, load, rename, or branch. Branching is
+ * wired through `context/branch.ts`, which takes a provider pointer +
+ * a summary model; the SlashContext exposes `getProvider()` +
+ * `getSummaryModel()` + `getSession()` + `getSessionStore()` for this.
  */
 import type { SlashCommand } from './types.js';
 export declare const sessionCommand: SlashCommand;

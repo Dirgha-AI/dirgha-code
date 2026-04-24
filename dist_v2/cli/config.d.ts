@@ -31,6 +31,16 @@ export interface DirghaConfig {
      * stock experience is unchanged.
      */
     vimMode?: boolean;
+    /**
+     * TUI colour palette. Defaults to 'dark'. Users switch via /theme at
+     * runtime; the preference is persisted to ~/.dirgha/config.json.
+     */
+    theme?: 'dark' | 'light' | 'none';
+    /**
+     * Persisted execution mode. Defaults to 'act' (normal execution).
+     * Changed live via /mode; also honoured by fresh sessions.
+     */
+    mode?: 'plan' | 'act' | 'verify';
 }
 export declare const DEFAULT_CONFIG: DirghaConfig;
 export declare function loadConfig(cwd?: string): Promise<DirghaConfig>;

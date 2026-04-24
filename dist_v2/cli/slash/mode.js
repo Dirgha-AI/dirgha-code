@@ -1,25 +1,30 @@
 /**
- * /mode — switch the REPL's execution mode. v2 doesn't yet ship a
- * mode subsystem (plan / act / verify), so this is a structured stub
- * that records the preferred mode in process.env.DIRGHA_MODE so
- * downstream integrations can observe it. STUB until packages/core
- * grows a mode kernel.
+ * /mode — switch the REPL's execution mode. The mode is prepended to
+ * the system prompt of every subsequent turn via the interactive loop,
+ * which reads ctx.mode / ctx.setMode on each submit. Preference
+ * persists to ~/.dirgha/config.json so new sessions honour it.
  */
-const MODES = ['plan', 'act', 'verify'];
+import { MODES, saveMode, modePreamble } from '../../context/mode.js';
 export const modeCommand = {
     name: 'mode',
-    description: 'Show or switch execution mode (plan|act|verify) — stub',
-    async execute(args) {
-        const current = process.env.DIRGHA_MODE ?? 'act';
+    description: 'Show or switch execution mode (plan|act|verify)',
+    async execute(args, ctx) {
+        const current = ctx.getMode();
         if (args.length === 0) {
-            return `Current mode: ${current}. Available: ${MODES.join(', ')}. (v2 doesn\'t yet gate behaviour on mode — this is a stub.)`;
+            return [
+                `Current mode: ${current}`,
+                `Available:    ${MODES.join(' · ')}`,
+                '',
+                modePreamble(current),
+            ].join('\n');
         }
         const next = args[0];
         if (!MODES.includes(next)) {
             return `Unknown mode "${next}". Choose one of: ${MODES.join(', ')}`;
         }
-        process.env.DIRGHA_MODE = next;
-        return `Mode set to ${next}. (Note: v2 does not yet route on mode.)`;
+        await saveMode(next);
+        ctx.setMode(next);
+        return `Mode set to ${next}. ${next === 'plan' ? '(Read-only — no writes or shells.)' : next === 'verify' ? '(Read-only audit — no modifications.)' : '(Normal execution.)'}`;
     },
 };
 //# sourceMappingURL=mode.js.map
