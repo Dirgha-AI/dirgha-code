@@ -11,7 +11,7 @@ export function registerBtwCommand(program: Command): void {
   program
     .command('btw <query>')
     .description('Ephemeral query — answered but not saved to history')
-    .option('-m, --model <model>', 'Model to use', 'claude-3-haiku-20240307')
+    .option('-m, --model <model>', 'Model to use', 'claude-haiku-4-5')
     .option('--think', 'Show thinking process')
     .action(async (query: string, options) => {
       const spinner = ora({

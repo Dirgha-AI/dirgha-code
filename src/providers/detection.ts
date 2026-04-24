@@ -42,7 +42,7 @@ export function getDefaultModel(): string {
     case 'anthropic':  return 'claude-sonnet-4-6';
     case 'fireworks':  return 'accounts/fireworks/routers/kimi-k2p5-turbo';
     case 'openrouter': return 'anthropic/claude-sonnet-4-6';
-    case 'nvidia':     return 'minimaxai/minimax-m2.7';
+    case 'nvidia':     return 'meta/llama-3.3-70b-instruct';
     case 'gemini':     return 'gemini-3.1-pro-preview';
     case 'openai':     return 'gpt-5.4';
     case 'xai':        return 'grok-4';

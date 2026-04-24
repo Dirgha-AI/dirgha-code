@@ -1,7 +1,7 @@
 /**
  * project-session/session.ts — Session lifecycle, forking, merging
  */
-import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import type { Session, SessionStatus, CompressedContext, PalaceNode, ScratchpadEntry } from './types.js';
@@ -100,6 +100,22 @@ export class SessionManager {
   }
 
   list(projectId: string): Session[] {
+    // Fresh CLI invocations have an empty in-memory map; scan the
+    // on-disk session directories so `session list` actually reports
+    // what `session create` persisted in a previous invocation.
+    const sessionsDir = join(DIRGHA_DIR, 'projects', projectId, 'sessions');
+    if (existsSync(sessionsDir)) {
+      for (const name of readdirSync(sessionsDir)) {
+        const id = `${projectId}:${name}`;
+        if (this.sessions.has(id)) continue;
+        const metaPath = join(sessionsDir, name, 'meta.json');
+        if (!existsSync(metaPath)) continue;
+        try {
+          const s = JSON.parse(readFileSync(metaPath, 'utf8')) as Session;
+          this.sessions.set(id, s);
+        } catch { /* skip unreadable session */ }
+      }
+    }
     return Array.from(this.sessions.values())
       .filter(s => s.projectId === projectId);
   }

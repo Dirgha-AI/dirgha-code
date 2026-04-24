@@ -1,7 +1,17 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { existsSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { homedir } from 'node:os';
 import { getMemory } from './unified-memory.js';
 
-describe('UnifiedMemory stub', () => {
+// Isolate the test's view of the memory store. We delete the backing
+// JSONL file before each test so assertions about "empty" actually hold.
+beforeEach(() => {
+  const memFile = join(homedir(), '.dirgha', 'memory', 'memories.jsonl');
+  if (existsSync(memFile)) rmSync(memFile);
+});
+
+describe('UnifiedMemory', () => {
   it('returns a singleton', () => {
     const a = getMemory();
     const b = getMemory();
@@ -29,13 +39,26 @@ describe('UnifiedMemory stub', () => {
 
   it('recall accepts options and still returns an array', () => {
     const mem = getMemory();
-    const result = mem.recall({ layer: 'hot', limit: 10 });
+    const result = mem.recall({ layer: 'workspace', limit: 10 });
     expect(Array.isArray(result)).toBe(true);
   });
 
-  it('store resolves without throwing', async () => {
+  it('store persists and returns an entry with id+layer', () => {
     const mem = getMemory();
-    await expect(mem.store('key', { v: 1 })).resolves.toBeUndefined();
+    const entry = mem.store('test fact', { layer: 'workspace', tags: ['t1'] });
+    expect(entry.id).toMatch(/^mem_/);
+    expect(entry.layer).toBe('workspace');
+    expect(entry.content).toBe('test fact');
+    expect(mem.recall()).toHaveLength(1);
+  });
+
+  it('search finds stored content by substring', () => {
+    const mem = getMemory();
+    mem.store('apples are red', { tags: [] });
+    mem.store('bananas are yellow', { tags: [] });
+    const red = mem.search('apple');
+    expect(red).toHaveLength(1);
+    expect(red[0]?.content).toContain('apples');
   });
 
   it('retrieve resolves to null for unknown keys', async () => {
@@ -123,12 +146,23 @@ describe('UnifiedMemory stub', () => {
     expect(a).not.toBe(b);
   });
 
-  it('store accepts any value shape', async () => {
+  it('store accepts optional opts, including empty', () => {
     const mem = getMemory();
-    await expect(mem.store('k', null)).resolves.toBeUndefined();
-    await expect(mem.store('k', 'string')).resolves.toBeUndefined();
-    await expect(mem.store('k', [1, 2, 3])).resolves.toBeUndefined();
-    await expect(mem.store('k', { deep: { nested: true } })).resolves.toBeUndefined();
+    expect(() => mem.store('no opts')).not.toThrow();
+    expect(() => mem.store('empty opts', {})).not.toThrow();
+    expect(() => mem.store('tags only', { tags: ['a', 'b'] })).not.toThrow();
+  });
+
+  it('getStats reports totals and breakdowns', () => {
+    const mem = getMemory();
+    mem.store('one', { layer: 'workspace' });
+    mem.store('two', { layer: 'project' });
+    mem.addRule('when x', 'do y');
+    const s = mem.getStats();
+    expect(s.totalEntries).toBe(3);
+    expect(s.byLayer.workspace).toBeGreaterThanOrEqual(2);
+    expect(s.byTier.hot).toBe(3);
+    expect(s.avgTruthScore).toBeGreaterThan(0);
   });
 
   it('recall options include valid tier names', () => {

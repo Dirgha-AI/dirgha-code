@@ -23,10 +23,14 @@ const WRITE_TOOLS = new Set([
   "delete_file",
 ]);
 
-// Tool allowlist by trust level (implements capability attenuation)
+// Tool allowlist by trust level (implements capability attenuation).
+// Tool names must match the catalogue in src/tools/defs.ts exactly.
+// When adding a new tool there, add it here too or it will be blocked
+// even when the user has granted full trust.
 const TOOL_ALLOWLIST: Record<TrustLevel, Set<string>> = {
   high: new Set([
     ...WRITE_TOOLS,
+    "make_dir",
     "run_command",
     "bash",
     "git_status",
@@ -45,12 +49,13 @@ const TOOL_ALLOWLIST: Record<TrustLevel, Set<string>> = {
     "repo_map",
     "search_knowledge",
     "index_files",
+    "session_search",
     "read_file",
-    "memory_store",
-    "memory_recall",
-    "memory_forget",
+    "read_memory",
+    "save_memory",
     "write_todos",
     "ask_user",
+    "execute_code",
     "web_search",
     "web_fetch",
     "qmd_search",
@@ -72,12 +77,12 @@ const TOOL_ALLOWLIST: Record<TrustLevel, Set<string>> = {
     "repo_map",
     "search_knowledge",
     "index_files",
+    "session_search",
     "git_status",
     "git_diff",
     "git_log",
-    "memory_store",
-    "memory_recall",
-    "memory_forget",
+    "read_memory",
+    "save_memory",
     "write_todos",
     "ask_user",
     "web_search",
@@ -91,8 +96,7 @@ const TOOL_ALLOWLIST: Record<TrustLevel, Set<string>> = {
     "list_files",
     "glob",
     "repo_map",
-    "memory_store",
-    "memory_recall",
+    "read_memory",
     "ask_user",
     "web_fetch",
   ]),
@@ -170,7 +174,7 @@ export function guardToolResult(content: string, toolName: string): string {
   return `[SECURITY: prompt injection detected in ${toolName} result — content sanitized]\n${clean}`;
 }
 
-const MEMORY_TOOLS = ["memory_store", "memory_recall", "memory_forget"];
+const MEMORY_TOOLS = ["save_memory", "read_memory", "session_search"];
 
 export interface ToolResultBlock {
   type: "tool_result";
