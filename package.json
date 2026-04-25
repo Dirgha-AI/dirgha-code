@@ -1,7 +1,7 @@
 {
-  "name": "@dirgha/cli",
+  "name": "@dirgha/code",
   "version": "1.4.0",
-  "description": "Dirgha AI CLI - Intelligent command-line agent with multi-model support",
+  "description": "A terminal coding agent. Free compute, full agency. Bring your own key. Or don't.",
   "type": "module",
   "main": "./dist_v2/index.js",
   "types": "./dist_v2/index.d.ts",
