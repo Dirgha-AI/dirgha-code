@@ -1,0 +1,17 @@
+{
+  "name": "store",
+  "path": "/app/store",
+  "expect": "App store",
+  "url_visited": "https://dirgha.ai/app/store",
+  "url_final": "https://dirgha.ai/app/store",
+  "http_status": 200,
+  "title": "Dirgha \u2014 Agent OS",
+  "body_text_excerpt": "D\nCONVERSATIONS\n\nNo conversations yet. Start one.\n\n~/dirgha-workspace\n0 open\nDIRGHA \u00b7 AGENT OS\nDeploy\nSign in\nAPP STORE\nEvery Dirgha app, one place\n\n9 live \u00b7 4 in preview \u00b7 7 building \u00b7 5 planned.\n\nAll\nCore\nCreator\nCommerce\nEducation\nResearch\nOps\nSecurity\nKnowledge\nCommunity\nAbundance (Bucky)\n\nOPS\n\nOSS\nLIVE\n\nDePIN compute mesh + Lightning settlement.\n\nOpen\nAgents\n\nCORE\n\nLIVE\n\nCurated personas: pick one and start.\n\nOpen\nChat\n\nCORE\n\nFLAGSHIP\nLIVE\n\nTalk to your agent, stream answers, save threads.\n\nOpen\nContribute\n\nCOMMUNITY\n\nLIVE\n\nSponsor Dirgha OSS \u2014 contribute-protocol.\n\nVisit\nMemory\n\nKNOWLEDGE\n\nLIVE\n\nPersonal memory bank (local-first, optional sync).\n\nOpen\nModels\n\nCORE\n\nLIVE\n\nDirgha-hosted frontier, thinking, and fast models.\n\nOpen\nSkills\n\nCORE\n\nLIVE\n\nReusable procedural prompts for any thread.\n\nOpen\nStatus\n\nOPS\n\nLIVE\n\nLive platform health + incident history.\n\nVisit\nWriter\n\nCREATOR\n\nV2\nLIVE\n\nLong-form writing with TipTap + Binder + StoryEngine.\n\nOpen\nBuild\n\nCORE\n\nPREVIEW\n\nMonaco + file tree + terminal. Cursor-grade coding.\n\nPreview\nCoach\n\nEDUCATION\n\nPREVIEW\n\nPersonal tutor-agent with Socratic loop.\n\nPreview\nDeploy\n\nCORE\n\nPREVIEW\n\nSandbox \u00b7 Server \u00b7 GitHub \u00b7 Your VPS.\n\nPreview\nMedia Studio\n\nCORE\n\nPREVIEW\n\nImage, video, voice on fal.ai / Runway / ElevenLabs.\n\nPreview\nAgency OS\n\nCREATOR\n\nBUILDING\n\nAgentic ad + creator workflow with Janus twin ops.\n\nPeek (incomplete)\nArniko\n\nSECURITY\n\nOSS\nBUILDING\n\nAI + code + infra security scanner (headless).\n\nPeek (incomplete)\nCampus\n\nEDUCATION\n\nBUILDING\n\nERP for schools + universities.\n\nPeek (incomplete)\nCreator OS\n\nCREATOR\n\nBUILDING\n\nMulti-agent workflow for creators: drafts \u2192 edits \u2192 publish.\n\nPeek (incomplete)\nFactory\n\nCOMMERCE\n\nBUILDING\n\nCommerce + invoicing + fulfilment (Medusa-backed).\n\nPeek (incomplete)\nLearn\n\nEDUCATION\n\nBUILDING\n\nLMS + course runner for Mahakosh / Rama language series.\n\nPeek (incomplete)\nSecurity\n\nSECURITY\n\nBUILDING\n\nArniko scanner findings and threat models.\n\nPeek (incomplete)\nBooks\n\nKNOWLEDGE\n\nPLANNED\n\nLibrary + reader + note-taking on your corpus.\n\nComing soon\nGrants\n\nCOMMERCE\n\nPLANNED\n\nFunded builder programmes and proposal submission.\n\nComing soon\nJobs\n\nCOMMERCE\n\nPLANNED\n\nLabour marketplace \u2014 post, apply, pay in Lightning.\n\nComing soon\nResearch\n\nRESEARCH\n\nPLANNED\n\nSource-cited analysis and PDF ingestion.\n\nComing soon\nStorage\n\nKNOWLEDGE\n\nPLANNED\n\nEncrypted object storage for your drafts and datasets.\n\nComing soon",
+  "console": [],
+  "network_failures": [],
+  "screenshot": "output/store.png",
+  "navigation_error": null,
+  "verdict": {
+    "error": "nim call failed: <html>\r\n<head><title>502 Bad Gateway</title></head>\r\n<body>\r\n<center><h1>502 Bad Gateway</h1></center>\r\n</body>\r\n</html>"
+  }
+}

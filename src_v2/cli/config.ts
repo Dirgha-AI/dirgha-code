@@ -36,6 +36,41 @@ export interface DirghaConfig {
    * Changed live via /mode; also honoured by fresh sessions.
    */
   mode?: 'plan' | 'act' | 'verify';
+  /**
+   * Optional MCP servers to spawn on startup. Each entry runs as a
+   * subprocess; its tools are bridged into the local tool registry
+   * with a `${name}_` prefix. Standard `mcpServers` block shape so
+   * existing configs port over directly.
+   *
+   *   "mcpServers": {
+   *     "fs": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"] }
+   *   }
+   */
+  mcpServers?: Record<
+    string,
+    | { command: string; args?: string[]; env?: Record<string, string>; cwd?: string }
+    | { url: string; bearerToken?: string; headers?: Record<string, string>; timeoutMs?: number }
+  >;
+  /**
+   * Lifecycle hooks fired by the agent loop. Each entry is a shell
+   * command run when the named event occurs; non-zero exit on a
+   * `before*` hook aborts/blocks the action. Stdout/stderr are
+   * forwarded to dirgha's stderr. JSON payload is piped to stdin.
+   *
+   *   "hooks": {
+   *     "before_tool_call": [{ "command": "./scripts/audit.sh" }],
+   *     "after_turn":      [{ "command": "echo 'turn done' >> /tmp/turns.log" }]
+   *   }
+   *
+   * Recognised events: before_turn · after_turn · before_tool_call ·
+   * after_tool_call.
+   */
+  hooks?: {
+    before_turn?: Array<{ command: string }>;
+    after_turn?: Array<{ command: string }>;
+    before_tool_call?: Array<{ command: string; matcher?: string }>;
+    after_tool_call?: Array<{ command: string; matcher?: string }>;
+  };
 }
 
 export const DEFAULT_CONFIG: DirghaConfig = {

@@ -32,6 +32,13 @@ export const gitTool: Tool = {
   async execute(rawInput: unknown, ctx): Promise<ToolResult<{ op: Op; exitCode: number }>> {
     const input = rawInput as Input;
     const base = commandFor(input.op);
+    if (!base) {
+      return {
+        content: `git: unknown op "${String(input.op)}". Expected one of: status, diff, log, branch, show.`,
+        data: { op: input.op, exitCode: 64 },
+        isError: true,
+      };
+    }
     const full = [...base, ...(input.args ?? [])];
     const cwd = input.cwd ?? ctx.cwd;
     const result = await run('git', full, cwd, ctx.env);
@@ -43,13 +50,14 @@ export const gitTool: Tool = {
   },
 };
 
-function commandFor(op: Op): string[] {
+function commandFor(op: Op | undefined): string[] | null {
   switch (op) {
     case 'status': return ['status', '--short', '--branch'];
     case 'diff': return ['diff', '--no-color'];
     case 'log': return ['log', '--oneline', '-n', '20'];
     case 'branch': return ['branch', '--list'];
     case 'show': return ['show', '--no-color'];
+    default: return null;
   }
 }
 

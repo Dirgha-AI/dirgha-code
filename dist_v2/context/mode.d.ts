@@ -3,7 +3,7 @@
  * prepended to the system prompt; it doesn't change the tool set or
  * the loop structure. Used by /mode slash and CLI flags.
  */
-export declare const MODES: readonly ["plan", "act", "verify"];
+export declare const MODES: readonly ["plan", "act", "verify", "ask"];
 export type Mode = (typeof MODES)[number];
 export declare const DEFAULT_MODE: Mode;
 export declare function modePreamble(mode: Mode): string;

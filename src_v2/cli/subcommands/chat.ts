@@ -38,9 +38,11 @@ export const chatSubcommand: Subcommand = {
       return 1;
     }
     const config = await loadConfig(ctx.cwd);
-    const model = typeof flags.model === 'string' ? flags.model
+    const { resolveModelAlias } = await import('../../intelligence/prices.js');
+    const rawModel = typeof flags.model === 'string' ? flags.model
       : typeof flags.m === 'string' ? flags.m
       : config.model;
+    const model = resolveModelAlias(rawModel);
     const system = typeof flags.system === 'string' ? flags.system
       : typeof flags.s === 'string' ? flags.s
       : undefined;

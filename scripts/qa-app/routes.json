@@ -1,0 +1,20 @@
+{
+  "$comment": "Routes under https://dirgha.ai/app. Captured from apps/agent-os/src/App.tsx. Auth-required routes will probably redirect to /login when run unauthenticated; the harness records that.",
+  "base": "https://dirgha.ai",
+  "routes": [
+    {"path": "/app/",            "name": "home",            "expect": "Home dashboard / room tiles"},
+    {"path": "/app/chat",        "name": "chat",            "expect": "Workspace (chat + canvas)"},
+    {"path": "/app/build",       "name": "build",           "expect": "Build placeholder room"},
+    {"path": "/app/research",    "name": "research",        "expect": "Research placeholder room"},
+    {"path": "/app/deploy",      "name": "deploy",          "expect": "Deploy room (VPS providers)"},
+    {"path": "/app/media",       "name": "media",           "expect": "Media studio"},
+    {"path": "/app/security",    "name": "security",        "expect": "Security placeholder room"},
+    {"path": "/app/agents",      "name": "agents",          "expect": "Agents marketplace"},
+    {"path": "/app/skills",      "name": "skills",          "expect": "Skills library"},
+    {"path": "/app/models",      "name": "models",          "expect": "Models hub"},
+    {"path": "/app/store",       "name": "store",           "expect": "App store"},
+    {"path": "/app/memory",      "name": "memory",          "expect": "Memory viewer"},
+    {"path": "/app/settings",    "name": "settings",        "expect": "Settings page"},
+    {"path": "/app/admin/secrets", "name": "admin-secrets", "expect": "Admin secrets page (auth + admin)"}
+  ]
+}

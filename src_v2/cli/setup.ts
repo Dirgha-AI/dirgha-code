@@ -25,9 +25,9 @@ interface ProviderEntry {
 
 const PROVIDERS: ProviderEntry[] = [
   { label: 'NVIDIA NIM',  env: 'NVIDIA_API_KEY',     helpUrl: 'https://build.nvidia.com/settings/api-keys', suggested: ['moonshotai/kimi-k2-instruct', 'qwen/qwen3-next-80b-a3b-instruct', 'meta/llama-3.3-70b-instruct'] },
-  { label: 'OpenRouter',  env: 'OPENROUTER_API_KEY', helpUrl: 'https://openrouter.ai/keys',                 suggested: ['inclusionai/ling-2.6-1t:free', 'anthropic/claude-sonnet-4-6', 'openai/gpt-5-mini'] },
+  { label: 'OpenRouter',  env: 'OPENROUTER_API_KEY', helpUrl: 'https://openrouter.ai/keys',                 suggested: ['tencent/hy3-preview:free', 'inclusionai/ling-2.6-1t:free', 'qwen/qwen3-coder:free', 'moonshotai/kimi-k2.6', 'deepseek/deepseek-v3.2-exp', 'google/gemini-3.1-pro-preview', 'z-ai/glm-5'] },
   { label: 'Anthropic',   env: 'ANTHROPIC_API_KEY',  helpUrl: 'https://console.anthropic.com/settings/keys', suggested: ['claude-opus-4-7', 'claude-sonnet-4-6', 'claude-haiku-4-5'] },
-  { label: 'OpenAI',      env: 'OPENAI_API_KEY',     helpUrl: 'https://platform.openai.com/api-keys',        suggested: ['gpt-5', 'gpt-5-mini', 'gpt-4o', 'gpt-4o-mini', 'o1'] },
+  { label: 'OpenAI',      env: 'OPENAI_API_KEY',     helpUrl: 'https://platform.openai.com/api-keys',        suggested: ['gpt-5.5-pro', 'gpt-5.5', 'gpt-5', 'gpt-5-mini', 'gpt-4o-mini', 'o1'] },
   { label: 'Google AI',   env: 'GEMINI_API_KEY',     helpUrl: 'https://aistudio.google.com/apikey',          suggested: ['gemini-2.5-pro', 'gemini-2.5-flash'] },
 ];
 

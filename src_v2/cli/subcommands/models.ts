@@ -15,7 +15,9 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { stdout, stderr } from 'node:process';
-import { PRICES } from '../../intelligence/prices.js';
+import { PRICES, contextWindowFor } from '../../intelligence/prices.js';
+import { refreshAllModels, readCache, writeCache, isCacheFresh, type ModelsCache } from '../../intelligence/models-refresh.js';
+import { listProviders } from '../../auth/providers.js';
 import { style, defaultTheme } from '../../tui/theme.js';
 import type { Subcommand } from './index.js';
 
@@ -103,9 +105,24 @@ function runInfo(id: string): number {
   for (const row of all) {
     stdout.write(`\n${style(defaultTheme.accent, row.model)}\n`);
     stdout.write(`  provider       ${row.provider}\n`);
+    if (row.family) stdout.write(`  family         ${row.family}\n`);
+    // Context window comes from the per-row override OR the canonical
+    // CONTEXT_WINDOWS map (in prices.ts) — `contextWindowFor` handles
+    // both, falls back to DEFAULT_CONTEXT_WINDOW only when neither has
+    // an entry. Surfacing it always so the user always knows the cap.
+    stdout.write(`  context        ${contextWindowFor(row.model).toLocaleString()} tokens\n`);
+    if (row.maxOutput !== undefined) {
+      stdout.write(`  max output     ${row.maxOutput.toLocaleString()} tokens\n`);
+    }
     stdout.write(`  input / M      ${priceText(row.inputPerM)}\n`);
     stdout.write(`  output / M     ${priceText(row.outputPerM)}\n`);
     if (row.cachedInputPerM !== undefined) stdout.write(`  cached in / M  $${row.cachedInputPerM.toFixed(2)}\n`);
+    if (row.supportsTools !== undefined) {
+      stdout.write(`  tools          ${row.supportsTools ? 'yes' : 'no'}\n`);
+    }
+    if (row.supportsThinking !== undefined) {
+      stdout.write(`  thinking       ${row.supportsThinking ? 'yes' : 'no'}\n`);
+    }
     const env = PROVIDER_ENV[row.provider] ?? '';
     const marker = configured(row.provider) ? 'configured' : env ? `set ${env} to enable` : 'no key required';
     stdout.write(`  configured?    ${marker}\n`);
@@ -123,20 +140,71 @@ function usage(): string {
   ].join('\n');
 }
 
+const CACHE_PATH = join(homedir(), '.dirgha', 'models-cache.json');
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+async function runRefresh(jsonOut: boolean): Promise<number> {
+  const targets = listProviders().map(p => ({
+    name: p.id,
+    baseUrl: p.baseUrl ?? '',
+    apiKey: process.env[p.envVars[0]],
+  })).filter(t => t.baseUrl && t.apiKey);
+  if (targets.length === 0) {
+    stderr.write(style(defaultTheme.muted, '(no provider keys present in env / pool — set at least one with `dirgha login --provider=...`)\n'));
+    return 1;
+  }
+  stdout.write(style(defaultTheme.muted, `fetching ${targets.length} provider${targets.length === 1 ? '' : 's'} in parallel…\n`));
+  const cache = await refreshAllModels({ providers: targets });
+  await mkdir(join(homedir(), '.dirgha'), { recursive: true });
+  await writeCache(CACHE_PATH, cache);
+  if (jsonOut) { stdout.write(`${JSON.stringify(cache)}\n`); return 0; }
+  stdout.write(style(defaultTheme.accent, `\n${cache.totalModels} models across ${cache.providers.length} providers\n`));
+  for (const p of cache.providers) {
+    const tag = p.error ? style(defaultTheme.danger, `error: ${p.error}`) : style(defaultTheme.success, `${p.models.length} models`);
+    stdout.write(`  ${p.name.padEnd(14)}  ${tag}\n`);
+  }
+  stdout.write(style(defaultTheme.muted, `\ncached at ${CACHE_PATH}\n`));
+  return 0;
+}
+
+async function runCacheShow(jsonOut: boolean): Promise<number> {
+  const cache = await readCache(CACHE_PATH);
+  if (!cache) {
+    stderr.write(style(defaultTheme.muted, '(no cache yet — run `dirgha models refresh`)\n'));
+    return 1;
+  }
+  const fresh = isCacheFresh(cache, CACHE_TTL_MS);
+  if (jsonOut) { stdout.write(`${JSON.stringify({ ...cache, fresh })}\n`); return 0; }
+  stdout.write(style(defaultTheme.accent, `Models cache (${fresh ? 'fresh' : 'stale, refresh recommended'})\n`));
+  stdout.write(style(defaultTheme.muted, `fetched: ${cache.fetchedAt}\n`));
+  for (const p of cache.providers) {
+    const head = `  ${p.name.padEnd(14)}`;
+    if (p.error) { stdout.write(`${head} ${style(defaultTheme.danger, p.error)}\n`); continue; }
+    stdout.write(`${head} ${p.models.length} models\n`);
+  }
+  return 0;
+}
+
 export const modelsSubcommand: Subcommand = {
   name: 'models',
-  description: 'List, inspect, and set the default model',
+  description: 'List, inspect, and refresh the live model catalogue',
   async run(argv): Promise<number> {
-    const [op, arg] = argv;
+    const json = argv.includes('--json');
+    const args = argv.filter(a => a !== '--json');
+    const [op, arg] = args;
     if (!op || op === 'list') return runList();
     if (op === 'default') return runDefault(arg);
     if (op === 'info') {
       if (!arg) { stderr.write(`${usage()}\n`); return 1; }
       return runInfo(arg);
     }
+    if (op === 'refresh') return runRefresh(json);
+    if (op === 'cache')   return runCacheShow(json);
     // Single bare model id? treat it as a shorthand for `info <id>`.
     if (!arg && PRICES.some(p => p.model === op)) return runInfo(op);
     stderr.write(`unknown subcommand "${op}"\n${usage()}\n`);
     return 1;
   },
 };
+// Type assertion to silence ModelsCache import (kept for external consumers).
+void ({} as ModelsCache);

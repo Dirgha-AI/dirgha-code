@@ -9,6 +9,7 @@ import { randomUUID } from 'node:crypto';
 import { createInterface } from 'node:readline';
 import type { Message, UsageTotal, Provider } from '../kernel/types.js';
 import { createEventStream } from '../kernel/event-stream.js';
+import { appendAudit } from '../audit/writer.js';
 import { runAgentLoop } from '../kernel/agent-loop.js';
 import type { ProviderRegistry } from '../providers/index.js';
 import type { ToolRegistry } from '../tools/registry.js';
@@ -18,10 +19,18 @@ import { getTheme, style, type Theme, type ThemeName } from '../tui/theme.js';
 import { createTuiApprovalBus } from '../tui/approval.js';
 import type { SessionStore, Session } from '../context/session.js';
 import { maybeCompact } from '../context/compaction.js';
+import { contextWindowFor, findPrice } from '../intelligence/prices.js';
+import { routeModel } from '../providers/dispatch.js';
+import { buildAgentHooksFromConfig } from '../hooks/config-bridge.js';
 import { createDefaultSlashRegistry, registerBuiltinSlashCommands, type SlashContext } from './slash.js';
 import type { DirghaConfig } from './config.js';
 import { loadToken, migrateLegacyAuth, type Token } from '../integrations/device-auth.js';
 import { applyMode, resolveMode, type Mode } from '../context/mode.js';
+import { loadProjectPrimer, composeSystemPrompt } from '../context/primer.js';
+import { probeGitState, renderGitState } from '../context/git-state.js';
+import { loadSoul } from '../context/soul.js';
+import { modePreamble } from '../context/mode.js';
+import { createErrorClassifier } from '../intelligence/error-classifier.js';
 
 export interface InteractiveOptions {
   registry: ToolRegistry;
@@ -45,6 +54,19 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
   events.subscribe(render);
 
   let currentModel = opts.config.model;
+
+  // Audit writer: produces entries the `dirgha audit` reader can show.
+  // Same shape as the one-shot path in cli/main.ts — kept inline so the
+  // closure can read currentModel for accurate model attribution.
+  events.subscribe(ev => {
+    if (ev.type === 'tool_exec_end') {
+      void appendAudit({ kind: 'tool', actor: sessionId, summary: `${ev.id} ${ev.isError ? 'error' : 'done'} ${ev.durationMs}ms`, toolId: ev.id, isError: ev.isError, durationMs: ev.durationMs });
+    } else if (ev.type === 'agent_end') {
+      void appendAudit({ kind: 'turn-end', actor: sessionId, summary: `model=${currentModel} stop=${ev.stopReason} in=${ev.usage.inputTokens} out=${ev.usage.outputTokens}`, model: currentModel, stopReason: ev.stopReason, usage: ev.usage });
+    } else if (ev.type === 'error') {
+      void appendAudit({ kind: 'error', actor: sessionId, summary: ev.message });
+    }
+  });
   let currentMode: Mode = await resolveMode();
   let currentThemeName: ThemeName = ((opts.config.theme as ThemeName | undefined) ?? 'dark');
   let currentTheme: Theme = getTheme(currentThemeName);
@@ -53,11 +75,26 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
   // System prompt is rebuilt per turn below so mode changes apply live.
   const history: Message[] = [...initial];
   const totals: UsageTotal = { inputTokens: 0, outputTokens: 0, cachedTokens: 0, costUsd: 0 };
-  events.subscribe(ev => {
+  // Cost lookup follows whichever model is current at usage-event time.
+  // The provider id is resolved via the dispatch router so the price
+  // table query matches the actual provider that served the call.
+  events.subscribe(async ev => {
     if (ev.type === 'usage') {
+      const cached = ev.cachedTokens ?? 0;
+      const providerId = routeModel(currentModel);
+      const price = findPrice(providerId, currentModel);
+      const turnCost = price
+        ? (ev.inputTokens / 1_000_000) * price.inputPerM + (ev.outputTokens / 1_000_000) * price.outputPerM + (cached / 1_000_000) * (price.cachedInputPerM ?? 0)
+        : 0;
       totals.inputTokens += ev.inputTokens;
       totals.outputTokens += ev.outputTokens;
-      totals.cachedTokens += ev.cachedTokens ?? 0;
+      totals.cachedTokens += cached;
+      totals.costUsd += turnCost;
+      try {
+        await session.append({ type: 'usage', ts: new Date().toISOString(), usage: {
+          inputTokens: ev.inputTokens, outputTokens: ev.outputTokens, cachedTokens: cached, costUsd: turnCost,
+        } });
+      } catch { /* swallow */ }
     }
   });
 
@@ -84,10 +121,24 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
     rl.prompt();
   };
 
-  /** Build the per-turn system prompt from options + current mode. */
-  const buildSystem = (): string | undefined => {
-    const base = opts.systemPrompt;
-    return applyMode(base, currentMode);
+  // Load the project primer once at boot. We walk up from cwd for
+  // DIRGHA.md (or CLAUDE.md as compat). Cached for the session — if
+  // the file changes mid-session, /clear or restart picks it up.
+  const primerLoaded = loadProjectPrimer(opts.cwd);
+  if (primerLoaded.source) {
+    process.stdout.write(style(currentTheme.muted, `  primer: ${primerLoaded.source}${primerLoaded.truncated ? ' (truncated)' : ''}\n`));
+  }
+
+  const soulLoaded = loadSoul();
+  /** Build the per-turn system prompt: soul + mode + primer + git_state + --system. */
+  const buildSystem = (): string => {
+    return composeSystemPrompt({
+      soul: soulLoaded.text,
+      modePreamble: modePreamble(currentMode),
+      primer: primerLoaded.primer,
+      gitState: renderGitState(probeGitState(opts.cwd)),
+      userSystem: opts.systemPrompt,
+    });
   };
 
   const handleLine = async (raw: string): Promise<void> => {
@@ -133,6 +184,7 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
     const sanitized = opts.registry.sanitize({ descriptionLimit: 200 });
     const provider = opts.providers.forModel(currentModel);
 
+    const userHooks = buildAgentHooksFromConfig(opts.config);
     try {
       const result = await runAgentLoop({
         sessionId,
@@ -144,8 +196,13 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
         toolExecutor: executor,
         approvalBus,
         events,
+        errorClassifier: createErrorClassifier(),
+        ...(userHooks !== undefined ? { hooks: userHooks } : {}),
+        // Per-model compaction trigger: 75 % of the model's actual
+        // context window beats a static 120k cap (which over-compacts
+        // big-window models and under-compacts 32k ones).
         contextTransform: async msgs => (await maybeCompact(msgs, {
-          triggerTokens: opts.config.compaction.triggerTokens,
+          triggerTokens: Math.floor(contextWindowFor(currentModel) * 0.75),
           preserveLastTurns: opts.config.compaction.preserveLastTurns,
           summarizer: provider,
           summaryModel: opts.config.summaryModel,

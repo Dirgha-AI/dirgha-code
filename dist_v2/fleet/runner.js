@@ -237,6 +237,13 @@ function onLocalEvent(agent, ev, opts) {
         agent.usage.outputTokens += ev.outputTokens;
         agent.usage.cachedTokens += ev.cachedTokens ?? 0;
     }
+    else if (ev.type === 'tool_exec_end') {
+        // Counting tool executions lets us distinguish "agent did real work"
+        // from "agent emitted text claiming completion without calling
+        // anything" — a common LLM failure mode that previously inflated
+        // fleet success counts.
+        agent.toolExecCount = (agent.toolExecCount ?? 0) + 1;
+    }
 }
 function agentRegistry(subtask) {
     const type = subtask.type ?? 'code';
@@ -246,13 +253,20 @@ function agentRegistry(subtask) {
     return createToolRegistry(scoped);
 }
 function agentSystemPrompt(subtask) {
+    const type = subtask.type ?? 'code';
+    const isCodeOrVerify = type === 'code' || type === 'verify';
+    const toolMandate = isCodeOrVerify
+        ? 'You MUST use the available tools (fs_write, fs_edit, shell, etc.) to make changes. Do NOT respond with text claiming you completed work — you have no effect on the filesystem unless you invoke a tool. After your tool calls, commit any new files with the git tool (`git add <file> && git commit -m "<msg>"`) so the work shows up on your branch.'
+        : 'Use tools (fs_read, search_grep, etc.) to inspect the workspace. Respond with a short summary of what you found.';
     return `You are a fleet subagent focused on a single subtask.
 Subtask: ${subtask.title}
-Type: ${subtask.type ?? 'code'}
+Type: ${type}
+Cwd: your assigned worktree (relative paths only — never write outside it).
 
-Stay inside your worktree (your cwd). Make the smallest change that
-solves the subtask. When done, respond with a short summary of what you
-changed or found — no apologies, no filler.`;
+${toolMandate}
+
+When the subtask is genuinely complete, respond with a short one-line
+summary of what you did — no apologies, no filler, no preamble.`;
 }
 function emitFleetEvent(events, ev) {
     // Fleet events are cast onto the AgentEvent stream so parent UIs that

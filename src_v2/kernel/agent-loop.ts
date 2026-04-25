@@ -85,6 +85,18 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
           events.emit(ev);
         }
       } catch (err) {
+        // An AbortError mid-stream is a clean cancellation, not a
+        // failure. Distinguish so callers (and `dirgha audit`) see
+        // `stopReason: 'aborted'` instead of misleading 'error'.
+        const isAbort = (
+          (err instanceof Error && (err.name === 'AbortError' || /aborted|abort/i.test(err.message)))
+          || cfg.signal?.aborted === true
+        );
+        if (isAbort) {
+          stopReason = 'aborted';
+          events.emit({ type: 'turn_end', turnId, stopReason });
+          break;
+        }
         const classified = cfg.errorClassifier?.classify(err, cfg.provider.id, cfg.model);
         events.emit({
           type: 'error',

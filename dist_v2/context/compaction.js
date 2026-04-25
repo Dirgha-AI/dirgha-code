@@ -20,6 +20,12 @@ export async function maybeCompact(messages, cfg, session) {
     if (historical.length === 0) {
         return { messages, compacted: false, tokensBefore, tokensAfter: tokensBefore };
     }
+    if (cfg.hooks) {
+        const veto = await cfg.hooks.emit('compaction_before', { tokensBefore, historicalCount: historical.length });
+        if (veto?.block) {
+            return { messages, compacted: false, tokensBefore, tokensAfter: tokensBefore };
+        }
+    }
     const summary = await summarise(cfg, historical);
     const trimmed = [
         ...systems,
@@ -39,6 +45,9 @@ export async function maybeCompact(messages, cfg, session) {
             keptFrom: `last-${preserveCount}-messages`,
             summary,
         });
+    }
+    if (cfg.hooks) {
+        await cfg.hooks.emit('compaction_after', { tokensBefore, tokensAfter, summary });
     }
     return { messages: trimmed, compacted: true, summary, tokensBefore, tokensAfter };
 }
@@ -117,4 +126,33 @@ function truncate(s, max) {
     return s.length <= max ? s : `${s.slice(0, max - 1)}…`;
 }
 void undefined;
+/**
+ * Build a `contextTransform` callback suitable for `runAgentLoop`'s
+ * config. Each turn, the transform measures the running history and —
+ * when its token estimate crosses 75% of the model's context window —
+ * runs maybeCompact to summarise older turns and replace them with a
+ * single synthetic user message. The compacted history is then
+ * persisted back into the caller's `history` mutable ref so subsequent
+ * turns build on the trimmed view, not the original.
+ */
+export function createCompactionTransform(opts) {
+    const triggerTokens = Math.floor(opts.contextWindow * 0.75);
+    return async (messages) => {
+        const result = await maybeCompact(messages, {
+            triggerTokens,
+            preserveLastTurns: opts.preserveLastTurns ?? 4,
+            summarizer: opts.summarizer,
+            summaryModel: opts.summaryModel,
+            hooks: opts.hooks,
+        }, opts.session);
+        if (result.compacted) {
+            // Replace the caller's mutable history in-place so post-turn
+            // appends don't reintroduce the old un-compacted prefix.
+            opts.history.length = 0;
+            opts.history.push(...result.messages);
+            opts.onCompact?.(result);
+        }
+        return result.messages;
+    };
+}
 //# sourceMappingURL=compaction.js.map

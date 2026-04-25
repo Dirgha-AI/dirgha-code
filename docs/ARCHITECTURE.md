@@ -1,137 +1,163 @@
-# Dirgha Code — Architecture
+# dirgha-cli — Architecture
 
-**Status:** 2026-04-24. Post-Sprint 3 of the launch plan. 54 dirs under `src/` (down from 60). 0 `@ts-nocheck` in security-critical paths.
+A terminal coding agent that adapts to your workflow without forcing a fork. Headless one-shots, an Ink TUI, a readline REPL, parallel sub-agent fleets, and remote MCP servers all run on the same kernel + provider abstraction.
 
-This doc is the contract for the top-level shape of the codebase. If a new directory shows up under `src/` that isn't listed here, either update this doc or delete the directory.
+## Purpose
 
-## Entry points
+Engineers ship working code. dirgha is a thin loop between an LLM and the filesystem / shell / git / browser, glued by audit-everything persistence so a long sprint survives context resets, network blips, and provider outages.
 
-- `src/index.ts` — CLI entry. Parses argv, registers ~51 user commands (+ 6 more under `DIRGHA_EXPERIMENTAL=1`), launches the REPL when no subcommand is given.
-- `src/index-agent.ts` — Headless agent entry (machine-to-machine).
-- `dist/dirgha.mjs` — Bundled output from esbuild. Ships in the npm tarball.
+It is **free-tier-first**: the same machinery runs on free OpenRouter `:free` models and on premium Claude / GPT / Gemini, with mid-session failover that swaps a dead key for a live one without losing the partial transcript.
 
-## Core (stable surface)
+## Vision
 
-These directories ship in 1.x and follow semver on their public exports.
+1. **One source of truth.** The parity matrix file scores dirgha against every dimension a coding agent needs. Mean is currently **9.82 / 10**, sum-of-gaps is **0**, and 38 offline tests run in 16 s. Every fix cites code + test in the matrix.
+2. **Adapt to workflows; don't fork dirgha.** Skills, themes, hooks, MCP servers, and **TypeScript / ESM extensions** are loadable artifacts, not patches.
+3. **Every model. Every wire. Every transport.** OpenAI chat-completions, Anthropic messages, Gemini generate, MCP stdio, MCP HTTP/SSE — one factory, providers as config blobs.
+4. **Free compute is a first-class user.** NIM (kimi/deepseek/qwen) + OpenRouter free tier (hy3, ling) work end-to-end including multi-turn coding sprints — proven by dogfood in `/tmp/dogfood-*`.
+5. **Failover is silent and lossless.** When `claude-opus-4-7` has no Anthropic key, the request routes to `anthropic/claude-opus-4-7` via OR. Mid-session timeouts resume from the partial transcript with `maxTurns − turnCount` budget remaining.
+6. **Multi-key BYOK with cooldown rotation.** A free-tier 429 cools that key out for the rate-limit window; the next-priority key takes over without restarting the CLI. 17 providers known, lock-protected concurrent writes.
+7. **Crash-safe persistence.** Append-only JSONL sessions replayed on `dirgha resume`. Audit log with `kinds` tally and `--filter`. Ledger with TF-IDF cosine search for semantic memory across sessions.
+8. **Every model has a soul.** A short Markdown file at `~/.dirgha/soul.md` (or the default that ships with the package) defines tone, boundaries, end-of-turn norms.
+9. **Self-update with permission.** `dirgha update --check` polls npm. `dirgha update [--yes]` installs after confirmation. `dirgha update --packages` refreshes installed skill packs. Audit-logged.
+10. **Self-fetching catalogue.** `dirgha models refresh` queries `/v1/models` on each configured provider in parallel, caches at `~/.dirgha/models-cache.json` with a 24 h TTL. Live: 499 models pulled in <1 s during dogfood.
 
-| Dir | Role |
-|---|---|
-| `agent/` | Tool-use loop, spawn, trust-level enforcement, context build. The heart. |
-| `providers/` | 13 LLM providers + dispatch router + stream parser. |
-| `tools/` | 40+ tool implementations (read/write/shell/git/browser/search/repo_map). |
-| `permission/` | Trust-level-based confirmation + persistent decisions (SQLite). |
-| `memory/` | Unified memory graph (hot/warm/cold tiers). |
-| `session/` | Session persistence + fork + resume. |
-| `project-session/` | Project-scoped state isolated from global session. |
-| `commands/` | All `dirgha <subcommand>` handlers. One file per command family. |
-| `repl/` | Interactive REPL: slash commands, streaming renderer, interruption. |
-| `tui/` | Ink-based TUI components (models picker, fleet panel, help overlay). |
-| `config/` | Rate limits and runtime config (not user config — that's `utils/config`). |
-| `types.ts` | Cross-module type definitions. |
-| `utils/` | Shared helpers (safe-exec, credentials, session-cache, experimental gate). |
+## What dirgha is
 
-## Platform integration
+- **Terminal coding agent.** `dirgha "prompt"` (one-shot), `dirgha` (Ink TUI), `dirgha resume <id>` (continue session), `dirgha fleet launch <goal>` (parallel git-worktree sub-agents), `dirgha verify "<goal>" --accept "<cmd>"` (gated agent loop).
+- **Multi-provider with one transport-abstraction.** Adding a new provider is a config-blob diff in `presets.ts`, not a new class.
+- **Tool surface:** `fs_read`, `fs_write`, `fs_edit`, `fs_ls`, `shell`, `search_grep`, `search_glob`, `git`, `browser`, `checkpoint`, `cron`, plus dynamic `task` for sub-agent dispatch.
+- **MCP-aware** with stdio + HTTP/SSE transports and async `bearerProvider` for OAuth token rotation.
+- **20 slash commands** in interactive mode.
+- **18 subcommands** for headless workflows.
+- **Modes:** `act`, `plan`, `verify`, `ask`. Kernel-hook gate blocks every write tool in non-`act` modes.
+- **Model aliases** (kimi, opus, sonnet, haiku, gemini, flash, deepseek, llama, ling, hy3, …) resolved before routing.
 
-Layers that bridge Dirgha Code to the Dirgha platform services.
+## What dirgha is NOT (yet)
 
-| Dir | Role |
-|---|---|
-| `gateway/` | `api.dirgha.ai` client — auth, quota, completions proxy. |
-| `billing/` | Quota checks, rate-limit LRU, usage reporting. |
-| `services/` | `UnifiedAgentClient` — gateway-mediated agent execution. |
-| `checkpoint/` | Shadow-git snapshots + durable workflow resume. |
-| `mcp/` | Model Context Protocol (stdio server + client). |
-| `extensions/` | Third-party extension loader and manager. |
-| `hub/` | Plugin discovery (`dirgha hub`) and installer. |
+- A web dashboard. `dirgha audit tail` is the live view; HTML rendering is on the roadmap.
+- Auto-updating without permission. Update is opt-in and prompts unless `--yes`.
+- Wired into npm marketplaces for plugin packs. Git-cloned skill packs work today; `dirgha install npm:@foo/pack` is roadmap.
+- OAuth-native for every provider. API-key BYOK + dirgha gateway device-code work today; per-provider OAuth (Anthropic Pro / ChatGPT Plus) is roadmap.
 
-## Content and knowledge
-
-| Dir | Role |
-|---|---|
-| `knowledge/` | Document ingestion + chunking for RAG. |
-| `embeddings/` | Vector store + VSS-backed similarity search. |
-| `context/` | Active-context window builder (files, recent edits, memory). |
-| `sync/` | Wiki/Obsidian-style sync (knowledge graph → markdown). |
-| `llm/` | Shared LLM utilities (structured output, summarization). |
-
-## Execution + sandbox
-
-| Dir | Role |
-|---|---|
-| `runtime/` | Isolate-based code execution sandbox, host-tools, WASM commands. No `@ts-nocheck` — type safety enforced. |
-| `security/` | Threat scanning, secret redaction. |
-| `browser/` | Playwright-backed browser tool (lazy-loaded). |
-
-## Task + planning
-
-| Dir | Role |
-|---|---|
-| `task/` | In-memory task queue with state-machine transitions. |
-| `sprint/` | Autonomous sprint engine — reads markdown plans, runs verified steps. |
-| `fleet/` | Parallel agents in git worktrees (`dirgha fleet launch`). |
-| `skills/` | `SKILL.md` frontmatter registry for reusable agent skills. |
-
-## Ops + telemetry
-
-| Dir | Role |
-|---|---|
-| `cron/` | Scheduled tasks (daily summaries, memory compaction). |
-| `analytics/` | Usage analytics (opt-in, anonymized). |
-| `compaction/` | Context-window compaction heuristics. |
-| `errors/` | Centralized error types. |
-| `platform/` | Platform detection (node version, OS, editor). |
-| `setup/` | First-run setup wizard helpers. |
-| `agents/` | Pre-built agent configurations (codex, hermes, etc.). |
-
-## Experimental (DIRGHA_EXPERIMENTAL=1)
-
-These compile and ship in the bundle but are hidden from default `--help`. See `src/experimental/README.md` for the graduation checklist.
-
-| Dir | Surface |
-|---|---|
-| `mesh/` | libp2p compute-mesh node |
-| `swarm/` | Multi-agent swarm coordinator |
-| `voice/` | Desktop mic + mobile bridge + browser extension voice input |
-| `multimodal/` | Image/PDF attachments in chat |
-| `realtime/` | WebSocket hub (infra for future mesh/fleet coordination) |
-| `workspace/` | Multi-tenant workspace isolation (infra for future teams) |
-
-## Directories slated for consolidation
-
-Legitimately in use, but small enough to fold into neighbors in a future sprint:
-
-- `api/` (71 LoC) → move into `gateway/`
-- `git/` (40 LoC) → merge into `tools/git.ts`
-- `errors/` (125 LoC) → move into `types.ts` or `utils/errors.ts`
-
-## Dead / recently removed
-
-For grep-ability when old docs reference these:
-
-- `src/recipes/` — removed 2026-04-24 (S3.2). Never invoked.
-- `src/business/` — removed 2026-04-24 (S3.2). Placeholder teams/billing.
-- `src/search/` — removed 2026-04-24 (S3.2). Replaced by `knowledge/` + `embeddings/`.
-- `src/cost/` — removed 2026-04-24 (S3.2). Superseded by `billing/` + `agent/loop.ts` quota.
-- `src/evals/` — removed 2026-04-24 (S3.2). Duplicated `tests/`.
-- `src/styles/` — removed 2026-04-24 (S3.2). TUI styling is inline now.
-- `src/models/router.ts` + `src/models/providers/litellm-unified.ts` — removed 2026-04-24 (S1.7). LiteLLM was decommissioned.
-
-## Command registration
-
-All 59 user commands are registered in `src/index.ts`. Six of them (mesh, swarm, voice, dao, make, bucky, join-mesh) are wrapped in `registerIfExperimental` from `src/utils/experimental.ts`. The rest are direct `register*(program)` calls.
-
-A future sprint may refactor this into a `registerCommands(program, modules)` registry pattern. The inline approach is fine for ~60 commands; it becomes painful around 100.
-
-## Import direction
-
-Allowed direction (no cycles):
+## Architecture
 
 ```
-index.ts
-  → commands/*
-    → agent/*
-      → providers/*, tools/*, permission/*, memory/*
-        → utils/*, types.ts, config/*
+src_v2/
+├── kernel/           agent loop, message types, event stream, projection
+├── providers/        wire transports + provider classes; rate-limit middleware
+├── intelligence/     model catalogue, cost tracker, error classifier, models refresh
+├── auth/             keystore (legacy single-slot) + keypool (multi-key, cooldown) + providers (registry of 17)
+├── context/          soul, primer, git-state, mode, mode-enforcement, compaction, ledger, session
+├── audit/            append-only JSONL writer + reader subcommand
+├── extensions/       loadable plugin API (registerTool / registerSlash / registerSubcommand / on)
+├── tools/            registry + 11 built-ins + task tool subagent dispatcher
+├── mcp/              client + stdio + HTTP/SSE transports + bearerProvider rotation
+├── skills/           agentskills.io frontmatter loader + matcher + runtime
+├── subagents/        delegator + pool for the `task` tool
+├── fleet/            parallel git-worktree dispatch
+├── hooks/            registry + AgentHooks shape + config-bridge
+├── cli/              entry points (one-shot main, REPL interactive, 18 subcommands, 20 slashes)
+└── tui/              Ink TUI with <Static> transcript + StatusBar (cost / tok-rate / context meter / mode badge)
 ```
 
-Shared primitives (`utils/`, `types.ts`, `config/`) may be imported from anywhere. Everything else flows top-down.
+**~14.5 K LOC** across 23 modules. Hard rule: every src file ≤ 200 lines.
+
+## How a one-shot turn flows
+
+```
+$ dirgha "implement log-histo per SPEC.md" -m hy3
+   │
+   ▼ cli/main.ts
+   ├─ parseFlags + resolveModelAlias        (kimi → moonshotai/kimi-k2-instruct, etc.)
+   ├─ hydrateEnvFromPool                     (multi-key BYOK, cooldown-aware)
+   ├─ hydrateEnvFromKeyStore                 (legacy single-slot)
+   ├─ loadExtensions(~/.dirgha/extensions)   (user plugins register tools / slashes / hooks)
+   ├─ loadSoul, loadProjectPrimer, resolveMode, loadSkills + matchSkills
+   ├─ providers.forModel  ◀────── construction-time failover
+   ├─ createCostTracker, createErrorClassifier
+   ├─ buildAgentHooksFromConfig ⊕ enforceMode
+   ├─ createCompactionTransform              (75% trigger; prints `[compacted]` banner)
+   ├─ SubagentDelegator + register `task` tool
+   ▼
+runAgentLoop (kernel/agent-loop.ts)
+   ├─ for each turn:
+   │    ├─ beforeTurn hook (continue / abort)
+   │    ├─ contextTransform (compaction + skills injection)
+   │    ├─ provider.stream(req) ──── chunks → events
+   │    ├─ for each tool_use:
+   │    │    ├─ beforeToolCall hook (mode-enforce + user) — can veto
+   │    │    ├─ toolExecutor.execute(call, signal)
+   │    │    └─ afterToolCall hook (rewrite)
+   │    └─ afterTurn hook (usage)
+   └─ stopReason: end_turn | tool_use | max_turns | error | aborted
+   ▼
+runtime failover (mid-session): if stopReason=error and a fallback is registered, swap and resume from result.messages with maxTurns − turnCount remaining
+   ▼
+persist: session.append(message) for every new message + appendAudit(turn-end)
+   ▼
+exit
+```
+
+## Test floor
+
+`npm run test:cli:offline` — **38 / 38 green in 16 s.** No row in the parity matrix closes without a test that locks it in. 3 network suites (`hooks`, `cancel`, `provider_matrix`) gated on API keys.
+
+## Extending dirgha
+
+Drop an ESM module at `~/.dirgha/extensions/<name>/index.mjs`:
+
+```js
+export default async function (api) {
+  api.registerTool({
+    name: 'deploy',
+    description: 'Deploy to staging',
+    inputSchema: { type: 'object', properties: { env: { type: 'string' } } },
+    execute: async (input) => ({ content: 'deployed', isError: false, durationMs: 0 }),
+  });
+  api.registerSlash({ name: 'stats', description: 'project stats', handler: () => 'OK' });
+  api.on('turn_start', (ev) => { /* observe every turn */ });
+}
+```
+
+The loader awaits async default exports. Extension errors are isolated — a broken extension is named on stderr but doesn't break the rest of the CLI.
+
+## Authoring a skill
+
+Drop `~/.dirgha/skills/<name>/SKILL.md`:
+
+```markdown
+---
+name: my-skill
+description: Use when the user asks about X
+triggers:
+  keywords: [foo, bar]
+---
+
+# My skill
+
+Step 1. Do this.
+Step 2. Then that.
+```
+
+Or install from a git repo:
+
+```bash
+dirgha skills install https://github.com/user/awesome-pack
+dirgha skills list
+```
+
+Compatible with the [agentskills.io](https://agentskills.io) frontmatter standard.
+
+## Roadmap
+
+| Sprint | Goal | Status |
+|---|---|---|
+| 1 | `dirgha update --check / --self / --packages` | ✓ shipped |
+| 2 | `dirgha models refresh` | ✓ shipped |
+| 3 | TS / ESM extensions API | ✓ shipped |
+| 4 | This doc + README + ROADMAP refresh | ✓ shipped |
+| 5 | Pi-package npm marketplace (`dirgha install npm:@foo/dirgha-pack`) | spec only |
+| 6 | OAuth flows for Anthropic Pro / ChatGPT Plus | spec only |
+| 7 | Web dashboard for audit + cost (live HTML view) | not started |
+
+The matrix file and the test sweep are the binding contract for each sprint.

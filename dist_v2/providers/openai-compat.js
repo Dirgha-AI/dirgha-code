@@ -121,6 +121,46 @@ class StreamState {
     toolOpen = new Map();
     toolIndexToId = new Map();
     usageEmitted = false;
+    // Buffer for inline <think>...</think> blocks that split across
+    // chunks. Once we see the open tag, accumulate until the close tag
+    // arrives. Anything before/after is text.
+    inThinkBlock = false;
+    thinkBuffer = '';
+    static THINK_OPEN_RE = /<(?:think|thinking|reasoning|thought|REASONING_SCRATCHPAD)>/i;
+    static THINK_CLOSE_RE = /<\/(?:think|thinking|reasoning|thought|REASONING_SCRATCHPAD)>/i;
+    /** Split a content delta into text + thinking pieces, honoring open <think> blocks across chunks. */
+    routeContent(input) {
+        let text = '';
+        let thinking = '';
+        let s = input;
+        while (s.length > 0) {
+            if (this.inThinkBlock) {
+                const close = s.match(StreamState.THINK_CLOSE_RE);
+                if (!close || close.index === undefined) {
+                    thinking += s;
+                    this.thinkBuffer += s;
+                    s = '';
+                    break;
+                }
+                thinking += s.slice(0, close.index);
+                this.thinkBuffer = '';
+                this.inThinkBlock = false;
+                s = s.slice(close.index + close[0].length);
+            }
+            else {
+                const open = s.match(StreamState.THINK_OPEN_RE);
+                if (!open || open.index === undefined) {
+                    text += s;
+                    s = '';
+                    break;
+                }
+                text += s.slice(0, open.index);
+                this.inThinkBlock = true;
+                s = s.slice(open.index + open[0].length);
+            }
+        }
+        return { text, thinking };
+    }
     constructor(includeThinking) {
         this.includeThinking = includeThinking;
     }
@@ -131,8 +171,15 @@ class StreamState {
             return;
         }
         const delta = choice.delta ?? {};
-        if (this.includeThinking && typeof delta.reasoning_content === 'string') {
-            const r = delta.reasoning_content ?? '';
+        // Reasoning channel: DeepSeek's native API uses `reasoning_content`,
+        // NVIDIA NIM's hosted DeepSeek-V4 uses `reasoning`. Accept both.
+        // Without this fallback, NIM's flash variant emits all its output on
+        // the `reasoning` channel and dirgha sees zero text → empty reply.
+        if (this.includeThinking) {
+            const d = delta;
+            const r = (typeof d.reasoning_content === 'string' && d.reasoning_content)
+                || (typeof d.reasoning === 'string' && d.reasoning)
+                || '';
             if (r.length > 0) {
                 if (!this.thinkingOpen) {
                     yield { type: 'thinking_start' };

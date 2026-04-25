@@ -55,6 +55,10 @@ export interface FleetAgent {
     sessionId?: string;
     /** Full transcript (only populated after completion). */
     transcript?: Message[];
+    /** Number of tool calls the agent successfully executed during the run.
+     * 0 = agent never invoked a tool — usually means it hallucinated
+     * completion via text rather than doing the work. */
+    toolExecCount?: number;
 }
 /** Handle to a git worktree created by the fleet. */
 export interface WorktreeHandle {

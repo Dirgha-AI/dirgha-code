@@ -2,7 +2,22 @@
  * Flag parser. Minimal but strict: supports --long, -s short flags,
  * --key=value and --key value. Unknown flags are returned as positionals
  * so callers can detect and reject them.
+ *
+ * Boolean flags (listed in BOOLEAN_FLAGS) never consume the next argv
+ * token. This matters for `dirgha --json "prompt"` — without the
+ * allowlist, "prompt" would be treated as the value of --json and
+ * the actual prompt would be lost.
  */
+const BOOLEAN_FLAGS = new Set([
+    'json',
+    'print',
+    'help',
+    'h',
+    'version',
+    'V',
+    'force',
+    'verbose',
+]);
 export function parseFlags(argv) {
     const flags = {};
     const positionals = [];
@@ -19,6 +34,10 @@ export function parseFlags(argv) {
             }
             else {
                 const key = arg.slice(2);
+                if (BOOLEAN_FLAGS.has(key)) {
+                    flags[key] = true;
+                    continue;
+                }
                 const next = argv[i + 1];
                 if (next !== undefined && !next.startsWith('-')) {
                     flags[key] = next;
@@ -31,6 +50,10 @@ export function parseFlags(argv) {
         }
         else if (arg.startsWith('-') && arg.length > 1) {
             const key = arg.slice(1);
+            if (BOOLEAN_FLAGS.has(key)) {
+                flags[key] = true;
+                continue;
+            }
             const next = argv[i + 1];
             if (next !== undefined && !next.startsWith('-')) {
                 flags[key] = next;

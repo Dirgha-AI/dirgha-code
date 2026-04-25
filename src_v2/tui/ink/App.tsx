@@ -19,7 +19,16 @@ import { Box, Static, Text, useApp, useInput } from 'ink';
 import { randomUUID } from 'node:crypto';
 import type { Message } from '../../kernel/types.js';
 import type { EventStream } from '../../kernel/event-stream.js';
+import { appendAudit } from '../../audit/writer.js';
+import { maybeCompact } from '../../context/compaction.js';
+import { contextWindowFor } from '../../intelligence/prices.js';
+import { buildAgentHooksFromConfig } from '../../hooks/config-bridge.js';
+import { loadProjectPrimer, composeSystemPrompt } from '../../context/primer.js';
+import { probeGitState, renderGitState } from '../../context/git-state.js';
+import { loadSoul } from '../../context/soul.js';
+import { modePreamble } from '../../context/mode.js';
 import { runAgentLoop } from '../../kernel/agent-loop.js';
+import { createErrorClassifier } from '../../intelligence/error-classifier.js';
 import type { ProviderRegistry } from '../../providers/index.js';
 import type { ToolRegistry } from '../../tools/registry.js';
 import { createToolExecutor } from '../../tools/exec.js';
@@ -39,7 +48,18 @@ import { AtFileComplete } from './components/AtFileComplete.js';
 import { useEventProjection, type TranscriptItem } from './use-event-projection.js';
 import { useOverlays } from './use-overlays.js';
 
-const VERSION = '0.2.0';
+import { createRequire } from 'node:module';
+
+// Pulled from the installed package.json so the TUI title matches the
+// shipped binary version. Falls back to '0.0.0-dev' if the file isn't
+// reachable (e.g. an unusual deploy layout).
+const VERSION: string = (() => {
+  try {
+    const req = createRequire(import.meta.url);
+    const pkg = req('../../../package.json') as { version?: string };
+    return typeof pkg.version === 'string' ? pkg.version : '0.0.0-dev';
+  } catch { return '0.0.0-dev'; }
+})();
 
 export interface AppProps {
   events: EventStream;
@@ -68,6 +88,59 @@ export function App(props: AppProps): React.JSX.Element {
   const [currentModel, setCurrentModel] = React.useState(props.config.model);
   const projection = useEventProjection(props.events);
   const overlays = useOverlays();
+  // Live counters for the in-progress turn — drive the StatusBar
+  // tok/s readout. Reset at agent_start, accumulate output deltas,
+  // refresh tick at 250 ms so the rate updates visibly.
+  const [liveOutputTokens, setLiveOutputTokens] = React.useState(0);
+  const [liveDurationMs, setLiveDurationMs] = React.useState(0);
+  const turnStartRef = React.useRef<number>(0);
+
+  React.useEffect(() => {
+    const unsub = props.events.subscribe(ev => {
+      if (ev.type === 'agent_start') {
+        turnStartRef.current = Date.now();
+        setLiveOutputTokens(0);
+        setLiveDurationMs(0);
+      } else if (ev.type === 'text_delta' || ev.type === 'thinking_delta') {
+        // Approximate output-token count by char/4 — same heuristic
+        // the rest of the codebase uses for streaming-side estimates.
+        const delta = (ev.delta?.length ?? 0) / 4;
+        setLiveOutputTokens(prev => prev + delta);
+      } else if (ev.type === 'usage') {
+        setLiveOutputTokens(ev.outputTokens ?? 0);
+      } else if (ev.type === 'agent_end') {
+        setLiveDurationMs(0);
+        setLiveOutputTokens(0);
+      }
+    });
+    return unsub;
+  }, [props.events]);
+
+  // Tick the duration so the tok/s number updates while streaming.
+  React.useEffect(() => {
+    if (!busy) return;
+    const t = setInterval(() => {
+      if (turnStartRef.current > 0) setLiveDurationMs(Date.now() - turnStartRef.current);
+    }, 250);
+    return () => clearInterval(t);
+  }, [busy]);
+
+  // Audit writer for the Ink TUI path. Mirrors the one-shot main.ts and
+  // readline runInteractive subscribers — without this, `dirgha audit`
+  // is empty for the most common surface (the interactive UI). Effect
+  // re-installs only if events ref changes (it shouldn't).
+  React.useEffect(() => {
+    const unsub = props.events.subscribe(ev => {
+      if (ev.type === 'tool_exec_end') {
+        void appendAudit({ kind: 'tool', actor: sessionIdRef.current, summary: `${ev.id} ${ev.isError ? 'error' : 'done'} ${ev.durationMs}ms`, toolId: ev.id, isError: ev.isError, durationMs: ev.durationMs });
+      } else if (ev.type === 'agent_end') {
+        void appendAudit({ kind: 'turn-end', actor: sessionIdRef.current, summary: `model=${currentModel} stop=${ev.stopReason} in=${ev.usage.inputTokens} out=${ev.usage.outputTokens}`, model: currentModel, stopReason: ev.stopReason, usage: ev.usage });
+      } else if (ev.type === 'error') {
+        void appendAudit({ kind: 'error', actor: sessionIdRef.current, summary: ev.message });
+      }
+    });
+    return unsub;
+  }, [props.events, currentModel]);
 
   const models = React.useMemo<ModelEntry[]>(() => props.models ?? defaultModelCatalogue(), [props.models]);
   const slashCommands = props.slashCommands ?? [];
@@ -128,6 +201,19 @@ export function App(props: AppProps): React.JSX.Element {
       const provider = props.providers.forModel(currentModel);
       const approvalBus = createTuiApprovalBus(new Set(props.config.autoApproveTools));
 
+      // Context-aware compaction: trigger at 75 % of the active model's
+      // window. Same machinery as the readline + one-shot paths so the
+      // Ink TUI doesn't 400-overflow on long sessions.
+      const compactionTransform = async (msgs: Message[]): Promise<Message[]> => (
+        await maybeCompact(msgs, {
+          triggerTokens: Math.floor(contextWindowFor(currentModel) * 0.75),
+          preserveLastTurns: props.config.compaction?.preserveLastTurns ?? 6,
+          summarizer: provider,
+          summaryModel: props.config.summaryModel ?? currentModel,
+        })
+      ).messages;
+
+      const userHooks = buildAgentHooksFromConfig(props.config);
       const result = await runAgentLoop({
         sessionId: sessionIdRef.current,
         model: currentModel,
@@ -139,6 +225,9 @@ export function App(props: AppProps): React.JSX.Element {
         approvalBus,
         events: props.events,
         signal: abort.signal,
+        contextTransform: compactionTransform,
+        errorClassifier: createErrorClassifier(),
+        ...(userHooks !== undefined ? { hooks: userHooks } : {}),
       });
       historyRef.current = result.messages;
     } catch (err) {
@@ -152,20 +241,38 @@ export function App(props: AppProps): React.JSX.Element {
     }
   };
 
-  // Overlay-level keybindings: Esc closes when one is up. Ctrl+M and
-  // Ctrl+H are captured here only while an overlay is absent;
-  // InputBox handles them while focused.
+  // Global Esc handler. Priority order:
+  //   1. If an overlay (other than @-file) is open → close it.
+  //   2. If a turn is streaming → abort it (cancels the in-flight LLM
+  //      request via the AbortController plumbed through runAgentLoop).
+  //   3. If the input box has draft text → clear it.
+  // Always active so Esc behaves like the user expects regardless of
+  // which surface they're looking at. The atfile overlay handles its
+  // own Esc (cancel completion) so we skip step 1 there.
   useInput((_ch, key) => {
+    if (!key.escape) return;
     if (overlays.active !== null && overlays.active !== 'atfile') {
-      if (key.escape) overlays.closeOverlay();
+      overlays.closeOverlay();
+      return;
     }
-  }, { isActive: overlays.active !== null && overlays.active !== 'atfile' });
+    if (busy && abortRef.current !== null) {
+      abortRef.current.abort();
+      projection.appendLive({ kind: 'notice', id: randomUUID(), text: 'Cancelled.' });
+      return;
+    }
+    if (input.length > 0) setInput('');
+  });
 
   const handleModelPick = React.useCallback((id: string): void => {
-    setCurrentModel(id);
     overlays.closeOverlay();
-    const note: TranscriptItem = { kind: 'notice', id: randomUUID(), text: `Model set to ${id}` };
-    setTranscript(prev => [...prev, note]);
+    // Dedupe: a stale picker callback firing after the model is already
+    // set should not spam the transcript with redundant notices.
+    setCurrentModel(prev => {
+      if (prev === id) return prev;
+      const note: TranscriptItem = { kind: 'notice', id: randomUUID(), text: `Model set to ${id}` };
+      setTranscript(t => [...t, note]);
+      return id;
+    });
   }, [overlays]);
 
   const handleAtPick = React.useCallback((path: string): void => {
@@ -176,6 +283,12 @@ export function App(props: AppProps): React.JSX.Element {
 
   const inputFocus = overlays.active === null || overlays.active === 'atfile';
 
+  // BISECT: Static moved out of the transcript render. Logo stays
+  // in a one-item Static (its original placement). Both committed
+  // transcript and live items render in the regular dynamic Box. If
+  // streaming text appears now, the Static-around-transcript pattern
+  // was suppressing the live region updates. If still not, the bug
+  // is upstream in useEventProjection.
   return (
     <Box flexDirection="column">
       <Static items={[{ key: 'logo' }]}>
@@ -229,6 +342,10 @@ export function App(props: AppProps): React.JSX.Element {
         costUsd={projection.totals.costUsd}
         cwd={props.cwd}
         busy={busy}
+        mode={props.config.mode ?? 'act'}
+        contextWindow={contextWindowFor(currentModel)}
+        liveOutputTokens={liveOutputTokens}
+        liveDurationMs={liveDurationMs}
       />
     </Box>
   );
@@ -276,7 +393,20 @@ function TranscriptRow({ item }: { item: TranscriptItem }): React.JSX.Element | 
 
 function initialHistory(props: AppProps): Message[] {
   const base = props.initialMessages ? [...props.initialMessages] : [];
-  if (props.systemPrompt) base.unshift({ role: 'system', content: props.systemPrompt });
+  // Boot context: mode preamble + project primer (DIRGHA.md) +
+  // caller's --system. Without this, the Ink TUI starts with zero
+  // project awareness — same parity-matrix #1 fix as the one-shot
+  // path in cli/main.ts.
+  const primer = loadProjectPrimer(props.cwd);
+  const soul = loadSoul();
+  const composedSystem = composeSystemPrompt({
+    soul: soul.text,
+    modePreamble: modePreamble(props.config.mode ?? 'act'),
+    primer: primer.primer,
+    gitState: renderGitState(probeGitState(props.cwd)),
+    userSystem: props.systemPrompt,
+  });
+  base.unshift({ role: 'system', content: composedSystem });
   return base;
 }
 

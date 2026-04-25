@@ -1,0 +1,17 @@
+{
+  "name": "deploy",
+  "path": "/app/deploy",
+  "expect": "Deploy room (VPS providers)",
+  "url_visited": "https://dirgha.ai/app/deploy",
+  "url_final": "https://dirgha.ai/app/deploy",
+  "http_status": 200,
+  "title": "Dirgha \u2014 Agent OS",
+  "body_text_excerpt": "D\nCONVERSATIONS\n\nNo conversations yet. Start one.\n\n~/dirgha-workspace\n0 open\nDIRGHA \u00b7 AGENT OS\nDeploy\nSign in\nDEPLOY\nDeploy anywhere\n\nOne action, four destinations. Each plan includes an isolated VPS where your chat, agent, and memory logs live \u2014 you own them, and you can wipe them.\n\nYour servers\nSign in to see your servers.\nDirgha Sandbox\nINCLUDED\n\nEphemeral browser sandbox for rapid iteration. Included in every plan.\n\nLaunch sandbox\n\nSign in and upgrade to enable this destination.\n\nDirgha Server\nBUILD+\n\nPersistent server-side VPS with a real Linux shell, PTY, and long-running processes.\n\nSpin up server\n\nSign in and upgrade to enable this destination.\n\nConnect GitHub repo\nALL PLANS\n\nPoint at any repo, pick a branch, one-click deploy. Auto-rebuilds on push.\n\nConnect repo\n\nSign in and upgrade to enable this destination.\n\nDeploy to your VPS\nALL PLANS\n\nUse your own Linux server via SSH. We generate and run the deploy script you approve.\n\nAdd server\n\nSign in and upgrade to enable this destination.",
+  "console": [],
+  "network_failures": [],
+  "screenshot": "output/deploy.png",
+  "navigation_error": null,
+  "verdict": {
+    "error": "nim call failed: Error code: 504"
+  }
+}
