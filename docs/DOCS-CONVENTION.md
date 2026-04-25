@@ -68,6 +68,21 @@ The agent answers in two places:
 1. A reply in chat (terse, with the code path).
 2. If the user asks more than once, the agent writes a new doc under the right slot and links to it next time.
 
+## Customer-facing text — extra rules
+
+Anything a user reads BEFORE they install (README hero, landing copy, video script, tweet, doc intros) follows the marketing principles in [`promo/MARKETING-BRIEF.md`](../promo/MARKETING-BRIEF.md). Summary:
+
+- **Verb-led one-liner ≤ 8 words.** "Codes across 17 providers with failover." not "A thoughtful coding agent…"
+- **Specific numbers as social proof.** Numbers > adjectives. Pick 3 that hit hardest, don't list all.
+- **Lead with concrete capability moments**, not architecture diagrams or data-flow vocabulary.
+- **No internal architecture jargon** ("cheap to write below, curated above," "information flows up") in user-facing surfaces. That language belongs in `docs/ARCHITECTURE.md` and `docs/memory/*.md`.
+- **No "free compute"** framing. Dirgha is BYOK; some providers happen to offer free-tier endpoints.
+- **CTA is two-beat:** *Build to last. Code with Dirgha.* That's the closing line, never the opener.
+- **Brand name late, not first.** Lead with the value the user gets. "Dirgha Code" appears in the footer.
+- **Audience triangulation:** every customer surface must satisfy developer + tech-founder + investor in the same prose. Concrete capability moments serve all three.
+
+The full reasoning + the five differentiators + the scoring rubric live in `promo/MARKETING-BRIEF.md`.
+
 ## Forbidden patterns
 
 - "We are pleased to announce…" / "Excited to share…"
@@ -75,3 +90,6 @@ The agent answers in two places:
 - "Comprehensive solution" / "best-in-class" / marketing adjectives
 - Mentioning a competitor by name outside `_internal/`
 - Inserting AI-generated changelog noise like "improved performance" without a measurement
+- Internal architecture metaphors ("information flows up," "cheap to write below") in customer copy
+- Sanskrit / brand-poetic flourishes (`dīrgha` with macron, "long vowel," etc.) — the brand name is `Dirgha`, plain
+- Three-beat taglines — drop the third beat ("Think." was removed for this reason)
