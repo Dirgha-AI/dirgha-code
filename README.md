@@ -139,7 +139,7 @@ You get the frontier tooling without the surrender.
 │           ▼                                  ▼                       │
 │   ┌──────────────┐  pending-messages  ┌───────────────┐              │
 │   │  providers/  │◀ ─ mid-turn inject ─ │  tool exec  │              │
-│   │   dispatch   │                     │  43 tools    │              │
+│   │   dispatch   │                     │  11 tools    │              │
 │   └──────┬───────┘                     └───────┬──────┘              │
 │          │                                     │                     │
 │          ▼  429/502/timeout → next hop         ▼                     │
