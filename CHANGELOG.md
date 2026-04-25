@@ -2,6 +2,29 @@
 
 Versioning: **semver**. `1.x` is the first stable line; `0.1.x` was the initial public preview. Pre-`1.0` entries (`0.1.1`, `0.2.0-beta.1`, `0.2.0-beta.2`) are kept below for history.
 
+## 1.2.1 (2026-04-25) — five fixes from end-to-end smoke test
+
+- **Flag parser**: `dirgha --json "prompt"` and `dirgha --print "prompt"`
+  no longer swallow the prompt as the flag's value. A boolean-flag
+  allowlist (`json`, `print`, `help`, `h`, `force`, `verbose`) ensures
+  these never consume the next argv token. Restores the one-shot
+  NDJSON form documented in `--help`.
+- **NVIDIA NIM timeout**: bumped 60s → 120s to absorb tail latency on
+  tool-followup turns. Eliminates the intermittent
+  `Network error: Request timed out after 60000ms` seen when the
+  default `moonshotai/kimi-k2-instruct` model is slow on the second
+  turn.
+- **Tool narration**: the streaming TUI now shows the tool input
+  summary and an output preview. Example:
+  ```
+  → shell · ls /tmp/dirgha-readmes (done, 8ms)
+    ⎿ exit=0 (+8 lines)
+  ```
+  Previously rendered only `→ shell (done, 8ms)`.
+- **README**: corrected the architecture diagram label from
+  `43 tools` to `11 tools` to match the actual count of registered
+  built-ins (`tools/index.ts`).
+
 ## 1.2.0 (2026-04-24) — v2 is now the default
 
 The clean-architecture v2 core, previously shipped as the `dirgha-v2`
