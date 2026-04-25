@@ -6,9 +6,8 @@
 [![License](https://img.shields.io/badge/license-FSL--1.1--MIT-d4a373?style=flat-square)](./LICENSE)
 [![Sponsor](https://img.shields.io/badge/sponsor-%E2%99%A1-c25a4f?style=flat-square)](https://dirgha.ai/contribute)
 
-> **Build to last. Code with Dirgha.**
-
-A terminal coding agent built for engineers who'd rather own their tooling than rent it. Bring your own keys across 17 providers — including the free-tier endpoints some providers offer. One binary. No telemetry. Audited every step.
+**Codes across 17 providers with failover.**
+A coding agent that doesn't blink when a model dies.
 
 </div>
 
@@ -27,24 +26,17 @@ A terminal coding agent built for engineers who'd rather own their tooling than 
   Done. CLI buckets JSONL by status, emits p50/p95 per bucket.
 ```
 
-## What you get
+## What it does
 
-A coding agent that lives in your terminal and produces real, tested code through tools you can audit. The agent loop is open source. Your laptop holds the keys, the session log, and every tool call ever issued. Providers are swappable mid-session — when a model dies, the loop fails over to the registered backup and resumes from the partial transcript without losing work.
+Reads your codebase, edits files, runs tests, commits, and audits every step. Bring your own keys across 17 providers — when a model rate-limits or times out, the loop swaps to the next-priority key in your pool and resumes from the partial transcript. Your work doesn't vanish when an API hiccups.
 
-You write code faster, with fewer silent failures, on the providers you choose to pay (or not pay) for.
+## Five things you don't get from other coding agents
 
-## Engineering posture
-
-| Property | Measurement |
-|---|---|
-| **Parity matrix** | 22 capability dimensions scored against the leading reference CLIs. Mean 9.82/10. Sum-of-gaps = 0. Every closure cites a code path AND a runnable test. |
-| **Test floor** | 40/40 offline tests in ~16 s. 3 network-gated suites. CI green is a precondition for any PR. |
-| **Source budget** | ~14.5 K LOC across 23 modules in `src_v2/`. Hard rule: every src file ≤ 200 lines. |
-| **Architecture** | Layered. Kernel ↔ providers ↔ tools ↔ memory ↔ extensions. Documented in [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md). |
-| **Memory model** | Four layers (audit, memory, ledger, KB) where information flows up. Documented in [`docs/memory/km-architecture.md`](./docs/memory/km-architecture.md). |
-| **Security** | Heuristic prompt-injection / supply-chain scanner runs at every skill install AND every load. Critical findings block. Threat model in [`docs/agents/skill-security.md`](./docs/agents/skill-security.md). |
-| **Audit trail** | Every session-start, turn-end, tool call, error, failover, compaction, scan is appended to `~/.dirgha/audit/events.jsonl`. Searchable, filterable, kind-tallied. |
-| **Release discipline** | One file per release at `changelog/<version>.md`. `.changeset/` per-PR. Tags + GitHub releases attach the long-form notes. |
+- **Multi-key BYOK with cooldown rotation.** When one key hits a 429, Dirgha rotates to the next in the pool. Other tools restart.
+- **Mid-session failover that resumes from where it left off.** When a model dies mid-turn, Dirgha swaps to the registered backup and continues with the partial transcript intact.
+- **Every third-party skill is scanned before it runs.** Heuristic prompt-injection / supply-chain check at install AND load. Critical findings block the install. We caught 2 critical issues in 112 real installed skills today.
+- **Compiled knowledge base of your repo.** OpenKB + PageIndex builds a wiki of your project's docs, decisions, and ledger. Vectorless reasoning-based RAG — the agent reasons over a structured index instead of re-reading files every turn.
+- **TypeScript / ESM plugins in 20 lines.** Drop a `.mjs` at `~/.dirgha/extensions/<name>/index.mjs` and register tools, slashes, subcommands, or lifecycle hooks. Ship as an npm package.
 
 ## Install
 
@@ -54,7 +46,7 @@ export OPENROUTER_API_KEY=sk-or-…  # or NVIDIA_API_KEY, ANTHROPIC_API_KEY, …
 dirgha "say ok in one word" -m haiku
 ```
 
-That's the whole onboarding. The interactive TUI is `dirgha` with no args. Resume a session with `dirgha resume <id>`. Fan a parallel sub-agent fleet with `dirgha fleet launch "<goal>"`.
+The interactive TUI is `dirgha` with no args. Resume a session with `dirgha resume <id>`. Fan a parallel sub-agent fleet with `dirgha fleet launch "<goal>"`.
 
 ## What's in the box
 
@@ -62,7 +54,6 @@ That's the whole onboarding. The interactive TUI is `dirgha` with no args. Resum
 |---|---|
 | **17 providers** | anthropic, openai, gemini, openrouter, nvidia, fireworks, deepseek, groq, cerebras, together, deepinfra, mistral, xai, perplexity, cohere, kimi, zai |
 | **34 model aliases** | `kimi`, `opus`, `sonnet`, `haiku`, `gemini`, `flash`, `deepseek`, `llama`, `ling`, `hy3`, … resolved before routing |
-| **Multi-key BYOK pool** | priority + LRU + cooldown rotation; atomic file lock; mode 0600 |
 | **12 built-in tools** | `fs_read`, `fs_write`, `fs_edit`, `fs_ls`, `shell`, `search_grep`, `search_glob`, `git`, `browser`, `checkpoint`, `cron`, `task` |
 | **20 slash commands** | `/account`, `/clear`, `/compact`, `/cost`, `/fleet`, `/keys`, `/login`, `/memory`, `/mode`, `/models`, `/resume`, `/session`, `/status`, `/theme`, `/upgrade`, … |
 | **18 subcommands** | `audit`, `audit-codebase`, `cost`, `kb`, `keys`, `ledger`, `login`, `models`, `resume`, `skills`, `undo`, `update`, `verify`, … |
@@ -73,65 +64,14 @@ That's the whole onboarding. The interactive TUI is `dirgha` with no args. Resum
 | **Knowledge base** | compiled wiki via OpenKB + PageIndex; vectorless reasoning-based retrieval |
 | **Skill safety** | heuristic prompt-injection / supply-chain scanner at install + load |
 
-## Architecture
+## Numbers worth checking
 
-Four memory layers. Cheap to write below; curated above. Information flows up, never down.
-
-```
-KB        compiled wiki via OpenKB + PageIndex (vectorless RAG)
-Ledger    per-scope JSONL events + agent-rewritten digest
-Memory    curated key-value facts; loaded into context at boot
-Audit     append-only firehose; diagnostic only
-```
-
-The agent loop is a thin wrapper over a provider stream with kernel hooks at every turn boundary:
-
-```
-cli/main.ts
-  ├─ resolveModelAlias  · hydrateEnvFromPool · loadExtensions
-  ├─ loadSoul · loadProjectPrimer · loadSkills + scanSkillBody
-  ├─ providers.forModel  ◀── construction-time failover
-  ├─ createCompactionTransform · createErrorClassifier
-  └─ SubagentDelegator + register `task` tool
-                        │
-                        ▼
-kernel/agent-loop.ts
-  beforeTurn → contextTransform → provider.stream
-    → beforeToolCall (mode-enforce + user) — vetoable
-    → toolExecutor.execute
-    → afterToolCall (rewrite)
-    → afterTurn
-                        │
-                        ▼
-runtime failover (mid-session): resume from result.messages
-```
-
-Deep reading: [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) · [`docs/memory/km-architecture.md`](./docs/memory/km-architecture.md) · [`docs/memory/architecture-efficiency.md`](./docs/memory/architecture-efficiency.md).
-
-## Plugins
-
-Drop a TypeScript-or-ESM module at `~/.dirgha/extensions/<name>/index.mjs`:
-
-```js
-export default async function (api) {
-  api.registerTool({ name: 'deploy', description: '…', inputSchema: { … },
-    execute: async (input) => ({ content: 'deployed', isError: false, durationMs: 0 }) });
-  api.registerSlash({ name: 'stats', description: 'show project stats', handler: () => 'OK' });
-  api.on('turn_start', (ev) => { /* observe every turn */ });
-}
-```
-
-A broken extension is named on stderr but doesn't break the rest of the CLI. [`@dirgha/arniko-plugin`](./docs/agents/arniko-plugin-spec.md) — a 36-scanner deep-security pipeline as a `before_skill_install` hook — ships next.
-
-## Skills
-
-Markdown packs with YAML frontmatter. Install from a git repo, scanned at install + load time:
-
-```bash
-dirgha skills install https://github.com/mattpocock/skills
-dirgha skills audit                 # heuristic prompt-injection / supply-chain check
-dirgha skills list                  # 112 skills loaded across 4 packs today
-```
+| | |
+|---|---|
+| Tests | **40/40** offline in ~16 s. CI green is a precondition for any PR. |
+| Parity | **9.82 / 10** mean across 22 capability dimensions scored against the leading reference CLIs. Sum-of-gaps = 0. Every closure cites a code path AND a runnable test. |
+| Source | **~14.5 K LOC** across 23 modules in `src_v2/`. Hard rule: every src file ≤ 200 lines. |
+| Skill audit | **112 installed** today across 4 packs. **74 allow · 36 warn · 2 block** by the heuristic scanner at the time of writing. |
 
 ## Why this exists
 
@@ -151,20 +91,14 @@ The opposite assumption is the right one. Your laptop is the unit of sovereignty
 | Files & search contract | [`docs/agents/files-and-search.md`](./docs/agents/files-and-search.md) |
 | Parity scoreboard | [`docs/parity/CLI_PARITY_MATRIX.md`](./docs/parity/CLI_PARITY_MATRIX.md) |
 | Design system | [`DESIGN.md`](./DESIGN.md) |
+| Marketing brief | [`promo/MARKETING-BRIEF.md`](./promo/MARKETING-BRIEF.md) |
 | Per-release notes | [`changelog/`](./changelog) |
-
-## Testing
-
-```bash
-npm run test:cli:offline   # 40/40 in ~16s; no network
-npm run test:cli           # full sweep, including network providers
-```
-
-No row in the parity matrix closes without a runnable test that locks it in.
 
 ## Contributing
 
 Read [`docs/parity/CLI_PARITY_MATRIX.md`](./docs/parity/CLI_PARITY_MATRIX.md) before adding code — the highest-gap row is the most important work. Every PR adds a `.changeset/<random-name>.md` describing what changed and at what semver tier.
+
+Customer-facing text follows the principles in [`promo/MARKETING-BRIEF.md`](./promo/MARKETING-BRIEF.md). Verb-led, specific numbers, concrete capability moments. No internal data-flow language.
 
 ## License
 
@@ -173,6 +107,8 @@ Read [`docs/parity/CLI_PARITY_MATRIX.md`](./docs/parity/CLI_PARITY_MATRIX.md) be
 ---
 
 <div align="center">
+
+**Build to last. Code with Dirgha.**
 
 [`@dirgha/code`](https://www.npmjs.com/package/@dirgha/code) · [github.com/Dirgha-AI/dirgha-code](https://github.com/Dirgha-AI/dirgha-code) · [Sponsor](https://dirgha.ai/contribute)
 
