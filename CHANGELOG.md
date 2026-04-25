@@ -2,6 +2,17 @@
 
 Versioning: **semver**. `1.x` is the first stable line; `0.1.x` was the initial public preview. Pre-`1.0` entries (`0.1.1`, `0.2.0-beta.1`, `0.2.0-beta.2`) are kept below for history.
 
+## 1.2.2 (2026-04-25) — Esc actually does something now
+
+- **Esc** is now wired in the Ink TUI with three priorities:
+  1. If an overlay (help, model picker, etc.) is open, close it.
+  2. If a turn is streaming, abort the in-flight LLM request.
+  3. Otherwise, clear the input draft.
+
+  Previously Esc was bound only inside vim mode and only as an
+  overlay-close shortcut, so pressing it during a normal turn or
+  while typing did nothing.
+
 ## 1.2.1 (2026-04-25) — five fixes from end-to-end smoke test
 
 - **Flag parser**: `dirgha --json "prompt"` and `dirgha --print "prompt"`

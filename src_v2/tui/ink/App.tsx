@@ -152,14 +152,27 @@ export function App(props: AppProps): React.JSX.Element {
     }
   };
 
-  // Overlay-level keybindings: Esc closes when one is up. Ctrl+M and
-  // Ctrl+H are captured here only while an overlay is absent;
-  // InputBox handles them while focused.
+  // Global Esc handler. Priority order:
+  //   1. If an overlay (other than @-file) is open → close it.
+  //   2. If a turn is streaming → abort it (cancels the in-flight LLM
+  //      request via the AbortController plumbed through runAgentLoop).
+  //   3. If the input box has draft text → clear it.
+  // Always active so Esc behaves like the user expects regardless of
+  // which surface they're looking at. The atfile overlay handles its
+  // own Esc (cancel completion) so we skip step 1 there.
   useInput((_ch, key) => {
+    if (!key.escape) return;
     if (overlays.active !== null && overlays.active !== 'atfile') {
-      if (key.escape) overlays.closeOverlay();
+      overlays.closeOverlay();
+      return;
     }
-  }, { isActive: overlays.active !== null && overlays.active !== 'atfile' });
+    if (busy && abortRef.current !== null) {
+      abortRef.current.abort();
+      projection.appendLive({ kind: 'notice', id: randomUUID(), text: 'Cancelled.' });
+      return;
+    }
+    if (input.length > 0) setInput('');
+  });
 
   const handleModelPick = React.useCallback((id: string): void => {
     setCurrentModel(id);
