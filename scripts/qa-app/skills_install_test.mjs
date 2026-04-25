@@ -15,8 +15,11 @@
 
 import { mkdtempSync, mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const BIN = resolve(__dirname, '../../dist_v2/cli/main.js');
 
 const sandbox = mkdtempSync(join(tmpdir(), 'skills-install-test-'));
 const fakeHome = join(sandbox, 'home');
@@ -48,7 +51,7 @@ function makeFakeRemote(name, withSkill) {
 function runSkills(args) {
   const env = { ...process.env, HOME: fakeHome };
   const res = spawnSync('node',
-    ['/root/dirgha-ai/domains/10-computer/cli/dist_v2/cli/main.js', 'skills', ...args],
+    [BIN, 'skills', ...args],
     { env, encoding: 'utf8' });
   return { stdout: res.stdout, stderr: res.stderr, status: res.status };
 }

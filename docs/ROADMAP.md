@@ -1,6 +1,6 @@
 # dirgha-cli — Roadmap
 
-The shipped state and the binding contract for what comes next. The `docs/parity/CLI_PARITY_MATRIX.md` file is the per-row burndown; this doc is the per-sprint chronology.
+The shipped state and the binding contract for what comes next.
 
 ## Shipped (1.4.0)
 
@@ -47,7 +47,6 @@ The shipped state and the binding contract for what comes next. The `docs/parity
 ## How a fresh contributor picks up the work
 
 1. Read `docs/ARCHITECTURE.md` for the kernel + provider model
-2. Read `docs/parity/CLI_PARITY_MATRIX.md` for current scores; pick the highest-gap row
-3. Run `npm run test:cli:offline` to confirm the green baseline
-4. Write or extend a test before changing code
-5. Cite the code + test in the matrix row when closing
+2. Run `npm run test:cli:offline` to confirm the green baseline
+3. Write or extend a test before changing code
+4. Open an issue or PR with the proposal

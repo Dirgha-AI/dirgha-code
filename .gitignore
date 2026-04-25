@@ -28,3 +28,7 @@ promo/script-run.log
 *-BRIEF.md
 *-old-*.md.bak
 *.bak
+
+# Promo build artefacts
+promo/snapshots/
+promo/renders/

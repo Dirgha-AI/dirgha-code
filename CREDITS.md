@@ -33,8 +33,8 @@ Dirgha Code runs on top of:
 
 ## The name
 
-*Dirgha* (दीर्घ) is Sanskrit for *long* / *enduring*. The project aims to be
-durable software — built once, owned forever, forkable, sovereign.
+The project aims to be durable software — built once, owned forever, forkable,
+sovereign.
 
 ## Thanks
 

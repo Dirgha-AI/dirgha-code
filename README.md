@@ -67,7 +67,8 @@ The interactive TUI is `dirgha` with no args. Resume a session with `dirgha resu
 | | |
 |---|---|
 | Tests | **40/40** offline in ~16 s. CI green is a precondition for any PR. |
-| Parity | **9.82 / 10** mean across 22 capability dimensions scored against the leading reference CLIs. Sum-of-gaps = 0. Every closure cites a code path AND a runnable test. |
+| 17 providers | Multi-key BYOK pool with cooldown rotation. |
+| 112 skills | Scanned by the heuristic prompt-injection / supply-chain check at install + load. |
 
 ## Why this exists
 
@@ -85,8 +86,6 @@ The opposite assumption is the right one. Your laptop is the unit of sovereignty
 | Architecture efficiency | [`docs/memory/architecture-efficiency.md`](./docs/memory/architecture-efficiency.md) |
 | Skill security | [`docs/agents/skill-security.md`](./docs/agents/skill-security.md) |
 | Files & search contract | [`docs/agents/files-and-search.md`](./docs/agents/files-and-search.md) |
-| Parity scoreboard | [`docs/parity/CLI_PARITY_MATRIX.md`](./docs/parity/CLI_PARITY_MATRIX.md) |
-| Design system | [`DESIGN.md`](./DESIGN.md) |
 | Per-release notes | [`changelog/`](./changelog) |
 
 ## Contributing
@@ -102,7 +101,7 @@ A few specific ways to plug in:
 - **Suggest providers.** If your favourite provider isn't in the 17 we support, open an issue and tell us which one + the env var. Most are a single config-blob diff.
 - **Write a skill.** SKILL.md packs work across compatible agent CLIs. Publish a git repo, share the URL, anyone can `dirgha skills install <url>`.
 - **Write a plugin.** TypeScript extensions API takes ~20 lines for a real tool. We're keen to feature good ones — drop a link.
-- **Send a PR.** Read [`docs/parity/CLI_PARITY_MATRIX.md`](./docs/parity/CLI_PARITY_MATRIX.md) — the highest-gap row is the most important work. Every PR adds a `.changeset/<random-name>.md` describing what changed and at what semver tier. Tests must stay green: `npm run test:cli:offline`.
+- **Send a PR.** Every PR adds a `.changeset/<random-name>.md` describing what changed and at what semver tier. Tests must stay green: `npm run test:cli:offline`.
 
 We're a small team. We answer issues. We accept PRs from first-time contributors. If something feels off about the project, the docs, or the experience — tell us.
 
