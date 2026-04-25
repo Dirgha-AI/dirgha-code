@@ -39,7 +39,7 @@
 
 ### Dogfood evidence
 
-The 1.4.0 features were built using `dirgha -m hy3` (Tencent Hunyuan-3 preview, free via OR) as the implementation worker. The promo video at `/tmp/dirgha-promo/renders/dirgha-promo_2026-04-25_19-19-09.mp4` was authored by hy3 from a brief and rendered by hyperframes 0.4.26.
+The 1.4.0 features were built using `dirgha -m hy3` as the implementation worker. The promo video at `changelog/1.4.1-promo.mp4` was authored from a brief and rendered by hyperframes.
 
 ## 0.2.0-beta.1 (2026-04-24) — new core + NVIDIA streaming fix
 
@@ -86,8 +86,8 @@ Second-generation CLI core under `src_v2/`, shipped as the `dirgha-v2` binary al
 - **Universal `--json`** — every command supports both `dirgha --json <cmd>` and `<cmd> --json`; output envelope is `{data, text, exitCode, command, timestamp, meta: {durationMs}}`
 - **`/side <prompt>`** — Codex-style ephemeral sub-agent fork; doesn't pollute main history
 - **Modal `/help`** — searchable overlay (type to filter, ↑↓ scroll, q/Esc close)
-- **Spinner + elapsed time** on in-flight tool cells (Codex pattern)
-- **Inline paste-collapse** — long pastes render as `[paste: N lines]` with first-line preview (Hermes pattern)
+- **Spinner + elapsed time** on in-flight tool cells
+- **Inline paste-collapse** — long pastes render as `[paste: N lines]` with first-line preview
 - **Paste-burst detector** — Windows/terminal-safe; rapid `\n`-bursts coalesce instead of early-submitting
 - **Fleet indicator** in status bar — `fleet × N` when ≥2 tools run in parallel
 - **Auto-generated SKILL.md** on every `npm run build` (57 commands documented)

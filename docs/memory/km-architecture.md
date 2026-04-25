@@ -88,7 +88,7 @@ This is the loop OpenKB calls "knowledge compounds over time".
 
 ### How GEPA fits
 
-GEPA (the genetic-pareto / per-conversation memory in `/root/.claude/projects/-root/memory/`) is the **session-side** mirror of dirgha's memory layer. The two share schema: `user / feedback / project / reference` types with frontmatter + body. Migration:
+GEPA (Claude Code's session-side per-project memory under `~/.claude/projects/<slug>/memory/`) is the IDE mirror of dirgha's memory layer. The two share schema: `user / feedback / project / reference` types with frontmatter + body. Migration:
 
 - Keep both for now. The user's GEPA memory continues to live where it is — that's their personal IDE-side memory.
 - `dirgha memory` exposes the same schema for dirgha-runtime memory (project + machine scoped).

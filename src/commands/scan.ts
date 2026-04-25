@@ -235,7 +235,7 @@ async function outputSarif(results: ScanResult[], outputFile?: string) {
         driver: {
           name: 'dirgha-security-scanner',
           version: '0.2.0',
-          informationUri: 'https://github.com/dirgha-ai/cli',
+          informationUri: 'https://github.com/Dirgha-AI/dirgha-code',
           rules: generateSarifRules(),
         },
       },

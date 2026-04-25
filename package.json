@@ -1,7 +1,7 @@
 {
   "name": "@dirgha/code",
-  "version": "1.4.0",
-  "description": "A terminal coding agent. Free compute, full agency. Bring your own key. Or don't.",
+  "version": "1.4.1",
+  "description": "A CLI coding agent built on four pillars: BYOK across 17 providers, persistent memory, parallel agents, and scanned skills.",
   "type": "module",
   "main": "./dist_v2/index.js",
   "types": "./dist_v2/index.d.ts",

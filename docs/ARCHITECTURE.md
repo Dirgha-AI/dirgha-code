@@ -13,7 +13,7 @@ It is **free-tier-first**: the same machinery runs on free OpenRouter `:free` mo
 1. **One source of truth.** The parity matrix file scores dirgha against every dimension a coding agent needs. Mean is currently **9.82 / 10**, sum-of-gaps is **0**, and 38 offline tests run in 16 s. Every fix cites code + test in the matrix.
 2. **Adapt to workflows; don't fork dirgha.** Skills, themes, hooks, MCP servers, and **TypeScript / ESM extensions** are loadable artifacts, not patches.
 3. **Every model. Every wire. Every transport.** OpenAI chat-completions, Anthropic messages, Gemini generate, MCP stdio, MCP HTTP/SSE — one factory, providers as config blobs.
-4. **Free compute is a first-class user.** NIM (kimi/deepseek/qwen) + OpenRouter free tier (hy3, ling) work end-to-end including multi-turn coding sprints — proven by dogfood in `/tmp/dogfood-*`.
+4. **Free-tier endpoints are first-class.** NVIDIA NIM (kimi/deepseek/qwen) and OpenRouter free models (hy3, ling) work end-to-end including multi-turn coding sprints — proven by dogfood runs.
 5. **Failover is silent and lossless.** When `claude-opus-4-7` has no Anthropic key, the request routes to `anthropic/claude-opus-4-7` via OR. Mid-session timeouts resume from the partial transcript with `maxTurns − turnCount` budget remaining.
 6. **Multi-key BYOK with cooldown rotation.** A free-tier 429 cools that key out for the rate-limit window; the next-priority key takes over without restarting the CLI. 17 providers known, lock-protected concurrent writes.
 7. **Crash-safe persistence.** Append-only JSONL sessions replayed on `dirgha resume`. Audit log with `kinds` tally and `--filter`. Ledger with TF-IDF cosine search for semantic memory across sessions.

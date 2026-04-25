@@ -30,7 +30,10 @@ const check = (label, ok, detail) => {
   ok ? pass++ : fail++;
 };
 
-const BIN = '/root/dirgha-ai/domains/10-computer/cli/dist_v2/cli/main.js';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const BIN = resolve(__dirname, '../../dist_v2/cli/main.js');
 
 function run(args) {
   const env = { ...process.env, HOME: fakeHome };

@@ -13,6 +13,10 @@
 
 import { mkdtempSync, writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const BIN = resolve(__dirname, '../../dist_v2/cli/main.js');
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
@@ -49,7 +53,7 @@ function rebuildSession(turns) {
 function runUndo(args) {
   const env = { ...process.env, HOME: sandbox };
   const res = spawnSync('node',
-    ['/root/dirgha-ai/domains/10-computer/cli/dist_v2/cli/main.js', 'undo', ...args],
+    [BIN, 'undo', ...args],
     { env, encoding: 'utf8' });
   return { stdout: res.stdout, stderr: res.stderr, status: res.status };
 }
