@@ -18,8 +18,9 @@ const TOOL_SUPPORT = [
     /^qwen\//,
     /^deepseek\//,
     /^moonshotai\//,
-    /^minimaxai\//,
+    /^minimaxai?\//, // matches both `minimaxai/` (legacy) and `minimax/` (current OR slug)
     /^z-ai\//,
+    /^tencent\//,
 ];
 const THINKING_PATTERNS = [/^deepseek-ai\//, /^anthropic\/claude-opus/, /^openai\/o[1-9]/];
 export class OpenRouterProvider {

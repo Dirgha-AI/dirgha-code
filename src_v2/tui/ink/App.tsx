@@ -39,7 +39,18 @@ import { AtFileComplete } from './components/AtFileComplete.js';
 import { useEventProjection, type TranscriptItem } from './use-event-projection.js';
 import { useOverlays } from './use-overlays.js';
 
-const VERSION = '0.2.0';
+import { createRequire } from 'node:module';
+
+// Pulled from the installed package.json so the TUI title matches the
+// shipped binary version. Falls back to '0.0.0-dev' if the file isn't
+// reachable (e.g. an unusual deploy layout).
+const VERSION: string = (() => {
+  try {
+    const req = createRequire(import.meta.url);
+    const pkg = req('../../../package.json') as { version?: string };
+    return typeof pkg.version === 'string' ? pkg.version : '0.0.0-dev';
+  } catch { return '0.0.0-dev'; }
+})();
 
 export interface AppProps {
   events: EventStream;

@@ -56,7 +56,9 @@ export class NvidiaProvider {
             throw new ProviderError('NVIDIA_API_KEY is required', this.id);
         }
         this.baseUrl = (config.baseUrl ?? DEFAULT_BASE).replace(/\/+$/, '');
-        this.timeoutMs = config.timeoutMs ?? 60_000;
+        // NVIDIA NIM tool-followup latency p99 occasionally exceeds 60s; 120s
+        // absorbs the variance without making genuine hangs invisible.
+        this.timeoutMs = config.timeoutMs ?? 120_000;
     }
     supportsTools(modelId) {
         return TOOLS_SUPPORTED.has(modelId);

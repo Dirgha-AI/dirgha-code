@@ -32,7 +32,20 @@ import { HelpOverlay } from './components/HelpOverlay.js';
 import { AtFileComplete } from './components/AtFileComplete.js';
 import { useEventProjection } from './use-event-projection.js';
 import { useOverlays } from './use-overlays.js';
-const VERSION = '0.2.0';
+import { createRequire } from 'node:module';
+// Pulled from the installed package.json so the TUI title matches the
+// shipped binary version. Falls back to '0.0.0-dev' if the file isn't
+// reachable (e.g. an unusual deploy layout).
+const VERSION = (() => {
+    try {
+        const req = createRequire(import.meta.url);
+        const pkg = req('../../../package.json');
+        return typeof pkg.version === 'string' ? pkg.version : '0.0.0-dev';
+    }
+    catch {
+        return '0.0.0-dev';
+    }
+})();
 export function App(props) {
     const { exit } = useApp();
     const sessionIdRef = React.useRef(randomUUID());
@@ -123,15 +136,29 @@ export function App(props) {
             abortRef.current = null;
         }
     };
-    // Overlay-level keybindings: Esc closes when one is up. Ctrl+M and
-    // Ctrl+H are captured here only while an overlay is absent;
-    // InputBox handles them while focused.
+    // Global Esc handler. Priority order:
+    //   1. If an overlay (other than @-file) is open → close it.
+    //   2. If a turn is streaming → abort it (cancels the in-flight LLM
+    //      request via the AbortController plumbed through runAgentLoop).
+    //   3. If the input box has draft text → clear it.
+    // Always active so Esc behaves like the user expects regardless of
+    // which surface they're looking at. The atfile overlay handles its
+    // own Esc (cancel completion) so we skip step 1 there.
     useInput((_ch, key) => {
+        if (!key.escape)
+            return;
         if (overlays.active !== null && overlays.active !== 'atfile') {
-            if (key.escape)
-                overlays.closeOverlay();
+            overlays.closeOverlay();
+            return;
         }
-    }, { isActive: overlays.active !== null && overlays.active !== 'atfile' });
+        if (busy && abortRef.current !== null) {
+            abortRef.current.abort();
+            projection.appendLive({ kind: 'notice', id: randomUUID(), text: 'Cancelled.' });
+            return;
+        }
+        if (input.length > 0)
+            setInput('');
+    });
     const handleModelPick = React.useCallback((id) => {
         setCurrentModel(id);
         overlays.closeOverlay();

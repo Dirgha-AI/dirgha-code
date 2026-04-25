@@ -2,6 +2,48 @@
 
 Versioning: **semver**. `1.x` is the first stable line; `0.1.x` was the initial public preview. Pre-`1.0` entries (`0.1.1`, `0.2.0-beta.1`, `0.2.0-beta.2`) are kept below for history.
 
+## 1.3.0 (2026-04-25) — model catalogue + Esc fix
+
+### Model catalogue refresh
+
+Refreshed the catalogue against the live OpenRouter registry. Restored
+the models that were pruned in the 1.2.0 ship-cut and added everything
+new from the past month:
+
+- **OpenAI native**: added `gpt-5.5-pro`, `gpt-5.5`.
+- **Gemini 3 preview** via OpenRouter: `google/gemini-3.1-pro-preview`,
+  `google/gemini-3-flash-preview`.
+- **Moonshot Kimi**: `moonshotai/kimi-k2.6`, `kimi-k2.5`,
+  `kimi-k2-thinking` (via OpenRouter — NIM does not serve these).
+- **MiniMax**: `minimax/minimax-m2.7`, `minimax-m2`,
+  `minimax-m2.5:free`.
+- **DeepSeek**: `deepseek-v3.2-exp`, `deepseek-r1`,
+  `deepseek-chat-v3.1`.
+- **Qwen**: `qwen3-coder-plus`, `qwen3-235b-a22b-thinking-2507`,
+  `qwen3-vl-235b-a22b-instruct`, plus `qwen3-coder:free`.
+- **Tencent**: `tencent/hunyuan-a13b-instruct`,
+  `tencent/hy3-preview:free`.
+- **Z.ai (GLM)**: `z-ai/glm-5.1`, `glm-5-turbo`, `glm-5`, `glm-4.7`,
+  `glm-4.7-flash`, plus `glm-4.5-air:free`.
+
+Total: 36 models across 5 providers (was 13 across 5).
+
+### Routing
+
+Cleaner dispatch in `providers/dispatch.ts`:
+
+- Specific NVIDIA NIM model IDs (e.g. `moonshotai/kimi-k2-instruct`) are
+  routed via NIM by exact-match allowlist.
+- Bare IDs (`claude-*`, `gpt-*`, `gemini-*`, `o1`) go to native APIs.
+- Anything with a `/` slug or `:free` suffix that isn't on the NIM
+  allowlist falls through to OpenRouter. This is the fix for the
+  `404` errors the previous ship hit when sending OR-only IDs to NIM.
+
+### Other
+
+- **TUI version label**: pulled from `package.json` instead of the
+  hardcoded `0.2.0` constant.
+
 ## 1.2.2 (2026-04-25) — Esc actually does something now
 
 - **Esc** is now wired in the Ink TUI with three priorities:
