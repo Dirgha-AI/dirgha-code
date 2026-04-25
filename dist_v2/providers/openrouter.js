@@ -35,7 +35,11 @@ export class OpenRouterProvider {
         if (!this.apiKey)
             throw new ProviderError('OPENROUTER_API_KEY is required', this.id);
         this.baseUrl = (config.baseUrl ?? DEFAULT_BASE).replace(/\/+$/, '');
-        this.timeoutMs = config.timeoutMs ?? 60_000;
+        // OR's free-tier models (hy3, ling, etc.) can take 30–60 s for the
+        // first byte on long prompts; multi-turn coding sprints need more
+        // headroom. 300 s leaves the timer well above legitimate latency
+        // without making a genuine hang invisible.
+        this.timeoutMs = config.timeoutMs ?? 300_000;
         this.appName = config.appName ?? 'dirgha-cli';
         this.appUrl = config.appUrl ?? 'https://dirgha.ai';
     }

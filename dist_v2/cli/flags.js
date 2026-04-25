@@ -13,6 +13,8 @@ const BOOLEAN_FLAGS = new Set([
     'print',
     'help',
     'h',
+    'version',
+    'V',
     'force',
     'verbose',
 ]);

@@ -34,7 +34,11 @@ export declare class DefaultMcpClient implements McpClient {
     private transport;
     private nextId;
     private pending;
-    constructor(transport: Transport);
+    private requestTimeoutMs;
+    constructor(transport: Transport, opts?: {
+        requestTimeoutMs?: number;
+    });
+    private failPending;
     initialize(): Promise<InitializeResult>;
     listTools(): Promise<McpTool[]>;
     callTool(name: string, arguments_: unknown): Promise<McpToolCallResult>;

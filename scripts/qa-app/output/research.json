@@ -1,0 +1,17 @@
+{
+  "name": "research",
+  "path": "/app/research",
+  "expect": "Research placeholder room",
+  "url_visited": "https://dirgha.ai/app/research",
+  "url_final": "https://dirgha.ai/app/research",
+  "http_status": 200,
+  "title": "Dirgha \u2014 Agent OS",
+  "body_text_excerpt": "D\nCONVERSATIONS\n\nNo conversations yet. Start one.\n\n~/dirgha-workspace\n0 open\nDIRGHA \u00b7 AGENT OS\nDeploy\nSign in\nResearch\n\nSource-cited research room. Gather, synthesize, cite. Coming next sprint.",
+  "console": [],
+  "network_failures": [],
+  "screenshot": "output/research.png",
+  "navigation_error": null,
+  "verdict": {
+    "error": "nim call failed: Error code: 504"
+  }
+}

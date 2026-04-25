@@ -9,6 +9,16 @@ export interface PricePoint {
   inputPerM: number;
   outputPerM: number;
   cachedInputPerM?: number;
+  /** Maximum input tokens the model accepts in a single request. */
+  contextWindow?: number;
+  /** Maximum output tokens per response. */
+  maxOutput?: number;
+  /** True if the model can call functions / tools. Defaults via provider preset. */
+  supportsTools?: boolean;
+  /** True if the model surfaces a separate "thinking" / reasoning channel. */
+  supportsThinking?: boolean;
+  /** Free-text family for grouping in the picker (`gpt`, `claude`, `kimi`, …). */
+  family?: string;
 }
 
 // Refreshed 2026-04-25 against the live OpenRouter registry. Models that
@@ -36,6 +46,8 @@ export const PRICES: PricePoint[] = [
   { provider: 'gemini', model: 'gemini-2.5-flash', inputPerM: 0.075, outputPerM: 0.3 },
 
   // NVIDIA NIM — verified live on the integrate.api.nvidia.com endpoint
+  { provider: 'nvidia', model: 'deepseek-ai/deepseek-v4-pro', inputPerM: 0, outputPerM: 0 },
+  { provider: 'nvidia', model: 'deepseek-ai/deepseek-v4-flash', inputPerM: 0, outputPerM: 0 },
   { provider: 'nvidia', model: 'moonshotai/kimi-k2-instruct', inputPerM: 0.15, outputPerM: 0.60 },
   { provider: 'nvidia', model: 'qwen/qwen3-next-80b-a3b-instruct', inputPerM: 0.08, outputPerM: 0.30 },
   { provider: 'nvidia', model: 'meta/llama-3.3-70b-instruct', inputPerM: 0.20, outputPerM: 0.80 },
@@ -85,4 +97,196 @@ export const PRICES: PricePoint[] = [
 
 export function findPrice(provider: string, model: string): PricePoint | undefined {
   return PRICES.find(p => p.provider === provider && p.model === model);
+}
+
+/**
+ * Single-source-of-truth lookup. Returns the full PricePoint for a
+ * model id (provider-agnostic — model ids are unique across providers
+ * in our catalogue). Pair with `contextWindowFor(id)` (which adds
+ * a fallback default) when you only need the context limit.
+ */
+export function lookupModel(modelId: string): PricePoint | undefined {
+  return PRICES.find(p => p.model === modelId);
+}
+
+/**
+ * All models grouped by their `family` field (or by inferred family
+ * from the model id when unset). Powers the model picker + the
+ * `dirgha models info` subcommand. Mutating the returned map does not
+ * affect PRICES.
+ */
+export function modelsByFamily(): Map<string, PricePoint[]> {
+  const out = new Map<string, PricePoint[]>();
+  for (const p of PRICES) {
+    const family = p.family ?? inferFamily(p.model);
+    if (!out.has(family)) out.set(family, []);
+    out.get(family)!.push(p);
+  }
+  return out;
+}
+
+function inferFamily(id: string): string {
+  if (/claude/.test(id)) return 'claude';
+  if (/^o[1-9]/.test(id) || /^gpt/.test(id) || /openai\//.test(id)) return 'gpt';
+  if (/gemini/.test(id) || /google\//.test(id)) return 'gemini';
+  if (/kimi/.test(id) || /moonshot/.test(id)) return 'kimi';
+  if (/minimax/.test(id)) return 'minimax';
+  if (/deepseek/.test(id)) return 'deepseek';
+  if (/qwen/.test(id)) return 'qwen';
+  if (/llama|meta\//.test(id)) return 'llama';
+  if (/glm/.test(id) || /z-ai/.test(id)) return 'glm';
+  if (/hunyuan/.test(id) || /tencent\//.test(id)) return 'hunyuan';
+  if (/ling/.test(id) || /inclusionai/.test(id)) return 'ling';
+  return 'other';
+}
+
+/**
+ * Best-effort lookup of the context-window cap for a model id. Searches
+ * across all providers since model ids in this catalogue are unique
+ * enough to disambiguate. Returns undefined when the model is unknown
+ * (caller should fall back to a conservative default like 32k).
+ */
+export function findContextWindow(modelId: string): number | undefined {
+  const hit = PRICES.find(p => p.model === modelId);
+  return hit?.contextWindow;
+}
+
+/**
+ * Per-model context-window catalogue. Numbers come from each provider's
+ * published spec sheet (cross-checked against models.dev). When we add
+ * a new model id to PRICES, also add its window here so context-aware
+ * compaction has a real cap to compare against. Models not listed fall
+ * back to DEFAULT_CONTEXT_WINDOW at runtime.
+ */
+export const DEFAULT_CONTEXT_WINDOW = 32_000;
+const CONTEXT_WINDOWS: Record<string, number> = {
+  // Anthropic
+  'claude-opus-4-7': 200_000,
+  'claude-sonnet-4-6': 200_000,
+  'claude-haiku-4-5': 200_000,
+  // OpenAI
+  'gpt-5.5-pro': 400_000,
+  'gpt-5.5': 400_000,
+  'gpt-5': 400_000,
+  'gpt-5-mini': 128_000,
+  'gpt-4o-mini': 128_000,
+  'o1': 200_000,
+  // Gemini
+  'gemini-2.5-pro': 2_000_000,
+  'gemini-2.5-flash': 1_000_000,
+  // NVIDIA NIM (verified live)
+  'deepseek-ai/deepseek-v4-pro': 128_000,
+  'deepseek-ai/deepseek-v4-flash': 128_000,
+  'moonshotai/kimi-k2-instruct': 128_000,
+  'qwen/qwen3-next-80b-a3b-instruct': 128_000,
+  'meta/llama-3.3-70b-instruct': 128_000,
+  // OpenRouter — frontier
+  'openai/gpt-5.5-pro': 400_000,
+  'openai/gpt-5.5': 400_000,
+  'google/gemini-3.1-pro-preview': 2_000_000,
+  'google/gemini-3-flash-preview': 1_000_000,
+  // OpenRouter — Moonshot/Kimi
+  'moonshotai/kimi-k2.6': 128_000,
+  'moonshotai/kimi-k2.5': 128_000,
+  'moonshotai/kimi-k2-thinking': 128_000,
+  // OpenRouter — MiniMax
+  'minimax/minimax-m2.7': 200_000,
+  'minimax/minimax-m2': 200_000,
+  // OpenRouter — DeepSeek
+  'deepseek/deepseek-v3.2-exp': 128_000,
+  'deepseek/deepseek-r1': 128_000,
+  'deepseek/deepseek-chat-v3.1': 128_000,
+  // OpenRouter — Qwen
+  'qwen/qwen3-coder-plus': 256_000,
+  'qwen/qwen3-235b-a22b-thinking-2507': 128_000,
+  'qwen/qwen3-vl-235b-a22b-instruct': 128_000,
+  // OpenRouter — Tencent
+  'tencent/hunyuan-a13b-instruct': 32_000,
+  // OpenRouter — Z.ai (GLM)
+  'z-ai/glm-5.1': 128_000,
+  'z-ai/glm-5-turbo': 128_000,
+  'z-ai/glm-5': 128_000,
+  'z-ai/glm-4.7': 128_000,
+  'z-ai/glm-4.7-flash': 32_000,
+  // OpenRouter — free
+  'inclusionai/ling-2.6-1t:free': 32_000,
+  'tencent/hy3-preview:free': 32_000,
+  'minimax/minimax-m2.5:free': 200_000,
+  'qwen/qwen3-coder:free': 32_000,
+  'z-ai/glm-4.5-air:free': 128_000,
+};
+
+export function contextWindowFor(modelId: string): number {
+  return CONTEXT_WINDOWS[modelId] ?? findContextWindow(modelId) ?? DEFAULT_CONTEXT_WINDOW;
+}
+
+/**
+ * Failover map: when the primary model is unavailable (provider 504,
+ * timeout, rate-limit), callers swap to the fallback model id. We
+ * pick OpenRouter equivalents for NIM-hosted models since OR has been
+ * the most-stable upstream in our smoke tests, and same-family
+ * fallbacks (Kimi → Kimi, DeepSeek → DeepSeek) so behavior stays
+ * comparable.
+ *
+ * We use a model-substitution failover strategy that doesn't require
+ * OAuth juggling — simpler than per-credential rotation.
+ * `findFailover('x')` returns undefined when no good substitute is
+ * known — caller surfaces the original error instead of retrying.
+ */
+const MODEL_FAILOVERS: Record<string, string> = {
+  // NIM → OpenRouter mirror
+  'moonshotai/kimi-k2-instruct':         'moonshotai/kimi-k2.5',
+  'qwen/qwen3-next-80b-a3b-instruct':    'qwen/qwen3-235b-a22b-thinking-2507',
+  'meta/llama-3.3-70b-instruct':         'qwen/qwen3-coder:free',
+  'deepseek-ai/deepseek-v4-pro':         'deepseek/deepseek-v3.2-exp',
+  'deepseek-ai/deepseek-v4-flash':       'deepseek/deepseek-chat-v3.1',
+  // Anthropic-native → OpenRouter mirror (no key needed if OR set)
+  'claude-opus-4-7':                     'anthropic/claude-opus-4-7',
+  'claude-sonnet-4-6':                   'anthropic/claude-sonnet-4.6',
+  'claude-haiku-4-5':                    'anthropic/claude-haiku-4.5',
+};
+
+export function findFailover(modelId: string): string | undefined {
+  return MODEL_FAILOVERS[modelId];
+}
+
+/**
+ * Short model aliases — let users type `dirgha -m kimi` instead of the
+ * full canonical id. Lookup is case-insensitive and runs before any
+ * provider routing, so the alias is invisible past resolveModelAlias.
+ */
+const MODEL_ALIASES: Record<string, string> = {
+  // Anthropic
+  opus:           'claude-opus-4-7',
+  sonnet:         'claude-sonnet-4-6',
+  haiku:          'claude-haiku-4-5',
+  // OpenAI
+  gpt5:           'gpt-5',
+  'gpt-5':        'gpt-5',
+  'gpt5-pro':     'gpt-5.5-pro',
+  'gpt5-mini':    'gpt-5-mini',
+  o1:             'o1',
+  // Gemini
+  gemini:         'gemini-2.5-pro',
+  flash:          'gemini-2.5-flash',
+  // NVIDIA NIM
+  kimi:           'moonshotai/kimi-k2-instruct',
+  qwen:           'qwen/qwen3-next-80b-a3b-instruct',
+  llama:          'meta/llama-3.3-70b-instruct',
+  deepseek:       'deepseek-ai/deepseek-v4-pro',
+  'deepseek-pro': 'deepseek-ai/deepseek-v4-pro',
+  'deepseek-flash':'deepseek-ai/deepseek-v4-flash',
+  // OpenRouter free tier
+  ling:           'inclusionai/ling-2.6-1t:free',
+  hy3:            'tencent/hy3-preview:free',
+};
+
+export function resolveModelAlias(input: string): string {
+  if (!input) return input;
+  const key = input.toLowerCase().trim();
+  return MODEL_ALIASES[key] ?? input;
+}
+
+export function listModelAliases(): Array<{ alias: string; model: string }> {
+  return Object.entries(MODEL_ALIASES).map(([alias, model]) => ({ alias, model }));
 }

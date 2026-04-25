@@ -19,6 +19,8 @@ const BOOLEAN_FLAGS = new Set<string>([
   'print',
   'help',
   'h',
+  'version',
+  'V',
   'force',
   'verbose',
 ]);

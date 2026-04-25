@@ -1,0 +1,17 @@
+{
+  "name": "agents",
+  "path": "/app/agents",
+  "expect": "Agents marketplace",
+  "url_visited": "https://dirgha.ai/app/agents",
+  "url_final": "https://dirgha.ai/app/agents",
+  "http_status": 200,
+  "title": "Dirgha \u2014 Agent OS",
+  "body_text_excerpt": "D\nCONVERSATIONS\n\nNo conversations yet. Start one.\n\n~/dirgha-workspace\n0 open\nDIRGHA \u00b7 AGENT OS\nDeploy\nSign in\nAGENTS\nAgent marketplace\n\nCurated personas. Pick one and start \u2014 everything preconfigured.\n\nAll\nGeneral\nCode\nResearch\nProduct\nWriting\nOps\nSecurity\nData\nCreative\nEducation\nStaff Engineer\n\nCODE \u00b7 BY DIRGHA\n\nSenior architect: reviews, refactors, explains systems, plans migrations with clear trade-offs.\n\narchitecture\nreview\nrefactor\nanthropic/claude-opus-4-7\nLaunch\nShipper\n\nCODE \u00b7 BY DIRGHA\n\nBias-to-action builder: picks an MVP slice, writes it, tests it, and deploys.\n\nmvp\nfullstack\ndeploy\nanthropic/claude-sonnet-4-6\nLaunch\nCode Reviewer\n\nCODE \u00b7 BY DIRGHA\n\nStrict code reviewer for security, correctness, and readability.\n\nreview\nsecurity\nlinting\nanthropic/claude-opus-4-7\nLaunch\nResearcher\n\nRESEARCH \u00b7 BY DIRGHA\n\nEvidence-first analyst: gathers sources, synthesizes findings, cites everything.\n\nresearch\nanalysis\ncitations\ngoogle/gemini-2.5-pro\nLaunch\nProduct PM\n\nPRODUCT \u00b7 BY DIRGHA\n\nProduct manager: writes briefs, scopes MVPs, weighs trade-offs, drafts launch posts.\n\nbriefs\nscoping\nlaunch\nanthropic/claude-sonnet-4-6\nLaunch\nWriter\n\nWRITING \u00b7 BY DIRGHA\n\nCrisp editorial writer for essays, product copy, and docs.\n\nessays\ncopy\ndocs\nanthropic/claude-opus-4-7\nLaunch\nSRE\n\nOPS \u00b7 BY DIRGHA\n\nOperations engineer: debugs prod, reads logs, writes runbooks.\n\noncall\ndebug\nrunbook\nanthropic/claude-sonnet-4-6\nLaunch\nSecurity Analyst\n\nSECURITY \u00b7 BY DIRGHA\n\nAppSec reviewer: OWASP, supply chain, secret hygiene, LLM safety.\n\nowasp\nsecrets\nsupply-chain\nanthropic/claude-opus-4-7\nLaunch\nData Analyst\n\nDATA \u00b7 BY DIRGHA\n\nSQL + notebooks; turns data into decisions.\n\nsql\nanalytics\nreporting\nanthropic/claude-sonnet-4-6\nLaunch\nTutor\n\nEDUCATION \u00b7 BY DIRGHA\n\nPatient Socratic tutor: breaks problems down, asks leading questions.\n\nteaching\nsocratic\nanthropic/claude-sonnet-4-6\nLaunch\nUI Designer\n\nCREATIVE \u00b7 BY DIRGHA\n\nInterface designer: layout, hierarchy, motion, zinc/dark-mode aesthetic.\n\nui\nux\ntailwind\nanthropic/claude-opus-4-7\nLaunch\nDirgha (general)\n\nGENERAL \u00b7 BY DIRGHA\n\nDefault general-purpose assistant. No strong persona \u2014 pick another for specialised work.\n\ndefault\nanthropic/claude-sonnet-4-6\nLaunch",
+  "console": [],
+  "network_failures": [],
+  "screenshot": "output/agents.png",
+  "navigation_error": null,
+  "verdict": {
+    "error": "nim call failed: Error code: 502"
+  }
+}

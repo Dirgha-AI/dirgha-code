@@ -88,9 +88,30 @@ export async function fleetCommand(
 /* ---------------------------- subcommands ------------------------- */
 
 async function doLaunch(argv: string[], opts: FleetCommandOptions): Promise<number> {
-  const goal = argv.join(' ').trim();
+  // Strip every flag (top-level + fleet-local) so only the goal words
+  // remain. Top-level flags (`-m`, `--max-turns`, `--concurrency`,
+  // `--verbose`, `--json`) are already merged into `opts` by main.ts;
+  // fleet-local flags here are `--single`, `--branch=<x>`,
+  // `--auto-merge`, `--strategy=<kind>`. Anything else with a leading
+  // `-` is dropped from the goal so it doesn't end up in the subtask
+  // title.
+  const FLAG_TAKES_VALUE = new Set(['-m', '--model', '--max-turns', '--concurrency', '--planner', '--strategy', '--timeout-ms']);
+  const positional: string[] = [];
+  let single = false;
+  let branchOverride: string | undefined;
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '--single') { single = true; continue; }
+    if (a.startsWith('--branch=')) { branchOverride = a.slice('--branch='.length); continue; }
+    if (a === '--branch') { branchOverride = argv[i + 1]; i++; continue; }
+    if (a === '--verbose' || a === '--json' || a === '--auto-merge') { continue; }
+    if (FLAG_TAKES_VALUE.has(a)) { i++; continue; } // skip flag + its value
+    if (a.startsWith('-')) { continue; } // unknown flag, drop
+    positional.push(a);
+  }
+  const goal = positional.join(' ').trim();
   if (!goal) {
-    process.stderr.write('usage: dirgha fleet launch <goal>\n');
+    process.stderr.write('usage: dirgha fleet launch [--single] [--branch=<name>] <goal>\n');
     return 1;
   }
   const events = createEventStream();
@@ -105,8 +126,11 @@ async function doLaunch(argv: string[], opts: FleetCommandOptions): Promise<numb
     timeoutMs: opts.timeoutMs,
     events,
     verbose: opts.verbose,
+    ...(single ? { subtasks: [{ id: branchOverride ?? 'task', title: goal, task: goal, type: 'code' }] } : {}),
   };
-  process.stderr.write(`[fleet] decomposing and launching…\n`);
+  process.stderr.write(single
+    ? `[fleet] launching single-task agent…\n`
+    : `[fleet] decomposing and launching…\n`);
   const result = await runFleet(config);
   emitResult('launch', result, opts);
   return result.failCount > 0 && result.successCount === 0 ? 1 : 0;
@@ -238,17 +262,25 @@ function emitResult(phase: string, r: FleetResult, opts: FleetCommandOptions): v
   process.stdout.write(
     `\nFleet done: ${r.successCount}/${r.agents.length} succeeded · ${Math.floor(r.durationMs / 1000)}s\n`,
   );
+  let noopCount = 0;
   for (const a of r.agents) {
-    const dot = a.status === 'completed' ? '✓'
-             : a.status === 'failed' ? '✗'
-             : a.status === 'cancelled' ? '⊘'
-             : '·';
+    const noop = a.status === 'completed' && (a.toolExecCount ?? 0) === 0;
+    if (noop) noopCount++;
+    const dot = a.status === 'completed'
+      ? (noop ? '⚠' : '✓')
+      : a.status === 'failed' ? '✗'
+      : a.status === 'cancelled' ? '⊘'
+      : '·';
     const dur = a.completedAt && a.startedAt
       ? `${Math.floor((a.completedAt - a.startedAt) / 1000)}s`
       : '';
-    process.stdout.write(`  ${dot} ${a.subtask.title.padEnd(40)} ${a.branchName.padEnd(30)} ${dur}\n`);
+    const toolNote = noop ? ' (no tool calls — likely hallucinated)' : '';
+    process.stdout.write(`  ${dot} ${a.subtask.title.padEnd(40)} ${a.branchName.padEnd(30)} ${dur}${toolNote}\n`);
   }
-  if (r.failed.length === 0 && r.successCount > 0) {
+  if (noopCount > 0) {
+    process.stdout.write(`\n⚠  ${noopCount} agent(s) finished without invoking any tool. Re-run with a stronger model or a more specific prompt — current LLM may be hallucinating completion.\n`);
+  }
+  if (r.failed.length === 0 && r.successCount > 0 && noopCount < r.agents.length) {
     process.stdout.write('\nNext:\n  dirgha fleet list\n  dirgha fleet merge <branch>\n  dirgha fleet discard <branch>\n');
   }
 }

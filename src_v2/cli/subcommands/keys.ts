@@ -14,16 +14,11 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { stdout, stderr } from 'node:process';
 import { style, defaultTheme } from '../../tui/theme.js';
+import { listEnvVars, findProviderByEnv } from '../../auth/providers.js';
+import { readPool, addEntry, removeEntry, clearProvider } from '../../auth/keypool.js';
 import type { Subcommand } from './index.js';
 
-const KNOWN_PROVIDERS = [
-  'NVIDIA_API_KEY',
-  'OPENROUTER_API_KEY',
-  'ANTHROPIC_API_KEY',
-  'OPENAI_API_KEY',
-  'GEMINI_API_KEY',
-  'FIREWORKS_API_KEY',
-];
+const KNOWN_PROVIDERS = listEnvVars();
 
 interface KeyStore { [envVar: string]: string }
 
@@ -52,31 +47,106 @@ function mask(value: string): string {
 function usage(): string {
   return [
     'usage:',
-    '  dirgha keys list                 List stored keys (masked)',
-    '  dirgha keys set <ENV> <value>    Set a provider key',
-    '  dirgha keys get <ENV>            Print the raw value (avoid; use env vars)',
-    '  dirgha keys clear <ENV>          Remove a key',
-    '  dirgha keys clear all            Remove every key',
-    `known: ${KNOWN_PROVIDERS.join(', ')}`,
+    '  dirgha keys list                       List env + stored + pool (masked)',
+    '  dirgha keys set <ENV> <value>          Set the legacy single-slot key',
+    '  dirgha keys get <ENV>                  Print the raw value (avoid)',
+    '  dirgha keys clear <ENV|all>            Remove a key (or all)',
+    '  dirgha keys pool add <ENV> <value> [--label=…] [--priority=N]',
+    '                                         Add an entry to the multi-key pool',
+    '  dirgha keys pool list [<ENV>]          List pool entries (masked)',
+    '  dirgha keys pool remove <ENV> <id>     Drop one entry by short id',
+    '  dirgha keys pool clear <ENV>           Drop every entry for one provider',
+    `known: ${KNOWN_PROVIDERS.slice(0, 6).join(', ')} … (+${KNOWN_PROVIDERS.length - 6} more)`,
   ].join('\n');
 }
 
 async function runList(): Promise<number> {
   const store = await read();
-  const all = new Set<string>([...KNOWN_PROVIDERS, ...Object.keys(store)]);
-  stdout.write(`${style(defaultTheme.accent, 'Stored keys')}\n`);
-  for (const key of [...all].sort()) {
-    const stored = store[key];
-    const envInherit = process.env[key];
-    const state = stored
-      ? style(defaultTheme.success, `stored  ${mask(stored)}`)
-      : envInherit
-        ? style(defaultTheme.muted, `env     ${mask(envInherit)}`)
-        : style(defaultTheme.muted, 'unset');
-    stdout.write(`  ${key.padEnd(22)} ${state}\n`);
+  const pool = await readPool();
+  const all = new Set<string>([...KNOWN_PROVIDERS, ...Object.keys(store), ...Object.keys(pool)]);
+  stdout.write(`${style(defaultTheme.accent, 'BYOK keys')}\n`);
+  for (const env of [...all].sort()) {
+    const stored = store[env];
+    const envInherit = process.env[env];
+    const poolCount = (pool[env] ?? []).length;
+    const provider = findProviderByEnv(env);
+    const head = `  ${env.padEnd(24)}`;
+    let state: string;
+    if (poolCount > 0) {
+      state = style(defaultTheme.success, `pool×${poolCount}  ${mask(pool[env][0].value)}`);
+    } else if (stored) {
+      state = style(defaultTheme.success, `stored  ${mask(stored)}`);
+    } else if (envInherit) {
+      state = style(defaultTheme.muted, `env     ${mask(envInherit)}`);
+    } else {
+      state = style(defaultTheme.muted, 'unset');
+    }
+    const tag = provider ? style(defaultTheme.muted, `  (${provider.displayName})`) : '';
+    stdout.write(`${head}${state}${tag}\n`);
   }
-  stdout.write(`\n${style(defaultTheme.muted, `file: ${keyPath()}`)}\n`);
+  stdout.write(`\n${style(defaultTheme.muted, `legacy: ${keyPath()}`)}\n`);
+  stdout.write(`${style(defaultTheme.muted, `pool:   ${join(homedir(), '.dirgha', 'keypool.json')}`)}\n`);
   return 0;
+}
+
+function parseLabel(argv: string[]): string | undefined {
+  const flag = argv.find(a => a.startsWith('--label='));
+  return flag?.split('=', 2)[1];
+}
+
+function parsePriority(argv: string[]): number | undefined {
+  const flag = argv.find(a => a.startsWith('--priority='));
+  if (!flag) return undefined;
+  const n = Number.parseInt(flag.split('=', 2)[1] ?? '', 10);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+async function runPool(args: string[]): Promise<number> {
+  const sub = args[0] ?? 'list';
+  if (sub === 'list') {
+    const envFilter = args[1]?.toUpperCase();
+    const pool = await readPool();
+    const keys = envFilter ? [envFilter] : Object.keys(pool).sort();
+    if (keys.length === 0) { stdout.write(style(defaultTheme.muted, '(no pool entries — `dirgha keys pool add <ENV> <value>`)\n')); return 0; }
+    for (const env of keys) {
+      const list = pool[env] ?? [];
+      stdout.write(style(defaultTheme.accent, `\n${env}\n`));
+      if (list.length === 0) { stdout.write(style(defaultTheme.muted, '  (no entries)\n')); continue; }
+      for (const e of list) {
+        const state = e.exhaustedUntil && new Date(e.exhaustedUntil) > new Date()
+          ? style(defaultTheme.muted, `cooldown until ${e.exhaustedUntil.slice(0, 19)}`)
+          : style(defaultTheme.success, 'live');
+        stdout.write(`  ${e.id}  prio=${e.priority}  ${e.label.padEnd(16).slice(0, 16)}  ${mask(e.value)}  ${state}\n`);
+      }
+    }
+    return 0;
+  }
+  if (sub === 'add') {
+    const envName = (args[1] ?? '').toUpperCase();
+    const value = args[2];
+    if (!envName || !value) { stderr.write(`${usage()}\n`); return 1; }
+    const entry = await addEntry(envName, value, { label: parseLabel(args), priority: parsePriority(args) });
+    stdout.write(`${style(defaultTheme.success, '✓')} pool[${envName}] += ${entry.label} (id=${entry.id}, prio=${entry.priority})\n`);
+    return 0;
+  }
+  if (sub === 'remove') {
+    const envName = (args[1] ?? '').toUpperCase();
+    const id = args[2];
+    if (!envName || !id) { stderr.write(`${usage()}\n`); return 1; }
+    const ok = await removeEntry(envName, id);
+    if (!ok) { stderr.write(`No entry ${id} in ${envName}.\n`); return 1; }
+    stdout.write(`${style(defaultTheme.success, '✓')} removed ${id} from ${envName}\n`);
+    return 0;
+  }
+  if (sub === 'clear') {
+    const envName = (args[1] ?? '').toUpperCase();
+    if (!envName) { stderr.write(`${usage()}\n`); return 1; }
+    const n = await clearProvider(envName);
+    stdout.write(`${style(defaultTheme.success, '✓')} cleared ${n} entr${n === 1 ? 'y' : 'ies'} from ${envName}\n`);
+    return 0;
+  }
+  stderr.write(`unknown pool subcommand "${sub}"\n${usage()}\n`);
+  return 1;
 }
 
 export const keysSubcommand: Subcommand = {
@@ -85,6 +155,8 @@ export const keysSubcommand: Subcommand = {
   async run(argv): Promise<number> {
     const [op, envVar, value] = argv;
     if (!op || op === 'list') return runList();
+
+    if (op === 'pool') return runPool(argv.slice(1));
 
     if (op === 'set') {
       if (!envVar || !value) { stderr.write(`${usage()}\n`); return 1; }

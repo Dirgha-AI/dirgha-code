@@ -26,6 +26,8 @@ interface RoutingRule {
 // so we route by exact ID rather than prefix to avoid sending OR-only
 // variants like `moonshotai/kimi-k2.5` to NIM (which 404s).
 const NVIDIA_NIM_MODELS = new Set<string>([
+  'deepseek-ai/deepseek-v4-pro',
+  'deepseek-ai/deepseek-v4-flash',
   'moonshotai/kimi-k2-instruct',
   'qwen/qwen3-next-80b-a3b-instruct',
   'meta/llama-3.3-70b-instruct',

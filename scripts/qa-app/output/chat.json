@@ -1,0 +1,17 @@
+{
+  "name": "chat",
+  "path": "/app/chat",
+  "expect": "Workspace (chat + canvas)",
+  "url_visited": "https://dirgha.ai/app/chat",
+  "url_final": "https://dirgha.ai/app/chat",
+  "http_status": 200,
+  "title": "Dirgha \u2014 Agent OS",
+  "body_text_excerpt": "D\nCONVERSATIONS\n\nNo conversations yet. Start one.\n\n~/dirgha-workspace\n0 open\nDIRGHA \u00b7 AGENT OS\nDeploy\nSign in\nWhat would you like to build?\n\nAsk, and I'll plan, write code, run tests, and deploy \u2014 all in one thread.\n\nAudit the repository in my cwd and report the top 5 architectural risks.\nRefactor `src/index.ts` into a layered module structure.\nWrite a Stripe webhook handler that gates on signature + idempotency.\nDeploy this project to my VPS over SSH \u2014 ask first before destructive steps.\nKimi K2 Instruct\nSend\n\nDirgha can make mistakes. Review code before running.",
+  "console": [],
+  "network_failures": [],
+  "screenshot": "output/chat.png",
+  "navigation_error": null,
+  "verdict": {
+    "error": "nim call failed: Error code: 504"
+  }
+}

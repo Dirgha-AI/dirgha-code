@@ -17,7 +17,16 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import * as React from 'react';
 import { Box, Static, Text, useApp, useInput } from 'ink';
 import { randomUUID } from 'node:crypto';
+import { appendAudit } from '../../audit/writer.js';
+import { maybeCompact } from '../../context/compaction.js';
+import { contextWindowFor } from '../../intelligence/prices.js';
+import { buildAgentHooksFromConfig } from '../../hooks/config-bridge.js';
+import { loadProjectPrimer, composeSystemPrompt } from '../../context/primer.js';
+import { probeGitState, renderGitState } from '../../context/git-state.js';
+import { loadSoul } from '../../context/soul.js';
+import { modePreamble } from '../../context/mode.js';
 import { runAgentLoop } from '../../kernel/agent-loop.js';
+import { createErrorClassifier } from '../../intelligence/error-classifier.js';
 import { createToolExecutor } from '../../tools/exec.js';
 import { createTuiApprovalBus } from '../approval.js';
 import { PRICES } from '../../intelligence/prices.js';
@@ -57,6 +66,63 @@ export function App(props) {
     const [currentModel, setCurrentModel] = React.useState(props.config.model);
     const projection = useEventProjection(props.events);
     const overlays = useOverlays();
+    // Live counters for the in-progress turn — drive the StatusBar
+    // tok/s readout. Reset at agent_start, accumulate output deltas,
+    // refresh tick at 250 ms so the rate updates visibly.
+    const [liveOutputTokens, setLiveOutputTokens] = React.useState(0);
+    const [liveDurationMs, setLiveDurationMs] = React.useState(0);
+    const turnStartRef = React.useRef(0);
+    React.useEffect(() => {
+        const unsub = props.events.subscribe(ev => {
+            if (ev.type === 'agent_start') {
+                turnStartRef.current = Date.now();
+                setLiveOutputTokens(0);
+                setLiveDurationMs(0);
+            }
+            else if (ev.type === 'text_delta' || ev.type === 'thinking_delta') {
+                // Approximate output-token count by char/4 — same heuristic
+                // the rest of the codebase uses for streaming-side estimates.
+                const delta = (ev.delta?.length ?? 0) / 4;
+                setLiveOutputTokens(prev => prev + delta);
+            }
+            else if (ev.type === 'usage') {
+                setLiveOutputTokens(ev.outputTokens ?? 0);
+            }
+            else if (ev.type === 'agent_end') {
+                setLiveDurationMs(0);
+                setLiveOutputTokens(0);
+            }
+        });
+        return unsub;
+    }, [props.events]);
+    // Tick the duration so the tok/s number updates while streaming.
+    React.useEffect(() => {
+        if (!busy)
+            return;
+        const t = setInterval(() => {
+            if (turnStartRef.current > 0)
+                setLiveDurationMs(Date.now() - turnStartRef.current);
+        }, 250);
+        return () => clearInterval(t);
+    }, [busy]);
+    // Audit writer for the Ink TUI path. Mirrors the one-shot main.ts and
+    // readline runInteractive subscribers — without this, `dirgha audit`
+    // is empty for the most common surface (the interactive UI). Effect
+    // re-installs only if events ref changes (it shouldn't).
+    React.useEffect(() => {
+        const unsub = props.events.subscribe(ev => {
+            if (ev.type === 'tool_exec_end') {
+                void appendAudit({ kind: 'tool', actor: sessionIdRef.current, summary: `${ev.id} ${ev.isError ? 'error' : 'done'} ${ev.durationMs}ms`, toolId: ev.id, isError: ev.isError, durationMs: ev.durationMs });
+            }
+            else if (ev.type === 'agent_end') {
+                void appendAudit({ kind: 'turn-end', actor: sessionIdRef.current, summary: `model=${currentModel} stop=${ev.stopReason} in=${ev.usage.inputTokens} out=${ev.usage.outputTokens}`, model: currentModel, stopReason: ev.stopReason, usage: ev.usage });
+            }
+            else if (ev.type === 'error') {
+                void appendAudit({ kind: 'error', actor: sessionIdRef.current, summary: ev.message });
+            }
+        });
+        return unsub;
+    }, [props.events, currentModel]);
     const models = React.useMemo(() => props.models ?? defaultModelCatalogue(), [props.models]);
     const slashCommands = props.slashCommands ?? [];
     const handleSubmit = React.useCallback((raw) => {
@@ -110,6 +176,16 @@ export function App(props) {
             const sanitized = props.registry.sanitize({ descriptionLimit: 200 });
             const provider = props.providers.forModel(currentModel);
             const approvalBus = createTuiApprovalBus(new Set(props.config.autoApproveTools));
+            // Context-aware compaction: trigger at 75 % of the active model's
+            // window. Same machinery as the readline + one-shot paths so the
+            // Ink TUI doesn't 400-overflow on long sessions.
+            const compactionTransform = async (msgs) => (await maybeCompact(msgs, {
+                triggerTokens: Math.floor(contextWindowFor(currentModel) * 0.75),
+                preserveLastTurns: props.config.compaction?.preserveLastTurns ?? 6,
+                summarizer: provider,
+                summaryModel: props.config.summaryModel ?? currentModel,
+            })).messages;
+            const userHooks = buildAgentHooksFromConfig(props.config);
             const result = await runAgentLoop({
                 sessionId: sessionIdRef.current,
                 model: currentModel,
@@ -121,6 +197,9 @@ export function App(props) {
                 approvalBus,
                 events: props.events,
                 signal: abort.signal,
+                contextTransform: compactionTransform,
+                errorClassifier: createErrorClassifier(),
+                ...(userHooks !== undefined ? { hooks: userHooks } : {}),
             });
             historyRef.current = result.messages;
         }
@@ -160,10 +239,16 @@ export function App(props) {
             setInput('');
     });
     const handleModelPick = React.useCallback((id) => {
-        setCurrentModel(id);
         overlays.closeOverlay();
-        const note = { kind: 'notice', id: randomUUID(), text: `Model set to ${id}` };
-        setTranscript(prev => [...prev, note]);
+        // Dedupe: a stale picker callback firing after the model is already
+        // set should not spam the transcript with redundant notices.
+        setCurrentModel(prev => {
+            if (prev === id)
+                return prev;
+            const note = { kind: 'notice', id: randomUUID(), text: `Model set to ${id}` };
+            setTranscript(t => [...t, note]);
+            return id;
+        });
     }, [overlays]);
     const handleAtPick = React.useCallback((path) => {
         setInput(current => overlays.spliceAtSelection(current, path));
@@ -171,7 +256,13 @@ export function App(props) {
         overlays.setActive(null);
     }, [overlays]);
     const inputFocus = overlays.active === null || overlays.active === 'atfile';
-    return (_jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: [{ key: 'logo' }], children: (_item) => _jsx(Logo, { version: VERSION }, "logo") }), _jsxs(Box, { flexDirection: "column", children: [transcript.map(item => (_jsx(TranscriptRow, { item: item }, item.id))), projection.liveItems.map(item => (_jsx(TranscriptRow, { item: item }, item.id)))] }), _jsx(InputBox, { value: input, onChange: setInput, onSubmit: handleSubmit, busy: busy, vimMode: props.config.vimMode === true, onAtQueryChange: overlays.setAtQuery, onRequestOverlay: overlays.openOverlay, inputFocus: inputFocus && !busy }), overlays.active === 'atfile' && overlays.atQuery !== null && (_jsx(AtFileComplete, { cwd: props.cwd, query: overlays.atQuery, onPick: handleAtPick, onCancel: () => { overlays.setAtQuery(null); overlays.setActive(null); } })), overlays.active === 'models' && (_jsx(ModelPicker, { models: models, current: currentModel, onPick: handleModelPick, onCancel: overlays.closeOverlay })), overlays.active === 'help' && (_jsx(HelpOverlay, { slashCommands: slashCommands, onClose: overlays.closeOverlay })), _jsx(StatusBar, { model: currentModel, provider: providerIdForModel(currentModel), inputTokens: projection.totals.inputTokens, outputTokens: projection.totals.outputTokens, costUsd: projection.totals.costUsd, cwd: props.cwd, busy: busy })] }));
+    // BISECT: Static moved out of the transcript render. Logo stays
+    // in a one-item Static (its original placement). Both committed
+    // transcript and live items render in the regular dynamic Box. If
+    // streaming text appears now, the Static-around-transcript pattern
+    // was suppressing the live region updates. If still not, the bug
+    // is upstream in useEventProjection.
+    return (_jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: [{ key: 'logo' }], children: (_item) => _jsx(Logo, { version: VERSION }, "logo") }), _jsxs(Box, { flexDirection: "column", children: [transcript.map(item => (_jsx(TranscriptRow, { item: item }, item.id))), projection.liveItems.map(item => (_jsx(TranscriptRow, { item: item }, item.id)))] }), _jsx(InputBox, { value: input, onChange: setInput, onSubmit: handleSubmit, busy: busy, vimMode: props.config.vimMode === true, onAtQueryChange: overlays.setAtQuery, onRequestOverlay: overlays.openOverlay, inputFocus: inputFocus && !busy }), overlays.active === 'atfile' && overlays.atQuery !== null && (_jsx(AtFileComplete, { cwd: props.cwd, query: overlays.atQuery, onPick: handleAtPick, onCancel: () => { overlays.setAtQuery(null); overlays.setActive(null); } })), overlays.active === 'models' && (_jsx(ModelPicker, { models: models, current: currentModel, onPick: handleModelPick, onCancel: overlays.closeOverlay })), overlays.active === 'help' && (_jsx(HelpOverlay, { slashCommands: slashCommands, onClose: overlays.closeOverlay })), _jsx(StatusBar, { model: currentModel, provider: providerIdForModel(currentModel), inputTokens: projection.totals.inputTokens, outputTokens: projection.totals.outputTokens, costUsd: projection.totals.costUsd, cwd: props.cwd, busy: busy, mode: props.config.mode ?? 'act', contextWindow: contextWindowFor(currentModel), liveOutputTokens: liveOutputTokens, liveDurationMs: liveDurationMs })] }));
 }
 function TranscriptRow({ item }) {
     switch (item.kind) {
@@ -191,8 +282,20 @@ function TranscriptRow({ item }) {
 }
 function initialHistory(props) {
     const base = props.initialMessages ? [...props.initialMessages] : [];
-    if (props.systemPrompt)
-        base.unshift({ role: 'system', content: props.systemPrompt });
+    // Boot context: mode preamble + project primer (DIRGHA.md) +
+    // caller's --system. Without this, the Ink TUI starts with zero
+    // project awareness — same parity-matrix #1 fix as the one-shot
+    // path in cli/main.ts.
+    const primer = loadProjectPrimer(props.cwd);
+    const soul = loadSoul();
+    const composedSystem = composeSystemPrompt({
+        soul: soul.text,
+        modePreamble: modePreamble(props.config.mode ?? 'act'),
+        primer: primer.primer,
+        gitState: renderGitState(probeGitState(props.cwd)),
+        userSystem: props.systemPrompt,
+    });
+    base.unshift({ role: 'system', content: composedSystem });
     return base;
 }
 function providerIdForModel(model) {

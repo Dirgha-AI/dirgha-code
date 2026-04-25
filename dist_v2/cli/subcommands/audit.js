@@ -59,17 +59,19 @@ function emit(entries, json) {
 function usage() {
     return [
         'usage:',
-        '  dirgha audit list [N]       Last N entries (default 20)',
-        '  dirgha audit tail           Follow the log',
-        '  dirgha audit search <q>     Entries containing q',
-        '  dirgha audit [--json]       JSON output',
+        '  dirgha audit list [N]                Last N entries (default 20)',
+        '  dirgha audit tail                    Follow the log',
+        '  dirgha audit search <q>              Entries containing q',
+        '  dirgha audit kinds                   Tally entries by kind',
+        '  dirgha audit ... --filter=<kind>     Restrict to one kind (turn-end, tool, error, failover, …)',
+        '  dirgha audit ... --json              JSON output',
     ].join('\n');
 }
-async function runTail(json) {
+async function runTail(json, matchKind = () => true) {
     await ensureLog();
     const path = auditPath();
     const initial = await readEntries();
-    emit(initial.slice(-20), json);
+    emit(initial.filter(matchKind).slice(-20), json);
     let lastSize = (await stat(path).catch(() => undefined))?.size ?? 0;
     stderr.write(style(defaultTheme.muted, '\n(following — Ctrl-C to stop)\n'));
     return new Promise(resolve => {
@@ -84,7 +86,9 @@ async function runTail(json) {
                 if (!line.trim())
                     continue;
                 try {
-                    emit([JSON.parse(line)], json);
+                    const entry = JSON.parse(line);
+                    if (matchKind(entry))
+                        emit([entry], json);
                 }
                 catch { /* skip */ }
             }
@@ -100,16 +104,18 @@ export const auditSubcommand = {
     description: 'Read the local audit log (list / tail / search)',
     async run(argv) {
         const json = argv.includes('--json');
-        const args = argv.filter(a => a !== '--json');
+        const filterFlag = argv.find(a => a.startsWith('--filter='))?.split('=')[1];
+        const args = argv.filter(a => a !== '--json' && !a.startsWith('--filter='));
         const op = args[0] ?? 'list';
+        const matchKind = (e) => !filterFlag || e.kind === filterFlag;
         if (op === 'list') {
             const n = Number.parseInt(args[1] ?? '20', 10);
             const entries = await readEntries();
-            emit(entries.slice(-n), json);
+            emit(entries.filter(matchKind).slice(-n), json);
             return 0;
         }
         if (op === 'tail')
-            return runTail(json);
+            return runTail(json, matchKind);
         if (op === 'search') {
             const query = args[1];
             if (!query) {
@@ -118,7 +124,26 @@ export const auditSubcommand = {
             }
             const entries = await readEntries();
             const needle = query.toLowerCase();
-            emit(entries.filter(e => JSON.stringify(e).toLowerCase().includes(needle)), json);
+            emit(entries.filter(e => matchKind(e) && JSON.stringify(e).toLowerCase().includes(needle)), json);
+            return 0;
+        }
+        if (op === 'kinds') {
+            const entries = await readEntries();
+            const counts = new Map();
+            for (const e of entries)
+                counts.set(e.kind ?? 'event', (counts.get(e.kind ?? 'event') ?? 0) + 1);
+            if (json) {
+                stdout.write(`${JSON.stringify(Object.fromEntries(counts))}\n`);
+                return 0;
+            }
+            if (counts.size === 0) {
+                stdout.write(style(defaultTheme.muted, '(no audit entries yet)\n'));
+                return 0;
+            }
+            stdout.write(style(defaultTheme.accent, '\nKinds in audit log\n'));
+            for (const [kind, n] of [...counts.entries()].sort((a, b) => b[1] - a[1])) {
+                stdout.write(`  ${kind.padEnd(20)} ${String(n).padStart(6)}\n`);
+            }
             return 0;
         }
         stderr.write(`unknown subcommand "${op}"\n${usage()}\n`);

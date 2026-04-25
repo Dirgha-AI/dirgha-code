@@ -1,0 +1,17 @@
+{
+  "name": "build",
+  "path": "/app/build",
+  "expect": "Build placeholder room",
+  "url_visited": "https://dirgha.ai/app/build",
+  "url_final": "https://dirgha.ai/app/build",
+  "http_status": 200,
+  "title": "Dirgha \u2014 Agent OS",
+  "body_text_excerpt": "D\nCONVERSATIONS\n\nNo conversations yet. Start one.\n\n~/dirgha-workspace\n0 open\nDIRGHA \u00b7 AGENT OS\nDeploy\nSign in\nBuild\n\nFile browser + Monaco editor + preview for standalone coding sessions. Opens artifacts inline with the chat when an AI turn produces code.",
+  "console": [],
+  "network_failures": [],
+  "screenshot": "output/build.png",
+  "navigation_error": null,
+  "verdict": {
+    "error": "nim call failed: Error code: 504"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "media",
+  "path": "/app/media",
+  "expect": "Media studio",
+  "url_visited": "https://dirgha.ai/app/media",
+  "url_final": "https://dirgha.ai/app/media",
+  "http_status": 200,
+  "title": "Dirgha \u2014 Agent OS",
+  "body_text_excerpt": "D\nCONVERSATIONS\n\nNo conversations yet. Start one.\n\n~/dirgha-workspace\n0 open\nDIRGHA \u00b7 AGENT OS\nDeploy\nSign in\nMEDIA STUDIO\nGenerate images, video, and voice\n\nHosted through Dirgha. Metered against your plan allowance.\n\nImage\nVideo\nVoice\nTranscribe\nSign in to generate media\n\nMedia Studio runs on the Dirgha inference pool. An active subscription is required; use the Sign-in button in the top bar.",
+  "console": [],
+  "network_failures": [],
+  "screenshot": "output/media.png",
+  "navigation_error": null,
+  "verdict": {
+    "error": "nim call failed: Error code: 504"
+  }
+}
