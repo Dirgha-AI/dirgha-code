@@ -14,3 +14,17 @@ coverage/
 # Source maps: regenerated on build, never tracked
 dist/*.map
 dist/**/*.map
+
+# Internal authoring artefacts — NEVER ship publicly.
+# Canonical rule: docs/PUBLISH-RULES.md in the internal monorepo.
+docs/DOCS-CONVENTION.md
+docs/PUBLISH-RULES.md
+docs/audits/AUDIT-INPUT.md
+docs/sessions/
+docs/_internal/
+promo/MARKETING-BRIEF.md
+promo/SCRIPT.md
+promo/script-run.log
+*-BRIEF.md
+*-old-*.md.bak
+*.bak

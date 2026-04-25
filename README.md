@@ -145,7 +145,6 @@ The opposite assumption is the right one. Your laptop is the unit of sovereignty
 |---|---|
 | Architecture | [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) |
 | Roadmap | [`docs/ROADMAP.md`](./docs/ROADMAP.md) |
-| Doc convention | [`docs/DOCS-CONVENTION.md`](./docs/DOCS-CONVENTION.md) |
 | Knowledge management | [`docs/memory/km-architecture.md`](./docs/memory/km-architecture.md) |
 | Architecture efficiency | [`docs/memory/architecture-efficiency.md`](./docs/memory/architecture-efficiency.md) |
 | Skill security | [`docs/agents/skill-security.md`](./docs/agents/skill-security.md) |
@@ -165,7 +164,7 @@ No row in the parity matrix closes without a runnable test that locks it in.
 
 ## Contributing
 
-Read [`docs/DOCS-CONVENTION.md`](./docs/DOCS-CONVENTION.md) before adding docs. Read [`docs/parity/CLI_PARITY_MATRIX.md`](./docs/parity/CLI_PARITY_MATRIX.md) before adding code — the highest-gap row is the most important work. Every PR adds a `.changeset/<random-name>.md` describing what changed and at what semver tier.
+Read [`docs/parity/CLI_PARITY_MATRIX.md`](./docs/parity/CLI_PARITY_MATRIX.md) before adding code — the highest-gap row is the most important work. Every PR adds a `.changeset/<random-name>.md` describing what changed and at what semver tier.
 
 ## License
 
