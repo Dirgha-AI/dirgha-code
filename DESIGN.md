@@ -1,6 +1,6 @@
 ---
-name: dirgha
-tagline: A terminal coding agent. Free compute, full agency.
+name: Dirgha
+tagline: Build to last. Code with Dirgha. Think.
 colors:
   ink: "#0a0a0a"           # near-black background, document feel
   surface: "#161413"        # secondary surface (cards, code blocks)
@@ -14,99 +14,114 @@ colors:
   ink-glow: "#191614"       # near-ink for soft shadows on dark
 typography:
   display:
-    fontFamily: Fraunces, Georgia, serif
-    weight: 400
-    optical: 144
-    feel: editorial, sovereign, deliberate
-    use: titles, hero, section heads
+    fontFamily: Inter, system-ui, sans-serif
+    weight: 600
+    tracking: -0.025em
+    use: hero, section heads, wordmark
   body:
     fontFamily: Inter, system-ui, sans-serif
     weight: 400
-    feel: clean, terminal-adjacent, reads at small sizes
     use: paragraphs, captions
   mono:
     fontFamily: JetBrains Mono, ui-monospace, monospace
     weight: 400
-    feel: terminal verbatim
     use: code, commands, output
 spacing: { xs: 4, sm: 8, md: 16, lg: 24, xl: 40, 2xl: 64, 3xl: 96 }
 radii: { sm: 4, md: 8, lg: 12, xl: 16, pill: 999 }
 motion:
-  ease: cubic-bezier(0.22, 0.61, 0.36, 1)   # decisive, not springy
+  ease: cubic-bezier(0.22, 0.61, 0.36, 1)
   fast: 200ms
   base: 320ms
   slow: 600ms
-  feel: deliberate. Things move once and settle. No bouncy overshoot.
+  feel: deliberate. Things move once and settle. No springs, no loops.
 ---
 
-# dirgha — design system
+# Dirgha — design system
 
-This file is authoritative for every dirgha surface — CLI, web, video promos, slide decks. The YAML frontmatter is machine-readable; the prose below tells you *why* the values exist.
+This file is authoritative for every Dirgha surface — CLI, web, video, slides. The YAML frontmatter is machine-readable; the prose tells you why.
 
-## Tone
+## Voice
 
-dirgha is sovereign infrastructure for engineers who'd rather own their tools than rent them. The tone is direct, terse, and confident — not playful, not snarky, not corporate. Read it and you should think: *deep, deliberate, free, mine*.
+The product talks like a senior engineer explaining their setup to a peer over a coffee. Direct. Informed. Useful. No marketing flourish.
 
-Adjectives we lean into: **sovereign · terminal · deliberate · honest · free**.
+**Lean in:** sovereign · terminal · deliberate · honest · free.
+**Avoid:** cute · revolutionary · synergistic · disruptive · seamless · empowering · unleash · supercharge · "we are excited."
 
-Adjectives we avoid: cute · revolutionary · synergistic · disruptive · seamless · empowering · unleash · supercharge.
+Customer-first means leading with the value and ending with the brand. "Build to last" comes before "Dirgha." "What you can do with this" comes before "what we are."
+
+## Tagline
+
+```
+Build to last. Code with Dirgha. Think.
+```
+
+Three beats. The first is the value. The second is the action. The third is the philosophy — agents that move fast aren't the same as agents that think well.
 
 ## Why these colors
 
-The palette is **warm monochromatic** — black, cream, and a single warm amber accent. It reads like an old typewriter manual or a hardcover technical book. The sage green is a quieter secondary accent for "calm OK" states (test pass, scan clean, success). Copper is the only red-adjacent value — used sparingly for warnings.
+The palette is **warm monochromatic** — black, cream, and a single warm amber accent. It reads like a hardcover technical book, not a SaaS dashboard. Sage green is the quiet "OK" state (test pass, scan clean). Copper is the only red-adjacent value, used sparingly for warnings.
 
 We do NOT use:
-- Pure white (`#fff`) — too clinical against the cream.
-- Pure red (`#f00`) — alarmist; copper does the same job with less noise.
-- Gradients on text or backgrounds — flat surfaces only.
-- Shadows beyond `0 0 0 1px ink-glow` for inset edges — no drop shadows.
+- Pure white. Too clinical against the cream.
+- Pure red. Alarmist. Copper does the same job with less noise.
+- Gradients on text or backgrounds. Flat surfaces only.
+- Drop shadows. Inset edges only.
 
-## Why this typography
+## Why Inter
 
-**Fraunces** for display sets dirgha apart from every other CLI tool out there. Most ship in Inter or system-ui everywhere — clean but anonymous. Fraunces is opinionated: it has stress, tension, optical-size axes. It says "this is built by someone who thought about the look." We use it for titles only — body and code stay readable.
+Inter is the modern UI default for a reason. It was designed by Rasmus Andersson specifically for screens — variable axes, optical sizing, slashed-zero option for code, excellent rendering at small sizes. Vercel, Linear, Figma, and most thoughtful developer tools ship in Inter. We do too.
 
-**Inter** for body is the standard for screen-reading at small sizes. We use the regular weight; bold is reserved for emphasis inside paragraphs and section transitions.
+One family across everything. **Display = Inter at weight 600 with tight tracking (-0.025em).** **Body = Inter at weight 400.** That's the rule. Bold inside paragraphs is reserved for emphasis. Italic is for technical terms on first appearance.
 
-**JetBrains Mono** for code matches the terminal where dirgha actually lives. It's the same typeface most developers see in their editor, so a code sample in our docs feels native, not pasted-in.
+JetBrains Mono is the only secondary face. It matches what developers see in their editor, so a code snippet feels native, not pasted-in.
 
 ## Logo
 
-The wordmark is `dīrgha` set in Fraunces with a **macron over the i** (the "ī"). This is literal: in Sanskrit phonetics, *dīrgha* (दीर्घ) means "long vowel," and the macron is the ASCII transliteration mark for a long vowel. The logo IS the meaning of the word.
+The wordmark is `Dirgha` set in Inter Display weight 600 with tight tracking. No diacritics, no decoration. Capital D, lowercase rest.
 
-Symbol-only mark: `◈` — a four-cusped diamond. Used in CLI prompts (`◈ dirgha · 1.4.0`), favicons, where the wordmark would be too long.
+Symbol-only mark: `◈`, the four-cusped diamond. Used in CLI prompts and favicons.
 
 Color usage:
 - Wordmark cream-on-ink for dark surfaces (default)
-- Wordmark ink-on-cream only for printed materials
-- Macron always one shade lighter than the wordmark — so it reads as a deliberate diacritical, not a typo
-- Symbol amber-on-ink for accent moments (the cursor blink, the "spinner" in CLI)
+- Wordmark ink-on-cream for printed materials
+- Symbol amber-on-ink for accent moments (cursor blink, CLI spinner)
 
-`assets/logo/` contains:
-- `dirgha-wordmark-cream.svg` — primary
+`assets/logo/` ships:
+- `dirgha-wordmark-cream.svg` — primary wordmark
 - `dirgha-wordmark-ink.svg` — for cream backgrounds
 - `dirgha-mark-amber.svg` — symbol only, accent
 - `dirgha-mark-cream.svg` — symbol only, monochrome
 
-## Motion principles
+## Naming convention
 
-dirgha animates the way a well-designed terminal feels: things appear, settle, and stay. No bouncing, no springing, no looping decoration. Specific rules:
+The product is **Dirgha**. The npm package is `@dirgha/code`. The CLI binary is `dirgha`. "Dirgha Code" disambiguates the CLI from the broader Dirgha ecosystem (gateway, web, mobile) — used at the end of copy, not the start.
 
-- **Type-on for text** that represents what the user typed or what the agent streamed. 30-40 ms per character. Slows down on punctuation (50 ms after `.`, `,`, `;`).
+Wrong:
+> Dirgha Code is a terminal coding agent that …
+
+Right:
+> A terminal coding agent that ships working code on free-tier compute. Dirgha Code, on npm.
+
+## Motion
+
+Things appear, settle, and stay. No bouncing, no springs, no looping decoration.
+
+- **Type-on for text** that represents user input or streamed agent output. 30–40 ms per character. Slows on punctuation (50 ms after `.`, `,`, `;`).
 - **Fade-in for everything else** — 320 ms with the `ease` curve. Never slide-in from off-screen.
-- **No mid-loop motion** — once an element is on screen, it doesn't drift, breathe, or pulse. The cursor is the only exception (1 Hz blink).
-- **Cuts, not crossfades** between major sections in a video — same rule as good documentary editing. A 600 ms crossfade is a smell.
+- **No mid-loop motion.** Once on screen, an element doesn't drift, breathe, or pulse. The cursor is the only exception (1 Hz blink).
+- **Cuts, not crossfades** between major sections in video. A 600 ms crossfade is a smell.
 
 ## Audio
 
-Background music for dirgha video promos is a slow ambient drone in the same register as the design feel — warm, low-mid, not melodic. The reference is something between a Brian Eno *Music for Airports* texture and the hum of a quiet server room. **Never** upbeat tech-stock music; that's the opposite of the brand.
+Background for video is a slow ambient drone. Warm, low-mid, not melodic. The reference is somewhere between *Music for Airports* and the hum of a quiet server room. Never upbeat tech-stock — the opposite of the brand.
 
-Spec for promo audio (synthesised in ffmpeg, no licensing required):
+Spec for promo audio (synthesised in ffmpeg, no licensing):
 - Base drone: 110 Hz sine (A2) at -18 dB
 - Fifth above: 165 Hz sine (E3) at -22 dB, slow LFO at 0.1 Hz
-- Light noise floor: pink noise at -38 dB, low-pass at 800 Hz
-- Soft fade-in 2 s, fade-out 4 s
+- Pink noise floor: -38 dB, low-pass at 800 Hz
+- 2 s fade-in, 4 s fade-out
 - No percussion, no melody, no swells beyond the LFO breath
 
-## How agents use this file
+## How to use this file
 
-Any AI agent working on dirgha — including dirgha itself when building its own marketing — reads this file before producing visuals. The `design-md` skill (installed via `dirgha skills install`) tells the agent: tokens are authoritative, prose is rationale, don't invent colors or fonts that aren't here.
+Any AI agent or designer working on Dirgha reads this file before producing visuals or copy. The `design-md` skill (installed via `dirgha skills install`) tells the agent: tokens are authoritative, prose is rationale, don't invent values that aren't here.
