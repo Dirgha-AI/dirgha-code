@@ -1,13 +1,14 @@
 <div align="center">
 
-# Build to last.<br/>Code with Dirgha.
-
-A terminal coding agent built for engineers who'd rather own their tooling than rent it. Bring your own keys across 17 providers — including the free-tier endpoints some providers offer. One binary. No telemetry. Audited every step.
+# Dirgha Code
 
 [![npm](https://img.shields.io/npm/v/@dirgha/code?style=flat-square&color=000)](https://www.npmjs.com/package/@dirgha/code)
 [![License](https://img.shields.io/badge/license-FSL--1.1--MIT-d4a373?style=flat-square)](./LICENSE)
-[![Tests](https://img.shields.io/badge/tests-40%2F40-7c8b7e?style=flat-square)](./scripts/qa-app)
-[![Parity](https://img.shields.io/badge/parity%20matrix-9.82%2F10-7c8b7e?style=flat-square)](./docs/parity/CLI_PARITY_MATRIX.md)
+[![Sponsor](https://img.shields.io/badge/sponsor-%E2%99%A1-c25a4f?style=flat-square)](https://dirgha.ai/contribute)
+
+> **Build to last. Code with Dirgha.**
+
+A terminal coding agent built for engineers who'd rather own their tooling than rent it. Bring your own keys across 17 providers — including the free-tier endpoints some providers offer. One binary. No telemetry. Audited every step.
 
 </div>
 
@@ -34,15 +35,13 @@ You write code faster, with fewer silent failures, on the providers you choose t
 
 ## Engineering posture
 
-Investors and engineers should both find this section interesting.
-
 | Property | Measurement |
 |---|---|
 | **Parity matrix** | 22 capability dimensions scored against the leading reference CLIs. Mean 9.82/10. Sum-of-gaps = 0. Every closure cites a code path AND a runnable test. |
 | **Test floor** | 40/40 offline tests in ~16 s. 3 network-gated suites. CI green is a precondition for any PR. |
 | **Source budget** | ~14.5 K LOC across 23 modules in `src_v2/`. Hard rule: every src file ≤ 200 lines. |
-| **Architecture** | Layered. Kernel ↔ providers ↔ tools ↔ memory ↔ extensions. No god-object. Documented + diagrammed in [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md). |
-| **Memory model** | Four layers (audit, memory, ledger, KB) where information flows up. Lower = cheap to write, hard to query. Higher = expensive to compile, instant to query. Documented in [`docs/memory/km-architecture.md`](./docs/memory/km-architecture.md). |
+| **Architecture** | Layered. Kernel ↔ providers ↔ tools ↔ memory ↔ extensions. Documented in [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md). |
+| **Memory model** | Four layers (audit, memory, ledger, KB) where information flows up. Documented in [`docs/memory/km-architecture.md`](./docs/memory/km-architecture.md). |
 | **Security** | Heuristic prompt-injection / supply-chain scanner runs at every skill install AND every load. Critical findings block. Threat model in [`docs/agents/skill-security.md`](./docs/agents/skill-security.md). |
 | **Audit trail** | Every session-start, turn-end, tool call, error, failover, compaction, scan is appended to `~/.dirgha/audit/events.jsonl`. Searchable, filterable, kind-tallied. |
 | **Release discipline** | One file per release at `changelog/<version>.md`. `.changeset/` per-PR. Tags + GitHub releases attach the long-form notes. |
@@ -176,6 +175,6 @@ Read [`docs/DOCS-CONVENTION.md`](./docs/DOCS-CONVENTION.md) before adding docs. 
 
 <div align="center">
 
-**Dirgha Code** · [`@dirgha/code`](https://www.npmjs.com/package/@dirgha/code) · [github.com/Dirgha-AI/dirgha-code](https://github.com/Dirgha-AI/dirgha-code)
+[`@dirgha/code`](https://www.npmjs.com/package/@dirgha/code) · [github.com/Dirgha-AI/dirgha-code](https://github.com/Dirgha-AI/dirgha-code) · [Sponsor](https://dirgha.ai/contribute)
 
 </div>
