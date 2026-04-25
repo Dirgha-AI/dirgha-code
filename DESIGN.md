@@ -1,17 +1,17 @@
 ---
 name: Dirgha
-tagline: Build to last. Code with Dirgha. Think.
+tagline: Build to last. Code with Dirgha.
 colors:
-  ink: "#0a0a0a"           # near-black background, document feel
-  surface: "#161413"        # secondary surface (cards, code blocks)
-  surface-2: "#23211f"      # tertiary surface (inset panels)
-  cream: "#f7f3ed"          # primary text on dark
-  cream-mute: "#a8a29e"     # secondary text, captions
-  amber: "#d4a373"          # primary accent — warm, deliberate
-  amber-deep: "#a87c4f"     # accent shadow / hover
-  sage: "#7c8b7e"           # secondary accent — calm, success
-  copper: "#c25a4f"         # warning / danger (muted, never bright red)
-  ink-glow: "#191614"       # near-ink for soft shadows on dark
+  ink: "#0a0a0a"
+  surface: "#161413"
+  surface-2: "#23211f"
+  cream: "#f7f3ed"
+  cream-mute: "#a8a29e"
+  amber: "#d4a373"
+  amber-deep: "#a87c4f"
+  sage: "#7c8b7e"
+  copper: "#c25a4f"
+  ink-glow: "#191614"
 typography:
   display:
     fontFamily: Inter, system-ui, sans-serif
@@ -38,24 +38,36 @@ motion:
 
 # Dirgha — design system
 
-This file is authoritative for every Dirgha surface — CLI, web, video, slides. The YAML frontmatter is machine-readable; the prose tells you why.
+Authoritative for every Dirgha surface — CLI, web, video, slides. Frontmatter is machine-readable; the prose explains why.
 
 ## Voice
 
-The product talks like a senior engineer explaining their setup to a peer over a coffee. Direct. Informed. Useful. No marketing flourish.
+Dirgha talks like a senior engineer explaining their setup to a peer. Direct. Informed. Useful. No marketing flourish, no hype.
 
-**Lean in:** sovereign · terminal · deliberate · honest · free.
-**Avoid:** cute · revolutionary · synergistic · disruptive · seamless · empowering · unleash · supercharge · "we are excited."
+The audience is split between developers (who care about correctness, performance, and ergonomics) and investors (who care about defensibility, engineering quality, and unit economics). The same prose has to satisfy both. The way to do that is by being precise — show the parity matrix, show the test count, show the LOC budget, show the architecture diagram. Specifics outperform claims.
 
-Customer-first means leading with the value and ending with the brand. "Build to last" comes before "Dirgha." "What you can do with this" comes before "what we are."
+**Lean in:** sovereign · terminal · deliberate · honest · engineered · precise · BYOK.
+**Avoid:** free · cute · revolutionary · synergistic · disruptive · seamless · empowering · unleash · supercharge · "we are excited."
+
+We do not say "free compute" or "free-tier first." Dirgha is a BYOK product. Some providers (OpenRouter, NVIDIA NIM) happen to offer free-tier endpoints that work with the same `OPENROUTER_API_KEY` / `NVIDIA_API_KEY` Dirgha already routes through — that's a property of those providers, not a Dirgha promise. Frame it as: "Bring your own keys, including the free tiers some providers offer."
 
 ## Tagline
 
 ```
-Build to last. Code with Dirgha. Think.
+Build to last. Code with Dirgha.
 ```
 
-Three beats. The first is the value. The second is the action. The third is the philosophy — agents that move fast aren't the same as agents that think well.
+Two beats. The first is the value: longevity, durability, sovereignty. The second is the action. The product name comes second, not first.
+
+## Naming convention
+
+The product is **Dirgha**. The npm package is `@dirgha/code`. The CLI binary is `dirgha`. "Dirgha Code" disambiguates the CLI from the broader Dirgha ecosystem (gateway, web, mobile) — used at the end of copy and in package metadata, not the start.
+
+Wrong:
+> Dirgha Code is a terminal coding agent that …
+
+Right:
+> A terminal coding agent that ships working code through 17 providers, with cited test coverage and parity scoring. Dirgha Code, on npm.
 
 ## Why these colors
 
@@ -69,7 +81,7 @@ We do NOT use:
 
 ## Why Inter
 
-Inter is the modern UI default for a reason. It was designed by Rasmus Andersson specifically for screens — variable axes, optical sizing, slashed-zero option for code, excellent rendering at small sizes. Vercel, Linear, Figma, and most thoughtful developer tools ship in Inter. We do too.
+Inter is the modern UI default for a reason. Designed by Rasmus Andersson specifically for screens — variable axes, optical sizing, slashed-zero option for code, excellent rendering at small sizes. Vercel, Linear, Figma, and most thoughtful developer tools ship in Inter. We do too.
 
 One family across everything. **Display = Inter at weight 600 with tight tracking (-0.025em).** **Body = Inter at weight 400.** That's the rule. Bold inside paragraphs is reserved for emphasis. Italic is for technical terms on first appearance.
 
@@ -92,16 +104,6 @@ Color usage:
 - `dirgha-mark-amber.svg` — symbol only, accent
 - `dirgha-mark-cream.svg` — symbol only, monochrome
 
-## Naming convention
-
-The product is **Dirgha**. The npm package is `@dirgha/code`. The CLI binary is `dirgha`. "Dirgha Code" disambiguates the CLI from the broader Dirgha ecosystem (gateway, web, mobile) — used at the end of copy, not the start.
-
-Wrong:
-> Dirgha Code is a terminal coding agent that …
-
-Right:
-> A terminal coding agent that ships working code on free-tier compute. Dirgha Code, on npm.
-
 ## Motion
 
 Things appear, settle, and stay. No bouncing, no springs, no looping decoration.
@@ -109,11 +111,11 @@ Things appear, settle, and stay. No bouncing, no springs, no looping decoration.
 - **Type-on for text** that represents user input or streamed agent output. 30–40 ms per character. Slows on punctuation (50 ms after `.`, `,`, `;`).
 - **Fade-in for everything else** — 320 ms with the `ease` curve. Never slide-in from off-screen.
 - **No mid-loop motion.** Once on screen, an element doesn't drift, breathe, or pulse. The cursor is the only exception (1 Hz blink).
-- **Cuts, not crossfades** between major sections in video. A 600 ms crossfade is a smell.
+- **Cuts, not crossfades** between major sections in video.
 
 ## Audio
 
-Background for video is a slow ambient drone. Warm, low-mid, not melodic. The reference is somewhere between *Music for Airports* and the hum of a quiet server room. Never upbeat tech-stock — the opposite of the brand.
+Background for video is a slow ambient drone. Warm, low-mid, not melodic. Reference: somewhere between *Music for Airports* and the hum of a quiet server room. Never upbeat tech-stock — the opposite of the brand.
 
 Spec for promo audio (synthesised in ffmpeg, no licensing):
 - Base drone: 110 Hz sine (A2) at -18 dB
@@ -124,4 +126,4 @@ Spec for promo audio (synthesised in ffmpeg, no licensing):
 
 ## How to use this file
 
-Any AI agent or designer working on Dirgha reads this file before producing visuals or copy. The `design-md` skill (installed via `dirgha skills install`) tells the agent: tokens are authoritative, prose is rationale, don't invent values that aren't here.
+Any AI agent or designer working on Dirgha reads this file before producing visuals or copy. Tokens are authoritative. Prose is rationale. Don't invent values that aren't here.
