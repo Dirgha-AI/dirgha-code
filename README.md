@@ -6,23 +6,38 @@
 [![License](https://img.shields.io/badge/license-FSL--1.1--MIT-d4a373?style=flat-square)](./LICENSE)
 [![Sponsor](https://img.shields.io/badge/sponsor-%E2%99%A1-c25a4f?style=flat-square)](https://dirgha.ai/contribute)
 
-**Codes across 17 providers with failover.**
-A coding agent that doesn't blink when a model dies.
+**Dirgha Code is a CLI coding agent built on four pillars: BYOK, persistent memory, parallel agents, and scanned skills.**
 
 </div>
 
-## What it does
+## What it is
 
-Reads your codebase, edits files, runs tests, commits, and audits every step. Bring your own keys across 17 providers — when a model rate-limits or times out, the loop swaps to the next-priority key in your pool and resumes from the partial transcript. Your work doesn't vanish when an API hiccups.
+A terminal coding assistant that reads your codebase, edits files, runs tests, commits, and audits every step. It runs on your keys, on your machine, with your transcripts staying local until you choose otherwise. When a model rate-limits or times out, the loop swaps to the next-priority key in your pool and resumes from the partial transcript. Your work doesn't vanish when an API hiccups.
 
-## Five things you don't get from other coding agents
+## The four pillars
 
-- **A four-layer memory system** that compounds over time. An append-only audit log captures every event for forensics. A curated key-value memory loads project facts at boot. A per-scope ledger keeps decisions and observations as JSONL plus an agent-rewritten digest, searchable by TF-IDF cosine ranking. A compiled knowledge base via OpenKB + PageIndex turns your `docs/` into a wiki the agent reasons over instead of re-reading files every turn. Cheap to write below; curated above; information flows up.
-- **Parallel sub-agents in git worktrees.** `dirgha fleet launch "<goal>"` decomposes the goal into N independent tasks, spawns each in its own worktree, and merges the winners back. Run three approaches in parallel with `dirgha fleet triple` and let a judge pick. Inside any session the agent can also call the `task` tool to dispatch a fresh sub-agent with its own context budget for a sub-problem — no compaction loss.
-- **Multi-key BYOK with cooldown rotation.** When one key hits a 429, Dirgha rotates to the next in the pool with priority + LRU + cooldown. Other tools restart.
-- **Mid-session failover that resumes from where it left off.** When a model dies mid-turn, Dirgha swaps to the registered backup and continues with the partial transcript intact.
-- **Every third-party skill is scanned before it runs.** Heuristic prompt-injection / supply-chain check at install AND load. Critical findings block. We caught 2 critical issues in 112 real installed skills today.
-- **TypeScript / ESM plugins in 20 lines.** Drop a `.mjs` at `~/.dirgha/extensions/<name>/index.mjs` and register tools, slashes, subcommands, or lifecycle hooks. Ship as an npm package.
+### BYOK across 17 providers
+
+Anthropic, OpenAI, Gemini, OpenRouter, NVIDIA, Fireworks, DeepSeek, Groq, Cerebras, Together, DeepInfra, Mistral, xAI, Perplexity, Cohere, Kimi, Z.AI. Drop multiple keys per provider into a pool — Dirgha rotates with priority + LRU + cooldown when one hits a 429. When a model dies mid-turn, registered backups take over and the agent continues from the partial transcript intact. Other tools restart the conversation.
+
+### Persistent memory that compounds
+
+Four layers, each cheaper to write than the one above and more curated than the one below:
+
+- **Audit log** — append-only JSONL of every event for forensics.
+- **Memory** — curated key-value facts loaded into the system prompt at boot.
+- **Ledger** — per-scope JSONL of decisions and observations, plus an agent-rewritten digest, searchable by TF-IDF cosine ranking.
+- **Knowledge base** — your `docs/` compiled into a wiki via OpenKB + PageIndex. Vectorless, reasoning-based retrieval. The agent reasons over a table of contents instead of re-reading files every turn.
+
+Information flows up. Old context gets distilled, not discarded.
+
+### Parallel agents
+
+`dirgha fleet launch "<goal>"` decomposes the goal into N independent tasks, spawns each in its own git worktree, runs them in parallel, and merges the winners back. `dirgha fleet triple "<goal>"` runs three approaches and lets a judge pick. Inside any session, the agent can call the `task` tool to dispatch a fresh sub-agent with its own context budget for a sub-problem — no compaction loss on the parent.
+
+### Skills, scanned
+
+SKILL.md packs are portable Markdown agents — share one git URL, anyone can `dirgha skills install <url>`. Every third-party skill is scanned at install AND load time by a heuristic prompt-injection / supply-chain check. Critical findings block. Today: 112 installed across 4 packs, 74 allow · 36 warn · 2 block. TypeScript / ESM plugins are the sibling concept — drop a `.mjs` at `~/.dirgha/extensions/<name>/index.mjs` and register tools, slashes, subcommands, or lifecycle hooks in ~20 lines.
 
 ## Install
 
@@ -44,11 +59,8 @@ The interactive TUI is `dirgha` with no args. Resume a session with `dirgha resu
 | **20 slash commands** | `/account`, `/clear`, `/compact`, `/cost`, `/fleet`, `/keys`, `/login`, `/memory`, `/mode`, `/models`, `/resume`, `/session`, `/status`, `/theme`, `/upgrade`, … |
 | **18 subcommands** | `audit`, `audit-codebase`, `cost`, `kb`, `keys`, `ledger`, `login`, `models`, `resume`, `skills`, `undo`, `update`, `verify`, … |
 | **4 modes** | `act` · `plan` (read-only thinking) · `verify` (read-only audit) · `ask` (read-only Q&A) |
-| **Fleet + `task`** | parallel sub-agents in git worktrees, plus dynamic dispatch from inside any session |
 | **MCP** | stdio + HTTP/SSE + `bearerProvider` async OAuth rotation |
-| **Plugins** | TypeScript / ESM extensions API at `~/.dirgha/extensions/<name>/` |
-| **Knowledge base** | compiled wiki via OpenKB + PageIndex; vectorless reasoning-based retrieval |
-| **Skill safety** | heuristic prompt-injection / supply-chain scanner at install + load |
+| **Source** | ~14.5 K LOC across 23 modules in `src_v2/`. Hard rule: every src file ≤ 200 lines. |
 
 ## Numbers worth checking
 
@@ -56,8 +68,6 @@ The interactive TUI is `dirgha` with no args. Resume a session with `dirgha resu
 |---|---|
 | Tests | **40/40** offline in ~16 s. CI green is a precondition for any PR. |
 | Parity | **9.82 / 10** mean across 22 capability dimensions scored against the leading reference CLIs. Sum-of-gaps = 0. Every closure cites a code path AND a runnable test. |
-| Source | **~14.5 K LOC** across 23 modules in `src_v2/`. Hard rule: every src file ≤ 200 lines. |
-| Skill audit | **112 installed** today across 4 packs. **74 allow · 36 warn · 2 block** by the heuristic scanner at the time of writing. |
 
 ## Why this exists
 
