@@ -56,7 +56,10 @@ export class NvidiaProvider {
             throw new ProviderError('NVIDIA_API_KEY is required', this.id);
         }
         this.baseUrl = (config.baseUrl ?? DEFAULT_BASE).replace(/\/+$/, '');
-        this.timeoutMs = config.timeoutMs ?? 60_000;
+        // NVIDIA NIM has long tail latency on multi-turn tool followups +
+        // reasoning models can stream their chain-of-thought for 2–3 min.
+        // 300s absorbs that without making a genuine hang invisible.
+        this.timeoutMs = config.timeoutMs ?? 300_000;
     }
     supportsTools(modelId) {
         return TOOLS_SUPPORTED.has(modelId);

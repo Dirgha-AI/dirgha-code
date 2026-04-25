@@ -50,7 +50,6 @@ export function useEventProjection(events: EventStream): EventProjection {
     // Local ids used to attribute in-flight deltas to the right span.
     let currentTextId: string | null = null;
     let currentThinkingId: string | null = null;
-
     const unsubscribe = events.subscribe((event: AgentEvent) => {
       switch (event.type) {
         case 'text_start':

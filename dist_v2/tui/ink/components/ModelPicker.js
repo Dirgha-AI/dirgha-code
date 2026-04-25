@@ -34,6 +34,12 @@ export function ModelPicker(props) {
     const width = Math.min(cols - 4, 72);
     const initial = Math.max(0, props.models.findIndex(m => m.id === props.current));
     const [cursor, setCursor] = React.useState(initial);
+    // Explicit `isActive: true` makes Ink's input dispatcher visible to
+    // anyone reading this code — the previous implicit-default form was
+    // correct but invited "is this hook still firing after close?" doubts.
+    // The component itself is mount-gated by App.tsx (rendered only when
+    // overlays.active === 'models'), so React's normal effect cleanup
+    // handles teardown.
     useInput((ch, key) => {
         if (key.escape || ch === 'q') {
             props.onCancel();
@@ -61,7 +67,7 @@ export function ModelPicker(props) {
                     props.onPick(picked.id);
             }
         }
-    });
+    }, { isActive: true });
     const groups = groupByProvider(props.models);
     const selected = props.models[cursor];
     // Build a flat row index so digit shortcuts map to the visible ordering.

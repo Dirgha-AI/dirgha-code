@@ -1,0 +1,20 @@
+{
+  "name": "home",
+  "path": "/app/",
+  "expect": "Home dashboard / room tiles",
+  "url_visited": "https://dirgha.ai/app/",
+  "url_final": "https://dirgha.ai/app/",
+  "http_status": 200,
+  "title": "Dirgha \u2014 Agent OS",
+  "body_text_excerpt": "D\nCONVERSATIONS\n\nNo conversations yet. Start one.\n\n~/dirgha-workspace\n0 open\nDIRGHA \u00b7 AGENT OS\nDeploy\nSign in\n\nGOOD MORNING \u00b7 DIRGHA\n\nWhat do you want to build today?\nKimi K2 Instruct\n\u00b7\nchange\nSend\nAudit this repo\nDraft a landing page\nExplain this codebase\nDebug a flaky test\nGenerate an image\nYOUR DESK\n\u2318K anywhere \u00b7 drag widgets soon\nTASKS\nFinish onboarding flow\ntoday\nDeploy v0.2 to staging\ntomorrow\n\u2713\nReview PR for billing\nDraft launch announcement\nFriday\nTODAY\n\nSaturday, April 25\n\n09:30\nStandup\n11:00\nDeep work: refactor billing\n14:00\nDesign review with Priya\n17:30\nShip soft-launch\n\nAdd Google Calendar in Settings.\n\nPROJECTS\nBrowse \u2192\ndirgha-core\n23 turns\nrama-i hardware\n17 turns\ndirgha-org-site\n4 turns\nRECENT CHATS\nOpen chat \u2192\n\nNo conversations yet. Type above to start one.\n\nMEMORY\nOpen \u2192\n\u2014\n\nentries saved \u00b7 auto-recalled when relevant\n\nACTIVITY\nVPS fleet:\n0 servers\nDaily deploys:\n\u2014 allowed\nMax subagents:\n\u2014",
+  "console": [],
+  "network_failures": [],
+  "screenshot": "output/home.png",
+  "navigation_error": null,
+  "verdict": {
+    "score": 10,
+    "verdict": "The /app/ route fully renders the home dashboard with room tiles, conversations, tasks, calendar, projects, and memory panels as expected and shows no errors.",
+    "issues": [],
+    "evidence": "HTTP 200, title matches the app, body contains the expected dashboard sections (conversations, tasks, projects, recent chats, memory, activity) with content and no console or network failures."
+  }
+}

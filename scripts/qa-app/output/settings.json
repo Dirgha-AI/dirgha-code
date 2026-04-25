@@ -1,0 +1,17 @@
+{
+  "name": "settings",
+  "path": "/app/settings",
+  "expect": "Settings page",
+  "url_visited": "https://dirgha.ai/app/settings",
+  "url_final": "https://dirgha.ai/app/settings",
+  "http_status": 200,
+  "title": "Dirgha \u2014 Agent OS",
+  "body_text_excerpt": "D\nCONVERSATIONS\n\nNo conversations yet. Start one.\n\n~/dirgha-workspace\n0 open\nDIRGHA \u00b7 AGENT OS\nDeploy\nSign in\nSETTINGS\nSettings\nAccount\n\nSign in and pick a plan from the top bar to start using Dirgha.\n\nConversations\n\n0 saved locally. Conversations never leave your browser unless you're signed in and opted in.\n\nClear all conversations",
+  "console": [],
+  "network_failures": [],
+  "screenshot": "output/settings.png",
+  "navigation_error": null,
+  "verdict": {
+    "error": "nim call failed: Error code: 504"
+  }
+}

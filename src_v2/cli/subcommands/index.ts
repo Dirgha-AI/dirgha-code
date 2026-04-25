@@ -36,6 +36,16 @@ import { askSubcommand } from './ask.js';
 import { compactSubcommand } from './compact.js';
 import { exportSessionSubcommand } from './export-session.js';
 import { importSessionSubcommand } from './import-session.js';
+import { memorySubcommand } from './memory.js';
+import { verifySubcommand } from './verify.js';
+import { resumeSubcommand } from './resume.js';
+import { skillsSubcommand } from './skills.js';
+import { ledgerSubcommand } from './ledger.js';
+import { costSubcommand } from './cost.js';
+import { undoSubcommand } from './undo.js';
+import { updateSubcommand } from './update.js';
+import { auditCodebaseSubcommand } from './audit-codebase.js';
+import { kbSubcommand } from './kb.js';
 
 export const subcommands: Subcommand[] = [
   doctorSubcommand,
@@ -48,11 +58,21 @@ export const subcommands: Subcommand[] = [
   initSubcommand,
   keysSubcommand,
   modelsSubcommand,
+  memorySubcommand,
+  ledgerSubcommand,
+  costSubcommand,
+  undoSubcommand,
+  updateSubcommand,
+  auditCodebaseSubcommand,
+  kbSubcommand,
+  skillsSubcommand,
+  verifySubcommand,
   chatSubcommand,
   askSubcommand,
   compactSubcommand,
   exportSessionSubcommand,
   importSessionSubcommand,
+  resumeSubcommand,
 ];
 
 export function findSubcommand(verb: string): Subcommand | undefined {

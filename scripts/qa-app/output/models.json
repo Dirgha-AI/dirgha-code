@@ -1,0 +1,17 @@
+{
+  "name": "models",
+  "path": "/app/models",
+  "expect": "Models hub",
+  "url_visited": "https://dirgha.ai/app/models",
+  "url_final": "https://dirgha.ai/app/models",
+  "http_status": 200,
+  "title": "Dirgha \u2014 Agent OS",
+  "body_text_excerpt": "D\nCONVERSATIONS\n\nNo conversations yet. Start one.\n\n~/dirgha-workspace\n0 open\nDIRGHA \u00b7 AGENT OS\nDeploy\nSign in\nMODELS\nModel catalogue\n\nLeading hosted + BYOK models. Default is moonshotai/kimi-k2-instruct.\n\nAll\nFrontier\nThinking\nBalanced\nFast\nFree\nKimi K2 Instruct\n\nnvidia \u00b7 balanced \u00b7 128.0K ctx\n\nDefault. Strong coding agent, open weights, sustainable cost.\n\nnvidia\nSelected\nQwen 3 Next 80B A3B\n\nnvidia \u00b7 fast \u00b7 128.0K ctx\n\nFast, cheap Qwen MoE. Hosted on NIM.\n\nnvidia\nSelect\nLlama 3.3 70B\n\nnvidia \u00b7 balanced \u00b7 128.0K ctx\n\nMeta flagship open weights.\n\nnvidia\nSelect\nLing 2.6-1T (free)\n\nopenrouter \u00b7 free \u00b7 256.0K ctx\n\nIncluded free-tier 1T-param workhorse.\n\nopenrouter\nSelect\nClaude Opus 4.7\n\nanthropic \u00b7 frontier \u00b7 1.00M ctx\n\nBest-in-class reasoning. Expensive \u2014 use for hard problems.\n\nanthropic\nSelect\nClaude Sonnet 4.6\n\nanthropic \u00b7 balanced \u00b7 200.0K ctx\n\nPremium balanced Claude.\n\nanthropic\nSelect\nClaude Haiku 4.5\n\nanthropic \u00b7 fast \u00b7 200.0K ctx\n\nFastest Claude for short turns.\n\nanthropic\nSelect\nGPT-5\n\nopenai \u00b7 frontier \u00b7 400.0K ctx\n\nOpenAI flagship.\n\nopenai\nSelect\nGPT-5 mini\n\nopenai \u00b7 balanced \u00b7 256.0K ctx\n\nGPT-5 class at balanced cost.\n\nopenai\nSelect\nGPT-4o mini\n\nopenai \u00b7 fast \u00b7 128.0K ctx\n\nCheap + fast OpenAI.\n\nopenai\nSelect\no1\n\nopenai \u00b7 thinking \u00b7 200.0K ctx\n\nOpenAI long-chain reasoning.\n\nopenai\nSelect\nGemini 2.5 Pro\n\ngemini \u00b7 frontier \u00b7 2.00M ctx\n\nGoogle flagship, 2M context.\n\ngemini\nSelect\nGemini 2.5 Flash\n\ngemini \u00b7 fast \u00b7 1.00M ctx\n\nFast Gemini, 1M context.\n\ngemini\nSelect",
+  "console": [],
+  "network_failures": [],
+  "screenshot": "output/models.png",
+  "navigation_error": null,
+  "verdict": {
+    "error": "nim call failed: Error code: 504"
+  }
+}

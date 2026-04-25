@@ -1,0 +1,17 @@
+{
+  "name": "memory",
+  "path": "/app/memory",
+  "expect": "Memory viewer",
+  "url_visited": "https://dirgha.ai/app/memory",
+  "url_final": "https://dirgha.ai/app/memory",
+  "http_status": 200,
+  "title": "Dirgha \u2014 Agent OS",
+  "body_text_excerpt": "D\nCONVERSATIONS\n\nNo conversations yet. Start one.\n\n~/dirgha-workspace\n0 open\nDIRGHA \u00b7 AGENT OS\nDeploy\nSign in\nMEMORY\nPersonal memory\n\nLocal-first notes the agent can reference. 0 entries saved on this device.\n\nAll\nFact\nPreference\nProject\nReference\nFeedback\nNew memory\n\nNothing saved yet. Capture facts about yourself, projects, and preferences so your agents can use them.\n\nAdd first memory",
+  "console": [],
+  "network_failures": [],
+  "screenshot": "output/memory.png",
+  "navigation_error": null,
+  "verdict": {
+    "error": "nim call failed: Error code: 504"
+  }
+}

@@ -20,6 +20,13 @@ export const gitTool = {
     async execute(rawInput, ctx) {
         const input = rawInput;
         const base = commandFor(input.op);
+        if (!base) {
+            return {
+                content: `git: unknown op "${String(input.op)}". Expected one of: status, diff, log, branch, show.`,
+                data: { op: input.op, exitCode: 64 },
+                isError: true,
+            };
+        }
         const full = [...base, ...(input.args ?? [])];
         const cwd = input.cwd ?? ctx.cwd;
         const result = await run('git', full, cwd, ctx.env);
@@ -37,6 +44,7 @@ function commandFor(op) {
         case 'log': return ['log', '--oneline', '-n', '20'];
         case 'branch': return ['branch', '--list'];
         case 'show': return ['show', '--no-color'];
+        default: return null;
     }
 }
 async function run(command, args, cwd, env) {

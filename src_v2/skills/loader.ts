@@ -94,15 +94,47 @@ export function parseSkill(text: string, path: string, source: Skill['source']):
   };
 }
 
+/**
+ * Two-level YAML-lite frontmatter parser. Supports:
+ *   - top-level scalars: `key: value` (string), `key: [a, b]` (inline array)
+ *   - top-level objects: `key:\n  sub: value\n  sub2: [x, y]` (one level deep)
+ *
+ * Nested arrays of objects, anchors, refs, multi-line strings — not
+ * supported; SKILL.md frontmatter is intentionally tiny.
+ */
 function parseFrontmatter(raw: string): Partial<SkillMeta> {
   const out: Record<string, unknown> = {};
-  for (const line of raw.split('\n')) {
-    if (!line.trim() || line.startsWith('#')) continue;
+  const lines = raw.split('\n');
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (!line.trim() || line.trim().startsWith('#')) { i++; continue; }
+    // Skip indented lines at the top level — they belong to the
+    // previous key and were consumed in the nested branch below.
+    if (line.startsWith('  ') || line.startsWith('\t')) { i++; continue; }
     const idx = line.indexOf(':');
-    if (idx < 0) continue;
+    if (idx < 0) { i++; continue; }
     const key = line.slice(0, idx).trim();
-    const value = line.slice(idx + 1).trim();
-    out[key] = parseValue(value);
+    const after = line.slice(idx + 1).trim();
+    if (after.length > 0) {
+      out[key] = parseValue(after);
+      i++;
+      continue;
+    }
+    // Empty value → consume indented child lines as a nested object.
+    const nested: Record<string, unknown> = {};
+    i++;
+    while (i < lines.length && (lines[i].startsWith('  ') || lines[i].startsWith('\t'))) {
+      const child = lines[i].replace(/^[\t ]+/, '');
+      if (!child.trim() || child.startsWith('#')) { i++; continue; }
+      const cidx = child.indexOf(':');
+      if (cidx < 0) { i++; continue; }
+      const ckey = child.slice(0, cidx).trim();
+      const cval = child.slice(cidx + 1).trim();
+      nested[ckey] = parseValue(cval);
+      i++;
+    }
+    out[key] = nested;
   }
   return out as Partial<SkillMeta>;
 }

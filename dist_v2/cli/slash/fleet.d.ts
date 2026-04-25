@@ -1,7 +1,9 @@
 /**
- * /fleet — shortcut to the fleet command. v2 doesn't ship a fleet
- * module yet; delegate to the out-of-band CLI runner once it exists.
- * STUB: print the equivalent shell invocation and exit.
+ * /fleet — dispatch to fleet/cli-command for the read-only / quick
+ * subcommands (list, help, discard, cleanup, merge). Long-running
+ * launch + triple still belong in a separate shell because they spawn
+ * 3+ subagents that would block the REPL for minutes; we point users
+ * at the shell variant for those.
  */
 import type { SlashCommand } from './types.js';
 export declare const fleetCommand: SlashCommand;

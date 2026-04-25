@@ -1,0 +1,240 @@
+[
+  {
+    "name": "home",
+    "path": "/app/",
+    "expect": "Home dashboard / room tiles",
+    "url_visited": "https://dirgha.ai/app/",
+    "url_final": "https://dirgha.ai/app/",
+    "http_status": 200,
+    "title": "Dirgha \u2014 Agent OS",
+    "body_text_excerpt": "D\nCONVERSATIONS\n\nNo conversations yet. Start one.\n\n~/dirgha-workspace\n0 open\nDIRGHA \u00b7 AGENT OS\nDeploy\nSign in\n\nGOOD MORNING \u00b7 DIRGHA\n\nWhat do you want to build today?\nKimi K2 Instruct\n\u00b7\nchange\nSend\nAudit this repo\nDraft a landing page\nExplain this codebase\nDebug a flaky test\nGenerate an image\nYOUR DESK\n\u2318K anywhere \u00b7 drag widgets soon\nTASKS\nFinish onboarding flow\ntoday\nDeploy v0.2 to staging\ntomorrow\n\u2713\nReview PR for billing\nDraft launch announcement\nFriday\nTODAY\n\nSaturday, April 25\n\n09:30\nStandup\n11:00\nDeep work: refactor billing\n14:00\nDesign review with Priya\n17:30\nShip soft-launch\n\nAdd Google Calendar in Settings.\n\nPROJECTS\nBrowse \u2192\ndirgha-core\n23 turns\nrama-i hardware\n17 turns\ndirgha-org-site\n4 turns\nRECENT CHATS\nOpen chat \u2192\n\nNo conversations yet. Type above to start one.\n\nMEMORY\nOpen \u2192\n\u2014\n\nentries saved \u00b7 auto-recalled when relevant\n\nACTIVITY\nVPS fleet:\n0 servers\nDaily deploys:\n\u2014 allowed\nMax subagents:\n\u2014",
+    "console": [],
+    "network_failures": [],
+    "screenshot": "output/home.png",
+    "navigation_error": null,
+    "verdict": {
+      "error": "nim call failed: <html>\r\n<head><title>502 Bad Gateway</title></head>\r\n<body>\r\n<center><h1>502 Bad Gateway</h1></center>\r\n</body>\r\n</html>"
+    }
+  },
+  {
+    "name": "chat",
+    "path": "/app/chat",
+    "expect": "Workspace (chat + canvas)",
+    "url_visited": "https://dirgha.ai/app/chat",
+    "url_final": "https://dirgha.ai/app/chat",
+    "http_status": 200,
+    "title": "Dirgha \u2014 Agent OS",
+    "body_text_excerpt": "D\nCONVERSATIONS\n\nNo conversations yet. Start one.\n\n~/dirgha-workspace\n0 open\nDIRGHA \u00b7 AGENT OS\nDeploy\nSign in\nWhat would you like to build?\n\nAsk, and I'll plan, write code, run tests, and deploy \u2014 all in one thread.\n\nAudit the repository in my cwd and report the top 5 architectural risks.\nRefactor `src/index.ts` into a layered module structure.\nWrite a Stripe webhook handler that gates on signature + idempotency.\nDeploy this project to my VPS over SSH \u2014 ask first before destructive steps.\nKimi K2 Instruct\nSend\n\nDirgha can make mistakes. Review code before running.",
+    "console": [],
+    "network_failures": [],
+    "screenshot": "output/chat.png",
+    "navigation_error": null,
+    "verdict": {
+      "error": "nim call failed: Error code: 504"
+    }
+  },
+  {
+    "name": "build",
+    "path": "/app/build",
+    "expect": "Build placeholder room",
+    "url_visited": "https://dirgha.ai/app/build",
+    "url_final": "https://dirgha.ai/app/build",
+    "http_status": 200,
+    "title": "Dirgha \u2014 Agent OS",
+    "body_text_excerpt": "D\nCONVERSATIONS\n\nNo conversations yet. Start one.\n\n~/dirgha-workspace\n0 open\nDIRGHA \u00b7 AGENT OS\nDeploy\nSign in\nBuild\n\nFile browser + Monaco editor + preview for standalone coding sessions. Opens artifacts inline with the chat when an AI turn produces code.",
+    "console": [],
+    "network_failures": [],
+    "screenshot": "output/build.png",
+    "navigation_error": null,
+    "verdict": {
+      "error": "nim call failed: Error code: 504"
+    }
+  },
+  {
+    "name": "research",
+    "path": "/app/research",
+    "expect": "Research placeholder room",
+    "url_visited": "https://dirgha.ai/app/research",
+    "url_final": "https://dirgha.ai/app/research",
+    "http_status": 200,
+    "title": "Dirgha \u2014 Agent OS",
+    "body_text_excerpt": "D\nCONVERSATIONS\n\nNo conversations yet. Start one.\n\n~/dirgha-workspace\n0 open\nDIRGHA \u00b7 AGENT OS\nDeploy\nSign in\nResearch\n\nSource-cited research room. Gather, synthesize, cite. Coming next sprint.",
+    "console": [],
+    "network_failures": [],
+    "screenshot": "output/research.png",
+    "navigation_error": null,
+    "verdict": {
+      "error": "nim call failed: Error code: 504"
+    }
+  },
+  {
+    "name": "deploy",
+    "path": "/app/deploy",
+    "expect": "Deploy room (VPS providers)",
+    "url_visited": "https://dirgha.ai/app/deploy",
+    "url_final": "https://dirgha.ai/app/deploy",
+    "http_status": 200,
+    "title": "Dirgha \u2014 Agent OS",
+    "body_text_excerpt": "D\nCONVERSATIONS\n\nNo conversations yet. Start one.\n\n~/dirgha-workspace\n0 open\nDIRGHA \u00b7 AGENT OS\nDeploy\nSign in\nDEPLOY\nDeploy anywhere\n\nOne action, four destinations. Each plan includes an isolated VPS where your chat, agent, and memory logs live \u2014 you own them, and you can wipe them.\n\nYour servers\nSign in to see your servers.\nDirgha Sandbox\nINCLUDED\n\nEphemeral browser sandbox for rapid iteration. Included in every plan.\n\nLaunch sandbox\n\nSign in and upgrade to enable this destination.\n\nDirgha Server\nBUILD+\n\nPersistent server-side VPS with a real Linux shell, PTY, and long-running processes.\n\nSpin up server\n\nSign in and upgrade to enable this destination.\n\nConnect GitHub repo\nALL PLANS\n\nPoint at any repo, pick a branch, one-click deploy. Auto-rebuilds on push.\n\nConnect repo\n\nSign in and upgrade to enable this destination.\n\nDeploy to your VPS\nALL PLANS\n\nUse your own Linux server via SSH. We generate and run the deploy script you approve.\n\nAdd server\n\nSign in and upgrade to enable this destination.",
+    "console": [],
+    "network_failures": [],
+    "screenshot": "output/deploy.png",
+    "navigation_error": null,
+    "verdict": {
+      "error": "nim call failed: Error code: 504"
+    }
+  },
+  {
+    "name": "media",
+    "path": "/app/media",
+    "expect": "Media studio",
+    "url_visited": "https://dirgha.ai/app/media",
+    "url_final": "https://dirgha.ai/app/media",
+    "http_status": 200,
+    "title": "Dirgha \u2014 Agent OS",
+    "body_text_excerpt": "D\nCONVERSATIONS\n\nNo conversations yet. Start one.\n\n~/dirgha-workspace\n0 open\nDIRGHA \u00b7 AGENT OS\nDeploy\nSign in\nMEDIA STUDIO\nGenerate images, video, and voice\n\nHosted through Dirgha. Metered against your plan allowance.\n\nImage\nVideo\nVoice\nTranscribe\nSign in to generate media\n\nMedia Studio runs on the Dirgha inference pool. An active subscription is required; use the Sign-in button in the top bar.",
+    "console": [],
+    "network_failures": [],
+    "screenshot": "output/media.png",
+    "navigation_error": null,
+    "verdict": {
+      "error": "nim call failed: Error code: 504"
+    }
+  },
+  {
+    "name": "security",
+    "path": "/app/security",
+    "expect": "Security placeholder room",
+    "url_visited": "https://dirgha.ai/app/security",
+    "url_final": "https://dirgha.ai/app/security",
+    "http_status": 200,
+    "title": "Dirgha \u2014 Agent OS",
+    "body_text_excerpt": "D\nCONVERSATIONS\n\nNo conversations yet. Start one.\n\n~/dirgha-workspace\n0 open\nDIRGHA \u00b7 AGENT OS\nDeploy\nSign in\nSecurity\n\nArniko findings + threat model viewer. Coming next sprint.",
+    "console": [],
+    "network_failures": [],
+    "screenshot": "output/security.png",
+    "navigation_error": null,
+    "verdict": {
+      "error": "nim call failed: Error code: 504"
+    }
+  },
+  {
+    "name": "agents",
+    "path": "/app/agents",
+    "expect": "Agents marketplace",
+    "url_visited": "https://dirgha.ai/app/agents",
+    "url_final": "https://dirgha.ai/app/agents",
+    "http_status": 200,
+    "title": "Dirgha \u2014 Agent OS",
+    "body_text_excerpt": "D\nCONVERSATIONS\n\nNo conversations yet. Start one.\n\n~/dirgha-workspace\n0 open\nDIRGHA \u00b7 AGENT OS\nDeploy\nSign in\nAGENTS\nAgent marketplace\n\nCurated personas. Pick one and start \u2014 everything preconfigured.\n\nAll\nGeneral\nCode\nResearch\nProduct\nWriting\nOps\nSecurity\nData\nCreative\nEducation\nStaff Engineer\n\nCODE \u00b7 BY DIRGHA\n\nSenior architect: reviews, refactors, explains systems, plans migrations with clear trade-offs.\n\narchitecture\nreview\nrefactor\nanthropic/claude-opus-4-7\nLaunch\nShipper\n\nCODE \u00b7 BY DIRGHA\n\nBias-to-action builder: picks an MVP slice, writes it, tests it, and deploys.\n\nmvp\nfullstack\ndeploy\nanthropic/claude-sonnet-4-6\nLaunch\nCode Reviewer\n\nCODE \u00b7 BY DIRGHA\n\nStrict code reviewer for security, correctness, and readability.\n\nreview\nsecurity\nlinting\nanthropic/claude-opus-4-7\nLaunch\nResearcher\n\nRESEARCH \u00b7 BY DIRGHA\n\nEvidence-first analyst: gathers sources, synthesizes findings, cites everything.\n\nresearch\nanalysis\ncitations\ngoogle/gemini-2.5-pro\nLaunch\nProduct PM\n\nPRODUCT \u00b7 BY DIRGHA\n\nProduct manager: writes briefs, scopes MVPs, weighs trade-offs, drafts launch posts.\n\nbriefs\nscoping\nlaunch\nanthropic/claude-sonnet-4-6\nLaunch\nWriter\n\nWRITING \u00b7 BY DIRGHA\n\nCrisp editorial writer for essays, product copy, and docs.\n\nessays\ncopy\ndocs\nanthropic/claude-opus-4-7\nLaunch\nSRE\n\nOPS \u00b7 BY DIRGHA\n\nOperations engineer: debugs prod, reads logs, writes runbooks.\n\noncall\ndebug\nrunbook\nanthropic/claude-sonnet-4-6\nLaunch\nSecurity Analyst\n\nSECURITY \u00b7 BY DIRGHA\n\nAppSec reviewer: OWASP, supply chain, secret hygiene, LLM safety.\n\nowasp\nsecrets\nsupply-chain\nanthropic/claude-opus-4-7\nLaunch\nData Analyst\n\nDATA \u00b7 BY DIRGHA\n\nSQL + notebooks; turns data into decisions.\n\nsql\nanalytics\nreporting\nanthropic/claude-sonnet-4-6\nLaunch\nTutor\n\nEDUCATION \u00b7 BY DIRGHA\n\nPatient Socratic tutor: breaks problems down, asks leading questions.\n\nteaching\nsocratic\nanthropic/claude-sonnet-4-6\nLaunch\nUI Designer\n\nCREATIVE \u00b7 BY DIRGHA\n\nInterface designer: layout, hierarchy, motion, zinc/dark-mode aesthetic.\n\nui\nux\ntailwind\nanthropic/claude-opus-4-7\nLaunch\nDirgha (general)\n\nGENERAL \u00b7 BY DIRGHA\n\nDefault general-purpose assistant. No strong persona \u2014 pick another for specialised work.\n\ndefault\nanthropic/claude-sonnet-4-6\nLaunch",
+    "console": [],
+    "network_failures": [],
+    "screenshot": "output/agents.png",
+    "navigation_error": null,
+    "verdict": {
+      "error": "nim call failed: Error code: 502"
+    }
+  },
+  {
+    "name": "skills",
+    "path": "/app/skills",
+    "expect": "Skills library",
+    "url_visited": "https://dirgha.ai/app/skills",
+    "url_final": "https://dirgha.ai/app/skills",
+    "http_status": 200,
+    "title": "Dirgha \u2014 Agent OS",
+    "body_text_excerpt": "D\nCONVERSATIONS\n\nNo conversations yet. Start one.\n\n~/dirgha-workspace\n0 open\nDIRGHA \u00b7 AGENT OS\nDeploy\nSign in\nSKILLS\nSkills library\n\nReusable procedural prompts. Inject into any conversation.\n\nAll\nWorkflow\nReview\nWriting\nOps\nSecurity\nDebug\nPlanning\nTest-Driven Development\n\nWORKFLOW\n\nRed / Green / Refactor: write a failing test, minimal code to pass, then refactor.\n\nFollow strict TDD.\n1. Write a single failing test that expresses the next behaviour.\n2. Write the smallest amount of code that makes the test pass.\n3. Refactor without changing behaviour, rerunning tests after each edit.\n4. Commit the test and the implementation in the same commit.\nNever skip the red step. Never write untested code.\ntdd\ntesting\nrefactor\nUse\nSystematic Debugging\n\nDEBUG\n\nReproduce, isolate, bisect, fix. One change at a time.\n\nWhen debugging:\n1. Reproduce with the smallest input that still fails.\n2. Isolate to the smallest slice of code involved.\n3. Form one hypothesis. State it aloud.\n4. Test the hypothesis with a single change. If wrong, discard cleanly.\n5. Fix, then add a regression test that would have caught this bug.\nDo not shotgun changes. Do not assume a cause without evidence.\ndebug\ntriage\nUse\nBrainstorm \u2192 Design\n\nPLANNING\n\nTurn a vague idea into a crisp design doc before coding.\n\nBefore writing code, produce a 1-page design:\n- Problem (what changes after this ships?)\n- Users (who / when / why)\n- Non-goals (out of scope \u2014 list explicitly)\n- Approach (architecture + key trade-offs)\n- Open questions (tagged with owner)\nStop and get sign-off before implementation.\nplanning\ndesign\nUse\nRigorous Code Review\n\nREVIEW\n\nSystematic review for correctness, security, clarity.\n\nReview this change. Check every file:\n- Correctness: does it do what it claims? edge cases? error paths?\n- Security: input validation, auth, secrets, injection, IDOR.\n- Clarity: naming, readability, module size \u2264500 LOC.\n- Tests: does new behaviour have tests? are tests meaningful?\n- Performance: obvious hot loops, unbounded queries, N+1.\nOutput: per-file notes + prioritised fix list (critical / high / medium / low).\nreview\nsecurity\nUse\nPost-Ship Writeup\n\nWRITING\n\nConcise release post \u2014 what shipped, why, how to use it.\n\nDraft a release post in this shape:\n- One-sentence headline.\n- What changed (bulleted).\n- Why it matters (user-facing, 2-3 sentences).\n- How to use (mini quickstart).\n- Upgrade notes (breaking changes).\nKeep it under 300 words.\nrelease\ndocs\nUse\nRoot-Cause Analysis\n\nOPS\n\n5-whys + system-level analysis; prevent recurrence.\n\nWrite an RCA:\n1. Timeline (UTC, 1-line entries).\n2. Impact (who was affected, how long).\n3. Root cause (5 whys; stop at the *system* level, not the person).\n4. Detection (what alerted? what should have?).\n5. Response (what worked; what didn't).\n6. Action items (owner + date + verification).\nrca\npostmortem\nUse\nThreat Model (STRIDE)\n\nSECURITY\n\nWalk the system with STRIDE and produce a mitigation list.\n\nModel this system under STRIDE:\n- Spoofing \u2014 identities / sessions\n- ",
+    "console": [],
+    "network_failures": [],
+    "screenshot": "output/skills.png",
+    "navigation_error": null,
+    "verdict": {
+      "error": "nim call failed: Error code: 504"
+    }
+  },
+  {
+    "name": "models",
+    "path": "/app/models",
+    "expect": "Models hub",
+    "url_visited": "https://dirgha.ai/app/models",
+    "url_final": "https://dirgha.ai/app/models",
+    "http_status": 200,
+    "title": "Dirgha \u2014 Agent OS",
+    "body_text_excerpt": "D\nCONVERSATIONS\n\nNo conversations yet. Start one.\n\n~/dirgha-workspace\n0 open\nDIRGHA \u00b7 AGENT OS\nDeploy\nSign in\nMODELS\nModel catalogue\n\nLeading hosted + BYOK models. Default is moonshotai/kimi-k2-instruct.\n\nAll\nFrontier\nThinking\nBalanced\nFast\nFree\nKimi K2 Instruct\n\nnvidia \u00b7 balanced \u00b7 128.0K ctx\n\nDefault. Strong coding agent, open weights, sustainable cost.\n\nnvidia\nSelected\nQwen 3 Next 80B A3B\n\nnvidia \u00b7 fast \u00b7 128.0K ctx\n\nFast, cheap Qwen MoE. Hosted on NIM.\n\nnvidia\nSelect\nLlama 3.3 70B\n\nnvidia \u00b7 balanced \u00b7 128.0K ctx\n\nMeta flagship open weights.\n\nnvidia\nSelect\nLing 2.6-1T (free)\n\nopenrouter \u00b7 free \u00b7 256.0K ctx\n\nIncluded free-tier 1T-param workhorse.\n\nopenrouter\nSelect\nClaude Opus 4.7\n\nanthropic \u00b7 frontier \u00b7 1.00M ctx\n\nBest-in-class reasoning. Expensive \u2014 use for hard problems.\n\nanthropic\nSelect\nClaude Sonnet 4.6\n\nanthropic \u00b7 balanced \u00b7 200.0K ctx\n\nPremium balanced Claude.\n\nanthropic\nSelect\nClaude Haiku 4.5\n\nanthropic \u00b7 fast \u00b7 200.0K ctx\n\nFastest Claude for short turns.\n\nanthropic\nSelect\nGPT-5\n\nopenai \u00b7 frontier \u00b7 400.0K ctx\n\nOpenAI flagship.\n\nopenai\nSelect\nGPT-5 mini\n\nopenai \u00b7 balanced \u00b7 256.0K ctx\n\nGPT-5 class at balanced cost.\n\nopenai\nSelect\nGPT-4o mini\n\nopenai \u00b7 fast \u00b7 128.0K ctx\n\nCheap + fast OpenAI.\n\nopenai\nSelect\no1\n\nopenai \u00b7 thinking \u00b7 200.0K ctx\n\nOpenAI long-chain reasoning.\n\nopenai\nSelect\nGemini 2.5 Pro\n\ngemini \u00b7 frontier \u00b7 2.00M ctx\n\nGoogle flagship, 2M context.\n\ngemini\nSelect\nGemini 2.5 Flash\n\ngemini \u00b7 fast \u00b7 1.00M ctx\n\nFast Gemini, 1M context.\n\ngemini\nSelect",
+    "console": [],
+    "network_failures": [],
+    "screenshot": "output/models.png",
+    "navigation_error": null,
+    "verdict": {
+      "error": "nim call failed: Error code: 504"
+    }
+  },
+  {
+    "name": "store",
+    "path": "/app/store",
+    "expect": "App store",
+    "url_visited": "https://dirgha.ai/app/store",
+    "url_final": "https://dirgha.ai/app/store",
+    "http_status": 200,
+    "title": "Dirgha \u2014 Agent OS",
+    "body_text_excerpt": "D\nCONVERSATIONS\n\nNo conversations yet. Start one.\n\n~/dirgha-workspace\n0 open\nDIRGHA \u00b7 AGENT OS\nDeploy\nSign in\nAPP STORE\nEvery Dirgha app, one place\n\n9 live \u00b7 4 in preview \u00b7 7 building \u00b7 5 planned.\n\nAll\nCore\nCreator\nCommerce\nEducation\nResearch\nOps\nSecurity\nKnowledge\nCommunity\nAbundance (Bucky)\n\nOPS\n\nOSS\nLIVE\n\nDePIN compute mesh + Lightning settlement.\n\nOpen\nAgents\n\nCORE\n\nLIVE\n\nCurated personas: pick one and start.\n\nOpen\nChat\n\nCORE\n\nFLAGSHIP\nLIVE\n\nTalk to your agent, stream answers, save threads.\n\nOpen\nContribute\n\nCOMMUNITY\n\nLIVE\n\nSponsor Dirgha OSS \u2014 contribute-protocol.\n\nVisit\nMemory\n\nKNOWLEDGE\n\nLIVE\n\nPersonal memory bank (local-first, optional sync).\n\nOpen\nModels\n\nCORE\n\nLIVE\n\nDirgha-hosted frontier, thinking, and fast models.\n\nOpen\nSkills\n\nCORE\n\nLIVE\n\nReusable procedural prompts for any thread.\n\nOpen\nStatus\n\nOPS\n\nLIVE\n\nLive platform health + incident history.\n\nVisit\nWriter\n\nCREATOR\n\nV2\nLIVE\n\nLong-form writing with TipTap + Binder + StoryEngine.\n\nOpen\nBuild\n\nCORE\n\nPREVIEW\n\nMonaco + file tree + terminal. Cursor-grade coding.\n\nPreview\nCoach\n\nEDUCATION\n\nPREVIEW\n\nPersonal tutor-agent with Socratic loop.\n\nPreview\nDeploy\n\nCORE\n\nPREVIEW\n\nSandbox \u00b7 Server \u00b7 GitHub \u00b7 Your VPS.\n\nPreview\nMedia Studio\n\nCORE\n\nPREVIEW\n\nImage, video, voice on fal.ai / Runway / ElevenLabs.\n\nPreview\nAgency OS\n\nCREATOR\n\nBUILDING\n\nAgentic ad + creator workflow with Janus twin ops.\n\nPeek (incomplete)\nArniko\n\nSECURITY\n\nOSS\nBUILDING\n\nAI + code + infra security scanner (headless).\n\nPeek (incomplete)\nCampus\n\nEDUCATION\n\nBUILDING\n\nERP for schools + universities.\n\nPeek (incomplete)\nCreator OS\n\nCREATOR\n\nBUILDING\n\nMulti-agent workflow for creators: drafts \u2192 edits \u2192 publish.\n\nPeek (incomplete)\nFactory\n\nCOMMERCE\n\nBUILDING\n\nCommerce + invoicing + fulfilment (Medusa-backed).\n\nPeek (incomplete)\nLearn\n\nEDUCATION\n\nBUILDING\n\nLMS + course runner for Mahakosh / Rama language series.\n\nPeek (incomplete)\nSecurity\n\nSECURITY\n\nBUILDING\n\nArniko scanner findings and threat models.\n\nPeek (incomplete)\nBooks\n\nKNOWLEDGE\n\nPLANNED\n\nLibrary + reader + note-taking on your corpus.\n\nComing soon\nGrants\n\nCOMMERCE\n\nPLANNED\n\nFunded builder programmes and proposal submission.\n\nComing soon\nJobs\n\nCOMMERCE\n\nPLANNED\n\nLabour marketplace \u2014 post, apply, pay in Lightning.\n\nComing soon\nResearch\n\nRESEARCH\n\nPLANNED\n\nSource-cited analysis and PDF ingestion.\n\nComing soon\nStorage\n\nKNOWLEDGE\n\nPLANNED\n\nEncrypted object storage for your drafts and datasets.\n\nComing soon",
+    "console": [],
+    "network_failures": [],
+    "screenshot": "output/store.png",
+    "navigation_error": null,
+    "verdict": {
+      "error": "nim call failed: <html>\r\n<head><title>502 Bad Gateway</title></head>\r\n<body>\r\n<center><h1>502 Bad Gateway</h1></center>\r\n</body>\r\n</html>"
+    }
+  },
+  {
+    "name": "memory",
+    "path": "/app/memory",
+    "expect": "Memory viewer",
+    "url_visited": "https://dirgha.ai/app/memory",
+    "url_final": "https://dirgha.ai/app/memory",
+    "http_status": 200,
+    "title": "Dirgha \u2014 Agent OS",
+    "body_text_excerpt": "D\nCONVERSATIONS\n\nNo conversations yet. Start one.\n\n~/dirgha-workspace\n0 open\nDIRGHA \u00b7 AGENT OS\nDeploy\nSign in\nMEMORY\nPersonal memory\n\nLocal-first notes the agent can reference. 0 entries saved on this device.\n\nAll\nFact\nPreference\nProject\nReference\nFeedback\nNew memory\n\nNothing saved yet. Capture facts about yourself, projects, and preferences so your agents can use them.\n\nAdd first memory",
+    "console": [],
+    "network_failures": [],
+    "screenshot": "output/memory.png",
+    "navigation_error": null,
+    "verdict": {
+      "error": "nim call failed: Error code: 504"
+    }
+  },
+  {
+    "name": "settings",
+    "path": "/app/settings",
+    "expect": "Settings page",
+    "url_visited": "https://dirgha.ai/app/settings",
+    "url_final": "https://dirgha.ai/app/settings",
+    "http_status": 200,
+    "title": "Dirgha \u2014 Agent OS",
+    "body_text_excerpt": "D\nCONVERSATIONS\n\nNo conversations yet. Start one.\n\n~/dirgha-workspace\n0 open\nDIRGHA \u00b7 AGENT OS\nDeploy\nSign in\nSETTINGS\nSettings\nAccount\n\nSign in and pick a plan from the top bar to start using Dirgha.\n\nConversations\n\n0 saved locally. Conversations never leave your browser unless you're signed in and opted in.\n\nClear all conversations",
+    "console": [],
+    "network_failures": [],
+    "screenshot": "output/settings.png",
+    "navigation_error": null,
+    "verdict": {
+      "error": "nim call failed: Error code: 504"
+    }
+  },
+  {
+    "name": "admin-secrets",
+    "path": "/app/admin/secrets",
+    "expect": "Admin secrets page (auth + admin)",
+    "url_visited": "https://dirgha.ai/app/admin/secrets",
+    "url_final": "https://dirgha.ai/app/admin/secrets",
+    "http_status": 200,
+    "title": "Dirgha \u2014 Agent OS",
+    "body_text_excerpt": "D\nCONVERSATIONS\n\nNo conversations yet. Start one.\n\n~/dirgha-workspace\n0 open\nDIRGHA \u00b7 AGENT OS\nDeploy\nSign in\nADMIN \u00b7 VAULT\nSystem secrets\n\nEncrypted platform secrets. Values are AES-256-GCM encrypted before DB storage; only masked previews are returned.\n\nRefresh\nSign in required",
+    "console": [],
+    "network_failures": [],
+    "screenshot": "output/admin-secrets.png",
+    "navigation_error": null,
+    "verdict": {
+      "error": "nim call failed: <html>\r\n<head><title>502 Bad Gateway</title></head>\r\n<body>\r\n<center><h1>502 Bad Gateway</h1></center>\r\n</body>\r\n</html>"
+    }
+  }
+]

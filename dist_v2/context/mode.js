@@ -6,7 +6,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-export const MODES = ['plan', 'act', 'verify'];
+export const MODES = ['plan', 'act', 'verify', 'ask'];
 export const DEFAULT_MODE = 'act';
 const MODE_PREAMBLES = {
     plan: [
@@ -20,6 +20,10 @@ const MODE_PREAMBLES = {
     verify: [
         'Mode: VERIFY.',
         'Treat the current state as a proposed change to audit. Read code, run tests and type-checkers, inspect git diffs — but do NOT modify files. Surface risks, test failures, and unverified assumptions. Return a pass/fail summary.',
+    ].join('\n'),
+    ask: [
+        'Mode: ASK.',
+        'Answer questions about the codebase. You may read files, search, list directories, and inspect git state — but you must NOT modify anything (no fs_write, no fs_edit, no shell, no git, no commits, no checkpoint, no browser). Keep answers terse, cite paths and line numbers, and if the question would require running code, say so explicitly instead of running it.',
     ].join('\n'),
 };
 export function modePreamble(mode) {
