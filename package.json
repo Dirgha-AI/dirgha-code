@@ -1,6 +1,6 @@
 {
   "name": "@dirgha/code",
-  "version": "1.4.3",
+  "version": "1.5.0",
   "description": "A CLI coding agent built on four pillars: BYOK across 17 providers, persistent memory, parallel agents, and scanned skills.",
   "type": "module",
   "main": "./dist_v2/index.js",

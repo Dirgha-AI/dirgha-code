@@ -113,7 +113,7 @@ async function executeToolCalls(toolUses, cfg, events) {
                 input = decision.replaceInput;
             }
         }
-        if (cfg.approvalBus?.requiresApproval(call.name, input)) {
+        if (cfg.approvalBus?.requiresApproval(call.name, input) && !cfg.autoApprove) {
             const decision = await cfg.approvalBus.request({
                 id: call.id,
                 tool: call.name,

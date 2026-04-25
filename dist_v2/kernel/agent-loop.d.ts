@@ -28,5 +28,13 @@ export interface AgentLoopConfig {
     contextTransform?: (messages: Message[]) => Promise<Message[]>;
     toolConcurrency?: 'serial' | 'parallel';
     signal?: AbortSignal;
+    /**
+     * When true, every approval-required tool call is auto-granted
+     * without going through the ApprovalBus. Set by `dirgha --yolo` or
+     * by the YOLO mode preamble. The ApprovalBus is otherwise the
+     * canonical gate for risky operations (writes outside cwd, shell,
+     * git mutations, etc.).
+     */
+    autoApprove?: boolean;
 }
 export declare function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult>;

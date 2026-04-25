@@ -8,10 +8,21 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-export const MODES = ['plan', 'act', 'verify', 'ask'] as const;
+export const MODES = ['plan', 'act', 'yolo', 'verify', 'ask'] as const;
 export type Mode = (typeof MODES)[number];
 
 export const DEFAULT_MODE: Mode = 'act';
+
+/**
+ * Modes that auto-approve every tool call. Consumed by the agent loop
+ * so the ApprovalBus is short-circuited without modifying its
+ * underlying policy table.
+ */
+export const AUTO_APPROVE_MODES: ReadonlySet<Mode> = new Set<Mode>(['yolo']);
+
+export function isAutoApprove(mode: Mode | undefined): boolean {
+  return mode !== undefined && AUTO_APPROVE_MODES.has(mode);
+}
 
 const MODE_PREAMBLES: Record<Mode, string> = {
   plan: [
@@ -20,7 +31,11 @@ const MODE_PREAMBLES: Record<Mode, string> = {
   ].join('\n'),
   act: [
     'Mode: ACT.',
-    'Execute the task end to end. Use tools as needed, write code, run shells, commit when asked. Report concisely on what you did.',
+    'Execute the task end to end. Use tools as needed, write code, run shells, commit when asked. Confirm with the user before destructive or wide-reaching actions. Report concisely on what you did.',
+  ].join('\n'),
+  yolo: [
+    'Mode: YOLO.',
+    'Execute the task end to end with no confirmation gates — every tool call is pre-approved. The user has explicitly opted in; destructive or wide-reaching actions (rm, force-push, bulk edits) will run without asking. Be deliberate; do not optimise for speed at the cost of correctness.',
   ].join('\n'),
   verify: [
     'Mode: VERIFY.',

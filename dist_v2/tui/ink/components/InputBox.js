@@ -39,6 +39,15 @@ function lastAtToken(value) {
         return null;
     return tail;
 }
+function leadingSlashToken(value) {
+    // Buffer must start with `/` and the first token must contain no whitespace.
+    // Returns the substring after `/` up to the first whitespace (or EOL).
+    if (!value.startsWith('/'))
+        return null;
+    const tail = value.slice(1);
+    const ws = tail.search(/\s/);
+    return ws === -1 ? tail : tail.slice(0, ws);
+}
 export function InputBox(props) {
     const { stdout } = useStdout();
     const { exit } = useApp();
@@ -63,6 +72,20 @@ export function InputBox(props) {
             props.onAtQueryChange(lastAtToken(props.value));
         }
     }, [props.value, props.onAtQueryChange]);
+    // Notify parent whenever the leading `/<token>` shifts. We only emit
+    // a non-null query when the buffer is *just* the slash command being
+    // typed (no first-token whitespace yet) — once the user adds an
+    // argument, the dropdown auto-dismisses.
+    React.useEffect(() => {
+        if (props.onSlashQueryChange) {
+            const token = leadingSlashToken(props.value);
+            // Only suggest while the buffer is JUST the command name, i.e.
+            // there is no whitespace anywhere in the value yet. After the
+            // user types a space the suggestion is in the way.
+            const active = token !== null && !/\s/.test(props.value);
+            props.onSlashQueryChange(active ? token : null);
+        }
+    }, [props.value, props.onSlashQueryChange]);
     // Invalidate paste-collapse if the buffer shrinks past the pasted region.
     React.useEffect(() => {
         if (pasteSegment === null)

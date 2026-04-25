@@ -1,10 +1,9 @@
 /**
- * `dirgha setup` — quick BYOK onboarding.
+ * `dirgha setup` — three-step provider/auth/model wizard.
  *
- * Non-interactive sibling of `cli/setup.ts`. Asks for a preferred
- * provider and optional API keys, then persists them to
- * `~/.dirgha/keys.json` (mode 0600). Falls back to a how-to doc when
- * stdin is not a TTY or `--interactive=false` is passed.
+ * Thin shim that delegates to the canonical implementation in
+ * `cli/flows/wizard.ts`. Kept here so other modules that import
+ * `setupSubcommand` or `runSetup` from `./setup.js` continue to work.
  */
 import type { Subcommand } from './index.js';
 export declare function runSetup(argv: string[]): Promise<number>;

@@ -27,6 +27,8 @@ export interface InputBoxProps {
     vimMode?: boolean;
     /** Parent wants to know when the @-token changes (null = none active). */
     onAtQueryChange?: (query: string | null) => void;
+    /** Parent wants to know when the leading `/<token>` changes (null = none active). */
+    onSlashQueryChange?: (query: string | null) => void;
     /** Parent wants to know when to surface a modal overlay. */
     onRequestOverlay?: (kind: 'models' | 'help') => void;
     /** Parent owns the focus so it can be stolen when an overlay is up. */

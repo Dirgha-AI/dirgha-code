@@ -14,8 +14,8 @@ export interface StatusBarProps {
     costUsd: number;
     cwd: string;
     busy: boolean;
-    /** Current execution mode (act/plan/verify/ask); visible at all times. */
-    mode?: 'act' | 'plan' | 'verify' | 'ask';
+    /** Current execution mode; badge hidden when 'act' (the default). */
+    mode?: 'act' | 'plan' | 'verify' | 'ask' | 'yolo';
     /** Model's context window in tokens — drives the context meter. */
     contextWindow?: number;
     /** Output tokens from the in-progress turn. Drives the tok/s readout. */

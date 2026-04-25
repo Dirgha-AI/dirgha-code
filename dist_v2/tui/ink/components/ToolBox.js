@@ -10,6 +10,7 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
  */
 import * as React from 'react';
 import { Box, Text } from 'ink';
+import { iconFor } from '../icons.js';
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 const TOOL_LABEL = {
     fs_read: 'Read',
@@ -58,6 +59,6 @@ export function ToolBox(props) {
     const preview = props.outputPreview
         ? props.outputPreview.replace(/\s+/g, ' ').slice(0, 80)
         : '';
-    return (_jsxs(Box, { flexDirection: "column", borderStyle: "round", borderColor: borderColour, paddingX: 1, marginBottom: 1, children: [_jsxs(Box, { gap: 1, children: [_jsx(Text, { color: iconColour, children: icon }), _jsx(Text, { color: props.status === 'done' ? 'gray' : 'white', bold: true, children: prettyName(props.name) }), props.argSummary !== undefined && props.argSummary.length > 0 && (_jsxs(Text, { color: "gray", dimColor: true, children: ["(", props.argSummary, ")"] })), elapsedLabel !== '' && _jsx(Text, { color: "gray", dimColor: true, children: elapsedLabel })] }), preview !== '' && (_jsx(Box, { children: _jsx(Text, { color: "gray", dimColor: true, children: preview }) }))] }));
+    return (_jsxs(Box, { flexDirection: "column", borderStyle: "round", borderColor: borderColour, paddingX: 1, marginBottom: 1, children: [_jsxs(Box, { gap: 1, children: [_jsx(Text, { color: iconColour, children: icon }), _jsx(Text, { color: "magenta", bold: true, children: iconFor(props.name) }), _jsx(Text, { color: props.status === 'done' ? 'gray' : 'white', bold: true, children: prettyName(props.name) }), props.argSummary !== undefined && props.argSummary.length > 0 && (_jsxs(Text, { color: "gray", dimColor: true, children: ["(", props.argSummary, ")"] })), elapsedLabel !== '' && _jsx(Text, { color: "gray", dimColor: true, children: elapsedLabel })] }), preview !== '' && (_jsx(Box, { children: _jsx(Text, { color: "gray", dimColor: true, children: preview }) }))] }));
 }
 //# sourceMappingURL=ToolBox.js.map
