@@ -39,6 +39,7 @@ import { InputBox } from './components/InputBox.js';
 import { ModelPicker } from './components/ModelPicker.js';
 import { HelpOverlay } from './components/HelpOverlay.js';
 import { AtFileComplete } from './components/AtFileComplete.js';
+import { SlashComplete } from './components/SlashComplete.js';
 import { useEventProjection } from './use-event-projection.js';
 import { useOverlays } from './use-overlays.js';
 import { createRequire } from 'node:module';
@@ -255,14 +256,25 @@ export function App(props) {
         overlays.setAtQuery(null);
         overlays.setActive(null);
     }, [overlays]);
-    const inputFocus = overlays.active === null || overlays.active === 'atfile';
+    const handleSlashPick = React.useCallback((name) => {
+        // Replace the leading /<typed> with /<picked> + a trailing space so
+        // the user can immediately type arguments. If there's already a
+        // tail (rare — only if they pasted), preserve it.
+        setInput(current => {
+            const spliced = overlays.spliceSlashSelection(current, name);
+            return spliced === `/${name}` ? `${spliced} ` : spliced;
+        });
+        overlays.setSlashQuery(null);
+        overlays.setActive(null);
+    }, [overlays]);
+    const inputFocus = overlays.active === null || overlays.active === 'atfile' || overlays.active === 'slash';
     // BISECT: Static moved out of the transcript render. Logo stays
     // in a one-item Static (its original placement). Both committed
     // transcript and live items render in the regular dynamic Box. If
     // streaming text appears now, the Static-around-transcript pattern
     // was suppressing the live region updates. If still not, the bug
     // is upstream in useEventProjection.
-    return (_jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: [{ key: 'logo' }], children: (_item) => _jsx(Logo, { version: VERSION }, "logo") }), _jsxs(Box, { flexDirection: "column", children: [transcript.map(item => (_jsx(TranscriptRow, { item: item }, item.id))), projection.liveItems.map(item => (_jsx(TranscriptRow, { item: item }, item.id)))] }), _jsx(InputBox, { value: input, onChange: setInput, onSubmit: handleSubmit, busy: busy, vimMode: props.config.vimMode === true, onAtQueryChange: overlays.setAtQuery, onRequestOverlay: overlays.openOverlay, inputFocus: inputFocus && !busy }), overlays.active === 'atfile' && overlays.atQuery !== null && (_jsx(AtFileComplete, { cwd: props.cwd, query: overlays.atQuery, onPick: handleAtPick, onCancel: () => { overlays.setAtQuery(null); overlays.setActive(null); } })), overlays.active === 'models' && (_jsx(ModelPicker, { models: models, current: currentModel, onPick: handleModelPick, onCancel: overlays.closeOverlay })), overlays.active === 'help' && (_jsx(HelpOverlay, { slashCommands: slashCommands, onClose: overlays.closeOverlay })), _jsx(StatusBar, { model: currentModel, provider: providerIdForModel(currentModel), inputTokens: projection.totals.inputTokens, outputTokens: projection.totals.outputTokens, costUsd: projection.totals.costUsd, cwd: props.cwd, busy: busy, mode: props.config.mode ?? 'act', contextWindow: contextWindowFor(currentModel), liveOutputTokens: liveOutputTokens, liveDurationMs: liveDurationMs })] }));
+    return (_jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: [{ key: 'logo' }], children: (_item) => _jsx(Logo, { version: VERSION }, "logo") }), _jsxs(Box, { flexDirection: "column", children: [transcript.map(item => (_jsx(TranscriptRow, { item: item }, item.id))), projection.liveItems.map(item => (_jsx(TranscriptRow, { item: item }, item.id)))] }), _jsx(InputBox, { value: input, onChange: setInput, onSubmit: handleSubmit, busy: busy, vimMode: props.config.vimMode === true, onAtQueryChange: overlays.setAtQuery, onSlashQueryChange: overlays.setSlashQuery, onRequestOverlay: overlays.openOverlay, inputFocus: inputFocus && !busy }), overlays.active === 'atfile' && overlays.atQuery !== null && (_jsx(AtFileComplete, { cwd: props.cwd, query: overlays.atQuery, onPick: handleAtPick, onCancel: () => { overlays.setAtQuery(null); overlays.setActive(null); } })), overlays.active === 'slash' && overlays.slashQuery !== null && (_jsx(SlashComplete, { commands: slashCommands, query: overlays.slashQuery, onPick: handleSlashPick, onCancel: () => { overlays.setSlashQuery(null); overlays.setActive(null); } })), overlays.active === 'models' && (_jsx(ModelPicker, { models: models, current: currentModel, onPick: handleModelPick, onCancel: overlays.closeOverlay })), overlays.active === 'help' && (_jsx(HelpOverlay, { slashCommands: slashCommands, onClose: overlays.closeOverlay })), _jsx(StatusBar, { model: currentModel, provider: providerIdForModel(currentModel), inputTokens: projection.totals.inputTokens, outputTokens: projection.totals.outputTokens, costUsd: projection.totals.costUsd, cwd: props.cwd, busy: busy, mode: props.config.mode ?? 'act', contextWindow: contextWindowFor(currentModel), liveOutputTokens: liveOutputTokens, liveDurationMs: liveDurationMs })] }));
 }
 function TranscriptRow({ item }) {
     switch (item.kind) {

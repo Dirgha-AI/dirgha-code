@@ -10,6 +10,7 @@
 
 import * as React from 'react';
 import { Box, Text } from 'ink';
+import { iconFor } from '../icons.js';
 
 export type ToolStatus = 'running' | 'done' | 'error';
 
@@ -79,6 +80,7 @@ export function ToolBox(props: ToolBoxProps): React.JSX.Element {
     <Box flexDirection="column" borderStyle="round" borderColor={borderColour} paddingX={1} marginBottom={1}>
       <Box gap={1}>
         <Text color={iconColour}>{icon}</Text>
+        <Text color="magenta" bold>{iconFor(props.name)}</Text>
         <Text color={props.status === 'done' ? 'gray' : 'white'} bold>{prettyName(props.name)}</Text>
         {props.argSummary !== undefined && props.argSummary.length > 0 && (
           <Text color="gray" dimColor>({props.argSummary})</Text>

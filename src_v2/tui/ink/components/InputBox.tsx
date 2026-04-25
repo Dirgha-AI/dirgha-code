@@ -33,6 +33,8 @@ export interface InputBoxProps {
   vimMode?: boolean;
   /** Parent wants to know when the @-token changes (null = none active). */
   onAtQueryChange?: (query: string | null) => void;
+  /** Parent wants to know when the leading `/<token>` changes (null = none active). */
+  onSlashQueryChange?: (query: string | null) => void;
   /** Parent wants to know when to surface a modal overlay. */
   onRequestOverlay?: (kind: 'models' | 'help') => void;
   /** Parent owns the focus so it can be stolen when an overlay is up. */
@@ -52,6 +54,15 @@ function lastAtToken(value: string): string | null {
   const tail = value.slice(idx + 1);
   if (/\s/.test(tail)) return null;
   return tail;
+}
+
+function leadingSlashToken(value: string): string | null {
+  // Buffer must start with `/` and the first token must contain no whitespace.
+  // Returns the substring after `/` up to the first whitespace (or EOL).
+  if (!value.startsWith('/')) return null;
+  const tail = value.slice(1);
+  const ws = tail.search(/\s/);
+  return ws === -1 ? tail : tail.slice(0, ws);
 }
 
 export function InputBox(props: InputBoxProps): React.JSX.Element {
@@ -81,6 +92,21 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
       props.onAtQueryChange(lastAtToken(props.value));
     }
   }, [props.value, props.onAtQueryChange]);
+
+  // Notify parent whenever the leading `/<token>` shifts. We only emit
+  // a non-null query when the buffer is *just* the slash command being
+  // typed (no first-token whitespace yet) — once the user adds an
+  // argument, the dropdown auto-dismisses.
+  React.useEffect(() => {
+    if (props.onSlashQueryChange) {
+      const token = leadingSlashToken(props.value);
+      // Only suggest while the buffer is JUST the command name, i.e.
+      // there is no whitespace anywhere in the value yet. After the
+      // user types a space the suggestion is in the way.
+      const active = token !== null && !/\s/.test(props.value);
+      props.onSlashQueryChange(active ? token : null);
+    }
+  }, [props.value, props.onSlashQueryChange]);
 
   // Invalidate paste-collapse if the buffer shrinks past the pasted region.
   React.useEffect(() => {

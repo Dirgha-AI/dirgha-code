@@ -10,7 +10,7 @@ import { MODES, saveMode, modePreamble, type Mode } from '../../context/mode.js'
 
 export const modeCommand: SlashCommand = {
   name: 'mode',
-  description: 'Show or switch execution mode (plan|act|verify)',
+  description: 'Show or switch execution mode (plan|act|yolo|verify|ask)',
   async execute(args, ctx) {
     const current = ctx.getMode();
     if (args.length === 0) {
@@ -27,6 +27,11 @@ export const modeCommand: SlashCommand = {
     }
     await saveMode(next);
     ctx.setMode(next);
-    return `Mode set to ${next}. ${next === 'plan' ? '(Read-only — no writes or shells.)' : next === 'verify' ? '(Read-only audit — no modifications.)' : '(Normal execution.)'}`;
+    const blurb = next === 'plan' ? '(Read-only — no writes or shells.)'
+      : next === 'verify' ? '(Read-only audit — no modifications.)'
+      : next === 'ask' ? '(Read-only Q&A — no mutating tools.)'
+      : next === 'yolo' ? '(⚠ Every tool call is auto-approved. Destructive actions run without prompting.)'
+      : '(Normal execution.)';
+    return `Mode set to ${next}. ${blurb}`;
   },
 };

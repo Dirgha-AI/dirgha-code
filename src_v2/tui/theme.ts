@@ -52,20 +52,89 @@ export const lightTheme: Theme = {
 // Backward-compat alias — existing call sites use `defaultTheme`.
 export const defaultTheme: Theme = darkTheme;
 
-export type ThemeName = 'dark' | 'light' | 'none';
+export type ThemeName =
+  | 'dark' | 'light' | 'none'
+  | 'midnight' | 'ocean' | 'solarized' | 'warm'
+  | 'violet-storm' | 'cosmic' | 'nord' | 'ember'
+  | 'sakura' | 'obsidian-gold' | 'crimson';
 
+/**
+ * Hex-colour palette for Ink components and downstream renderers that
+ * support truecolor output. The escape-code `Theme` above remains the
+ * source of truth for plain terminal rendering; Ink components can
+ * read the hex palette via `paletteFor(name)` when they want richer
+ * differentiation than ANSI 16-colour allows.
+ *
+ * Ported from the v1 `src/tui/themes.ts` catalogue so users who set
+ * `/theme cosmic` etc. don't lose their name back to "unknown theme".
+ */
+export interface Palette {
+  brand: string;
+  accent: string;
+  error: string;
+  textPrimary: string;
+  textMuted: string;
+  borderActive: string;
+  borderIdle: string;
+  logoA: string;
+  logoB: string;
+}
+
+export const PALETTES: Record<ThemeName, Palette> = {
+  dark:    { brand: '#22C55E', accent: '#F59E0B', error: '#EF4444', textPrimary: '#E5E7EB', textMuted: '#6B7280', borderActive: '#22C55E', borderIdle: '#1F2937', logoA: '#22C55E', logoB: '#60A5FA' },
+  light:   { brand: '#16A34A', accent: '#D97706', error: '#DC2626', textPrimary: '#111827', textMuted: '#6B7280', borderActive: '#16A34A', borderIdle: '#E5E7EB', logoA: '#16A34A', logoB: '#2563EB' },
+  none:    { brand: '#FFFFFF', accent: '#FFFFFF', error: '#FFFFFF', textPrimary: '#FFFFFF', textMuted: '#FFFFFF', borderActive: '#FFFFFF', borderIdle: '#FFFFFF', logoA: '#FFFFFF', logoB: '#FFFFFF' },
+  midnight:        { brand: '#8B5CF6', accent: '#F59E0B', error: '#EF4444', textPrimary: '#E2E8F0', textMuted: '#64748B', borderActive: '#8B5CF6', borderIdle: '#1E293B', logoA: '#8B5CF6', logoB: '#60A5FA' },
+  ocean:           { brand: '#06B6D4', accent: '#F59E0B', error: '#EF4444', textPrimary: '#ECFEFF', textMuted: '#22D3EE', borderActive: '#06B6D4', borderIdle: '#164E63', logoA: '#06B6D4', logoB: '#7DD3FC' },
+  solarized:       { brand: '#859900', accent: '#CB4B16', error: '#DC322F', textPrimary: '#EEE8D5', textMuted: '#657B83', borderActive: '#859900', borderIdle: '#073642', logoA: '#268BD2', logoB: '#859900' },
+  warm:            { brand: '#F59E0B', accent: '#EF4444', error: '#DC2626', textPrimary: '#FEF3C7', textMuted: '#D97706', borderActive: '#F59E0B', borderIdle: '#1C0A00', logoA: '#F59E0B', logoB: '#EF4444' },
+  'violet-storm':  { brand: '#8B5CF6', accent: '#A78BFA', error: '#EF4444', textPrimary: '#EDE9FE', textMuted: '#A78BFA', borderActive: '#8B5CF6', borderIdle: '#1E1B4B', logoA: '#8B5CF6', logoB: '#A78BFA' },
+  cosmic:          { brand: '#FF006E', accent: '#FB5607', error: '#EF4444', textPrimary: '#FFFFFF', textMuted: '#FFBE0B', borderActive: '#FF006E', borderIdle: '#1A1A1A', logoA: '#FF006E', logoB: '#FB5607' },
+  nord:            { brand: '#88C0D0', accent: '#81A1C1', error: '#BF616A', textPrimary: '#ECEFF4', textMuted: '#4C566A', borderActive: '#88C0D0', borderIdle: '#2E3440', logoA: '#88C0D0', logoB: '#81A1C1' },
+  ember:           { brand: '#FF4500', accent: '#FFD700', error: '#DC2626', textPrimary: '#FFF176', textMuted: '#FF8C00', borderActive: '#FF4500', borderIdle: '#1A0F00', logoA: '#FF4500', logoB: '#FFD700' },
+  sakura:          { brand: '#C4306A', accent: '#FF85A1', error: '#EF4444', textPrimary: '#FFF0F3', textMuted: '#FF5C8D', borderActive: '#C4306A', borderIdle: '#1F000A', logoA: '#C4306A', logoB: '#FF85A1' },
+  'obsidian-gold': { brand: '#C47C0A', accent: '#F5C518', error: '#EF4444', textPrimary: '#FFF8E7', textMuted: '#E8A015', borderActive: '#C47C0A', borderIdle: '#1A1100', logoA: '#C47C0A', logoB: '#F5C518' },
+  crimson:         { brand: '#C10023', accent: '#FF2952', error: '#DC143C', textPrimary: '#FFB3C1', textMuted: '#FF2952', borderActive: '#C10023', borderIdle: '#1A0005', logoA: '#C10023', logoB: '#FF2952' },
+};
+
+export function paletteFor(name: string | undefined): Palette {
+  if (name && name in PALETTES) return PALETTES[name as ThemeName];
+  return PALETTES.dark;
+}
+
+/**
+ * The 16-ANSI Theme each named theme maps to. `dark`/`light`/`none`
+ * use their dedicated escape-code tables; everything else falls back
+ * to dark — the visual differentiation lives in the hex palette and
+ * is consumed by Ink components that opt into `paletteFor()`.
+ */
 export const themes: Record<ThemeName, Theme> = {
   dark: darkTheme,
   light: lightTheme,
   none: Object.fromEntries(
     Object.keys(darkTheme).map(k => [k, '']),
   ) as unknown as Theme,
+  midnight: darkTheme,
+  ocean: darkTheme,
+  solarized: darkTheme,
+  warm: darkTheme,
+  'violet-storm': darkTheme,
+  cosmic: darkTheme,
+  nord: darkTheme,
+  ember: darkTheme,
+  sakura: darkTheme,
+  'obsidian-gold': darkTheme,
+  crimson: darkTheme,
 };
 
 /** Look up a theme by name; unknown names fall back to dark. */
 export function getTheme(name: string | undefined): Theme {
   if (name && name in themes) return themes[name as ThemeName];
   return darkTheme;
+}
+
+export function listThemes(): ThemeName[] {
+  return Object.keys(themes) as ThemeName[];
 }
 
 export function style(token: string, text: string): string {

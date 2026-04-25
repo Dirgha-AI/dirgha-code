@@ -45,6 +45,7 @@ import { InputBox } from './components/InputBox.js';
 import { ModelPicker, type ModelEntry } from './components/ModelPicker.js';
 import { HelpOverlay, type HelpSlashCommand } from './components/HelpOverlay.js';
 import { AtFileComplete } from './components/AtFileComplete.js';
+import { SlashComplete } from './components/SlashComplete.js';
 import { useEventProjection, type TranscriptItem } from './use-event-projection.js';
 import { useOverlays } from './use-overlays.js';
 
@@ -281,7 +282,19 @@ export function App(props: AppProps): React.JSX.Element {
     overlays.setActive(null);
   }, [overlays]);
 
-  const inputFocus = overlays.active === null || overlays.active === 'atfile';
+  const handleSlashPick = React.useCallback((name: string): void => {
+    // Replace the leading /<typed> with /<picked> + a trailing space so
+    // the user can immediately type arguments. If there's already a
+    // tail (rare — only if they pasted), preserve it.
+    setInput(current => {
+      const spliced = overlays.spliceSlashSelection(current, name);
+      return spliced === `/${name}` ? `${spliced} ` : spliced;
+    });
+    overlays.setSlashQuery(null);
+    overlays.setActive(null);
+  }, [overlays]);
+
+  const inputFocus = overlays.active === null || overlays.active === 'atfile' || overlays.active === 'slash';
 
   // BISECT: Static moved out of the transcript render. Logo stays
   // in a one-item Static (its original placement). Both committed
@@ -309,6 +322,7 @@ export function App(props: AppProps): React.JSX.Element {
         busy={busy}
         vimMode={props.config.vimMode === true}
         onAtQueryChange={overlays.setAtQuery}
+        onSlashQueryChange={overlays.setSlashQuery}
         onRequestOverlay={overlays.openOverlay}
         inputFocus={inputFocus && !busy}
       />
@@ -318,6 +332,14 @@ export function App(props: AppProps): React.JSX.Element {
           query={overlays.atQuery}
           onPick={handleAtPick}
           onCancel={(): void => { overlays.setAtQuery(null); overlays.setActive(null); }}
+        />
+      )}
+      {overlays.active === 'slash' && overlays.slashQuery !== null && (
+        <SlashComplete
+          commands={slashCommands}
+          query={overlays.slashQuery}
+          onPick={handleSlashPick}
+          onCancel={(): void => { overlays.setSlashQuery(null); overlays.setActive(null); }}
         />
       )}
       {overlays.active === 'models' && (

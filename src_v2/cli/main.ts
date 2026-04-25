@@ -36,7 +36,7 @@ import { routeModel } from '../providers/dispatch.js';
 import { loadProjectPrimer, composeSystemPrompt } from '../context/primer.js';
 import { probeGitState, renderGitState } from '../context/git-state.js';
 import { loadSoul } from '../context/soul.js';
-import { modePreamble, resolveMode } from '../context/mode.js';
+import { modePreamble, resolveMode, isAutoApprove, type Mode } from '../context/mode.js';
 import { enforceMode, composeHooks } from '../context/mode-enforcement.js';
 import { loadSkills } from '../skills/loader.js';
 import { matchSkills } from '../skills/matcher.js';
@@ -194,6 +194,16 @@ async function main(): Promise<void> {
 
   if (!prompt) {
     if (print || json) { printHelp(); exit(1); }
+    // First-run wizard: if the user has no BYOK keys saved AND no
+    // hosted token, auto-launch the three-step setup flow. The wizard
+    // itself prints CI-safe help when stdin is non-TTY.
+    if (stdin.isTTY && await isFirstRun()) {
+      const { runWizard } = await import('./flows/wizard.js');
+      const code = await runWizard([]);
+      // If they completed setup, fall through into the REPL so they
+      // can immediately use what they just configured. Otherwise exit.
+      if (code !== 0) exit(code);
+    }
     // Ink TUI is the default interactive renderer. Fall back to the
     // readline REPL when DIRGHA_NO_INK=1 (diagnostic / CI escape hatch).
     const useInk = process.env['DIRGHA_NO_INK'] !== '1' && stdin.isTTY;
@@ -279,7 +289,15 @@ async function main(): Promise<void> {
   // CLAUDE.md, capped at 8 KB) + caller's --system text. Without
   // this, the agent has zero project awareness — it's the parity
   // matrix's #1 gap to close.
-  const mode = await resolveMode();
+  let mode = await resolveMode();
+  // CLI-level overrides for one-off mode flips. `--yolo` is the most
+  // surface-level form of "skip every approval", more discoverable
+  // than `DIRGHA_MODE=yolo`.
+  if (flags.yolo === true) mode = 'yolo' as Mode;
+  if (typeof flags.mode === 'string' && (['plan', 'act', 'yolo', 'verify', 'ask'] as const).includes(flags.mode as Mode)) {
+    mode = flags.mode as Mode;
+  }
+  const autoApprove = isAutoApprove(mode);
   // Audit: record session start so `dirgha audit search <model>` /
   // `audit list` can surface every dirgha invocation, not just turns.
   // Lives after mode-resolve so we can include it in the entry.
@@ -386,6 +404,7 @@ async function main(): Promise<void> {
     events,
     contextTransform: compactionTransform,
     errorClassifier,
+    autoApprove,
     ...(composedHooks !== undefined ? { hooks: composedHooks } : {}),
   });
   // Runtime failover: if the agent loop errored (5xx, timeout, etc.)
@@ -412,6 +431,7 @@ async function main(): Promise<void> {
           events,
           contextTransform: compactionTransform,
           errorClassifier,
+          autoApprove,
           ...(composedHooks !== undefined ? { hooks: composedHooks } : {}),
         });
       } catch { /* swallow — original error already reported */ }
@@ -425,6 +445,23 @@ async function main(): Promise<void> {
   }
   if (!json) stdout.write('\n');
   if (result.stopReason === 'error') exit(2);
+}
+
+async function isFirstRun(): Promise<boolean> {
+  const { stat } = await import('node:fs/promises');
+  const { homedir } = await import('node:os');
+  const { join } = await import('node:path');
+  const home = homedir();
+  const candidates = [
+    join(home, '.dirgha', 'keys.json'),
+    join(home, '.dirgha', 'credentials.json'),
+    join(home, '.dirgha', 'config.json'),
+  ];
+  for (const p of candidates) {
+    const exists = await stat(p).then(() => true).catch(() => false);
+    if (exists) return false;
+  }
+  return true;
 }
 
 function readAllStdin(): Promise<string> {

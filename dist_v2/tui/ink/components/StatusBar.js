@@ -33,28 +33,25 @@ export function StatusBar(props) {
         return () => clearInterval(t);
     }, [props.busy]);
     const totalTokens = props.inputTokens + props.outputTokens;
-    const tokenLabel = totalTokens > 0 ? formatTokens(totalTokens) : '';
     const costLabel = props.costUsd > 0 ? `$${props.costUsd.toFixed(3)}` : '';
     const modelShort = props.model.length > 28 ? `${props.model.slice(0, 27)}…` : props.model;
-    // Context meter: "12k / 128k" — shows total used vs the model's
-    // window. Only renders when both ends are known.
+    // Context meter: "12k/128k" — only renders when both ends are known.
     const contextMeter = props.contextWindow && props.contextWindow > 0 && totalTokens > 0
         ? `${formatTokens(totalTokens)}/${formatTokens(props.contextWindow)}`
         : '';
-    // Mode badge: only visible when not 'act' (the default), so the
-    // status bar stays clean for normal usage.
+    // Mode badge: hidden when in default 'act'/'yolo' so the bar stays
+    // quiet. YOLO is shown in red as a danger reminder.
     const modeBadge = props.mode && props.mode !== 'act' ? props.mode.toUpperCase() : '';
-    const modeColour = props.mode === 'plan' ? 'yellow' : props.mode === 'verify' ? 'magenta' : props.mode === 'ask' ? 'cyan' : 'gray';
-    // Live tok/s readout: only when busy AND we have wall-clock + output
-    // counters from the in-progress turn. Hidden between turns to keep
-    // the status bar quiet.
-    const tokRate = props.busy
-        && (props.liveOutputTokens ?? 0) > 0
-        && (props.liveDurationMs ?? 0) >= 250
-        ? `${Math.round(((props.liveOutputTokens ?? 0) / (props.liveDurationMs ?? 1)) * 1000)} tok/s`
-        : '';
-    return (_jsxs(Box, { width: cols, paddingX: 1, justifyContent: "space-between", children: [_jsxs(Box, { gap: 1, children: [_jsx(Text, { color: "gray", dimColor: true, children: "\u25CF" }), _jsx(Text, { color: "gray", children: cwdLabel(props.cwd) }), _jsx(Text, { color: "magenta", dimColor: true, children: props.provider }), modeBadge !== '' && _jsxs(Text, { color: modeColour, bold: true, children: ["[", modeBadge, "]"] })] }), _jsxs(Box, { gap: 1, children: [props.busy && _jsx(Text, { color: "cyan", children: SPINNER_FRAMES[frame] }), tokRate !== '' && _jsx(Text, { color: "green", children: tokRate }), _jsx(Text, { color: "cyan", children: modelShort }), contextMeter !== ''
-                        ? _jsx(Text, { color: "gray", dimColor: true, children: contextMeter })
-                        : tokenLabel !== '' && _jsx(Text, { color: "gray", dimColor: true, children: tokenLabel }), costLabel !== '' && _jsx(Text, { color: "gray", dimColor: true, children: costLabel }), !props.busy && _jsx(Text, { color: "gray", dimColor: true, children: "/help" })] })] }));
+    const modeColour = props.mode === 'plan' ? 'yellow'
+        : props.mode === 'verify' ? 'magenta'
+            : props.mode === 'ask' ? 'cyan'
+                : props.mode === 'yolo' ? 'red'
+                    : 'gray';
+    // Slim status bar — only what's load-bearing:
+    //   left:  cwd · mode badge (when not 'act')
+    //   right: spinner (when busy) · model · context-meter or cost
+    // Drops: decorative dot, provider id (model name implies it),
+    // /help hint, redundant token count when meter is present, tok/s.
+    return (_jsxs(Box, { width: cols, paddingX: 1, justifyContent: "space-between", children: [_jsxs(Box, { gap: 1, children: [_jsx(Text, { color: "gray", children: cwdLabel(props.cwd) }), modeBadge !== '' && _jsxs(Text, { color: modeColour, bold: true, children: ["[", modeBadge, "]"] })] }), _jsxs(Box, { gap: 1, children: [props.busy && _jsx(Text, { color: "cyan", children: SPINNER_FRAMES[frame] }), _jsx(Text, { color: "cyan", children: modelShort }), contextMeter !== '' && _jsx(Text, { color: "gray", dimColor: true, children: contextMeter }), costLabel !== '' && _jsx(Text, { color: "gray", dimColor: true, children: costLabel })] })] }));
 }
 //# sourceMappingURL=StatusBar.js.map
