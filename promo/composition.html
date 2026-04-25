@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1920, height=1080" />
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: #0a0a0a; color: #f7f3ed; font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+.scene { position: absolute; inset: 0; padding: 88px 120px; display: flex; flex-direction: column; opacity: 0; }
+.center { align-items: center; justify-content: center; }
+.term { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 28px; line-height: 1.55; color: #f7f3ed; }
+.term-prompt { color: #d4a373; }
+.term-mute { color: #a8a29e; }
+.term-ok { color: #7c8b7e; }
+.term-line { display: block; opacity: 0; }
+.wordmark { font-weight: 600; letter-spacing: -0.025em; color: #f7f3ed; }
+.diamond-mark { display: inline-block; color: #d4a373; }
+.section-eyebrow { color: #d4a373; font-size: 22px; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 24px; }
+.section-title { font-size: 56px; font-weight: 600; letter-spacing: -0.025em; color: #f7f3ed; }
+.section-sub { font-size: 26px; color: #a8a29e; margin-top: 16px; max-width: 1200px; line-height: 1.5; }
+.cursor { display: inline-block; width: 14px; height: 30px; background: #d4a373; vertical-align: text-bottom; animation: blink 1s steps(2) infinite; margin-left: 4px; }
+@keyframes blink { 50% { opacity: 0; } }
+.pill { display: inline-flex; align-items: center; gap: 12px; padding: 14px 26px; background: #161413; border: 1px solid #23211f; border-radius: 999px; font-size: 22px; color: #f7f3ed; }
+.pill .num { color: #d4a373; font-weight: 600; }
+.stack-row { display: flex; align-items: stretch; padding: 28px 32px; background: #161413; border: 1px solid #23211f; border-left: 3px solid #d4a373; border-radius: 12px; gap: 24px; }
+.stack-row + .stack-row { margin-top: 14px; }
+.stack-row .label { width: 130px; font-size: 26px; font-weight: 600; color: #d4a373; letter-spacing: -0.01em; }
+.stack-row .body { font-size: 22px; color: #f7f3ed; line-height: 1.45; }
+.stack-row .body small { display: block; color: #a8a29e; font-size: 18px; margin-top: 4px; }
+.numbers-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; margin-top: 40px; }
+.number-card { background: #161413; border: 1px solid #23211f; border-radius: 16px; padding: 36px; }
+.number-card .big { font-size: 68px; font-weight: 600; letter-spacing: -0.03em; color: #d4a373; line-height: 1; }
+.number-card .label { font-size: 20px; color: #a8a29e; margin-top: 14px; line-height: 1.4; }
+.code-block { background: #161413; border: 1px solid #23211f; border-radius: 12px; padding: 36px 40px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 22px; line-height: 1.6; color: #f7f3ed; max-width: 1400px; }
+.code-keyword { color: #d4a373; }
+.code-string { color: #7c8b7e; }
+.code-comment { color: #a8a29e; }
+.cta-line { font-size: 88px; font-weight: 600; letter-spacing: -0.025em; line-height: 1.1; color: #f7f3ed; opacity: 0; }
+.cta-line.amber { color: #d4a373; }
+.url { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 28px; color: #a8a29e; opacity: 0; }
+.modes-row { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 32px; }
+.mode-badge { padding: 16px 32px; border-radius: 999px; font-size: 24px; font-weight: 500; letter-spacing: 0.04em; }
+.mode-act { background: #d4a373; color: #0a0a0a; }
+.mode-plan { background: transparent; color: #d4a373; border: 1px solid #d4a373; }
+.mode-verify { background: transparent; color: #c25a4f; border: 1px solid #c25a4f; }
+.mode-ask { background: transparent; color: #7c8b7e; border: 1px solid #7c8b7e; }
+.audit-summary { display: flex; gap: 56px; margin-top: 28px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 28px; }
+.audit-summary span { display: flex; gap: 12px; }
+.audit-summary .num { font-weight: 600; }
+.audit-summary .ok { color: #7c8b7e; }
+.audit-summary .warn { color: #d4a373; }
+.audit-summary .block { color: #c25a4f; }
+.audit-summary .label { color: #a8a29e; }
+.cap-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 36px; max-width: 1500px; }
+.fleet-diagram { display: flex; gap: 28px; margin-top: 32px; align-items: flex-start; }
+.fleet-parent { padding: 24px 28px; background: #d4a373; color: #0a0a0a; border-radius: 12px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 22px; }
+.fleet-arrow { width: 64px; height: 4px; background: #23211f; margin-top: 32px; position: relative; }
+.fleet-arrow::after { content: '▶'; position: absolute; right: -2px; top: -10px; color: #23211f; font-size: 16px; }
+.fleet-children { display: flex; flex-direction: column; gap: 12px; }
+.fleet-child { padding: 18px 22px; background: #161413; border: 1px solid #23211f; border-radius: 8px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 18px; color: #a8a29e; }
+</style>
+</head>
+<body>
+<div id="root" data-composition-id="main" data-start="0" data-duration="160" data-width="1920" data-height="1080">
+
+<audio id="bgm" src="assets/audio/dirgha-ambient-150s.m4a" data-start="0" data-duration="160" data-track-index="0"></audio>
+
+<!-- 1: Cold open — terminal, command being typed -->
+<div class="scene clip center" id="s1" data-start="0" data-duration="4" data-track-index="1">
+  <div class="term" style="width: 1100px;">
+    <div class="term-mute" style="margin-bottom: 8px;">~ </div>
+    <div><span class="term-prompt">❯</span> <span id="s1-typed"></span><span class="cursor"></span></div>
+  </div>
+</div>
+
+<!-- 2: Wordmark reveal — Dirgha Code -->
+<div class="scene clip center" id="s2" data-start="4" data-duration="4" data-track-index="1">
+  <div style="text-align: center;">
+    <div class="diamond-mark" style="font-size: 72px; margin-bottom: 32px;">◈</div>
+    <div class="wordmark" style="font-size: 144px;">Dirgha Code</div>
+  </div>
+</div>
+
+<!-- 3: Real demo — tool calls cascade -->
+<div class="scene clip" id="s3" data-start="8" data-duration="16" data-track-index="1">
+  <div class="term" style="margin-top: 60px;">
+    <div class="term-mute s3-line">◈ 1.4.0 · openrouter/anthropic/claude-haiku-4.5</div>
+    <div class="term-mute s3-line" style="margin-bottom: 12px;">────────────────────────────────────────────────────</div>
+    <div class="s3-line"><span class="term-prompt">❯</span> implement log-histo per SPEC.md and run the tests</div>
+    <div class="term-mute s3-line" style="margin-top: 16px;">  ∇ thinking…</div>
+    <div class="s3-line" style="margin-top: 16px;">  <span style="color: #d4a373;">∴ fs_read</span>     SPEC.md</div>
+    <div class="s3-line">  <span style="color: #d4a373;">⊕ fs_write</span>    log-histo.mjs       <span class="term-mute">(2.7K)</span></div>
+    <div class="s3-line">  <span style="color: #d4a373;">⊕ fs_write</span>    log-histo.test.mjs  <span class="term-mute">(5.1K)</span></div>
+    <div class="s3-line">  <span style="color: #d4a373;">∂ shell</span>       node --test         <span class="term-ok">9/9 passed · 0.4s</span></div>
+    <div class="s3-line">  <span style="color: #d4a373;">≡ git_commit</span>  feat: log-histo + tests</div>
+    <div class="s3-line term-mute" style="margin-top: 16px;">  Done. CLI buckets JSONL by status, emits p50/p95 per bucket.</div>
+  </div>
+</div>
+
+<!-- 4: Install — single line -->
+<div class="scene clip center" id="s4" data-start="24" data-duration="6" data-track-index="1">
+  <div class="term" style="font-size: 36px;">
+    <span class="term-prompt">$</span> <span id="s4-typed"></span><span class="cursor"></span>
+  </div>
+</div>
+
+<!-- 5: Architecture — memory stack -->
+<div class="scene clip" id="s5" data-start="30" data-duration="24" data-track-index="1">
+  <div class="section-eyebrow s5-fade">Architecture · memory model</div>
+  <div class="section-title s5-fade">Information flows up. Never down.</div>
+  <div style="margin-top: 56px; max-width: 1500px;">
+    <div class="stack-row s5-fade"><div class="label">KB</div><div class="body">compiled wiki via OpenKB + PageIndex<small>vectorless reasoning-based retrieval</small></div></div>
+    <div class="stack-row s5-fade"><div class="label">Ledger</div><div class="body">per-scope JSONL events + agent-rewritten digest<small>TF-IDF cosine search</small></div></div>
+    <div class="stack-row s5-fade"><div class="label">Memory</div><div class="body">curated key-value facts<small>loaded into context at boot</small></div></div>
+    <div class="stack-row s5-fade"><div class="label">Audit</div><div class="body">append-only firehose<small>every event; the model never reads it</small></div></div>
+  </div>
+</div>
+
+<!-- 6: Memory layers — slow walkthrough is the same as 5; reuse the time, just emphasize the contract -->
+<div class="scene clip" id="s6" data-start="54" data-duration="26" data-track-index="1">
+  <div class="section-eyebrow s6-fade">The contract per layer</div>
+  <div class="section-title s6-fade">Cheap to write below. Curated above.</div>
+  <div class="section-sub s6-fade">Lower layers are the firehose. Upper layers are the signal. Agent-rewritten digests bubble decisions up; raw events stay below for forensics. Knowledge compounds — it doesn't get re-derived on every query.</div>
+  <div class="section-sub s6-fade" style="margin-top: 32px; color: #d4a373;">Decay is fought at the boundary between layers. Each one keeps the layer below from becoming canonical.</div>
+</div>
+
+<!-- 7: Agents — modes + fleet -->
+<div class="scene clip" id="s7" data-start="80" data-duration="18" data-track-index="1">
+  <div class="section-eyebrow s7-fade">Agents</div>
+  <div class="section-title s7-fade">Four modes. Parallel fleets. Dynamic dispatch.</div>
+  <div class="modes-row s7-fade">
+    <div class="mode-badge mode-act">act</div>
+    <div class="mode-badge mode-plan">plan · read-only</div>
+    <div class="mode-badge mode-verify">verify · audit</div>
+    <div class="mode-badge mode-ask">ask · Q&amp;A</div>
+  </div>
+  <div class="fleet-diagram s7-fade">
+    <div class="fleet-parent">dirgha fleet launch "&lt;goal&gt;"</div>
+    <div class="fleet-arrow"></div>
+    <div class="fleet-children">
+      <div class="fleet-child">sub-agent · git worktree A</div>
+      <div class="fleet-child">sub-agent · git worktree B</div>
+      <div class="fleet-child">sub-agent · git worktree C</div>
+    </div>
+  </div>
+</div>
+
+<!-- 8: Security — skill scanner audit -->
+<div class="scene clip" id="s8" data-start="98" data-duration="18" data-track-index="1">
+  <div class="section-eyebrow s8-fade">Security · skill scanner</div>
+  <div class="section-title s8-fade">Every skill scanned. Install + load. Critical findings block.</div>
+  <div class="audit-summary s8-fade">
+    <span><span class="num">112</span> <span class="label">installed</span></span>
+    <span><span class="num ok">74</span> <span class="label">allow</span></span>
+    <span><span class="num warn">36</span> <span class="label">warn</span></span>
+    <span><span class="num block">2</span> <span class="label">block</span></span>
+  </div>
+  <div class="code-block s8-fade" style="margin-top: 32px; font-size: 18px;">
+<span class="code-comment">$ dirgha skills audit</span><br>
+<span style="color: #c25a4f;">block </span> gstack/land-and-deploy   <span class="code-comment">block · score=50 · 3 findings (top: permission_grab)</span><br>
+<span style="color: #c25a4f;">block </span> gstack/ship              <span class="code-comment">block · score=50 · 3 findings (top: permission_grab)</span><br>
+<span style="color: #d4a373;">warn  </span> gstack/autoplan          <span class="code-comment">warn · score=20 · 2 findings (top: excess_shell_blocks)</span><br>
+<span style="color: #7c8b7e;">allow </span> mattpocock/tdd           <span class="code-comment">allow · score=0 · 0 findings</span>
+  </div>
+</div>
+
+<!-- 9: Engineering posture — big numbers -->
+<div class="scene clip" id="s9" data-start="116" data-duration="18" data-track-index="1">
+  <div class="section-eyebrow s9-fade">Engineering posture</div>
+  <div class="section-title s9-fade">Specifics outperform claims.</div>
+  <div class="numbers-grid s9-fade">
+    <div class="number-card"><div class="big">22</div><div class="label">capability dimensions in the parity matrix, scored against the leading reference CLIs</div></div>
+    <div class="number-card"><div class="big">9.82</div><div class="label">mean across all 22 rows. Sum-of-gaps = 0.</div></div>
+    <div class="number-card"><div class="big">40/40</div><div class="label">offline tests in ~16s. CI green is a precondition for any PR.</div></div>
+    <div class="number-card"><div class="big">14.5K</div><div class="label">LOC across 23 modules. Every src file ≤ 200 lines.</div></div>
+    <div class="number-card"><div class="big">17</div><div class="label">providers. Multi-key BYOK pool with cooldown rotation.</div></div>
+    <div class="number-card"><div class="big">12</div><div class="label">built-in tools. 20 slash commands. 18 subcommands.</div></div>
+  </div>
+</div>
+
+<!-- 10: Plugins — code on screen -->
+<div class="scene clip" id="s10" data-start="134" data-duration="14" data-track-index="1">
+  <div class="section-eyebrow s10-fade">Plugins</div>
+  <div class="section-title s10-fade">Drop a module. Register tools, slashes, hooks.</div>
+  <div class="code-block s10-fade" style="margin-top: 36px;">
+<span class="code-comment">// ~/.dirgha/extensions/&lt;name&gt;/index.mjs</span><br>
+<span class="code-keyword">export default async function</span> (api) {<br>
+&nbsp;&nbsp;api.<span class="code-keyword">registerTool</span>({ name: <span class="code-string">'deploy'</span>, ... });<br>
+&nbsp;&nbsp;api.<span class="code-keyword">registerSlash</span>({ name: <span class="code-string">'stats'</span>, handler: () =&gt; <span class="code-string">'OK'</span> });<br>
+&nbsp;&nbsp;api.<span class="code-keyword">on</span>(<span class="code-string">'turn_start'</span>, (ev) =&gt; { <span class="code-comment">/* observe every turn */</span> });<br>
+}
+  </div>
+</div>
+
+<!-- 11: CTA -->
+<div class="scene clip center" id="s11" data-start="148" data-duration="12" data-track-index="1">
+  <div style="text-align: center;">
+    <div class="diamond-mark" style="font-size: 56px; margin-bottom: 32px;" id="cta-mark">◈</div>
+    <div class="wordmark" style="font-size: 96px; opacity: 0;" id="cta-wordmark">Dirgha Code</div>
+    <div class="cta-line" id="cta-line-1" style="margin-top: 56px;">Build to last.</div>
+    <div class="cta-line amber" id="cta-line-2" style="margin-top: 12px;">Code with Dirgha.</div>
+    <div class="url" id="cta-url" style="margin-top: 56px;">github.com/Dirgha-AI/dirgha-code · @dirgha/code</div>
+  </div>
+</div>
+
+</div>
+
+<script>
+window.__timelines = window.__timelines || {};
+const tl = gsap.timeline({ paused: true });
+const E = "power2.out";
+
+// Scene 1 — cold open: type the command
+const s1Cmd = 'dirgha "implement log-histo per SPEC.md" -m haiku';
+tl.set("#s1", { opacity: 1 }, 0)
+  .to({}, { duration: 0, onStart: () => { animateTypeOn("#s1-typed", s1Cmd, 30); } }, 0.3)
+  .to("#s1", { opacity: 0, duration: 0.4, ease: E }, 3.6);
+
+// Scene 2 — wordmark reveal
+tl.fromTo("#s2", { opacity: 0 }, { opacity: 1, duration: 0.6, ease: E }, 4)
+  .to("#s2", { opacity: 0, duration: 0.4, ease: E }, 7.6);
+
+// Scene 3 — demo cascade (8s start, 16s duration; 9 lines staggered)
+tl.set("#s3", { opacity: 1 }, 8);
+const s3Lines = document.querySelectorAll("#s3 .s3-line");
+s3Lines.forEach((el, i) => {
+  tl.to(el, { opacity: 1, duration: 0.3, ease: E }, 8.2 + i * 1.4);
+});
+tl.to("#s3", { opacity: 0, duration: 0.4, ease: E }, 23.6);
+tl.set("#s3", { opacity: 0 }, 24);
+
+// Scene 4 — install line
+const s4Cmd = "npm install -g @dirgha/code";
+tl.set("#s4", { opacity: 1 }, 24)
+  .to({}, { duration: 0, onStart: () => { animateTypeOn("#s4-typed", s4Cmd, 60); } }, 24.2)
+  .to("#s4", { opacity: 0, duration: 0.4, ease: E }, 29.6);
+
+// Scene 5 — architecture stack
+tl.set("#s5", { opacity: 1 }, 30);
+document.querySelectorAll("#s5 .s5-fade").forEach((el, i) => {
+  tl.fromTo(el, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.5, ease: E }, 30.4 + i * 0.7);
+});
+tl.to("#s5", { opacity: 0, duration: 0.4, ease: E }, 53.6);
+tl.set("#s5", { opacity: 0 }, 54);
+
+// Scene 6 — contract per layer
+tl.set("#s6", { opacity: 1 }, 54);
+document.querySelectorAll("#s6 .s6-fade").forEach((el, i) => {
+  tl.fromTo(el, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.6, ease: E }, 54.4 + i * 1.2);
+});
+tl.to("#s6", { opacity: 0, duration: 0.4, ease: E }, 79.6);
+tl.set("#s6", { opacity: 0 }, 80);
+
+// Scene 7 — agents
+tl.set("#s7", { opacity: 1 }, 80);
+document.querySelectorAll("#s7 .s7-fade").forEach((el, i) => {
+  tl.fromTo(el, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.5, ease: E }, 80.4 + i * 1.0);
+});
+tl.to("#s7", { opacity: 0, duration: 0.4, ease: E }, 97.6);
+tl.set("#s7", { opacity: 0 }, 98);
+
+// Scene 8 — security
+tl.set("#s8", { opacity: 1 }, 98);
+document.querySelectorAll("#s8 .s8-fade").forEach((el, i) => {
+  tl.fromTo(el, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.5, ease: E }, 98.4 + i * 1.0);
+});
+tl.to("#s8", { opacity: 0, duration: 0.4, ease: E }, 115.6);
+tl.set("#s8", { opacity: 0 }, 116);
+
+// Scene 9 — engineering posture (big numbers)
+tl.set("#s9", { opacity: 1 }, 116);
+document.querySelectorAll("#s9 .s9-fade").forEach((el, i) => {
+  tl.fromTo(el, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.5, ease: E }, 116.4 + i * 0.55);
+});
+tl.to("#s9", { opacity: 0, duration: 0.4, ease: E }, 133.6);
+tl.set("#s9", { opacity: 0 }, 134);
+
+// Scene 10 — plugins
+tl.set("#s10", { opacity: 1 }, 134);
+document.querySelectorAll("#s10 .s10-fade").forEach((el, i) => {
+  tl.fromTo(el, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.5, ease: E }, 134.4 + i * 0.6);
+});
+tl.to("#s10", { opacity: 0, duration: 0.4, ease: E }, 147.6);
+tl.set("#s10", { opacity: 0 }, 148);
+
+// Scene 11 — CTA, two-beat hold
+tl.set("#s11", { opacity: 1 }, 148)
+  .fromTo("#cta-mark", { opacity: 0, scale: 0.8 }, { opacity: 1, scale: 1, duration: 0.6, ease: E }, 148.2)
+  .fromTo("#cta-wordmark", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: E }, 149)
+  .to("#cta-line-1", { opacity: 1, duration: 0.4, ease: E }, 150.5)
+  .to("#cta-line-2", { opacity: 1, duration: 0.4, ease: E }, 152.5)
+  .to("#cta-url", { opacity: 1, duration: 0.5, ease: E }, 155);
+
+window.__timelines["main"] = tl;
+
+// Type-on helper
+function animateTypeOn(sel, text, charsPerSecond) {
+  const el = document.querySelector(sel);
+  if (!el) return;
+  el.textContent = "";
+  const ms = 1000 / charsPerSecond;
+  let i = 0;
+  const step = () => {
+    if (i < text.length) {
+      el.textContent += text[i++];
+      const delay = /[.,;]/.test(text[i - 1]) ? ms * 1.7 : ms;
+      setTimeout(step, delay);
+    }
+  };
+  step();
+}
+</script>
+</body>
+</html>
