@@ -7,6 +7,8 @@
 - **Local model provider** — first-class llama.cpp + Ollama support. New `LlamaCppProvider` at `src_v2/providers/llamacpp.ts` (default `http://localhost:8080/v1`, `LLAMACPP_URL` override). Model ids prefixed `llamacpp/…` route there; `ollama/…` continues to route to the existing Ollama provider.
 - **Setup wizard — Local option.** New "Local (llama.cpp / Ollama)" step in `dirgha setup` (option 2, right after Dirgha hosted). Auto-probes both `localhost:11434` and `localhost:8080`, lists installed models from each (`/api/tags` + `/v1/models`), and falls through with placeholder + install hints when neither server is up.
 - **`dirgha doctor` — Local probes.** Added Ollama (`http://localhost:11434/api/tags`) and llama.cpp (`http://localhost:8080/v1/models`) checks; warn (not fail) when not running, since local servers are optional.
+- **Hardware-aware model recommendation.** New `dirgha hardware` subcommand (alias `sysinfo` / `system`) detects CPU cores, RAM, NVIDIA VRAM, AVX2, then ranks the top 5 GGUF models that fit. The Local step in `dirgha setup` runs the same probe and surfaces top-3 download-able models when neither local server is up. Catalogue: 9 ungated Q4_K_M GGUFs from `bartowski/` and `unsloth/` on HuggingFace, refreshed Apr 2026 (Qwen 3.5, Phi-4, Gemma 4, Mistral Small 3.2). `--json` emits the full profile + recommendations.
+- **Five pillars.** README intro + `package.json` description rewritten to surface the new local-models pillar alongside BYOK, parallel agents, persistent memory, and skills.
 
 ## 1.4.0 — 2026-04-25
 

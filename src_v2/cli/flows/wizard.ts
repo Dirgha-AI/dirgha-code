@@ -267,12 +267,38 @@ async function fetchLocalModels(): Promise<{ models: string[]; suggested: string
 
 async function pickLocalModel(rl: ReturnType<typeof createInterface>): Promise<string | null> {
   printStep(3, 'Pick a default model · Local');
+
+  // Hardware probe → always show the user what they're working with.
+  const { detectHardware, summariseHardware } = await import('../../setup/hardware-detect.js');
+  const hw = await detectHardware();
+  for (const line of summariseHardware(hw)) {
+    stdout.write(`  ${style(defaultTheme.muted, line)}\n`);
+  }
+  stdout.write('\n');
+
   const { models, suggested } = await fetchLocalModels();
   if (models.length === 0) {
-    stdout.write(`  ${style(defaultTheme.muted, 'No local models detected.')}\n`);
-    stdout.write(`  ${style(defaultTheme.muted, 'Start your local server then run `dirgha models pull <gguf>` (Ollama) or point LLAMACPP_URL at your llama-server.')}\n\n`);
-    stdout.write(`  Using placeholder: ${style(defaultTheme.accent, suggested)}\n`);
-    const ans = (await rl.question(`\n  Press enter to accept, or paste a model id: `)).trim();
+    // No server running — fall back to hardware-aware GGUF recommendations.
+    const { recommendModels, modelDownloadHint } = await import('../../setup/model-curator.js');
+    const recs = recommendModels(hw, 3);
+    stdout.write(`  ${style(defaultTheme.warning, 'No local server detected on :11434 (Ollama) or :8080 (llama.cpp).')}\n\n`);
+    if (recs.length > 0) {
+      stdout.write(`  ${style(defaultTheme.accent, 'Recommended for your hardware')} (Q4_K_M GGUF, ungated):\n`);
+      recs.forEach((m, i) => {
+        stdout.write(`    ${i + 1}. ${style(defaultTheme.accent, m.name.padEnd(22))} ${m.sizeGB} GB · ${m.description}\n`);
+      });
+      const top = recs[0];
+      if (top) {
+        stdout.write(`\n  ${style(defaultTheme.muted, 'To install the top pick:')}\n`);
+        for (const line of modelDownloadHint(top).split('\n')) {
+          stdout.write(`    ${style(defaultTheme.muted, line)}\n`);
+        }
+      }
+    } else {
+      stdout.write(`  ${style(defaultTheme.muted, 'Hardware below the smallest tier (~2 GB RAM). Consider hosted providers.')}\n`);
+    }
+    stdout.write(`\n  ${style(defaultTheme.muted, 'Setup will store a placeholder default; re-run after the server is up.')}\n`);
+    const ans = (await rl.question(`\n  Press enter to accept ${style(defaultTheme.accent, suggested)}, or paste a model id: `)).trim();
     return ans.length > 0 ? ans : suggested;
   }
   const top = models.slice(0, 12);

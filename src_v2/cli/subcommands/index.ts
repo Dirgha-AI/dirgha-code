@@ -46,6 +46,7 @@ import { undoSubcommand } from './undo.js';
 import { updateSubcommand } from './update.js';
 import { auditCodebaseSubcommand } from './audit-codebase.js';
 import { kbSubcommand } from './kb.js';
+import { hardwareSubcommand } from './hardware.js';
 
 export const subcommands: Subcommand[] = [
   doctorSubcommand,
@@ -73,6 +74,7 @@ export const subcommands: Subcommand[] = [
   exportSessionSubcommand,
   importSessionSubcommand,
   resumeSubcommand,
+  hardwareSubcommand,
 ];
 
 export function findSubcommand(verb: string): Subcommand | undefined {
