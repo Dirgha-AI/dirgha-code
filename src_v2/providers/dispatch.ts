@@ -14,6 +14,7 @@ export type ProviderId =
   | 'openrouter'
   | 'nvidia'
   | 'ollama'
+  | 'llamacpp'
   | 'fireworks';
 
 interface RoutingRule {
@@ -42,6 +43,7 @@ const RULES: RoutingRule[] = [
   { match: id => id.startsWith('gemini-'), provider: 'gemini' },
   // Local & explicit-prefix providers.
   { match: id => id.startsWith('ollama/'), provider: 'ollama' },
+  { match: id => id.startsWith('llamacpp/'), provider: 'llamacpp' },
   { match: id => id.startsWith('fireworks/'), provider: 'fireworks' },
   // Catch-all: any vendor-prefixed slug or `:free` variant goes via
   // OpenRouter (anthropic/, openai/, google/, deepseek/, moonshotai/,
@@ -60,6 +62,6 @@ export function isKnownProvider(id: string): id is ProviderId {
   return (
     id === 'anthropic' || id === 'openai' || id === 'gemini'
     || id === 'openrouter' || id === 'nvidia' || id === 'ollama'
-    || id === 'fireworks'
+    || id === 'llamacpp' || id === 'fireworks'
   );
 }

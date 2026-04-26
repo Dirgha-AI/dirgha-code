@@ -83,6 +83,30 @@ async function probeProvider(probe: ProviderProbe): Promise<CheckResult> {
   }
 }
 
+interface LocalProbe {
+  label: string;
+  url: string;
+}
+
+const LOCAL_PROBES: LocalProbe[] = [
+  { label: 'Ollama',    url: 'http://localhost:11434/api/tags' },
+  { label: 'llama.cpp', url: 'http://localhost:8080/v1/models' },
+];
+
+async function probeLocal(p: LocalProbe): Promise<CheckResult> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetch(p.url, { method: 'GET', signal: controller.signal });
+    clearTimeout(timer);
+    if (res.status === 200) return { name: p.label, status: 'pass', detail: `${p.url} (200)` };
+    return { name: p.label, status: 'warn', detail: `${p.url} (HTTP ${res.status})` };
+  } catch {
+    clearTimeout(timer);
+    return { name: p.label, status: 'warn', detail: `${p.url} not running` };
+  }
+}
+
 function printTable(results: CheckResult[]): void {
   stdout.write(style(defaultTheme.accent, '\nDirgha doctor\n\n'));
   for (const r of results) {
@@ -113,6 +137,9 @@ export const doctorSubcommand: Subcommand = {
 
     const probes = await Promise.all(PROVIDER_PROBES.map(probeProvider));
     results.push(...probes);
+
+    const locals = await Promise.all(LOCAL_PROBES.map(probeLocal));
+    results.push(...locals);
 
     if (json) printNdjson(results); else printTable(results);
 

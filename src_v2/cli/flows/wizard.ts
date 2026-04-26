@@ -35,6 +35,8 @@ interface ProviderChoice {
 const PROVIDERS: ProviderChoice[] = [
   { id: 'dirgha', label: 'Dirgha hosted', hosted: true,
     blurb: 'Sign in with your Dirgha account · free tier + paid plans' },
+  { id: 'local', label: 'Local (llama.cpp / Ollama)', hosted: false,
+    blurb: 'Run models on your own machine · zero cost, fully private' },
   { id: 'nvidia', label: 'NVIDIA NIM', hosted: false,
     env: 'NVIDIA_API_KEY', helpUrl: 'https://build.nvidia.com/settings/api-keys',
     blurb: 'Free NIM tier · Kimi, DeepSeek, Qwen, Llama' },
@@ -137,10 +139,46 @@ async function pickProvider(rl: ReturnType<typeof createInterface>): Promise<Pro
   return PROVIDERS[idx] ?? null;
 }
 
+async function probeLocalServer(url: string): Promise<boolean> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 1500);
+  try {
+    const res = await fetch(url, { method: 'GET', signal: controller.signal });
+    clearTimeout(timer);
+    return res.status < 500;
+  } catch {
+    clearTimeout(timer);
+    return false;
+  }
+}
+
+async function authenticateLocal(): Promise<boolean> {
+  const ollamaUrl = process.env.OLLAMA_URL ?? 'http://localhost:11434/api/tags';
+  const llamacppUrl = (process.env.LLAMACPP_URL ?? 'http://localhost:8080/v1').replace(/\/+$/, '') + '/models';
+  const [ollamaUp, llamacppUp] = await Promise.all([
+    probeLocalServer(ollamaUrl),
+    probeLocalServer(llamacppUrl),
+  ]);
+  if (ollamaUp) stdout.write(style(defaultTheme.success, `  ✓ Ollama responding at ${ollamaUrl}\n`));
+  else stdout.write(style(defaultTheme.muted, `  · Ollama not running at ${ollamaUrl}\n`));
+  if (llamacppUp) stdout.write(style(defaultTheme.success, `  ✓ llama.cpp responding at ${llamacppUrl}\n`));
+  else stdout.write(style(defaultTheme.muted, `  · llama.cpp not running at ${llamacppUrl}\n`));
+  if (!ollamaUp && !llamacppUp) {
+    stdout.write(`\n  ${style(defaultTheme.warning, 'Neither server is running.')} Install one:\n`);
+    stdout.write(`    Install Ollama:    ${style(defaultTheme.accent, 'curl -fsSL https://ollama.com/install.sh | sh')}\n`);
+    stdout.write(`    Or llama.cpp:      ${style(defaultTheme.accent, 'https://github.com/ggerganov/llama.cpp')}\n`);
+    stdout.write(`  ${style(defaultTheme.muted, 'Continuing setup — you can start a server later.')}\n`);
+  }
+  return true;
+}
+
 async function authenticate(provider: ProviderChoice, rl: ReturnType<typeof createInterface>): Promise<boolean> {
   printStep(2, `Authenticate · ${provider.label}`);
   if (provider.hosted) {
     return authenticateDirgha();
+  }
+  if (provider.id === 'local') {
+    return authenticateLocal();
   }
   if (!provider.env) return false;
   stdout.write(`  Get a key:  ${style(defaultTheme.accent, provider.helpUrl ?? '')}\n`);
@@ -190,7 +228,72 @@ function modelsForProvider(providerId: string): string[] {
   return PRICES.filter(p => p.provider === providerId).map(p => p.model);
 }
 
+async function fetchLocalModels(): Promise<{ models: string[]; suggested: string }> {
+  const out: string[] = [];
+  let suggested = '';
+  // Ollama: /api/tags returns { models: [{ name: 'llama3.2:3b', ... }] }
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 1500);
+    const res = await fetch('http://localhost:11434/api/tags', { signal: ctrl.signal });
+    clearTimeout(t);
+    if (res.ok) {
+      const json = await res.json() as { models?: Array<{ name?: string }> };
+      for (const m of json.models ?? []) {
+        if (m.name) out.push(`ollama/${m.name}`);
+      }
+      if (out.length > 0 && out[0]) suggested = out[0];
+    }
+  } catch { /* ignored */ }
+  // llama.cpp: /v1/models returns { data: [{ id: '...' }] }
+  try {
+    const base = (process.env.LLAMACPP_URL ?? 'http://localhost:8080/v1').replace(/\/+$/, '');
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 1500);
+    const res = await fetch(`${base}/models`, { signal: ctrl.signal });
+    clearTimeout(t);
+    if (res.ok) {
+      const json = await res.json() as { data?: Array<{ id?: string }> };
+      const before = out.length;
+      for (const m of json.data ?? []) {
+        if (m.id) out.push(`llamacpp/${m.id}`);
+      }
+      if (!suggested && out.length > before && out[before]) suggested = out[before]!;
+    }
+  } catch { /* ignored */ }
+  if (!suggested) suggested = 'ollama/llama3.2:3b';
+  return { models: out, suggested };
+}
+
+async function pickLocalModel(rl: ReturnType<typeof createInterface>): Promise<string | null> {
+  printStep(3, 'Pick a default model · Local');
+  const { models, suggested } = await fetchLocalModels();
+  if (models.length === 0) {
+    stdout.write(`  ${style(defaultTheme.muted, 'No local models detected.')}\n`);
+    stdout.write(`  ${style(defaultTheme.muted, 'Start your local server then run `dirgha models pull <gguf>` (Ollama) or point LLAMACPP_URL at your llama-server.')}\n\n`);
+    stdout.write(`  Using placeholder: ${style(defaultTheme.accent, suggested)}\n`);
+    const ans = (await rl.question(`\n  Press enter to accept, or paste a model id: `)).trim();
+    return ans.length > 0 ? ans : suggested;
+  }
+  const top = models.slice(0, 12);
+  top.forEach((m, i) => {
+    const num = `${i + 1}`.padStart(2);
+    const marker = m === suggested ? style(defaultTheme.success, '  ← recommended') : '';
+    stdout.write(`  ${num}. ${m}${marker}\n`);
+  });
+  const more = models.length - top.length;
+  if (more > 0) stdout.write(`  ${style(defaultTheme.muted, `… ${more} more available`)}\n`);
+  const defaultIdx = `${Math.max(top.indexOf(suggested), 0) + 1}`;
+  const ans = (await rl.question(`\n  [1-${top.length}, default ${defaultIdx}]: `)).trim();
+  const idx = ans === '' ? Number.parseInt(defaultIdx, 10) - 1 : Number.parseInt(ans, 10) - 1;
+  if (Number.isNaN(idx) || idx < 0 || idx >= top.length) {
+    return ans.length > 0 ? ans : (top[0] ?? suggested);
+  }
+  return top[idx] ?? suggested;
+}
+
 async function pickModel(provider: ProviderChoice, rl: ReturnType<typeof createInterface>): Promise<string | null> {
+  if (provider.id === 'local') return pickLocalModel(rl);
   printStep(3, `Pick a default model · ${provider.label}`);
   const models = modelsForProvider(provider.id);
   if (models.length === 0) {
@@ -234,6 +337,10 @@ function printNonInteractiveHelp(): void {
   stdout.write(`Non-interactive context detected. Configure manually:\n\n`);
   stdout.write(`  ${style(defaultTheme.accent, 'Hosted account')}\n`);
   stdout.write(`    dirgha login\n\n`);
+  stdout.write(`  ${style(defaultTheme.accent, 'Local (llama.cpp / Ollama)')} — no key required:\n`);
+  stdout.write(`    Install Ollama:    curl -fsSL https://ollama.com/install.sh | sh\n`);
+  stdout.write(`    Or llama.cpp:      https://github.com/ggerganov/llama.cpp\n`);
+  stdout.write(`    Override URLs:     OLLAMA_URL=… LLAMACPP_URL=…\n\n`);
   stdout.write(`  ${style(defaultTheme.accent, 'BYOK')} — pick one or more:\n`);
   for (const p of PROVIDERS.filter(x => !x.hosted && x.env)) {
     stdout.write(`    export ${p.env}=<key>     ${style(defaultTheme.muted, p.helpUrl ?? '')}\n`);
