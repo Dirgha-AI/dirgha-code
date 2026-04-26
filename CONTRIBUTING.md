@@ -70,8 +70,20 @@ Open an issue. Include:
 
 ## Releases
 
-Maintainers handle publishing. We follow semantic versioning loosely pre-1.0,
-strictly thereafter.
+Maintainers handle publishing. We follow [semantic versioning](https://semver.org/)
+strictly:
+
+- **PATCH** (`1.5.1 → 1.5.2`) — bug fixes, copy tweaks, internal refactors,
+  dependency bumps. No user-visible behavior change. Bump freely; expect
+  high patch numbers.
+- **MINOR** (`1.5.x → 1.6.0`) — new commands, new flags, new features.
+  Existing flows continue to work the same.
+- **MAJOR** (`1.x → 2.0`) — a CLI contract changed: a flag was renamed,
+  a command removed, a config-file shape altered, or a default behavior
+  changed in a way that could surprise an existing user.
+
+If your PR doesn't add a new user-facing capability, it's a patch.
+We expect to live on `1.x` for a long time.
 
 ## Questions
 
