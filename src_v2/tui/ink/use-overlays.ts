@@ -9,7 +9,7 @@
 
 import * as React from 'react';
 
-export type OverlayKind = 'models' | 'help' | 'atfile' | 'slash' | null;
+export type OverlayKind = 'models' | 'help' | 'atfile' | 'slash' | 'theme' | null;
 
 export interface OverlayApi {
   active: OverlayKind;
@@ -18,7 +18,7 @@ export interface OverlayApi {
   setAtQuery: (q: string | null) => void;
   slashQuery: string | null;
   setSlashQuery: (q: string | null) => void;
-  openOverlay: (k: 'models' | 'help') => void;
+  openOverlay: (k: 'models' | 'help' | 'theme') => void;
   closeOverlay: () => void;
   /**
    * Splice a selected @-file path back into `value`, replacing the
@@ -57,7 +57,7 @@ export function useOverlays(): OverlayApi {
     if (active === null) setActive('slash');
   }, [slashQuery, active]);
 
-  const openOverlay = React.useCallback((k: 'models' | 'help'): void => {
+  const openOverlay = React.useCallback((k: 'models' | 'help' | 'theme'): void => {
     setActive(k);
   }, []);
 

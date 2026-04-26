@@ -216,7 +216,7 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
             </Text>
           )}
         </Box>
-        {ctrlCArmed && <Text color={palette.accent}>Press Ctrl+C again to exit.</Text>}
+        {ctrlCArmed && <Text color={palette.accent} bold>Press Ctrl+C again to exit.</Text>}
       </Box>
     </Box>
   );

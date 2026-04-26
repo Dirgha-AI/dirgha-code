@@ -10,9 +10,9 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { SlashCommand } from './types.js';
-import type { ThemeName } from '../../tui/theme.js';
+import { listThemes, type ThemeName } from '../../tui/theme.js';
 
-const THEMES: ThemeName[] = ['dark', 'light', 'none'];
+const THEMES: ThemeName[] = listThemes();
 
 function configPath(): string {
   return join(homedir(), '.dirgha', 'config.json');
@@ -31,18 +31,25 @@ async function writeConfig(cfg: Record<string, unknown>): Promise<void> {
 
 export const themeCommand: SlashCommand = {
   name: 'theme',
-  description: 'Show or pick TUI theme (dark|light|none)',
+  description: 'Pick TUI theme (14 palettes — opens picker with no args)',
   async execute(args, ctx) {
     const current = ctx.getTheme();
     if (args.length === 0) {
       return [
         `Current theme: ${current}`,
-        `Available:     ${THEMES.join(' · ')}`,
+        `Available (${THEMES.length}):`,
+        `  ${THEMES.join(' · ')}`,
+        ``,
+        `Pick one with /theme <name>  ·  e.g. /theme cosmic`,
       ].join('\n');
     }
     const next = args[0] as ThemeName;
     if (!THEMES.includes(next)) {
-      return `Unknown theme "${next}". Choose one of: ${THEMES.join(', ')}`;
+      return [
+        `Unknown theme "${next}".`,
+        `Available (${THEMES.length}):`,
+        `  ${THEMES.join(' · ')}`,
+      ].join('\n');
     }
     process.env['DIRGHA_THEME'] = next;
     const cfg = await readConfig();

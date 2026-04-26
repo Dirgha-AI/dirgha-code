@@ -46,8 +46,12 @@ import { ModelPicker, type ModelEntry } from './components/ModelPicker.js';
 import { HelpOverlay, type HelpSlashCommand } from './components/HelpOverlay.js';
 import { AtFileComplete } from './components/AtFileComplete.js';
 import { SlashComplete } from './components/SlashComplete.js';
+import { ThemePicker } from './components/ThemePicker.js';
 import { ThemeProvider } from './theme-context.js';
 import type { ThemeName } from '../theme.js';
+import { writeFile, mkdir, readFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { join as pathJoin } from 'node:path';
 import { useEventProjection, type TranscriptItem } from './use-event-projection.js';
 import { useOverlays } from './use-overlays.js';
 
@@ -181,6 +185,11 @@ export function App(props: AppProps): React.JSX.Element {
       overlays.openOverlay('help');
       return;
     }
+    // `/theme` with no args opens the picker; `/theme <name>` sets directly.
+    if (value === '/theme' || value === '/themes') {
+      overlays.openOverlay('theme');
+      return;
+    }
 
     const userItem: TranscriptItem = { kind: 'user', id: randomUUID(), text: value };
     setTranscript(prev => [...prev, userItem]);
@@ -298,9 +307,30 @@ export function App(props: AppProps): React.JSX.Element {
 
   const inputFocus = overlays.active === null || overlays.active === 'atfile' || overlays.active === 'slash';
 
-  // Active theme name from config — Ink components read the resolved
-  // hex Palette via `useTheme()` inside ThemeProvider.
-  const themeName: ThemeName = (props.config.theme ?? 'dark') as ThemeName;
+  // Active theme name — driven by local state so the picker can flip it
+  // live. Initial value comes from config; subsequent changes are
+  // persisted to ~/.dirgha/config.json so future sessions pick it up.
+  const [themeName, setThemeName] = React.useState<ThemeName>(
+    (props.config.theme ?? 'dark') as ThemeName,
+  );
+
+  const handleThemePick = React.useCallback((name: ThemeName): void => {
+    overlays.closeOverlay();
+    setThemeName(name);
+    const note: TranscriptItem = { kind: 'notice', id: randomUUID(), text: `Theme set to ${name}` };
+    setTranscript(t => [...t, note]);
+    void (async (): Promise<void> => {
+      try {
+        const dir = pathJoin(homedir(), '.dirgha');
+        await mkdir(dir, { recursive: true });
+        const path = pathJoin(dir, 'config.json');
+        const text = await readFile(path, 'utf8').catch(() => '');
+        const cfg = text ? (JSON.parse(text) as Record<string, unknown>) : {};
+        cfg.theme = name;
+        await writeFile(path, `${JSON.stringify(cfg, null, 2)}\n`, 'utf8');
+      } catch { /* best-effort persistence */ }
+    })();
+  }, [overlays]);
 
   // BISECT: Static moved out of the transcript render. Logo stays
   // in a one-item Static (its original placement). Both committed
@@ -361,6 +391,13 @@ export function App(props: AppProps): React.JSX.Element {
         <HelpOverlay
           slashCommands={slashCommands}
           onClose={overlays.closeOverlay}
+        />
+      )}
+      {overlays.active === 'theme' && (
+        <ThemePicker
+          current={themeName}
+          onPick={handleThemePick}
+          onCancel={overlays.closeOverlay}
         />
       )}
       <StatusBar
