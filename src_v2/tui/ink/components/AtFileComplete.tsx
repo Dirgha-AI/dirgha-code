@@ -20,6 +20,7 @@ import * as React from 'react';
 import { readdir, stat } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { Box, Text, useInput, useStdout } from 'ink';
+import { useTheme } from '../theme-context.js';
 
 export interface AtFileCompleteProps {
   cwd: string;
@@ -102,6 +103,7 @@ async function walk(root: string, budget = MAX_WALK_ENTRIES): Promise<string[]> 
 
 export function AtFileComplete(props: AtFileCompleteProps): React.JSX.Element {
   const { stdout } = useStdout();
+  const palette = useTheme();
   const cols = stdout?.columns ?? 80;
   const width = Math.min(cols - 2, 70);
 
@@ -144,38 +146,38 @@ export function AtFileComplete(props: AtFileCompleteProps): React.JSX.Element {
 
   if (error !== null) {
     return (
-      <Box borderStyle="single" borderColor="red" paddingX={1} width={width}>
-        <Text color="red">walk failed: {error}</Text>
+      <Box borderStyle="single" borderColor={palette.error} paddingX={1} width={width}>
+        <Text color={palette.error}>walk failed: {error}</Text>
       </Box>
     );
   }
 
   if (index === null) {
     return (
-      <Box borderStyle="single" borderColor="gray" paddingX={1} width={width}>
-        <Text color="gray" dimColor>indexing files…</Text>
+      <Box borderStyle="single" borderColor={palette.borderIdle} paddingX={1} width={width}>
+        <Text color={palette.textMuted} dimColor>indexing files…</Text>
       </Box>
     );
   }
 
   if (matches.length === 0) {
     return (
-      <Box borderStyle="single" borderColor="gray" paddingX={1} width={width}>
-        <Text color="gray" dimColor>no matches for @{props.query}</Text>
+      <Box borderStyle="single" borderColor={palette.borderIdle} paddingX={1} width={width}>
+        <Text color={palette.textMuted} dimColor>no matches for @{props.query}</Text>
       </Box>
     );
   }
 
   return (
-    <Box flexDirection="column" borderStyle="single" borderColor="magenta" paddingX={1} width={width}>
+    <Box flexDirection="column" borderStyle="single" borderColor={palette.accent} paddingX={1} width={width}>
       <Box justifyContent="space-between">
-        <Text color="magenta" bold>@{props.query}</Text>
-        <Text color="gray" dimColor>↑↓ · tab/enter · esc</Text>
+        <Text color={palette.accent} bold>@{props.query}</Text>
+        <Text color={palette.textMuted} dimColor>↑↓ · tab/enter · esc</Text>
       </Box>
       {matches.map((m, i) => (
         <Box key={m.path} gap={1} paddingLeft={1}>
-          <Text color={i === cursor ? 'magentaBright' : 'gray'}>{i === cursor ? '>' : ' '}</Text>
-          <Text color={i === cursor ? 'white' : 'gray'} bold={i === cursor}>{m.path}</Text>
+          <Text color={i === cursor ? palette.accent : palette.textMuted}>{i === cursor ? '>' : ' '}</Text>
+          <Text color={i === cursor ? palette.textPrimary : palette.textMuted} bold={i === cursor}>{m.path}</Text>
         </Box>
       ))}
     </Box>

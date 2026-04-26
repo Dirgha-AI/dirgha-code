@@ -46,6 +46,8 @@ import { ModelPicker, type ModelEntry } from './components/ModelPicker.js';
 import { HelpOverlay, type HelpSlashCommand } from './components/HelpOverlay.js';
 import { AtFileComplete } from './components/AtFileComplete.js';
 import { SlashComplete } from './components/SlashComplete.js';
+import { ThemeProvider } from './theme-context.js';
+import type { ThemeName } from '../theme.js';
 import { useEventProjection, type TranscriptItem } from './use-event-projection.js';
 import { useOverlays } from './use-overlays.js';
 
@@ -296,6 +298,10 @@ export function App(props: AppProps): React.JSX.Element {
 
   const inputFocus = overlays.active === null || overlays.active === 'atfile' || overlays.active === 'slash';
 
+  // Active theme name from config — Ink components read the resolved
+  // hex Palette via `useTheme()` inside ThemeProvider.
+  const themeName: ThemeName = (props.config.theme ?? 'dark') as ThemeName;
+
   // BISECT: Static moved out of the transcript render. Logo stays
   // in a one-item Static (its original placement). Both committed
   // transcript and live items render in the regular dynamic Box. If
@@ -303,6 +309,7 @@ export function App(props: AppProps): React.JSX.Element {
   // was suppressing the live region updates. If still not, the bug
   // is upstream in useEventProjection.
   return (
+    <ThemeProvider activeTheme={themeName}>
     <Box flexDirection="column">
       <Static items={[{ key: 'logo' }]}>
         {(_item): React.JSX.Element => <Logo key="logo" version={VERSION} />}
@@ -370,6 +377,7 @@ export function App(props: AppProps): React.JSX.Element {
         liveDurationMs={liveDurationMs}
       />
     </Box>
+    </ThemeProvider>
   );
 }
 

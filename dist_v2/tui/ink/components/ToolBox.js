@@ -11,6 +11,7 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import * as React from 'react';
 import { Box, Text } from 'ink';
 import { iconFor } from '../icons.js';
+import { useTheme } from '../theme-context.js';
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 const TOOL_LABEL = {
     fs_read: 'Read',
@@ -35,6 +36,7 @@ function formatElapsed(ms) {
     return `${Math.floor(s / 60)}m ${s % 60}s`;
 }
 export function ToolBox(props) {
+    const palette = useTheme();
     const [frame, setFrame] = React.useState(0);
     const [tick, setTick] = React.useState(0);
     React.useEffect(() => {
@@ -47,8 +49,8 @@ export function ToolBox(props) {
         return () => clearInterval(t);
     }, [props.status]);
     const icon = props.status === 'error' ? '✗' : props.status === 'done' ? '✓' : SPINNER_FRAMES[frame];
-    const iconColour = props.status === 'error' ? 'red' : props.status === 'done' ? 'green' : 'cyan';
-    const borderColour = props.status === 'error' ? 'red' : props.status === 'done' ? 'gray' : 'cyan';
+    const iconColour = props.status === 'error' ? palette.error : props.status === 'done' ? palette.brand : palette.brand;
+    const borderColour = props.status === 'error' ? palette.error : props.status === 'done' ? palette.borderIdle : palette.brand;
     const elapsedLabel = props.status === 'running'
         ? formatElapsed(Date.now() - props.startedAt)
         : props.durationMs !== undefined
@@ -59,6 +61,6 @@ export function ToolBox(props) {
     const preview = props.outputPreview
         ? props.outputPreview.replace(/\s+/g, ' ').slice(0, 80)
         : '';
-    return (_jsxs(Box, { flexDirection: "column", borderStyle: "round", borderColor: borderColour, paddingX: 1, marginBottom: 1, children: [_jsxs(Box, { gap: 1, children: [_jsx(Text, { color: iconColour, children: icon }), _jsx(Text, { color: "magenta", bold: true, children: iconFor(props.name) }), _jsx(Text, { color: props.status === 'done' ? 'gray' : 'white', bold: true, children: prettyName(props.name) }), props.argSummary !== undefined && props.argSummary.length > 0 && (_jsxs(Text, { color: "gray", dimColor: true, children: ["(", props.argSummary, ")"] })), elapsedLabel !== '' && _jsx(Text, { color: "gray", dimColor: true, children: elapsedLabel })] }), preview !== '' && (_jsx(Box, { children: _jsx(Text, { color: "gray", dimColor: true, children: preview }) }))] }));
+    return (_jsxs(Box, { flexDirection: "column", borderStyle: "round", borderColor: borderColour, paddingX: 1, marginBottom: 1, children: [_jsxs(Box, { gap: 1, children: [_jsx(Text, { color: iconColour, children: icon }), _jsx(Text, { color: palette.accent, bold: true, children: iconFor(props.name) }), _jsx(Text, { color: props.status === 'done' ? palette.textMuted : palette.textPrimary, bold: true, children: prettyName(props.name) }), props.argSummary !== undefined && props.argSummary.length > 0 && (_jsxs(Text, { color: palette.textMuted, dimColor: true, children: ["(", props.argSummary, ")"] })), elapsedLabel !== '' && _jsx(Text, { color: palette.textMuted, dimColor: true, children: elapsedLabel })] }), preview !== '' && (_jsx(Box, { children: _jsx(Text, { color: palette.textMuted, dimColor: true, children: preview }) }))] }));
 }
 //# sourceMappingURL=ToolBox.js.map
