@@ -21,6 +21,7 @@
 import * as React from 'react';
 import { Box, Text, useApp, useInput, useStdout } from 'ink';
 import TextInput from 'ink-text-input';
+import { useTheme } from '../theme-context.js';
 import { applyVimKey, createVimState, type VimMode, type VimState } from './vim-bindings.js';
 import { detectPaste, PasteCollapseView, type PasteSegment } from './PasteCollapse.js';
 
@@ -68,6 +69,7 @@ function leadingSlashToken(value: string): string | null {
 export function InputBox(props: InputBoxProps): React.JSX.Element {
   const { stdout } = useStdout();
   const { exit } = useApp();
+  const palette = useTheme();
   const cols = stdout?.columns ?? 80;
   const [ctrlCArmed, setCtrlCArmed] = React.useState(false);
   const armTimerRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -178,8 +180,8 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
     }
   }, { isActive: focus });
 
-  const borderColour = props.busy ? 'cyan' : 'magenta';
-  const promptColour = props.busy ? 'cyan' : 'magenta';
+  const borderColour = props.busy ? palette.brand : palette.accent;
+  const promptColour = props.busy ? palette.brand : palette.accent;
   const collapsed = pasteSegment !== null && !pasteExpanded;
 
   return (
@@ -204,17 +206,17 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
       <Box paddingX={1} justifyContent="space-between">
         <Box gap={1}>
           {props.vimMode === true && (
-            <Text color={vimActive ? 'yellow' : 'green'} bold>
+            <Text color={vimActive ? palette.accent : palette.brand} bold>
               [{vimModeLabel(vimState.mode)}]
             </Text>
           )}
           {pasteSegment !== null && pasteExpanded && (
-            <Text color="gray" dimColor>
+            <Text color={palette.textMuted} dimColor>
               pasted block expanded (Ctrl+E collapse)
             </Text>
           )}
         </Box>
-        {ctrlCArmed && <Text color="yellow">Press Ctrl+C again to exit.</Text>}
+        {ctrlCArmed && <Text color={palette.accent}>Press Ctrl+C again to exit.</Text>}
       </Box>
     </Box>
   );

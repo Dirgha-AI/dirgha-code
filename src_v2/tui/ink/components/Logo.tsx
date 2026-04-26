@@ -8,6 +8,7 @@
 
 import * as React from 'react';
 import { Box, Text, useStdout } from 'ink';
+import { useTheme } from '../theme-context.js';
 
 export interface LogoProps {
   version: string;
@@ -22,16 +23,17 @@ const WIDE_ROWS: readonly string[] = [
   '  ╚═════╝ ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝',
 ];
 
-const ROW_COLOURS: readonly string[] = [
-  '#C4B5FD', '#A78BFA', '#8B5CF6', '#7C3AED', '#6D28D9', '#5B21B6',
-];
-
-const BORDER = '#5B21B6';
-const TAG = '#A78BFA';
-
 export function Logo({ version }: LogoProps): React.JSX.Element {
   const { stdout } = useStdout();
+  const palette = useTheme();
   const cols = stdout?.columns ?? 80;
+  // Logo uses only the 4 palette colours so every theme tints it
+  // distinctly — gradient effect is dropped, pick beats per-row noise.
+  const ROW_COLOURS: readonly string[] = [
+    palette.logoB, palette.logoA, palette.brand, palette.accent, palette.brand, palette.borderActive,
+  ];
+  const BORDER = palette.borderActive;
+  const TAG = palette.accent;
   if (cols < 60) {
     return (
       <Box flexDirection="column" paddingLeft={2} marginBottom={1}>

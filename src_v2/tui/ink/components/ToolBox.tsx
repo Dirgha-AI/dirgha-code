@@ -11,6 +11,7 @@
 import * as React from 'react';
 import { Box, Text } from 'ink';
 import { iconFor } from '../icons.js';
+import { useTheme } from '../theme-context.js';
 
 export type ToolStatus = 'running' | 'done' | 'error';
 
@@ -48,6 +49,7 @@ function formatElapsed(ms: number): string {
 }
 
 export function ToolBox(props: ToolBoxProps): React.JSX.Element {
+  const palette = useTheme();
   const [frame, setFrame] = React.useState(0);
   const [tick, setTick] = React.useState(0);
 
@@ -61,8 +63,8 @@ export function ToolBox(props: ToolBoxProps): React.JSX.Element {
   }, [props.status]);
 
   const icon = props.status === 'error' ? '✗' : props.status === 'done' ? '✓' : SPINNER_FRAMES[frame];
-  const iconColour = props.status === 'error' ? 'red' : props.status === 'done' ? 'green' : 'cyan';
-  const borderColour = props.status === 'error' ? 'red' : props.status === 'done' ? 'gray' : 'cyan';
+  const iconColour = props.status === 'error' ? palette.error : props.status === 'done' ? palette.brand : palette.brand;
+  const borderColour = props.status === 'error' ? palette.error : props.status === 'done' ? palette.borderIdle : palette.brand;
 
   const elapsedLabel = props.status === 'running'
     ? formatElapsed(Date.now() - props.startedAt)
@@ -80,16 +82,16 @@ export function ToolBox(props: ToolBoxProps): React.JSX.Element {
     <Box flexDirection="column" borderStyle="round" borderColor={borderColour} paddingX={1} marginBottom={1}>
       <Box gap={1}>
         <Text color={iconColour}>{icon}</Text>
-        <Text color="magenta" bold>{iconFor(props.name)}</Text>
-        <Text color={props.status === 'done' ? 'gray' : 'white'} bold>{prettyName(props.name)}</Text>
+        <Text color={palette.accent} bold>{iconFor(props.name)}</Text>
+        <Text color={props.status === 'done' ? palette.textMuted : palette.textPrimary} bold>{prettyName(props.name)}</Text>
         {props.argSummary !== undefined && props.argSummary.length > 0 && (
-          <Text color="gray" dimColor>({props.argSummary})</Text>
+          <Text color={palette.textMuted} dimColor>({props.argSummary})</Text>
         )}
-        {elapsedLabel !== '' && <Text color="gray" dimColor>{elapsedLabel}</Text>}
+        {elapsedLabel !== '' && <Text color={palette.textMuted} dimColor>{elapsedLabel}</Text>}
       </Box>
       {preview !== '' && (
         <Box>
-          <Text color="gray" dimColor>{preview}</Text>
+          <Text color={palette.textMuted} dimColor>{preview}</Text>
         </Box>
       )}
     </Box>

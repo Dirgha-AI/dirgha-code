@@ -29,13 +29,16 @@ export interface DirghaConfig {
   /**
    * TUI colour palette. Defaults to 'dark'. Users switch via /theme at
    * runtime; the preference is persisted to ~/.dirgha/config.json.
+   * Accepts the full 12-theme catalogue from `src_v2/tui/theme.ts`.
    */
-  theme?: 'dark' | 'light' | 'none';
+  theme?: 'dark' | 'light' | 'none' | 'midnight' | 'ocean' | 'solarized'
+    | 'warm' | 'violet-storm' | 'cosmic' | 'nord' | 'ember' | 'sakura'
+    | 'obsidian-gold' | 'crimson';
   /**
    * Persisted execution mode. Defaults to 'act' (normal execution).
    * Changed live via /mode; also honoured by fresh sessions.
    */
-  mode?: 'plan' | 'act' | 'verify';
+  mode?: 'plan' | 'act' | 'yolo' | 'verify' | 'ask';
   /**
    * Optional MCP servers to spawn on startup. Each entry runs as a
    * subprocess; its tools are bridged into the local tool registry

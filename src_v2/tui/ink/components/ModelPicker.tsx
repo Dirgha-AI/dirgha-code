@@ -13,6 +13,7 @@
 
 import * as React from 'react';
 import { Box, Text, useInput, useStdout } from 'ink';
+import { useTheme } from '../theme-context.js';
 
 export interface ModelEntry {
   id: string;
@@ -47,6 +48,7 @@ function groupByProvider(models: ModelEntry[]): Array<{ provider: string; items:
 
 export function ModelPicker(props: ModelPickerProps): React.JSX.Element {
   const { stdout } = useStdout();
+  const palette = useTheme();
   const cols = stdout?.columns ?? 80;
   const width = Math.min(cols - 4, 72);
 
@@ -96,19 +98,19 @@ export function ModelPicker(props: ModelPickerProps): React.JSX.Element {
     <Box
       flexDirection="column"
       borderStyle="round"
-      borderColor="magenta"
+      borderColor={palette.accent}
       paddingX={1}
       width={width}
     >
       <Box justifyContent="space-between">
-        <Text color="magenta" bold>model picker</Text>
-        <Text color="gray" dimColor>↑↓ enter · 1-9 · esc</Text>
+        <Text color={palette.accent} bold>model picker</Text>
+        <Text color={palette.textMuted} dimColor>↑↓ enter · 1-9 · esc</Text>
       </Box>
 
       <Box marginTop={1} flexDirection="column">
         {groups.map(group => (
           <Box key={group.provider} flexDirection="column" marginBottom={1}>
-            <Text color="cyan" dimColor>{group.provider}</Text>
+            <Text color={palette.brand} dimColor>{group.provider}</Text>
             {group.items.map(m => {
               const myIdx = idx;
               idx += 1;
@@ -116,13 +118,13 @@ export function ModelPicker(props: ModelPickerProps): React.JSX.Element {
               const isCurrent = m.id === props.current;
               const prefix = isCursor ? '>' : isCurrent ? '•' : ' ';
               const num = myIdx < 9 ? String(myIdx + 1) : ' ';
-              const tierColor = m.tier ? TIER_COLOR[m.tier] : 'gray';
+              const tierColor = m.tier ? TIER_COLOR[m.tier] : palette.textMuted;
               return (
                 <Box key={m.id} gap={1} paddingLeft={1}>
-                  <Text color={isCursor ? 'magentaBright' : 'gray'}>{prefix}</Text>
-                  <Text color="gray" dimColor>{num}</Text>
+                  <Text color={isCursor ? palette.accent : palette.textMuted}>{prefix}</Text>
+                  <Text color={palette.textMuted} dimColor>{num}</Text>
                   <Text
-                    color={isCursor ? 'white' : isCurrent ? 'magenta' : 'gray'}
+                    color={isCursor ? palette.textPrimary : isCurrent ? palette.accent : palette.textMuted}
                     bold={isCursor}
                   >
                     {m.label ?? m.id}
@@ -137,10 +139,10 @@ export function ModelPicker(props: ModelPickerProps): React.JSX.Element {
         ))}
       </Box>
 
-      <Box borderStyle="single" borderTop borderBottom={false} borderLeft={false} borderRight={false} borderColor="gray">
+      <Box borderStyle="single" borderTop borderBottom={false} borderLeft={false} borderRight={false} borderColor={palette.borderIdle}>
         <Box gap={1}>
-          <Text color="gray" dimColor>→</Text>
-          <Text color="magenta">{selected?.id ?? props.current}</Text>
+          <Text color={palette.textMuted} dimColor>→</Text>
+          <Text color={palette.accent}>{selected?.id ?? props.current}</Text>
         </Box>
       </Box>
     </Box>

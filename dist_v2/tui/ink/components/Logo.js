@@ -1,5 +1,6 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { Box, Text, useStdout } from 'ink';
+import { useTheme } from '../theme-context.js';
 const WIDE_ROWS = [
     '  ██████╗ ██╗██████╗  ██████╗ ██╗  ██╗ █████╗ ',
     '  ██╔══██╗██║██╔══██╗██╔════╝ ██║  ██║██╔══██╗',
@@ -8,14 +9,17 @@ const WIDE_ROWS = [
     '  ██████╔╝██║██║  ██║╚██████╔╝██║  ██║██║  ██║',
     '  ╚═════╝ ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝',
 ];
-const ROW_COLOURS = [
-    '#C4B5FD', '#A78BFA', '#8B5CF6', '#7C3AED', '#6D28D9', '#5B21B6',
-];
-const BORDER = '#5B21B6';
-const TAG = '#A78BFA';
 export function Logo({ version }) {
     const { stdout } = useStdout();
+    const palette = useTheme();
     const cols = stdout?.columns ?? 80;
+    // Logo uses only the 4 palette colours so every theme tints it
+    // distinctly — gradient effect is dropped, pick beats per-row noise.
+    const ROW_COLOURS = [
+        palette.logoB, palette.logoA, palette.brand, palette.accent, palette.brand, palette.borderActive,
+    ];
+    const BORDER = palette.borderActive;
+    const TAG = palette.accent;
     if (cols < 60) {
         return (_jsxs(Box, { flexDirection: "column", paddingLeft: 2, marginBottom: 1, children: [_jsxs(Text, { color: BORDER, children: [_jsx(Text, { color: ROW_COLOURS[0], children: "\u25C6 " }), _jsx(Text, { color: ROW_COLOURS[1], children: "DIRGHA" }), _jsx(Text, { color: BORDER, children: " \u25C6" })] }), _jsxs(Text, { color: TAG, children: ["\u2726 Dirgha Code", ' ', _jsxs(Text, { color: ROW_COLOURS[2], children: ["v", version] }), ' ', "\u2726"] }), _jsx(Text, { color: ROW_COLOURS[3], children: "dirgha.ai \u00B7 /help" })] }));
     }

@@ -13,6 +13,7 @@
 
 import * as React from 'react';
 import { Box, Text, useInput, useStdout } from 'ink';
+import { useTheme } from '../theme-context.js';
 
 export interface HelpSlashCommand {
   name: string;
@@ -69,6 +70,7 @@ const GROUP_TITLES: Record<string, string> = {
 
 export function HelpOverlay(props: HelpOverlayProps): React.JSX.Element {
   const { stdout } = useStdout();
+  const palette = useTheme();
   const cols = stdout?.columns ?? 80;
   const rows = stdout?.rows ?? 24;
   const width = Math.min(cols - 2, 100);
@@ -112,14 +114,14 @@ export function HelpOverlay(props: HelpOverlayProps): React.JSX.Element {
     cmds.sort((a, b) => a.name.localeCompare(b.name));
     lines.push(
       <Box key={`h-${group}`} marginTop={1}>
-        <Text color="magenta" bold>{GROUP_TITLES[group] ?? group}</Text>
+        <Text color={palette.accent} bold>{GROUP_TITLES[group] ?? group}</Text>
       </Box>,
     );
     for (const c of cmds) {
       lines.push(
         <Box key={`c-${c.name}`} gap={2}>
-          <Text color="cyan">/{c.name.padEnd(14)}</Text>
-          <Text color="gray">{c.description}</Text>
+          <Text color={palette.brand}>/{c.name.padEnd(14)}</Text>
+          <Text color={palette.textMuted}>{c.description}</Text>
         </Box>,
       );
     }
@@ -128,14 +130,14 @@ export function HelpOverlay(props: HelpOverlayProps): React.JSX.Element {
   // Shortcut block always visible — append after command lines.
   lines.push(
     <Box key="kb-h" marginTop={1}>
-      <Text color="magenta" bold>Keyboard</Text>
+      <Text color={palette.accent} bold>Keyboard</Text>
     </Box>,
   );
   for (const kb of KEYBOARD_SHORTCUTS) {
     lines.push(
       <Box key={`kb-${kb.key}`} gap={2}>
-        <Text color="yellow">{kb.key.padEnd(14)}</Text>
-        <Text color="gray">{kb.desc}</Text>
+        <Text color={palette.accent}>{kb.key.padEnd(14)}</Text>
+        <Text color={palette.textMuted}>{kb.desc}</Text>
       </Box>,
     );
   }
@@ -147,29 +149,29 @@ export function HelpOverlay(props: HelpOverlayProps): React.JSX.Element {
     <Box
       flexDirection="column"
       borderStyle="round"
-      borderColor="magenta"
+      borderColor={palette.accent}
       paddingX={1}
       width={width}
     >
       <Box gap={1} justifyContent="space-between">
         <Box gap={1}>
-          <Text color="magenta" bold>help</Text>
-          <Text color="gray" dimColor>
+          <Text color={palette.accent} bold>help</Text>
+          <Text color={palette.textMuted} dimColor>
             {filtered.length} command{filtered.length === 1 ? '' : 's'}
             {filter !== '' ? ` · filter: "${filter}"` : ''}
           </Text>
         </Box>
-        <Text color="gray" dimColor>type to filter · ↑↓ · esc</Text>
+        <Text color={palette.textMuted} dimColor>type to filter · ↑↓ · esc</Text>
       </Box>
 
       {visible.length === 0
-        ? <Text color="gray" dimColor>No commands match "{filter}"</Text>
+        ? <Text color={palette.textMuted} dimColor>No commands match "{filter}"</Text>
         : <>{visible}</>
       }
 
       {lines.length > maxVisible && (
         <Box marginTop={1}>
-          <Text color="gray" dimColor>
+          <Text color={palette.textMuted} dimColor>
             {scroll + maxVisible < lines.length
               ? `↓ ${lines.length - scroll - maxVisible} more below`
               : '· end ·'}

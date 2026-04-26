@@ -8,6 +8,7 @@
 
 import * as React from 'react';
 import { Box, Text, useStdout } from 'ink';
+import { useTheme } from '../theme-context.js';
 
 export interface StatusBarProps {
   model: string;
@@ -42,6 +43,7 @@ function cwdLabel(cwd: string): string {
 
 export function StatusBar(props: StatusBarProps): React.JSX.Element {
   const { stdout } = useStdout();
+  const palette = useTheme();
   const cols = stdout?.columns ?? 80;
   const [frame, setFrame] = React.useState(0);
 
@@ -60,14 +62,14 @@ export function StatusBar(props: StatusBarProps): React.JSX.Element {
   const contextMeter = props.contextWindow && props.contextWindow > 0 && totalTokens > 0
     ? `${formatTokens(totalTokens)}/${formatTokens(props.contextWindow)}`
     : '';
-  // Mode badge: hidden when in default 'act'/'yolo' so the bar stays
-  // quiet. YOLO is shown in red as a danger reminder.
+  // Mode badge: hidden when in default 'act' so the bar stays quiet.
+  // YOLO surfaces in the palette's error colour as a danger reminder.
   const modeBadge = props.mode && props.mode !== 'act' ? props.mode.toUpperCase() : '';
-  const modeColour = props.mode === 'plan' ? 'yellow'
-    : props.mode === 'verify' ? 'magenta'
-    : props.mode === 'ask' ? 'cyan'
-    : props.mode === 'yolo' ? 'red'
-    : 'gray';
+  const modeColour = props.mode === 'plan' ? palette.accent
+    : props.mode === 'verify' ? palette.brand
+    : props.mode === 'ask' ? palette.brand
+    : props.mode === 'yolo' ? palette.error
+    : palette.textMuted;
 
   // Slim status bar — only what's load-bearing:
   //   left:  cwd · mode badge (when not 'act')
@@ -77,14 +79,14 @@ export function StatusBar(props: StatusBarProps): React.JSX.Element {
   return (
     <Box width={cols} paddingX={1} justifyContent="space-between">
       <Box gap={1}>
-        <Text color="gray">{cwdLabel(props.cwd)}</Text>
+        <Text color={palette.textMuted}>{cwdLabel(props.cwd)}</Text>
         {modeBadge !== '' && <Text color={modeColour} bold>[{modeBadge}]</Text>}
       </Box>
       <Box gap={1}>
-        {props.busy && <Text color="cyan">{SPINNER_FRAMES[frame]}</Text>}
-        <Text color="cyan">{modelShort}</Text>
-        {contextMeter !== '' && <Text color="gray" dimColor>{contextMeter}</Text>}
-        {costLabel !== '' && <Text color="gray" dimColor>{costLabel}</Text>}
+        {props.busy && <Text color={palette.brand}>{SPINNER_FRAMES[frame]}</Text>}
+        <Text color={palette.brand}>{modelShort}</Text>
+        {contextMeter !== '' && <Text color={palette.textMuted} dimColor>{contextMeter}</Text>}
+        {costLabel !== '' && <Text color={palette.textMuted} dimColor>{costLabel}</Text>}
       </Box>
     </Box>
   );
