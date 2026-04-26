@@ -6,15 +6,19 @@
 [![License](https://img.shields.io/badge/license-FSL--1.1--MIT-d4a373?style=flat-square)](./LICENSE)
 [![Sponsor](https://img.shields.io/badge/sponsor-%E2%99%A1-c25a4f?style=flat-square)](https://dirgha.ai/contribute)
 
-**Dirgha Code is a CLI coding agent built on four pillars: BYOK, persistent memory, parallel agents, and scanned skills.**
+**Dirgha Code is a CLI coding agent built to help you accomplish complex agentic workflows and long-horizon development with leading LLM models, parallel agents, persistent memory, and security. Supports local models, BYOK, and skills.**
 
 </div>
 
 ## What it is
 
-A terminal coding assistant that reads your codebase, edits files, runs tests, commits, and audits every step. It runs on your keys, on your machine, with your transcripts staying local until you choose otherwise. When a model rate-limits or times out, the loop swaps to the next-priority key in your pool and resumes from the partial transcript. Your work doesn't vanish when an API hiccups.
+A terminal coding assistant that reads your codebase, edits files, runs tests, commits, and audits every step. It runs on your keys — or entirely on your machine via llama.cpp / Ollama — with your transcripts staying local until you choose otherwise. When a model rate-limits or times out, the loop swaps to the next-priority key in your pool and resumes from the partial transcript. Your work doesn't vanish when an API hiccups.
 
-## The four pillars
+## The five pillars
+
+### Local models — run entirely offline
+
+First-class llama.cpp and Ollama support. The setup wizard auto-probes `localhost:8080` and `localhost:11434`, lists installed models, and sets one as your default — no API key, no telemetry, no per-token cost. Use `llamacpp/<model>` or `ollama/<model>` ids anywhere a hosted model id would go. `dirgha doctor` reports both servers' health alongside the hosted providers. Mix and match: route easy turns to a local model, escalate hard ones to a frontier API in the same session.
 
 ### BYOK across 17 providers
 
@@ -43,9 +47,12 @@ SKILL.md packs are portable Markdown agents — share one git URL, anyone can `d
 
 ```bash
 npm install -g @dirgha/code        # or: pnpm add -g @dirgha/code
-export NVIDIA_API_KEY=nvapi-…      # or OPENROUTER_API_KEY, ANTHROPIC_API_KEY, …
-dirgha "say ok in one word" -m deepseek
+dirgha setup                       # 3-step wizard: pick provider (local works too) → auth → model
+dirgha "say ok in one word"
 ```
+
+Or skip the wizard and go straight to a key: `export NVIDIA_API_KEY=nvapi-…` (any of the 17 providers — see below).
+For 100% local: install [Ollama](https://ollama.com) or [llama.cpp](https://github.com/ggerganov/llama.cpp), then run `dirgha setup` and pick **Local**.
 
 The interactive TUI is `dirgha` with no args. Resume a session with `dirgha resume <id>`. Fan a parallel sub-agent fleet with `dirgha fleet launch "<goal>"`.
 

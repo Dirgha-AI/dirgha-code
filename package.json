@@ -1,7 +1,7 @@
 {
   "name": "@dirgha/code",
   "version": "1.6.0",
-  "description": "A CLI coding agent built on four pillars: BYOK across 17 providers, persistent memory, parallel agents, and scanned skills.",
+  "description": "CLI coding agent for complex agentic workflows and long-horizon development. Local models (llama.cpp / Ollama), BYOK across 17 providers, parallel agents, persistent memory, scanned skills.",
   "type": "module",
   "main": "./dist_v2/index.js",
   "types": "./dist_v2/index.d.ts",
