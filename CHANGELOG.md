@@ -124,7 +124,7 @@ Second-generation CLI core under `src_v2/`, shipped as the `dirgha-v2` binary al
 
 ### Under the hood — standard terminology lock-in
 
-Adopted industry-standard terms from the multi-agent workspace ecosystem audit (multica, ccpm, claudio, genie, devteam, citadel, maw, agent-worktree):
+Adopted industry-standard terms from the multi-agent workspace ecosystem audit (ccpm, claudio, genie, devteam, citadel, maw, agent-worktree):
 
 | Term | Meaning |
 |---|---|

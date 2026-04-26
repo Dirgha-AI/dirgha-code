@@ -164,7 +164,7 @@ export const InMemoryRealtimeHub: RealtimeHub = {
 
 /**
  * Create scoped event (helper)
- * Multica uses scoped events for workspace/agent/task updates
+ * Scoped events drive workspace/agent/task updates.
  */
 export function createEvent(
   type: string,
