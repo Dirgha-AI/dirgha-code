@@ -1,6 +1,6 @@
 {
   "name": "@dirgha/code",
-  "version": "1.6.0",
+  "version": "1.7.7",
   "description": "CLI coding agent for complex agentic workflows and long-horizon development. Local models (llama.cpp / Ollama), BYOK across 17 providers, parallel agents, persistent memory, scanned skills.",
   "type": "module",
   "main": "./dist_v2/index.js",
@@ -19,10 +19,15 @@
     "build": "tsc -p tsconfig.v2.json && cp src_v2/context/default-soul.md dist_v2/context/default-soul.md",
     "build:watch": "tsc -p tsconfig.v2.json --watch",
     "clean": "rm -rf ./dist_v2",
+    "test": "vitest run --dir src_v2",
     "test:cli": "node scripts/qa-app/run-all.mjs",
     "test:cli:offline": "node scripts/qa-app/run-all.mjs --offline",
+    "test:tui": "bash scripts/qa-app/picker-flow.sh",
+    "test:smoke": "bash scripts/smoke-matrix.sh all",
     "typecheck": "tsc -p tsconfig.v2.json --noEmit",
-    "v2": "node dist_v2/cli/main.js"
+    "verify-install": "bash scripts/verify-install.sh",
+    "prepublish-guard": "bash scripts/prepublish-guard.sh",
+    "prepublishOnly": "npm run prepublish-guard && npm run build && npm run verify-install"
   },
   "dependencies": {
     "ink": "^5.0.0",
@@ -32,7 +37,8 @@
   "devDependencies": {
     "@types/node": "^20.11.5",
     "@types/react": "^18.3.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.2"
   },
   "engines": {
     "node": ">=18.0.0"

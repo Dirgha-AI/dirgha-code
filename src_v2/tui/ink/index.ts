@@ -15,6 +15,7 @@ import type { ToolRegistry } from '../../tools/registry.js';
 import type { SessionStore } from '../../context/session.js';
 import type { DirghaConfig } from '../../cli/config.js';
 import { App } from './App.js';
+import { createDefaultSlashRegistry, registerBuiltinSlashCommands } from '../../cli/slash.js';
 
 export { App } from './App.js';
 export { Logo } from './components/Logo.js';
@@ -47,6 +48,8 @@ export interface RunInkTUIOptions {
 
 export async function runInkTUI(opts: RunInkTUIOptions): Promise<void> {
   const events = createEventStream();
+  const slashRegistry = createDefaultSlashRegistry();
+  await registerBuiltinSlashCommands(slashRegistry);
   const element = React.createElement(App, {
     events,
     registry: opts.registry,
@@ -54,6 +57,7 @@ export async function runInkTUI(opts: RunInkTUIOptions): Promise<void> {
     sessions: opts.sessions,
     config: opts.config,
     cwd: opts.cwd,
+    slashRegistry,
     ...(opts.systemPrompt !== undefined ? { systemPrompt: opts.systemPrompt } : {}),
     ...(opts.slashCommands !== undefined ? { slashCommands: opts.slashCommands } : {}),
     ...(opts.models !== undefined ? { models: opts.models } : {}),

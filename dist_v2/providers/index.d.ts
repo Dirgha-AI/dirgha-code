@@ -13,6 +13,7 @@ export { OpenAIProvider } from './openai.js';
 export { AnthropicProvider } from './anthropic.js';
 export { GeminiProvider } from './gemini.js';
 export { OllamaProvider } from './ollama.js';
+export { LlamaCppProvider } from './llamacpp.js';
 export { FireworksProvider } from './fireworks.js';
 export interface ProviderRegistryConfig {
     nvidia?: ProviderConfig;
@@ -28,6 +29,7 @@ export interface ProviderRegistryConfig {
     };
     gemini?: ProviderConfig;
     ollama?: ProviderConfig;
+    llamacpp?: ProviderConfig;
     fireworks?: ProviderConfig;
 }
 export declare class ProviderRegistry {

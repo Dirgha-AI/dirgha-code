@@ -6,7 +6,7 @@
  * App.tsx. Extracted so App stays under 500 LOC as the feature surface
  * grew (model picker, help, vim mode, paste-collapse, at-file complete).
  */
-export type OverlayKind = 'models' | 'help' | 'atfile' | 'slash' | null;
+export type OverlayKind = 'models' | 'help' | 'atfile' | 'slash' | 'theme' | null;
 export interface OverlayApi {
     active: OverlayKind;
     setActive: (k: OverlayKind) => void;
@@ -14,7 +14,7 @@ export interface OverlayApi {
     setAtQuery: (q: string | null) => void;
     slashQuery: string | null;
     setSlashQuery: (q: string | null) => void;
-    openOverlay: (k: 'models' | 'help') => void;
+    openOverlay: (k: 'models' | 'help' | 'theme') => void;
     closeOverlay: () => void;
     /**
      * Splice a selected @-file path back into `value`, replacing the

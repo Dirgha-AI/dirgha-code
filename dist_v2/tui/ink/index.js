@@ -9,6 +9,7 @@ import * as React from 'react';
 import { render } from 'ink';
 import { createEventStream } from '../../kernel/event-stream.js';
 import { App } from './App.js';
+import { createDefaultSlashRegistry, registerBuiltinSlashCommands } from '../../cli/slash.js';
 export { App } from './App.js';
 export { Logo } from './components/Logo.js';
 export { StatusBar } from './components/StatusBar.js';
@@ -23,6 +24,8 @@ export { PasteCollapseView, detectPaste } from './components/PasteCollapse.js';
 export { applyVimKey, createVimState } from './components/vim-bindings.js';
 export async function runInkTUI(opts) {
     const events = createEventStream();
+    const slashRegistry = createDefaultSlashRegistry();
+    await registerBuiltinSlashCommands(slashRegistry);
     const element = React.createElement(App, {
         events,
         registry: opts.registry,
@@ -30,6 +33,7 @@ export async function runInkTUI(opts) {
         sessions: opts.sessions,
         config: opts.config,
         cwd: opts.cwd,
+        slashRegistry,
         ...(opts.systemPrompt !== undefined ? { systemPrompt: opts.systemPrompt } : {}),
         ...(opts.slashCommands !== undefined ? { slashCommands: opts.slashCommands } : {}),
         ...(opts.models !== undefined ? { models: opts.models } : {}),

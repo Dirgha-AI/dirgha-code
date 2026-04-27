@@ -11,6 +11,7 @@ import { OpenAIProvider } from './openai.js';
 import { AnthropicProvider } from './anthropic.js';
 import { GeminiProvider } from './gemini.js';
 import { OllamaProvider } from './ollama.js';
+import { LlamaCppProvider } from './llamacpp.js';
 import { FireworksProvider } from './fireworks.js';
 export * from './iface.js';
 export * from './dispatch.js';
@@ -20,6 +21,7 @@ export { OpenAIProvider } from './openai.js';
 export { AnthropicProvider } from './anthropic.js';
 export { GeminiProvider } from './gemini.js';
 export { OllamaProvider } from './ollama.js';
+export { LlamaCppProvider } from './llamacpp.js';
 export { FireworksProvider } from './fireworks.js';
 export class ProviderRegistry {
     config;
@@ -44,6 +46,7 @@ export class ProviderRegistry {
             case 'anthropic': return new AnthropicProvider(this.config.anthropic ?? {});
             case 'gemini': return new GeminiProvider(this.config.gemini ?? {});
             case 'ollama': return new OllamaProvider(this.config.ollama ?? {});
+            case 'llamacpp': return new LlamaCppProvider(this.config.llamacpp ?? {});
             case 'fireworks': return new FireworksProvider(this.config.fireworks ?? {});
         }
     }

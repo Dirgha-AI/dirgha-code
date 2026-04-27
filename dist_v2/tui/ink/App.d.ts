@@ -20,6 +20,7 @@ import type { ProviderRegistry } from '../../providers/index.js';
 import type { ToolRegistry } from '../../tools/registry.js';
 import type { SessionStore } from '../../context/session.js';
 import type { DirghaConfig } from '../../cli/config.js';
+import type { SlashRegistry } from '../../cli/slash.js';
 import { type ModelEntry } from './components/ModelPicker.js';
 import { type HelpSlashCommand } from './components/HelpOverlay.js';
 export interface AppProps {
@@ -35,5 +36,7 @@ export interface AppProps {
     slashCommands?: HelpSlashCommand[];
     /** Model catalogue. Defaults to the prices registry. */
     models?: ModelEntry[];
+    /** Slash registry — built by runInkTUI, dispatched on submit. */
+    slashRegistry: SlashRegistry;
 }
 export declare function App(props: AppProps): React.JSX.Element;

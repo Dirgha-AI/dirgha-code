@@ -1,5 +1,42 @@
 # Dirgha CLI — Changelog
 
+## 1.7.7 — 2026-04-27
+
+### Fixed (P0 — install)
+
+- **`npm i -g @dirgha/code` failed for every user since 1.5.x.** Two compounding issues in the publishes that came from the wrong working tree: `dependencies."@dirgha/pricing": "workspace:*"` was unresolvable outside the monorepo, and `dependencies."cli-markdown": "^1.0.0"` (unused) transitively required `cli-html@1.9.4 → boxen/fieldset@github:horosgrisa/fieldset`, a deleted GitHub repo. Both deps gone. Verified by `scripts/verify-install.sh` which packs the tarball, installs in a clean throwaway dir, and boots `dirgha --version` + `doctor` + `--help`.
+
+### Fixed (TUI dispatch)
+
+- **Ink TUI `handleSubmit` did not dispatch through `SlashRegistry`.** The slash picker showed all 20 commands, but Enter only ran the 5 hardcoded branches (/clear, /help, /model[s], /theme); 15 others (account, compact, config, fleet, history, init, keys, login, memory, mode, resume, session, setup, status, upgrade) were either silently sent to the LLM as user prompts (this tree) or rejected as "Unknown command" (private monorepo tree). Now `App.tsx` builds a `SlashContext` from component state and dispatches via the registry before the user-prompt path. `runInkTUI` constructs the registry via `createDefaultSlashRegistry` + `registerBuiltinSlashCommands`, mirroring `interactive.ts`.
+
+### Added (release safety)
+
+- **`scripts/verify-install.sh`** — pre-publish gate. Packs, installs in `/tmp/dirgha-verify-install-$$`, asserts the binary launches and `doctor` + `--help` print expected sections.
+- **`scripts/prepublish-guard.sh`** — refuses publish if `_legacy_v1/` exists in cwd OR any dep value starts with `workspace:`. Catches the failure mode that put the broken 1.7.0/1.7.1/1.7.6 on npm.
+- **`prepublishOnly` chain** = `prepublish-guard && build && verify-install`. A broken artifact can no longer reach npm.
+- **`.github/workflows/release.yml`** — on `v*.*.*` tag push: tag-vs-package.json version match check, npm ci, all gates above, `npm publish --access public --provenance` (OIDC-signed). Manual laptop publishes are no longer the path.
+
+### Changed
+
+- **Quarantined v1 source tree.** `src/` and `tsconfig.json` (the legacy v1 build config) moved to `_legacy_v1/`. `src_v2/` has been the canonical tree since 1.x; the legacy tree was dead code in the repo. Recoverable via `git checkout`. `dist/` (legacy build output) deleted and gitignored.
+
+### Added (test infrastructure)
+
+- **Vision-loop smoke matrix.** `scripts/vision-loop.sh` (tmux PTY driver + charmbracelet/freeze for ANSI→PNG capture) + `scripts/smoke-matrix.sh` (drives every slash + subcommand, asserts on body content excluding the splash banner). 24/24 PASS.
+- **Picker-flow smoke.** `scripts/qa-app/picker-flow.sh` drives `/models` end-to-end as a human would: open with /models, navigate Down × 5, Enter, then verify the confirmation message + StatusBar update + persistence on reopen. 10/10 assertions across 5 PNG frames.
+- New npm scripts: `test`, `test:tui`, `test:smoke`, `verify-install`, `prepublish-guard`.
+- Vitest added as devDependency.
+
+### Fixed (tests)
+
+- 7 stale `dispatch.test.ts` assertions updated to match `routeModel` intent: prefixed slugs (anthropic/, openai/, google/, minimaxai/, z-ai/, meta/) go via OpenRouter as the catch-all; only NIM-whitelisted exact IDs go to nvidia. Routing implementation unchanged. `npm test` now green.
+
+### Known issues (open, not regressions)
+
+- **Gateway `/api/auth/device/start` returns 404.** `/login` surfaces this clearly; CLI is correct, server-side endpoint missing.
+- **Gateway `/account` and `/upgrade` return 401** against a stale token. CLI handles gracefully.
+
 ## 1.6.0 — 2026-04-26
 
 ### Added

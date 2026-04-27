@@ -8,7 +8,8 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-const THEMES = ['dark', 'light', 'none'];
+import { listThemes } from '../../tui/theme.js';
+const THEMES = listThemes();
 function configPath() {
     return join(homedir(), '.dirgha', 'config.json');
 }
@@ -29,18 +30,25 @@ async function writeConfig(cfg) {
 }
 export const themeCommand = {
     name: 'theme',
-    description: 'Show or pick TUI theme (dark|light|none)',
+    description: 'Pick TUI theme (14 palettes — opens picker with no args)',
     async execute(args, ctx) {
         const current = ctx.getTheme();
         if (args.length === 0) {
             return [
                 `Current theme: ${current}`,
-                `Available:     ${THEMES.join(' · ')}`,
+                `Available (${THEMES.length}):`,
+                `  ${THEMES.join(' · ')}`,
+                ``,
+                `Pick one with /theme <name>  ·  e.g. /theme cosmic`,
             ].join('\n');
         }
         const next = args[0];
         if (!THEMES.includes(next)) {
-            return `Unknown theme "${next}". Choose one of: ${THEMES.join(', ')}`;
+            return [
+                `Unknown theme "${next}".`,
+                `Available (${THEMES.length}):`,
+                `  ${THEMES.join(' · ')}`,
+            ].join('\n');
         }
         process.env['DIRGHA_THEME'] = next;
         const cfg = await readConfig();

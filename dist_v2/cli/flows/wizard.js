@@ -23,6 +23,8 @@ import { PRICES } from '../../intelligence/prices.js';
 const PROVIDERS = [
     { id: 'dirgha', label: 'Dirgha hosted', hosted: true,
         blurb: 'Sign in with your Dirgha account · free tier + paid plans' },
+    { id: 'local', label: 'Local (llama.cpp / Ollama)', hosted: false,
+        blurb: 'Run models on your own machine · zero cost, fully private' },
     { id: 'nvidia', label: 'NVIDIA NIM', hosted: false,
         env: 'NVIDIA_API_KEY', helpUrl: 'https://build.nvidia.com/settings/api-keys',
         blurb: 'Free NIM tier · Kimi, DeepSeek, Qwen, Llama' },
@@ -125,10 +127,49 @@ async function pickProvider(rl) {
     }
     return PROVIDERS[idx] ?? null;
 }
+async function probeLocalServer(url) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 1500);
+    try {
+        const res = await fetch(url, { method: 'GET', signal: controller.signal });
+        clearTimeout(timer);
+        return res.status < 500;
+    }
+    catch {
+        clearTimeout(timer);
+        return false;
+    }
+}
+async function authenticateLocal() {
+    const ollamaUrl = process.env.OLLAMA_URL ?? 'http://localhost:11434/api/tags';
+    const llamacppUrl = (process.env.LLAMACPP_URL ?? 'http://localhost:8080/v1').replace(/\/+$/, '') + '/models';
+    const [ollamaUp, llamacppUp] = await Promise.all([
+        probeLocalServer(ollamaUrl),
+        probeLocalServer(llamacppUrl),
+    ]);
+    if (ollamaUp)
+        stdout.write(style(defaultTheme.success, `  ✓ Ollama responding at ${ollamaUrl}\n`));
+    else
+        stdout.write(style(defaultTheme.muted, `  · Ollama not running at ${ollamaUrl}\n`));
+    if (llamacppUp)
+        stdout.write(style(defaultTheme.success, `  ✓ llama.cpp responding at ${llamacppUrl}\n`));
+    else
+        stdout.write(style(defaultTheme.muted, `  · llama.cpp not running at ${llamacppUrl}\n`));
+    if (!ollamaUp && !llamacppUp) {
+        stdout.write(`\n  ${style(defaultTheme.warning, 'Neither server is running.')} Install one:\n`);
+        stdout.write(`    Install Ollama:    ${style(defaultTheme.accent, 'curl -fsSL https://ollama.com/install.sh | sh')}\n`);
+        stdout.write(`    Or llama.cpp:      ${style(defaultTheme.accent, 'https://github.com/ggerganov/llama.cpp')}\n`);
+        stdout.write(`  ${style(defaultTheme.muted, 'Continuing setup — you can start a server later.')}\n`);
+    }
+    return true;
+}
 async function authenticate(provider, rl) {
     printStep(2, `Authenticate · ${provider.label}`);
     if (provider.hosted) {
         return authenticateDirgha();
+    }
+    if (provider.id === 'local') {
+        return authenticateLocal();
     }
     if (!provider.env)
         return false;
@@ -178,7 +219,104 @@ function modelsForProvider(providerId) {
     }
     return PRICES.filter(p => p.provider === providerId).map(p => p.model);
 }
+async function fetchLocalModels() {
+    const out = [];
+    let suggested = '';
+    // Ollama: /api/tags returns { models: [{ name: 'llama3.2:3b', ... }] }
+    try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 1500);
+        const res = await fetch('http://localhost:11434/api/tags', { signal: ctrl.signal });
+        clearTimeout(t);
+        if (res.ok) {
+            const json = await res.json();
+            for (const m of json.models ?? []) {
+                if (m.name)
+                    out.push(`ollama/${m.name}`);
+            }
+            if (out.length > 0 && out[0])
+                suggested = out[0];
+        }
+    }
+    catch { /* ignored */ }
+    // llama.cpp: /v1/models returns { data: [{ id: '...' }] }
+    try {
+        const base = (process.env.LLAMACPP_URL ?? 'http://localhost:8080/v1').replace(/\/+$/, '');
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 1500);
+        const res = await fetch(`${base}/models`, { signal: ctrl.signal });
+        clearTimeout(t);
+        if (res.ok) {
+            const json = await res.json();
+            const before = out.length;
+            for (const m of json.data ?? []) {
+                if (m.id)
+                    out.push(`llamacpp/${m.id}`);
+            }
+            if (!suggested && out.length > before && out[before])
+                suggested = out[before];
+        }
+    }
+    catch { /* ignored */ }
+    if (!suggested)
+        suggested = 'ollama/llama3.2:3b';
+    return { models: out, suggested };
+}
+async function pickLocalModel(rl) {
+    printStep(3, 'Pick a default model · Local');
+    // Hardware probe → always show the user what they're working with.
+    const { detectHardware, summariseHardware } = await import('../../setup/hardware-detect.js');
+    const hw = await detectHardware();
+    for (const line of summariseHardware(hw)) {
+        stdout.write(`  ${style(defaultTheme.muted, line)}\n`);
+    }
+    stdout.write('\n');
+    const { models, suggested } = await fetchLocalModels();
+    if (models.length === 0) {
+        // No server running — fall back to hardware-aware GGUF recommendations.
+        const { recommendModels, modelDownloadHint } = await import('../../setup/model-curator.js');
+        const recs = recommendModels(hw, 3);
+        stdout.write(`  ${style(defaultTheme.warning, 'No local server detected on :11434 (Ollama) or :8080 (llama.cpp).')}\n\n`);
+        if (recs.length > 0) {
+            stdout.write(`  ${style(defaultTheme.accent, 'Recommended for your hardware')} (Q4_K_M GGUF, ungated):\n`);
+            recs.forEach((m, i) => {
+                stdout.write(`    ${i + 1}. ${style(defaultTheme.accent, m.name.padEnd(22))} ${m.sizeGB} GB · ${m.description}\n`);
+            });
+            const top = recs[0];
+            if (top) {
+                stdout.write(`\n  ${style(defaultTheme.muted, 'To install the top pick:')}\n`);
+                for (const line of modelDownloadHint(top).split('\n')) {
+                    stdout.write(`    ${style(defaultTheme.muted, line)}\n`);
+                }
+            }
+        }
+        else {
+            stdout.write(`  ${style(defaultTheme.muted, 'Hardware below the smallest tier (~2 GB RAM). Consider hosted providers.')}\n`);
+        }
+        stdout.write(`\n  ${style(defaultTheme.muted, 'Setup will store a placeholder default; re-run after the server is up.')}\n`);
+        const ans = (await rl.question(`\n  Press enter to accept ${style(defaultTheme.accent, suggested)}, or paste a model id: `)).trim();
+        return ans.length > 0 ? ans : suggested;
+    }
+    const top = models.slice(0, 12);
+    top.forEach((m, i) => {
+        const num = `${i + 1}`.padStart(2);
+        const marker = m === suggested ? style(defaultTheme.success, '  ← recommended') : '';
+        stdout.write(`  ${num}. ${m}${marker}\n`);
+    });
+    const more = models.length - top.length;
+    if (more > 0)
+        stdout.write(`  ${style(defaultTheme.muted, `… ${more} more available`)}\n`);
+    const defaultIdx = `${Math.max(top.indexOf(suggested), 0) + 1}`;
+    const ans = (await rl.question(`\n  [1-${top.length}, default ${defaultIdx}]: `)).trim();
+    const idx = ans === '' ? Number.parseInt(defaultIdx, 10) - 1 : Number.parseInt(ans, 10) - 1;
+    if (Number.isNaN(idx) || idx < 0 || idx >= top.length) {
+        return ans.length > 0 ? ans : (top[0] ?? suggested);
+    }
+    return top[idx] ?? suggested;
+}
 async function pickModel(provider, rl) {
+    if (provider.id === 'local')
+        return pickLocalModel(rl);
     printStep(3, `Pick a default model · ${provider.label}`);
     const models = modelsForProvider(provider.id);
     if (models.length === 0) {
@@ -221,6 +359,10 @@ function printNonInteractiveHelp() {
     stdout.write(`Non-interactive context detected. Configure manually:\n\n`);
     stdout.write(`  ${style(defaultTheme.accent, 'Hosted account')}\n`);
     stdout.write(`    dirgha login\n\n`);
+    stdout.write(`  ${style(defaultTheme.accent, 'Local (llama.cpp / Ollama)')} — no key required:\n`);
+    stdout.write(`    Install Ollama:    curl -fsSL https://ollama.com/install.sh | sh\n`);
+    stdout.write(`    Or llama.cpp:      https://github.com/ggerganov/llama.cpp\n`);
+    stdout.write(`    Override URLs:     OLLAMA_URL=… LLAMACPP_URL=…\n\n`);
     stdout.write(`  ${style(defaultTheme.accent, 'BYOK')} — pick one or more:\n`);
     for (const p of PROVIDERS.filter(x => !x.hosted && x.env)) {
         stdout.write(`    export ${p.env}=<key>     ${style(defaultTheme.muted, p.helpUrl ?? '')}\n`);

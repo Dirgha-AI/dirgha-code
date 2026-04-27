@@ -40,7 +40,11 @@ import { ModelPicker } from './components/ModelPicker.js';
 import { HelpOverlay } from './components/HelpOverlay.js';
 import { AtFileComplete } from './components/AtFileComplete.js';
 import { SlashComplete } from './components/SlashComplete.js';
+import { ThemePicker } from './components/ThemePicker.js';
 import { ThemeProvider } from './theme-context.js';
+import { writeFile, mkdir, readFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { join as pathJoin } from 'node:path';
 import { useEventProjection } from './use-event-projection.js';
 import { useOverlays } from './use-overlays.js';
 import { createRequire } from 'node:module';
@@ -160,6 +164,86 @@ export function App(props) {
             overlays.openOverlay('help');
             return;
         }
+        // `/theme` with no args opens the picker; `/theme <name>` sets directly.
+        if (value === '/theme' || value === '/themes') {
+            overlays.openOverlay('theme');
+            return;
+        }
+        // Anything else starting with `/` goes through the SlashRegistry — that
+        // covers /init /keys /memory /compact /setup /login /status /resume
+        // /session /history /fleet /account /upgrade /config /mode and friends.
+        // The hardcoded branches above (clear/help/model[s]/theme) ran first
+        // because they open Ink overlays and don't fit the registry string-output
+        // contract. Without this dispatch, unrecognised slash commands fell
+        // through to runTurn() and were sent to the LLM as user prompts —
+        // surprising behaviour that S1/2026-04-27 fixes.
+        if (value.startsWith('/')) {
+            const ctx = {
+                get model() { return currentModel; },
+                get sessionId() { return sessionIdRef.current; },
+                setModel: (m) => setCurrentModel(m),
+                showHelp: () => '',
+                compact: async () => '(compaction is automatic)',
+                clear: () => {
+                    historyRef.current = initialHistory(props);
+                    setTranscript([]);
+                    projection.clear();
+                },
+                listSessions: async () => {
+                    const ids = await props.sessions.list();
+                    return ids.length === 0 ? '(no saved sessions)' : ids.map(id => `- ${id}`).join('\n');
+                },
+                loadSession: async (id) => {
+                    const s = await props.sessions.open(id);
+                    return s ? `Loaded ${id}.` : `Session ${id} not found.`;
+                },
+                listSkills: async () => '(run `dirgha skills` for the full list)',
+                showCost: () => `model=${currentModel}`,
+                exit: (code = 0) => { exit(); process.exit(code); },
+                getToken: () => null,
+                setToken: () => undefined,
+                apiBase: () => process.env['DIRGHA_API_BASE'] ?? process.env['DIRGHA_GATEWAY_URL'] ?? 'https://api.dirgha.ai',
+                upgradeUrl: () => process.env['DIRGHA_UPGRADE_URL'] ?? 'https://dirgha.ai/billing/upgrade',
+                status: (msg) => {
+                    setTranscript(prev => [...prev, { kind: 'notice', id: randomUUID(), text: msg }]);
+                },
+                // Mode toggling is not yet wired into App state in this tree — the
+                // registry's /mode handler will report the current value but in-session
+                // changes do not persist to the running turn loop. TODO follow-up sprint.
+                getMode: () => (props.config.mode ?? 'act'),
+                setMode: () => undefined,
+                getTheme: () => (props.config.theme ?? 'dark'),
+                setTheme: () => undefined,
+                getSession: () => null,
+                getSessionStore: () => props.sessions,
+                getProvider: () => props.providers.forModel(currentModel),
+                getSummaryModel: () => props.config.summaryModel,
+            };
+            void (async () => {
+                try {
+                    const result = await props.slashRegistry.dispatch(value, ctx);
+                    if (result.handled) {
+                        const text = result.output ? String(result.output) : '(ok)';
+                        setTranscript(prev => [...prev, { kind: 'notice', id: randomUUID(), text }]);
+                    }
+                    else {
+                        setTranscript(prev => [...prev, {
+                                kind: 'notice',
+                                id: randomUUID(),
+                                text: `Unknown command: ${value.split(' ')[0]}. Type /help for the list.`,
+                            }]);
+                    }
+                }
+                catch (err) {
+                    setTranscript(prev => [...prev, {
+                            kind: 'notice',
+                            id: randomUUID(),
+                            text: `[slash error] ${err instanceof Error ? err.message : String(err)}`,
+                        }]);
+                }
+            })();
+            return;
+        }
         const userItem = { kind: 'user', id: randomUUID(), text: value };
         setTranscript(prev => [...prev, userItem]);
         historyRef.current.push({ role: 'user', content: value });
@@ -269,16 +353,35 @@ export function App(props) {
         overlays.setActive(null);
     }, [overlays]);
     const inputFocus = overlays.active === null || overlays.active === 'atfile' || overlays.active === 'slash';
-    // Active theme name from config — Ink components read the resolved
-    // hex Palette via `useTheme()` inside ThemeProvider.
-    const themeName = (props.config.theme ?? 'dark');
+    // Active theme name — driven by local state so the picker can flip it
+    // live. Initial value comes from config; subsequent changes are
+    // persisted to ~/.dirgha/config.json so future sessions pick it up.
+    const [themeName, setThemeName] = React.useState((props.config.theme ?? 'dark'));
+    const handleThemePick = React.useCallback((name) => {
+        overlays.closeOverlay();
+        setThemeName(name);
+        const note = { kind: 'notice', id: randomUUID(), text: `Theme set to ${name}` };
+        setTranscript(t => [...t, note]);
+        void (async () => {
+            try {
+                const dir = pathJoin(homedir(), '.dirgha');
+                await mkdir(dir, { recursive: true });
+                const path = pathJoin(dir, 'config.json');
+                const text = await readFile(path, 'utf8').catch(() => '');
+                const cfg = text ? JSON.parse(text) : {};
+                cfg.theme = name;
+                await writeFile(path, `${JSON.stringify(cfg, null, 2)}\n`, 'utf8');
+            }
+            catch { /* best-effort persistence */ }
+        })();
+    }, [overlays]);
     // BISECT: Static moved out of the transcript render. Logo stays
     // in a one-item Static (its original placement). Both committed
     // transcript and live items render in the regular dynamic Box. If
     // streaming text appears now, the Static-around-transcript pattern
     // was suppressing the live region updates. If still not, the bug
     // is upstream in useEventProjection.
-    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: [{ key: 'logo' }], children: (_item) => _jsx(Logo, { version: VERSION }, "logo") }), _jsxs(Box, { flexDirection: "column", children: [transcript.map(item => (_jsx(TranscriptRow, { item: item }, item.id))), projection.liveItems.map(item => (_jsx(TranscriptRow, { item: item }, item.id)))] }), _jsx(InputBox, { value: input, onChange: setInput, onSubmit: handleSubmit, busy: busy, vimMode: props.config.vimMode === true, onAtQueryChange: overlays.setAtQuery, onSlashQueryChange: overlays.setSlashQuery, onRequestOverlay: overlays.openOverlay, inputFocus: inputFocus && !busy }), overlays.active === 'atfile' && overlays.atQuery !== null && (_jsx(AtFileComplete, { cwd: props.cwd, query: overlays.atQuery, onPick: handleAtPick, onCancel: () => { overlays.setAtQuery(null); overlays.setActive(null); } })), overlays.active === 'slash' && overlays.slashQuery !== null && (_jsx(SlashComplete, { commands: slashCommands, query: overlays.slashQuery, onPick: handleSlashPick, onCancel: () => { overlays.setSlashQuery(null); overlays.setActive(null); } })), overlays.active === 'models' && (_jsx(ModelPicker, { models: models, current: currentModel, onPick: handleModelPick, onCancel: overlays.closeOverlay })), overlays.active === 'help' && (_jsx(HelpOverlay, { slashCommands: slashCommands, onClose: overlays.closeOverlay })), _jsx(StatusBar, { model: currentModel, provider: providerIdForModel(currentModel), inputTokens: projection.totals.inputTokens, outputTokens: projection.totals.outputTokens, costUsd: projection.totals.costUsd, cwd: props.cwd, busy: busy, mode: props.config.mode ?? 'act', contextWindow: contextWindowFor(currentModel), liveOutputTokens: liveOutputTokens, liveDurationMs: liveDurationMs })] }) }));
+    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: [{ key: 'logo' }], children: (_item) => _jsx(Logo, { version: VERSION }, "logo") }), _jsxs(Box, { flexDirection: "column", children: [transcript.map(item => (_jsx(TranscriptRow, { item: item }, item.id))), projection.liveItems.map(item => (_jsx(TranscriptRow, { item: item }, item.id)))] }), _jsx(InputBox, { value: input, onChange: setInput, onSubmit: handleSubmit, busy: busy, vimMode: props.config.vimMode === true, onAtQueryChange: overlays.setAtQuery, onSlashQueryChange: overlays.setSlashQuery, onRequestOverlay: overlays.openOverlay, inputFocus: inputFocus && !busy }), overlays.active === 'atfile' && overlays.atQuery !== null && (_jsx(AtFileComplete, { cwd: props.cwd, query: overlays.atQuery, onPick: handleAtPick, onCancel: () => { overlays.setAtQuery(null); overlays.setActive(null); } })), overlays.active === 'slash' && overlays.slashQuery !== null && (_jsx(SlashComplete, { commands: slashCommands, query: overlays.slashQuery, onPick: handleSlashPick, onCancel: () => { overlays.setSlashQuery(null); overlays.setActive(null); } })), overlays.active === 'models' && (_jsx(ModelPicker, { models: models, current: currentModel, onPick: handleModelPick, onCancel: overlays.closeOverlay })), overlays.active === 'help' && (_jsx(HelpOverlay, { slashCommands: slashCommands, onClose: overlays.closeOverlay })), overlays.active === 'theme' && (_jsx(ThemePicker, { current: themeName, onPick: handleThemePick, onCancel: overlays.closeOverlay })), _jsx(StatusBar, { model: currentModel, provider: providerIdForModel(currentModel), inputTokens: projection.totals.inputTokens, outputTokens: projection.totals.outputTokens, costUsd: projection.totals.costUsd, cwd: props.cwd, busy: busy, mode: props.config.mode ?? 'act', contextWindow: contextWindowFor(currentModel), liveOutputTokens: liveOutputTokens, liveDurationMs: liveDurationMs })] }) }));
 }
 function TranscriptRow({ item }) {
     switch (item.kind) {

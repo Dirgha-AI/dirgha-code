@@ -1,4 +1,4 @@
-import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { jsxs as _jsxs, jsx as _jsx } from "react/jsx-runtime";
 /**
  * Status bar rendered below the input box.
  *
@@ -21,6 +21,23 @@ function cwdLabel(cwd) {
     const parts = cwd.split('/').filter(Boolean);
     return parts[parts.length - 1] ?? '~';
 }
+// Drop the provider prefix from a model id so the footer reads short
+// and human. e.g. `moonshotai/kimi-k2-instruct` → `kimi-k2-instruct`,
+// `accounts/fireworks/models/deepseek-v3` → `deepseek-v3`.
+function shortModel(model) {
+    const slash = model.lastIndexOf('/');
+    return slash === -1 ? model : model.slice(slash + 1);
+}
+function modeStyle(mode) {
+    switch (mode) {
+        case 'yolo': return { label: 'YOLO', symbol: '⏵⏵' };
+        case 'plan': return { label: 'PLAN', symbol: '◔' };
+        case 'verify': return { label: 'VERIFY', symbol: '✓' };
+        case 'ask': return { label: 'ASK', symbol: '?' };
+        case 'act':
+        default: return { label: 'ACT', symbol: '▸' };
+    }
+}
 export function StatusBar(props) {
     const { stdout } = useStdout();
     const palette = useTheme();
@@ -36,24 +53,28 @@ export function StatusBar(props) {
     }, [props.busy]);
     const totalTokens = props.inputTokens + props.outputTokens;
     const costLabel = props.costUsd > 0 ? `$${props.costUsd.toFixed(3)}` : '';
-    const modelShort = props.model.length > 28 ? `${props.model.slice(0, 27)}…` : props.model;
+    // Strip provider prefix so the footer reads short and human.
+    const modelDisplay = (() => {
+        const s = shortModel(props.model);
+        return s.length > 28 ? `${s.slice(0, 27)}…` : s;
+    })();
     // Context meter: "12k/128k" — only renders when both ends are known.
     const contextMeter = props.contextWindow && props.contextWindow > 0 && totalTokens > 0
         ? `${formatTokens(totalTokens)}/${formatTokens(props.contextWindow)}`
         : '';
-    // Mode badge: hidden when in default 'act' so the bar stays quiet.
-    // YOLO surfaces in the palette's error colour as a danger reminder.
-    const modeBadge = props.mode && props.mode !== 'act' ? props.mode.toUpperCase() : '';
-    const modeColour = props.mode === 'plan' ? palette.accent
-        : props.mode === 'verify' ? palette.brand
-            : props.mode === 'ask' ? palette.brand
-                : props.mode === 'yolo' ? palette.error
+    // Mode badge: ALWAYS visible so the user knows what posture the
+    // agent is in. YOLO surfaces in the palette's error colour as a
+    // danger reminder; PLAN/ASK in accent; ACT in muted to stay calm.
+    const mode = props.mode ?? 'act';
+    const ms = modeStyle(mode);
+    const modeColour = mode === 'plan' ? palette.accent
+        : mode === 'verify' ? palette.brand
+            : mode === 'ask' ? palette.brand
+                : mode === 'yolo' ? palette.error
                     : palette.textMuted;
     // Slim status bar — only what's load-bearing:
-    //   left:  cwd · mode badge (when not 'act')
-    //   right: spinner (when busy) · model · context-meter or cost
-    // Drops: decorative dot, provider id (model name implies it),
-    // /help hint, redundant token count when meter is present, tok/s.
-    return (_jsxs(Box, { width: cols, paddingX: 1, justifyContent: "space-between", children: [_jsxs(Box, { gap: 1, children: [_jsx(Text, { color: palette.textMuted, children: cwdLabel(props.cwd) }), modeBadge !== '' && _jsxs(Text, { color: modeColour, bold: true, children: ["[", modeBadge, "]"] })] }), _jsxs(Box, { gap: 1, children: [props.busy && _jsx(Text, { color: palette.brand, children: SPINNER_FRAMES[frame] }), _jsx(Text, { color: palette.brand, children: modelShort }), contextMeter !== '' && _jsx(Text, { color: palette.textMuted, dimColor: true, children: contextMeter }), costLabel !== '' && _jsx(Text, { color: palette.textMuted, dimColor: true, children: costLabel })] })] }));
+    //   left:  ⏵⏵ MODE · cwd
+    //   right: spinner (when busy) · short model · context-meter or cost
+    return (_jsxs(Box, { width: cols, paddingX: 1, justifyContent: "space-between", children: [_jsxs(Box, { gap: 1, children: [_jsxs(Text, { color: modeColour, bold: true, children: [ms.symbol, " ", ms.label] }), _jsx(Text, { color: palette.textMuted, dimColor: true, children: "\u00B7" }), _jsx(Text, { color: palette.textMuted, children: cwdLabel(props.cwd) })] }), _jsxs(Box, { gap: 1, children: [props.busy && _jsx(Text, { color: palette.brand, children: SPINNER_FRAMES[frame] }), _jsx(Text, { color: palette.brand, children: modelDisplay }), props.busy && _jsx(Text, { color: palette.textMuted, dimColor: true, children: "\u00B7 Ctrl+C to stop" }), contextMeter !== '' && _jsx(Text, { color: palette.textMuted, dimColor: true, children: contextMeter }), costLabel !== '' && _jsx(Text, { color: palette.textMuted, dimColor: true, children: costLabel })] })] }));
 }
 //# sourceMappingURL=StatusBar.js.map

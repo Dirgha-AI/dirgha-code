@@ -23,6 +23,7 @@ import { undoSubcommand } from './undo.js';
 import { updateSubcommand } from './update.js';
 import { auditCodebaseSubcommand } from './audit-codebase.js';
 import { kbSubcommand } from './kb.js';
+import { hardwareSubcommand } from './hardware.js';
 export const subcommands = [
     doctorSubcommand,
     loginSubcommand,
@@ -49,6 +50,7 @@ export const subcommands = [
     exportSessionSubcommand,
     importSessionSubcommand,
     resumeSubcommand,
+    hardwareSubcommand,
 ];
 export function findSubcommand(verb) {
     return subcommands.find(cmd => cmd.name === verb || (cmd.aliases ?? []).includes(verb));

@@ -6,6 +6,6 @@
  * "nvidia/..."); bare ids fall through to the catch-all rules at the
  * end.
  */
-export type ProviderId = 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'nvidia' | 'ollama' | 'fireworks';
+export type ProviderId = 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'nvidia' | 'ollama' | 'llamacpp' | 'fireworks';
 export declare function routeModel(modelId: string): ProviderId;
 export declare function isKnownProvider(id: string): id is ProviderId;
