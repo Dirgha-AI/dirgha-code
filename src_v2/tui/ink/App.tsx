@@ -98,6 +98,11 @@ export function App(props: AppProps): React.JSX.Element {
   const [input, setInput] = React.useState('');
   const [busy, setBusy] = React.useState(false);
   const [currentModel, setCurrentModel] = React.useState(props.config.model);
+  // Mode state: SlashContext.setMode flips it live so /mode plan|act|verify|ask
+  // takes effect on the next turn (system-prompt rebuild downstream picks it up).
+  const [mode, setMode] = React.useState<Mode>(
+    (props.config.mode as Mode | undefined) ?? 'act',
+  );
   const projection = useEventProjection(props.events);
   const overlays = useOverlays();
   // Live counters for the in-progress turn — drive the StatusBar
@@ -234,11 +239,8 @@ export function App(props: AppProps): React.JSX.Element {
         status: (msg: string) => {
           setTranscript(prev => [...prev, { kind: 'notice', id: randomUUID(), text: msg }]);
         },
-        // Mode toggling is not yet wired into App state in this tree — the
-        // registry's /mode handler will report the current value but in-session
-        // changes do not persist to the running turn loop. TODO follow-up sprint.
-        getMode: () => ((props.config.mode as Mode | undefined) ?? 'act'),
-        setMode: () => undefined,
+        getMode: () => mode,
+        setMode: (m: Mode) => setMode(m),
         getTheme: () => ((props.config.theme as ThemeName | undefined) ?? 'dark'),
         setTheme: () => undefined,
         getSession: () => null,
