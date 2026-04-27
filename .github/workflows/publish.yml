@@ -5,17 +5,19 @@ on:
     tags:
       - 'v*.*.*'
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   publish:
     name: npm publish
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
-
     steps:
       - name: Check out
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -24,26 +26,32 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           cache: npm
 
-      - name: Install
-        run: npm ci
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Test
-        run: npm test
-
-      - name: Build (prepublishOnly also runs this — explicit for visibility)
-        run: npm run build:public
-
       - name: Verify tag matches package.json version
         run: |
           PKG_VER=$(node -p "require('./package.json').version")
           TAG_VER=${GITHUB_REF#refs/tags/v}
           if [ "$PKG_VER" != "$TAG_VER" ]; then
-            echo "package.json version ($PKG_VER) does not match git tag ($TAG_VER)"
+            echo "package.json version ($PKG_VER) does not match git tag ($TAG_VER)" >&2
             exit 1
           fi
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Prepublish guard
+        run: npm run prepublish-guard
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Verify install
+        run: npm run verify-install
 
       - name: Publish
         run: npm publish --access public --provenance

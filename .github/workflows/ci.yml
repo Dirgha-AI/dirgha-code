@@ -30,25 +30,18 @@ jobs:
           cache: npm
 
       - name: Install
-        run: npm ci
+        run: npm ci --no-audit --no-fund
 
-      - name: Lint (tsc --noEmit)
-        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
 
       - name: Test
         run: npm test
 
-      - name: Build (public)
-        run: npm run build:public
+      - name: Build
+        run: npm run build
 
       - name: Smoke-test bundle
         run: |
-          node dist/dirgha.mjs --version
-          node dist/dirgha.mjs --help > /dev/null
-
-      - name: Verify default help has no experimental commands
-        run: |
-          node dist/dirgha.mjs --help \
-            | grep -E '^  (dao|make|mesh|bucky|swarm|join-mesh|voice|voice-config)' \
-            && (echo "Experimental command leaked into default --help" && exit 1) \
-            || echo "ok — default --help has no experimental commands"
+          node dist_v2/cli/main.js --version
+          node dist_v2/cli/main.js --help > /dev/null
