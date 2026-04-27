@@ -4,6 +4,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
+import { aggregateCost, renderCostPage, type CostAuditEntry } from './cost.js';
 
 /**
  * Dirgha Web Dashboard — localhost-only HTTP server for audit events.
@@ -167,23 +168,37 @@ export async function startWebServer(opts?: StartWebServerOptions): Promise<Runn
 
   const auditFile = opts?.auditFile ?? path.join(os.homedir(), '.dirgha', 'audit', 'events.jsonl');
 
+  const HTML_HEADERS = {
+    'Content-Type': 'text/html; charset=utf-8',
+    'Cache-Control': 'no-store',
+  };
+
   const server = createServer(async (req, res) => {
-    if (req.method === 'GET' && req.url === '/') {
-      try {
+    if (req.method !== 'GET') {
+      res.writeHead(405, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('Method Not Allowed');
+      return;
+    }
+    try {
+      if (req.url === '/') {
         const entries = await readAuditEntries(auditFile, 100);
-        const html = renderAuditPage(entries);
-        res.writeHead(200, {
-          'Content-Type': 'text/html; charset=utf-8',
-          'Cache-Control': 'no-store',
-        });
-        res.end(html);
-      } catch {
-        res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
-        res.end('Internal Server Error');
+        res.writeHead(200, HTML_HEADERS);
+        res.end(renderAuditPage(entries));
+        return;
       }
-    } else {
+      if (req.url === '/cost') {
+        const entries = await readAuditEntries(auditFile);
+        // CostAuditEntry is structurally compatible — just retype.
+        const summary = aggregateCost(entries as CostAuditEntry[]);
+        res.writeHead(200, HTML_HEADERS);
+        res.end(renderCostPage(summary));
+        return;
+      }
       res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
       res.end('Not Found');
+    } catch {
+      res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('Internal Server Error');
     }
   });
 
