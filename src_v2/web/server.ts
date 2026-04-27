@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { aggregateCost, renderCostPage, type CostAuditEntry } from './cost.js';
+import { collectLedger, renderLedgerPage } from './ledger.js';
 
 /**
  * Dirgha Web Dashboard — localhost-only HTTP server for audit events.
@@ -192,6 +193,12 @@ export async function startWebServer(opts?: StartWebServerOptions): Promise<Runn
         const summary = aggregateCost(entries as CostAuditEntry[]);
         res.writeHead(200, HTML_HEADERS);
         res.end(renderCostPage(summary));
+        return;
+      }
+      if (req.url === '/ledger') {
+        const summary = await collectLedger();
+        res.writeHead(200, HTML_HEADERS);
+        res.end(renderLedgerPage(summary));
         return;
       }
       res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
