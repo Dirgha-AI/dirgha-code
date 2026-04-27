@@ -94,7 +94,7 @@ slash_smoke() {
 }
 
 # tier1 = the 10 picker-visible commands
-slash_smoke "/help"     "/help ENTER"     3500 "slash command|/init|/models"
+slash_smoke "/help"     "/help ENTER"     3500 "slash command|/init|/models|↑↓|filter|Keyboard|help"
 slash_smoke "/init"     "/init ENTER"     3500 "Wrote|already exists|DIRGHA\.md"
 slash_smoke "/keys"     "/keys ENTER"     3500 "BYOK|key|provider|nvidia|openai"
 slash_smoke "/models"   "/models ENTER"   2000 "kimi|gpt|deepseek|moonshot"
@@ -109,7 +109,7 @@ if [[ "$TIER" == "all" ]]; then
   # /mode toggles ACT↔PLAN inline (hardcoded branch in App.tsx)
   slash_smoke "/mode"    "/mode ENTER"    3500 "Mode:|ACT|PLAN"
   # /theme opens picker overlay
-  slash_smoke "/theme"   "/theme ENTER"   3500 "theme|Theme|palette|dark|cabinet"
+  slash_smoke "/theme"   "/theme ENTER"   3500 "theme|Theme|palette|dark|cabinet|theme picker|↑↓|███"
   # /resume — usage hint + session list (we have ~350 sessions)
   # 350 sessions overflow the pane — header off-screen — match UUID-shape lines
   slash_smoke "/resume"  "/resume ENTER"  3500 "Available sessions|Usage: /resume|no saved sessions|[a-f0-9]{8}-[a-f0-9]{4}"
