@@ -11,7 +11,13 @@ coverage/
 .idea/
 .vscode/
 
-# Source maps: regenerated on build, never tracked
+# Legacy v1 build artefacts — `dist/` is never tracked. The legacy v1
+# source has been archived to `_legacy_v1/`; only `dist_v2/` ships.
+dist/
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# Source maps regenerate on build, never tracked
 dist/*.map
 dist/**/*.map
 
