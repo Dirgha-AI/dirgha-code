@@ -109,6 +109,18 @@ export const auditCodebaseSubcommand: Subcommand = {
   name: 'audit-codebase',
   description: 'Run a parallel-fleet audit across every immediate src module',
   async run(argv): Promise<number> {
+    if (argv.includes('--help') || argv.includes('-h')) {
+      stdout.write(`dirgha audit-codebase [options]\n\n`);
+      stdout.write(`Fans out one read-only audit sub-agent per immediate child directory\n`);
+      stdout.write(`of <root>, then synthesises every partial into a single markdown report.\n\n`);
+      stdout.write(`Options:\n`);
+      stdout.write(`  --root=<dir>           Directory whose immediate children become audit units (default: ./src)\n`);
+      stdout.write(`  --out=<file>           Final synthesis path (default: ./docs/audits/AUDIT-<date>.md)\n`);
+      stdout.write(`  --concurrency=<n>      Parallel sub-agents (default: 4)\n`);
+      stdout.write(`  -m, --model=<id>       Model alias for every sub-agent (default: hy3)\n`);
+      stdout.write(`  --max-turns=<n>        Per-agent turn cap (default: 15)\n`);
+      return 0;
+    }
     const root = parseArg(argv, 'root') ?? join(process.cwd(), 'src');
     const out = parseArg(argv, 'out') ?? join(process.cwd(), 'docs', 'audits', `AUDIT-${new Date().toISOString().slice(0, 10)}.md`);
     const concurrency = Number.parseInt(parseArg(argv, 'concurrency') ?? '4', 10);
