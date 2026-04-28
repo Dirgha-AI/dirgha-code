@@ -11,6 +11,21 @@ All notable changes are tracked here. Format loosely follows [Keep a Changelog](
 - OpenSSF Scorecard runs weekly + on push to main; result published to scorecard.dev.
 - This CHANGELOG.md committed.
 
+## [1.10.0](https://github.com/Dirgha-AI/dirgha-code/compare/v1.9.0...v1.10.0) (2026-04-28)
+
+
+### Features
+
+* model-switch prompt + opencode picker + /provider skill ([587fe72](https://github.com/Dirgha-AI/dirgha-code/commit/587fe72b87a5a7f495386c859df6dff7ab35c23b))
+* **tui:** connected-border tool group + DenseToolMessage (gemini parity) ([72077c7](https://github.com/Dirgha-AI/dirgha-code/commit/72077c72d5c35dd080da5574239748516aa80cbd))
+* **tui:** native markdown rendering + semantic theme tokens + 5 themes ([49130b1](https://github.com/Dirgha-AI/dirgha-code/commit/49130b1ca7191b186fd3d72eb1b0943cccfeee93))
+
+
+### Bug Fixes
+
+* auto-migrate deprecated model IDs + readable theme + busy-state hint ([50c0c50](https://github.com/Dirgha-AI/dirgha-code/commit/50c0c507a390d2da17c0f8b262ca93b8bb806557))
+* **tui:** busy-hint reads 'ctrl+c clear' instead of 'ctrl+c×2 exit' ([6b0f367](https://github.com/Dirgha-AI/dirgha-code/commit/6b0f367295d3a30ccc1ae8fe7911b69e561d1709))
+
 ## [1.9.0](https://github.com/Dirgha-AI/dirgha-code/compare/v1.8.1...v1.9.0) (2026-04-28)
 
 
