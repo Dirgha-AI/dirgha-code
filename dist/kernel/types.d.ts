@@ -108,6 +108,7 @@ export type AgentEvent = {
     message: string;
     reason?: string;
     retryable?: boolean;
+    failoverModel?: string;
 };
 export interface ToolCall {
     id: string;

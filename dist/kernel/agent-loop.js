@@ -13,6 +13,7 @@
  */
 import { assembleTurn, extractToolUses, appendToolResults } from './message.js';
 import { resolveModelForDispatch } from '../providers/dispatch.js';
+import { findFailover } from '../intelligence/prices.js';
 export async function runAgentLoop(cfg) {
     const events = cfg.events;
     const history = [...cfg.messages];
@@ -64,11 +65,20 @@ export async function runAgentLoop(cfg) {
                     break;
                 }
                 const classified = cfg.errorClassifier?.classify(err, cfg.provider.id, cfg.model);
+                // Suggest a known-good fallback model so the TUI can prompt the
+                // user to switch instead of just dead-ending the turn. Only
+                // fires for errors that look fixable by swapping models —
+                // bad-id (400 "not a valid model"), deprecated, rate-limit,
+                // or 5xx upstream failures.
+                const errMsg = err instanceof Error ? err.message : String(err);
+                const looksFixable = /not a valid model id|deprecated|model_not_found|rate.?limit|429\b|5\d\d\b|bad.?gateway|upstream/i.test(errMsg);
+                const failover = looksFixable ? findFailover(cfg.model) : undefined;
                 events.emit({
                     type: 'error',
-                    message: String(err instanceof Error ? err.message : err),
+                    message: errMsg,
                     reason: classified?.reason,
                     retryable: classified?.retryable ?? false,
+                    ...(failover !== undefined ? { failoverModel: failover } : {}),
                 });
                 stopReason = 'error';
                 events.emit({ type: 'turn_end', turnId, stopReason });

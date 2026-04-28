@@ -39,6 +39,7 @@ import { ToolGroup } from './components/ToolGroup.js';
 import { InputBox } from './components/InputBox.js';
 import { PromptQueueIndicator } from './components/PromptQueueIndicator.js';
 import { ModelPicker } from './components/ModelPicker.js';
+import { ModelSwitchPrompt } from './components/ModelSwitchPrompt.js';
 import { HelpOverlay } from './components/HelpOverlay.js';
 import { AtFileComplete } from './components/AtFileComplete.js';
 import { SlashComplete } from './components/SlashComplete.js';
@@ -76,6 +77,12 @@ export function App(props) {
     // drain FIFO when the turn finishes (see useEffect below).
     const [promptQueue, setPromptQueue] = React.useState([]);
     const [currentModel, setCurrentModel] = React.useState(props.config.model);
+    // Pending model-switch prompt — set when the kernel emits an error
+    // with a `failoverModel` hint. Cleared when the user answers
+    // [y|n|p]. While set, an inline ModelSwitchPrompt renders below
+    // the input box; submitting any other prompt also clears it.
+    const [pendingFailover, setPendingFailover] = React.useState(null);
+    const lastUserPromptRef = React.useRef('');
     // Mode state: SlashContext.setMode flips it live so /mode plan|act|verify|ask
     // takes effect on the next turn (system-prompt rebuild downstream picks it up).
     const [mode, setMode] = React.useState(props.config.mode ?? 'act');
@@ -134,6 +141,13 @@ export function App(props) {
             }
             else if (ev.type === 'error') {
                 void appendAudit({ kind: 'error', actor: sessionIdRef.current, summary: ev.message });
+                if (ev.failoverModel) {
+                    setPendingFailover({
+                        failedModel: currentModel,
+                        failoverModel: ev.failoverModel,
+                        lastPrompt: lastUserPromptRef.current,
+                    });
+                }
             }
         });
         return unsub;
@@ -154,6 +168,11 @@ export function App(props) {
             return;
         }
         setInput('');
+        // Remember the last user prompt so we can re-submit it after a
+        // failover model swap (D2 — auto-prompt model switch on failure).
+        lastUserPromptRef.current = value;
+        // A new submission supersedes any pending failover prompt.
+        setPendingFailover(null);
         if (value === '/exit' || value === '/quit') {
             exit();
             return;
@@ -417,7 +436,18 @@ export function App(props) {
     // streaming text appears now, the Static-around-transcript pattern
     // was suppressing the live region updates. If still not, the bug
     // is upstream in useEventProjection.
-    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: [{ key: 'logo' }], children: (_item) => _jsx(Logo, { version: VERSION }, "logo") }), _jsx(Box, { flexDirection: "column", children: renderTranscript([...transcript, ...projection.liveItems]) }), _jsx(PromptQueueIndicator, { queued: promptQueue }), _jsx(InputBox, { value: input, onChange: setInput, onSubmit: handleSubmit, busy: busy, vimMode: props.config.vimMode === true, onAtQueryChange: overlays.setAtQuery, onSlashQueryChange: overlays.setSlashQuery, onRequestOverlay: overlays.openOverlay, inputFocus: inputFocus }), overlays.active === 'atfile' && overlays.atQuery !== null && (_jsx(AtFileComplete, { cwd: props.cwd, query: overlays.atQuery, onPick: handleAtPick, onCancel: () => { overlays.setAtQuery(null); overlays.setActive(null); } })), overlays.active === 'slash' && overlays.slashQuery !== null && (_jsx(SlashComplete, { commands: slashCommands, query: overlays.slashQuery, onPick: handleSlashPick, onCancel: () => { overlays.setSlashQuery(null); overlays.setActive(null); } })), overlays.active === 'models' && (_jsx(ModelPicker, { models: models, current: currentModel, onPick: handleModelPick, onCancel: overlays.closeOverlay })), overlays.active === 'help' && (_jsx(HelpOverlay, { slashCommands: slashCommands, onClose: overlays.closeOverlay })), overlays.active === 'theme' && (_jsx(ThemePicker, { current: themeName, onPick: handleThemePick, onCancel: overlays.closeOverlay })), _jsx(StatusBar, { model: currentModel, provider: providerIdForModel(currentModel), inputTokens: projection.totals.inputTokens, outputTokens: projection.totals.outputTokens, costUsd: projection.totals.costUsd, cwd: props.cwd, busy: busy, mode: props.config.mode ?? 'act', contextWindow: contextWindowFor(currentModel), liveOutputTokens: liveOutputTokens, liveDurationMs: liveDurationMs })] }) }));
+    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: [{ key: 'logo' }], children: (_item) => _jsx(Logo, { version: VERSION }, "logo") }), _jsx(Box, { flexDirection: "column", children: renderTranscript([...transcript, ...projection.liveItems]) }), pendingFailover !== null && (_jsx(ModelSwitchPrompt, { failedModel: pendingFailover.failedModel, failoverModel: pendingFailover.failoverModel, onAccept: (failover) => {
+                        const lastPrompt = pendingFailover.lastPrompt;
+                        setCurrentModel(failover);
+                        setPendingFailover(null);
+                        // Re-submit the failed prompt against the new model.
+                        if (lastPrompt) {
+                            setTimeout(() => handleSubmit(lastPrompt), 0);
+                        }
+                    }, onReject: () => setPendingFailover(null), onPicker: () => {
+                        setPendingFailover(null);
+                        overlays.openOverlay('models');
+                    } })), _jsx(PromptQueueIndicator, { queued: promptQueue }), _jsx(InputBox, { value: input, onChange: setInput, onSubmit: handleSubmit, busy: busy, vimMode: props.config.vimMode === true, onAtQueryChange: overlays.setAtQuery, onSlashQueryChange: overlays.setSlashQuery, onRequestOverlay: overlays.openOverlay, inputFocus: inputFocus }), overlays.active === 'atfile' && overlays.atQuery !== null && (_jsx(AtFileComplete, { cwd: props.cwd, query: overlays.atQuery, onPick: handleAtPick, onCancel: () => { overlays.setAtQuery(null); overlays.setActive(null); } })), overlays.active === 'slash' && overlays.slashQuery !== null && (_jsx(SlashComplete, { commands: slashCommands, query: overlays.slashQuery, onPick: handleSlashPick, onCancel: () => { overlays.setSlashQuery(null); overlays.setActive(null); } })), overlays.active === 'models' && (_jsx(ModelPicker, { models: models, current: currentModel, onPick: handleModelPick, onCancel: overlays.closeOverlay })), overlays.active === 'help' && (_jsx(HelpOverlay, { slashCommands: slashCommands, onClose: overlays.closeOverlay })), overlays.active === 'theme' && (_jsx(ThemePicker, { current: themeName, onPick: handleThemePick, onCancel: overlays.closeOverlay })), _jsx(StatusBar, { model: currentModel, provider: providerIdForModel(currentModel), inputTokens: projection.totals.inputTokens, outputTokens: projection.totals.outputTokens, costUsd: projection.totals.costUsd, cwd: props.cwd, busy: busy, mode: props.config.mode ?? 'act', contextWindow: contextWindowFor(currentModel), liveOutputTokens: liveOutputTokens, liveDurationMs: liveDurationMs })] }) }));
 }
 /**
  * Walk the transcript and fold consecutive `tool` items into a single

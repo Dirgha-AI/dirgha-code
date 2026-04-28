@@ -24,7 +24,7 @@
  *   addition / deletion → diff prefixes
  */
 
-import type { Token, TokenKind, Tokenizer } from './types.js';
+import type { Token, TokenKind } from './types.js';
 export type { Token, TokenKind, Tokenizer } from './types.js';
 
 interface LangSpec {

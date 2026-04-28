@@ -225,9 +225,7 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
             </Text>
           )}
           {props.busy && (
-            <Text color={palette.textMuted}>
-              esc cancel · ctrl+c×2 exit
-            </Text>
+            <BusyHint palette={palette} />
           )}
         </Box>
         {ctrlCArmed && <Text color={palette.accent} bold>Press Ctrl+C again to exit.</Text>}
@@ -238,4 +236,29 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
 
 function vimModeLabel(m: VimMode): string {
   return m === 'NORMAL' ? 'NORMAL' : 'INSERT';
+}
+
+/**
+ * Busy-state hint with a live elapsed-second counter, matching
+ * gemini-cli's `(esc to cancel, 12s)` pattern. The timer ticks every
+ * 1s while busy; cleans up on unmount.
+ */
+function BusyHint({ palette }: { palette: ReturnType<typeof useTheme> }): React.JSX.Element {
+  const [elapsed, setElapsed] = React.useState(0);
+  React.useEffect(() => {
+    const start = Date.now();
+    const t = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - start) / 1000));
+    }, 1000);
+    return (): void => clearInterval(t);
+  }, []);
+  const label =
+    elapsed < 60 ? `${elapsed}s`
+    : elapsed < 3600 ? `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`
+    : `${Math.floor(elapsed / 3600)}h ${Math.floor((elapsed % 3600) / 60)}m`;
+  return (
+    <Text color={palette.textMuted}>
+      esc cancel · {label} · ctrl+c×2 exit
+    </Text>
+  );
 }

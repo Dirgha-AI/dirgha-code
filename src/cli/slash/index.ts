@@ -22,6 +22,7 @@ import { memoryCommand } from './memory.js';
 import { modeCommand } from './mode.js';
 import { modelsCommand } from './models.js';
 import { pasteCommand } from './paste.js';
+import { providerCommand } from './provider.js';
 import { resumeCommand } from './resume.js';
 import { sessionCommand } from './session.js';
 import { setupCommand } from './setup.js';
@@ -50,6 +51,7 @@ export const builtinSlashCommands: SlashCommand[] = [
   fleetCommand,
   accountCommand,
   pasteCommand,
+  providerCommand,
   updateCommand,
   upgradeCommand,
   configCommand,
@@ -74,6 +76,7 @@ export {
   memoryCommand,
   modeCommand,
   modelsCommand,
+  providerCommand,
   resumeCommand,
   sessionCommand,
   setupCommand,

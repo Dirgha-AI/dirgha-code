@@ -74,7 +74,7 @@ export type AgentEvent =
   | { type: 'usage'; inputTokens: number; outputTokens: number; cachedTokens?: number }
   | { type: 'turn_end'; turnId: string; stopReason: StopReason }
   | { type: 'agent_end'; sessionId: string; stopReason: StopReason; usage: UsageTotal }
-  | { type: 'error'; message: string; reason?: string; retryable?: boolean };
+  | { type: 'error'; message: string; reason?: string; retryable?: boolean; failoverModel?: string };
 
 export interface ToolCall {
   id: string;

@@ -48,6 +48,7 @@ import { ToolGroup, type ToolItem } from './components/ToolGroup.js';
 import { InputBox } from './components/InputBox.js';
 import { PromptQueueIndicator } from './components/PromptQueueIndicator.js';
 import { ModelPicker, type ModelEntry } from './components/ModelPicker.js';
+import { ModelSwitchPrompt } from './components/ModelSwitchPrompt.js';
 import { HelpOverlay, type HelpSlashCommand } from './components/HelpOverlay.js';
 import { AtFileComplete } from './components/AtFileComplete.js';
 import { SlashComplete } from './components/SlashComplete.js';
@@ -104,6 +105,17 @@ export function App(props: AppProps): React.JSX.Element {
   // drain FIFO when the turn finishes (see useEffect below).
   const [promptQueue, setPromptQueue] = React.useState<string[]>([]);
   const [currentModel, setCurrentModel] = React.useState(props.config.model);
+  // Pending model-switch prompt — set when the kernel emits an error
+  // with a `failoverModel` hint. Cleared when the user answers
+  // [y|n|p]. While set, an inline ModelSwitchPrompt renders below
+  // the input box; submitting any other prompt also clears it.
+  const [pendingFailover, setPendingFailover] = React.useState<{
+    failedModel: string;
+    failoverModel: string;
+    /** The user prompt that triggered the failed turn — re-submit on accept. */
+    lastPrompt: string;
+  } | null>(null);
+  const lastUserPromptRef = React.useRef<string>('');
   // Mode state: SlashContext.setMode flips it live so /mode plan|act|verify|ask
   // takes effect on the next turn (system-prompt rebuild downstream picks it up).
   const [mode, setMode] = React.useState<Mode>(
@@ -160,6 +172,13 @@ export function App(props: AppProps): React.JSX.Element {
         void appendAudit({ kind: 'turn-end', actor: sessionIdRef.current, summary: `model=${currentModel} stop=${ev.stopReason} in=${ev.usage.inputTokens} out=${ev.usage.outputTokens}`, model: currentModel, stopReason: ev.stopReason, usage: ev.usage });
       } else if (ev.type === 'error') {
         void appendAudit({ kind: 'error', actor: sessionIdRef.current, summary: ev.message });
+        if (ev.failoverModel) {
+          setPendingFailover({
+            failedModel: currentModel,
+            failoverModel: ev.failoverModel,
+            lastPrompt: lastUserPromptRef.current,
+          });
+        }
       }
     });
     return unsub;
@@ -181,6 +200,11 @@ export function App(props: AppProps): React.JSX.Element {
       return;
     }
     setInput('');
+    // Remember the last user prompt so we can re-submit it after a
+    // failover model swap (D2 — auto-prompt model switch on failure).
+    lastUserPromptRef.current = value;
+    // A new submission supersedes any pending failover prompt.
+    setPendingFailover(null);
 
     if (value === '/exit' || value === '/quit') {
       exit();
@@ -462,6 +486,26 @@ export function App(props: AppProps): React.JSX.Element {
       <Box flexDirection="column">
         {renderTranscript([...transcript, ...projection.liveItems])}
       </Box>
+      {pendingFailover !== null && (
+        <ModelSwitchPrompt
+          failedModel={pendingFailover.failedModel}
+          failoverModel={pendingFailover.failoverModel}
+          onAccept={(failover): void => {
+            const lastPrompt = pendingFailover.lastPrompt;
+            setCurrentModel(failover);
+            setPendingFailover(null);
+            // Re-submit the failed prompt against the new model.
+            if (lastPrompt) {
+              setTimeout(() => handleSubmit(lastPrompt), 0);
+            }
+          }}
+          onReject={(): void => setPendingFailover(null)}
+          onPicker={(): void => {
+            setPendingFailover(null);
+            overlays.openOverlay('models');
+          }}
+        />
+      )}
       <PromptQueueIndicator queued={promptQueue} />
       <InputBox
         value={input}

@@ -182,9 +182,28 @@ export function InputBox(props) {
     const borderColour = props.busy ? palette.brand : palette.accent;
     const promptColour = props.busy ? palette.brand : palette.accent;
     const collapsed = pasteSegment !== null && !pasteExpanded;
-    return (_jsxs(Box, { flexDirection: "column", width: cols, children: [_jsx(Box, { borderStyle: "single", borderColor: borderColour, paddingX: 1, children: _jsxs(Box, { gap: 1, flexGrow: 1, children: [_jsx(Text, { color: promptColour, children: "\u276F" }), collapsed && pasteSegment !== null ? (_jsx(PasteCollapseView, { value: props.value, segment: pasteSegment, expanded: false })) : (_jsx(TextInput, { value: props.value, onChange: handleChange, onSubmit: props.onSubmit, placeholder: props.placeholder ?? 'Ask dirgha anything…', showCursor: !vimActive, focus: focus && !vimActive }))] }) }), _jsxs(Box, { paddingX: 1, justifyContent: "space-between", children: [_jsxs(Box, { gap: 1, children: [props.vimMode === true && (_jsxs(Text, { color: vimActive ? palette.accent : palette.brand, bold: true, children: ["[", vimModeLabel(vimState.mode), "]"] })), pasteSegment !== null && pasteExpanded && (_jsx(Text, { color: palette.textMuted, dimColor: true, children: "pasted block expanded (Ctrl+E collapse)" })), props.busy && (_jsx(Text, { color: palette.textMuted, children: "esc cancel \u00B7 ctrl+c\u00D72 exit" }))] }), ctrlCArmed && _jsx(Text, { color: palette.accent, bold: true, children: "Press Ctrl+C again to exit." })] })] }));
+    return (_jsxs(Box, { flexDirection: "column", width: cols, children: [_jsx(Box, { borderStyle: "single", borderColor: borderColour, paddingX: 1, children: _jsxs(Box, { gap: 1, flexGrow: 1, children: [_jsx(Text, { color: promptColour, children: "\u276F" }), collapsed && pasteSegment !== null ? (_jsx(PasteCollapseView, { value: props.value, segment: pasteSegment, expanded: false })) : (_jsx(TextInput, { value: props.value, onChange: handleChange, onSubmit: props.onSubmit, placeholder: props.placeholder ?? 'Ask dirgha anything…', showCursor: !vimActive, focus: focus && !vimActive }))] }) }), _jsxs(Box, { paddingX: 1, justifyContent: "space-between", children: [_jsxs(Box, { gap: 1, children: [props.vimMode === true && (_jsxs(Text, { color: vimActive ? palette.accent : palette.brand, bold: true, children: ["[", vimModeLabel(vimState.mode), "]"] })), pasteSegment !== null && pasteExpanded && (_jsx(Text, { color: palette.textMuted, dimColor: true, children: "pasted block expanded (Ctrl+E collapse)" })), props.busy && (_jsx(BusyHint, { palette: palette }))] }), ctrlCArmed && _jsx(Text, { color: palette.accent, bold: true, children: "Press Ctrl+C again to exit." })] })] }));
 }
 function vimModeLabel(m) {
     return m === 'NORMAL' ? 'NORMAL' : 'INSERT';
+}
+/**
+ * Busy-state hint with a live elapsed-second counter, matching
+ * gemini-cli's `(esc to cancel, 12s)` pattern. The timer ticks every
+ * 1s while busy; cleans up on unmount.
+ */
+function BusyHint({ palette }) {
+    const [elapsed, setElapsed] = React.useState(0);
+    React.useEffect(() => {
+        const start = Date.now();
+        const t = setInterval(() => {
+            setElapsed(Math.floor((Date.now() - start) / 1000));
+        }, 1000);
+        return () => clearInterval(t);
+    }, []);
+    const label = elapsed < 60 ? `${elapsed}s`
+        : elapsed < 3600 ? `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`
+            : `${Math.floor(elapsed / 3600)}h ${Math.floor((elapsed % 3600) / 60)}m`;
+    return (_jsxs(Text, { color: palette.textMuted, children: ["esc cancel \u00B7 ", label, " \u00B7 ctrl+c\u00D72 exit"] }));
 }
 //# sourceMappingURL=InputBox.js.map
