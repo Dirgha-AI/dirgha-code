@@ -382,8 +382,15 @@ export function App(props: AppProps): React.JSX.Element {
       const spliced = overlays.spliceSlashSelection(current, name);
       return spliced === `/${name}` ? `${spliced} ` : spliced;
     });
+    // Clear the slash query — the useEffect in use-overlays then closes
+    // the picker overlay automatically. We deliberately do NOT call
+    // `overlays.setActive(null)` here: when the user presses Enter, both
+    // SlashComplete (this onPick) and InputBox (its onSubmit) fire in
+    // the same batched render. If onSubmit calls openOverlay('theme'),
+    // an explicit setActive(null) from this handler would race and
+    // overwrite it — that's the bug that shipped to v1.7.8 and made
+    // /theme silently no-op.
     overlays.setSlashQuery(null);
-    overlays.setActive(null);
   }, [overlays]);
 
   const inputFocus = overlays.active === null || overlays.active === 'atfile' || overlays.active === 'slash';

@@ -105,12 +105,35 @@ slash_smoke "/status"   "/status ENTER"   3500 "model|session|provider|account"
 slash_smoke "/memory"   "/memory ENTER"   3500 "memory|/.dirgha|file|empty"
 slash_smoke "/compact"  "/compact ENTER"  3500 "compact|nothing|summari|0 turns"
 slash_smoke "/update"   "/update ENTER"   5000 "@dirgha/code|up to date|newer available|registry|update check"
+# /theme moved into tier1 in CI-1 sprint (was tier=all only) — its regression
+# in v1.7.8 motivated promoting it.
+slash_smoke "/theme"    "/theme ENTER"    3500 "theme|Theme|palette|dark|cabinet|theme picker|↑↓|███"
+
+# ---------- tool-call regression cell (tier1) ----------
+log ""
+log "## Tool-call regression"
+log ""
+tool_smoke() {
+  local name="$1" cmd="$2" expect_re="$3"
+  local out="$OUT/tool_${name// /_}.txt"
+  log -n "- \`$name\` … "
+  bash -c "$cmd" > "$out" 2>&1 &
+  local pid=$!
+  ( sleep 90; kill -9 $pid 2>/dev/null ) & local timer=$!
+  wait $pid 2>/dev/null
+  local rc=$?
+  kill -9 $timer 2>/dev/null
+  if grep -qE "$expect_re" "$out"; then
+    log "PASS (rc=$rc) → $(basename $out)"
+  else
+    log "FAIL (rc=$rc, no /$expect_re/) → $(basename $out)"
+  fi
+}
+tool_smoke "shell-tool" "DIRGHA_MODEL=tencent/hy3-preview:free DIRGHA_PROVIDER=openrouter dirgha ask --max-turns 3 --print 'use the shell tool to run echo TOOL_OK and report the exact output'" "TOOL_OK"
 
 if [[ "$TIER" == "all" ]]; then
   # /mode toggles ACT↔PLAN inline (hardcoded branch in App.tsx)
   slash_smoke "/mode"    "/mode ENTER"    3500 "Mode:|ACT|PLAN"
-  # /theme opens picker overlay
-  slash_smoke "/theme"   "/theme ENTER"   3500 "theme|Theme|palette|dark|cabinet|theme picker|↑↓|███"
   # /resume — usage hint + session list (we have ~350 sessions)
   # 350 sessions overflow the pane — header off-screen — match UUID-shape lines
   slash_smoke "/resume"  "/resume ENTER"  3500 "Available sessions|Usage: /resume|no saved sessions|[a-f0-9]{8}-[a-f0-9]{4}"

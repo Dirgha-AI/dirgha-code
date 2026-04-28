@@ -41,6 +41,12 @@ jobs:
       - name: Prepublish guard
         run: npm run prepublish-guard
 
+      - name: Lint
+        run: npm run lint
+
+      - name: License audit
+        run: npm run license-check
+
       - name: Typecheck
         run: npm run typecheck
 
@@ -52,6 +58,49 @@ jobs:
 
       - name: Verify install
         run: npm run verify-install
+
+      # Smoke matrix tier=all is a release-blocking gate as of CI-1 sprint.
+      # Drives every slash command + non-interactive subcommand against the
+      # JUST-BUILT dist_v2 bundle through tmux + freeze + a real tool-call
+      # round-trip. /theme regression in v1.7.8 motivated promoting this
+      # to a tag-push gate; tier1 alone missed that bug.
+      - name: Install tmux + freeze for smoke matrix
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y tmux
+          # charmbracelet/freeze official tarball — pinned to a known-good
+          # release so the smoke matrix is reproducible across CI runs.
+          FREEZE_VER="0.2.1"
+          curl -sSL "https://github.com/charmbracelet/freeze/releases/download/v${FREEZE_VER}/freeze_${FREEZE_VER}_Linux_x86_64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin --strip-components=1 freeze_${FREEZE_VER}_Linux_x86_64/freeze
+
+      - name: Install just-built CLI globally
+        # Smoke matrix drives the INSTALLED `dirgha` binary, not
+        # `node dist_v2/...` — proves the publish artefact actually works
+        # end-to-end before we let the publish step run.
+        run: |
+          npm pack
+          npm install -g --force ./dirgha-code-*.tgz
+          dirgha --version
+
+      - name: Smoke matrix (tier=all, release-blocking)
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          # Smoke matrix drives /theme, /update, /help, /init, /keys, /models,
+          # /clear, /login, /setup, /status, /memory, /compact, plus the
+          # non-interactive subcommands and one shell-tool round-trip.
+          if [ -z "${OPENROUTER_API_KEY:-}" ]; then
+            echo "OPENROUTER_API_KEY secret not set — tool-call cell will FAIL." >&2
+            echo "Add it under Settings → Secrets → Actions to fully gate this step." >&2
+          fi
+          bash scripts/smoke-matrix.sh all
+          if grep -q "FAIL" /tmp/dirgha-smoke-*/REPORT.md; then
+            echo "::error::Smoke matrix has FAIL cells — refusing to publish."
+            cat /tmp/dirgha-smoke-*/REPORT.md
+            exit 1
+          fi
+          echo "Smoke matrix tier=all: all cells PASS."
 
       # Publish with a pinned npm CLI ≥ 11.5.1 — required for Trusted
       # Publisher OIDC auth. Node 22 ships npm 10.x; rather than break
