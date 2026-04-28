@@ -5,9 +5,16 @@
  * spawns a child process with inherited env. Output is captured with a
  * byte cap; on overflow we truncate and indicate the remaining size so
  * the model does not misread a capped stream as a complete one.
+ *
+ * Platform routing (1.13.0):
+ *   posix → spawn(cmd, { shell: true })  // /bin/sh -c <cmd>
+ *   win32 → prefer pwsh > powershell > cmd.exe via env detection;
+ *           fall back to cmd if PowerShell isn't on PATH. PowerShell
+ *           handles quoting + UTF-8 + multi-line scripts more cleanly
+ *           than cmd.exe's relic Windows-95 parser.
  */
 
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import type { Tool } from './registry.js';
 import type { ToolResult } from '../kernel/types.js';
 
@@ -15,6 +22,36 @@ interface Input {
   command: string;
   cwd?: string;
   timeoutMs?: number;
+}
+
+/** Cached PowerShell executable detection (per-process, never re-probed). */
+let cachedWindowsShell: { cmd: string; args: (script: string) => string[] } | null = null;
+
+function resolveWindowsShell(): { cmd: string; args: (script: string) => string[] } {
+  if (cachedWindowsShell) return cachedWindowsShell;
+  // Prefer PowerShell 7+ (`pwsh`), then Windows PowerShell 5.1, then cmd.
+  for (const exe of ['pwsh', 'powershell']) {
+    const probe = spawnSync(exe, ['-NoLogo', '-Command', 'exit 0'], { timeout: 3000 });
+    if (probe.status === 0) {
+      cachedWindowsShell = {
+        cmd: exe,
+        args: (script: string): string[] => [
+          '-NoLogo',
+          '-NoProfile',
+          '-NonInteractive',
+          '-OutputFormat', 'Text',
+          '-Command', script,
+        ],
+      };
+      return cachedWindowsShell;
+    }
+  }
+  // Fallback: cmd.exe via shell:true (no /c needed since spawn handles it).
+  cachedWindowsShell = {
+    cmd: process.env.ComSpec ?? 'cmd.exe',
+    args: (script: string): string[] => ['/d', '/s', '/c', script],
+  };
+  return cachedWindowsShell;
 }
 
 interface Output {
@@ -29,7 +66,9 @@ const MAX_OUTPUT_BYTES = 256 * 1024;
 
 export const shellTool: Tool = {
   name: 'shell',
-  description: 'Execute a shell command via /bin/sh. Returns stdout, stderr, and exit code. Long-running commands time out.',
+  description: process.platform === 'win32'
+    ? 'Execute a shell command via PowerShell (or cmd.exe fallback). Returns stdout, stderr, and exit code. The host is Windows: prefer PowerShell-style commands (Get-ChildItem, Where-Object, Select-String) over POSIX (ls, grep). For maximum portability use cross-platform tools (node, npm, git, python). Long-running commands time out.'
+    : 'Execute a shell command via /bin/sh. Returns stdout, stderr, and exit code. Long-running commands time out.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -44,16 +83,26 @@ export const shellTool: Tool = {
     const input = rawInput as Input;
     const cwd = input.cwd ?? ctx.cwd;
     const timeoutMs = input.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-    // Cross-platform shell: spawn with `shell: true` invokes the user's
-    // default shell — /bin/sh on Linux/macOS, cmd.exe on Windows. The
-    // command string is passed through verbatim. Hardcoding /bin/sh
-    // broke the Windows leg of the cross-OS CI matrix.
-    const child = spawn(input.command, {
-      cwd,
-      env: ctx.env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      shell: true,
-    });
+    // Platform-aware spawn. On Windows, prefer pwsh > powershell > cmd.
+    // PowerShell handles UTF-8, quoting, and multi-line scripts more
+    // cleanly than cmd.exe's legacy parser. On POSIX, plain shell:true
+    // (= /bin/sh -c).
+    const child = process.platform === 'win32'
+      ? (() => {
+          const shell = resolveWindowsShell();
+          return spawn(shell.cmd, shell.args(input.command), {
+            cwd,
+            env: ctx.env,
+            stdio: ['ignore', 'pipe', 'pipe'],
+            windowsHide: true,
+          });
+        })()
+      : spawn(input.command, {
+          cwd,
+          env: ctx.env,
+          stdio: ['ignore', 'pipe', 'pipe'],
+          shell: true,
+        });
 
     const stdoutChunks: Buffer[] = [];
     const stderrChunks: Buffer[] = [];

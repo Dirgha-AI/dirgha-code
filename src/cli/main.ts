@@ -217,15 +217,44 @@ async function main(): Promise<void> {
       // can immediately use what they just configured. Otherwise exit.
       if (code !== 0) exit(code);
     }
-    // Ink TUI is the default interactive renderer. Fall back to the
-    // readline REPL when DIRGHA_NO_INK=1 (diagnostic / CI escape hatch).
-    const useInk = process.env['DIRGHA_NO_INK'] !== '1' && stdin.isTTY;
+    // Ink TUI is the default interactive renderer. Three escape hatches:
+    //   1. DIRGHA_NO_INK=1                — explicit user opt-out (CI, tmp).
+    //   2. Non-TTY stdin                  — piped input, can't drive ink.
+    //   3. Windows legacy console (auto)  — cmd.exe / PowerShell-ISE
+    //      drop Backspace + arrow keys via ink's raw-mode handling. We
+    //      detect WT_SESSION (Windows Terminal), ConEmuANSI, or
+    //      TERM_PROGRAM=vscode and only use ink when one is present.
+    //      Override with DIRGHA_FORCE_INK=1 if the user knows their
+    //      console actually works.
+    const explicitNoInk = process.env['DIRGHA_NO_INK'] === '1';
+    const explicitForceInk = process.env['DIRGHA_FORCE_INK'] === '1';
+    const onWindowsLegacy = process.platform === 'win32'
+      && !process.env['WT_SESSION']
+      && process.env['ConEmuANSI'] !== 'ON'
+      && process.env['TERM_PROGRAM'] !== 'vscode';
+    const autoFallbackToReadline = onWindowsLegacy && !explicitForceInk;
+    const useInk = !explicitNoInk && !autoFallbackToReadline && stdin.isTTY;
+
+    if (autoFallbackToReadline && !explicitNoInk) {
+      // Surface the swap so the user knows why the UI looks different.
+      stdout.write(
+        '\x1b[33mNote:\x1b[0m Windows legacy console detected — using readline mode.\n'
+        + '      For the full Ink TUI, run inside Windows Terminal, the VS Code terminal,\n'
+        + '      or set \x1b[36mDIRGHA_FORCE_INK=1\x1b[0m to override.\n\n',
+      );
+    }
+
     if (useInk) {
       const slashCommands = builtinSlashCommands.map(c => ({
         name: c.name,
         description: c.description,
         ...(c.aliases !== undefined ? { aliases: c.aliases } : {}),
       }));
+      // Mount banner — on Windows the readline→ink raw-mode handoff
+      // takes 1-2s during which nothing renders. Without this the user
+      // sees a blank screen and assumes the app froze. The line is
+      // overdrawn instantly when ink mounts.
+      stdout.write('\n  Launching dirgha…\n');
       await runInkTUI({ registry, providers, sessions, config, cwd: cwd(), systemPrompt: system, slashCommands });
     } else {
       await runInteractive({ registry, providers, sessions, config, cwd: cwd(), systemPrompt: system });
