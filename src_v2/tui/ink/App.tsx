@@ -45,6 +45,7 @@ import { StreamingText } from './components/StreamingText.js';
 import { ThinkingBlock } from './components/ThinkingBlock.js';
 import { ToolBox } from './components/ToolBox.js';
 import { InputBox } from './components/InputBox.js';
+import { PromptQueueIndicator } from './components/PromptQueueIndicator.js';
 import { ModelPicker, type ModelEntry } from './components/ModelPicker.js';
 import { HelpOverlay, type HelpSlashCommand } from './components/HelpOverlay.js';
 import { AtFileComplete } from './components/AtFileComplete.js';
@@ -97,6 +98,10 @@ export function App(props: AppProps): React.JSX.Element {
   const [transcript, setTranscript] = React.useState<TranscriptItem[]>([]);
   const [input, setInput] = React.useState('');
   const [busy, setBusy] = React.useState(false);
+  // Prompt queue: while a turn is streaming the user can still type and
+  // press Enter. Submissions land here instead of being dropped, then
+  // drain FIFO when the turn finishes (see useEffect below).
+  const [promptQueue, setPromptQueue] = React.useState<string[]>([]);
   const [currentModel, setCurrentModel] = React.useState(props.config.model);
   // Mode state: SlashContext.setMode flips it live so /mode plan|act|verify|ask
   // takes effect on the next turn (system-prompt rebuild downstream picks it up).
@@ -164,7 +169,16 @@ export function App(props: AppProps): React.JSX.Element {
 
   const handleSubmit = React.useCallback((raw: string): void => {
     const value = raw.trim();
-    if (value.length === 0 || busy) return;
+    if (value.length === 0) return;
+    // Non-disruptive queue: if a turn is still streaming, push the new
+    // prompt onto the queue and clear the input so the user can keep
+    // typing. The drain-effect below submits queued prompts FIFO once
+    // `busy` flips false.
+    if (busy) {
+      setPromptQueue(q => [...q, value]);
+      setInput('');
+      return;
+    }
     setInput('');
 
     if (value === '/exit' || value === '/quit') {
@@ -334,6 +348,18 @@ export function App(props: AppProps): React.JSX.Element {
     }
   };
 
+  // Drain the prompt queue when a turn finishes. Pops the oldest queued
+  // prompt and re-submits it through handleSubmit (which transitions
+  // back into busy=true via runTurn). Guarded on `!busy` so we never
+  // race against an already-active turn.
+  React.useEffect(() => {
+    if (busy) return;
+    if (promptQueue.length === 0) return;
+    const [next, ...rest] = promptQueue;
+    setPromptQueue(rest);
+    if (next !== undefined) handleSubmit(next);
+  }, [busy, promptQueue, handleSubmit]);
+
   // Global Esc handler. Priority order:
   //   1. If an overlay (other than @-file) is open → close it.
   //   2. If a turn is streaming → abort it (cancels the in-flight LLM
@@ -440,6 +466,7 @@ export function App(props: AppProps): React.JSX.Element {
           <TranscriptRow key={item.id} item={item} />
         ))}
       </Box>
+      <PromptQueueIndicator queued={promptQueue} />
       <InputBox
         value={input}
         onChange={setInput}
@@ -449,7 +476,7 @@ export function App(props: AppProps): React.JSX.Element {
         onAtQueryChange={overlays.setAtQuery}
         onSlashQueryChange={overlays.setSlashQuery}
         onRequestOverlay={overlays.openOverlay}
-        inputFocus={inputFocus && !busy}
+        inputFocus={inputFocus}
       />
       {overlays.active === 'atfile' && overlays.atQuery !== null && (
         <AtFileComplete

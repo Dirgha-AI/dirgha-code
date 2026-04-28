@@ -109,8 +109,20 @@ export function InputBox(props) {
         props.onChange(next);
     }, [props]);
     useInput((inputCh, key) => {
-        // Ctrl+C handling (two-press exit) — highest priority.
+        // Ctrl+C handling — highest priority.
+        //   1. If the buffer has text → clear it (don't arm exit).
+        //   2. If the buffer is empty → arm exit; second press within 1.5s exits.
+        // This matches the muscle memory most shells / Claude Code use.
         if (key.ctrl && inputCh === 'c') {
+            if (props.value.length > 0) {
+                props.onChange('');
+                setCtrlCArmed(false);
+                if (armTimerRef.current) {
+                    clearTimeout(armTimerRef.current);
+                    armTimerRef.current = null;
+                }
+                return;
+            }
             if (ctrlCArmed) {
                 exit();
                 return;
@@ -170,7 +182,7 @@ export function InputBox(props) {
     const borderColour = props.busy ? palette.brand : palette.accent;
     const promptColour = props.busy ? palette.brand : palette.accent;
     const collapsed = pasteSegment !== null && !pasteExpanded;
-    return (_jsxs(Box, { flexDirection: "column", width: cols, children: [_jsx(Box, { borderStyle: "single", borderColor: borderColour, paddingX: 1, children: _jsxs(Box, { gap: 1, flexGrow: 1, children: [_jsx(Text, { color: promptColour, children: "\u276F" }), collapsed && pasteSegment !== null ? (_jsx(PasteCollapseView, { value: props.value, segment: pasteSegment, expanded: false })) : (_jsx(TextInput, { value: props.value, onChange: handleChange, onSubmit: props.onSubmit, placeholder: props.placeholder ?? 'Ask dirgha anything…', showCursor: !props.busy && !vimActive, focus: focus && !vimActive }))] }) }), _jsxs(Box, { paddingX: 1, justifyContent: "space-between", children: [_jsxs(Box, { gap: 1, children: [props.vimMode === true && (_jsxs(Text, { color: vimActive ? palette.accent : palette.brand, bold: true, children: ["[", vimModeLabel(vimState.mode), "]"] })), pasteSegment !== null && pasteExpanded && (_jsx(Text, { color: palette.textMuted, dimColor: true, children: "pasted block expanded (Ctrl+E collapse)" }))] }), ctrlCArmed && _jsx(Text, { color: palette.accent, bold: true, children: "Press Ctrl+C again to exit." })] })] }));
+    return (_jsxs(Box, { flexDirection: "column", width: cols, children: [_jsx(Box, { borderStyle: "single", borderColor: borderColour, paddingX: 1, children: _jsxs(Box, { gap: 1, flexGrow: 1, children: [_jsx(Text, { color: promptColour, children: "\u276F" }), collapsed && pasteSegment !== null ? (_jsx(PasteCollapseView, { value: props.value, segment: pasteSegment, expanded: false })) : (_jsx(TextInput, { value: props.value, onChange: handleChange, onSubmit: props.onSubmit, placeholder: props.placeholder ?? 'Ask dirgha anything…', showCursor: !vimActive, focus: focus && !vimActive }))] }) }), _jsxs(Box, { paddingX: 1, justifyContent: "space-between", children: [_jsxs(Box, { gap: 1, children: [props.vimMode === true && (_jsxs(Text, { color: vimActive ? palette.accent : palette.brand, bold: true, children: ["[", vimModeLabel(vimState.mode), "]"] })), pasteSegment !== null && pasteExpanded && (_jsx(Text, { color: palette.textMuted, dimColor: true, children: "pasted block expanded (Ctrl+E collapse)" }))] }), ctrlCArmed && _jsx(Text, { color: palette.accent, bold: true, children: "Press Ctrl+C again to exit." })] })] }));
 }
 function vimModeLabel(m) {
     return m === 'NORMAL' ? 'NORMAL' : 'INSERT';

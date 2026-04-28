@@ -36,6 +36,7 @@ import { StreamingText } from './components/StreamingText.js';
 import { ThinkingBlock } from './components/ThinkingBlock.js';
 import { ToolBox } from './components/ToolBox.js';
 import { InputBox } from './components/InputBox.js';
+import { PromptQueueIndicator } from './components/PromptQueueIndicator.js';
 import { ModelPicker } from './components/ModelPicker.js';
 import { HelpOverlay } from './components/HelpOverlay.js';
 import { AtFileComplete } from './components/AtFileComplete.js';
@@ -69,6 +70,10 @@ export function App(props) {
     const [transcript, setTranscript] = React.useState([]);
     const [input, setInput] = React.useState('');
     const [busy, setBusy] = React.useState(false);
+    // Prompt queue: while a turn is streaming the user can still type and
+    // press Enter. Submissions land here instead of being dropped, then
+    // drain FIFO when the turn finishes (see useEffect below).
+    const [promptQueue, setPromptQueue] = React.useState([]);
     const [currentModel, setCurrentModel] = React.useState(props.config.model);
     // Mode state: SlashContext.setMode flips it live so /mode plan|act|verify|ask
     // takes effect on the next turn (system-prompt rebuild downstream picks it up).
@@ -136,8 +141,17 @@ export function App(props) {
     const slashCommands = props.slashCommands ?? [];
     const handleSubmit = React.useCallback((raw) => {
         const value = raw.trim();
-        if (value.length === 0 || busy)
+        if (value.length === 0)
             return;
+        // Non-disruptive queue: if a turn is still streaming, push the new
+        // prompt onto the queue and clear the input so the user can keep
+        // typing. The drain-effect below submits queued prompts FIFO once
+        // `busy` flips false.
+        if (busy) {
+            setPromptQueue(q => [...q, value]);
+            setInput('');
+            return;
+        }
         setInput('');
         if (value === '/exit' || value === '/quit') {
             exit();
@@ -301,6 +315,20 @@ export function App(props) {
             abortRef.current = null;
         }
     };
+    // Drain the prompt queue when a turn finishes. Pops the oldest queued
+    // prompt and re-submits it through handleSubmit (which transitions
+    // back into busy=true via runTurn). Guarded on `!busy` so we never
+    // race against an already-active turn.
+    React.useEffect(() => {
+        if (busy)
+            return;
+        if (promptQueue.length === 0)
+            return;
+        const [next, ...rest] = promptQueue;
+        setPromptQueue(rest);
+        if (next !== undefined)
+            handleSubmit(next);
+    }, [busy, promptQueue, handleSubmit]);
     // Global Esc handler. Priority order:
     //   1. If an overlay (other than @-file) is open → close it.
     //   2. If a turn is streaming → abort it (cancels the in-flight LLM
@@ -388,7 +416,7 @@ export function App(props) {
     // streaming text appears now, the Static-around-transcript pattern
     // was suppressing the live region updates. If still not, the bug
     // is upstream in useEventProjection.
-    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: [{ key: 'logo' }], children: (_item) => _jsx(Logo, { version: VERSION }, "logo") }), _jsxs(Box, { flexDirection: "column", children: [transcript.map(item => (_jsx(TranscriptRow, { item: item }, item.id))), projection.liveItems.map(item => (_jsx(TranscriptRow, { item: item }, item.id)))] }), _jsx(InputBox, { value: input, onChange: setInput, onSubmit: handleSubmit, busy: busy, vimMode: props.config.vimMode === true, onAtQueryChange: overlays.setAtQuery, onSlashQueryChange: overlays.setSlashQuery, onRequestOverlay: overlays.openOverlay, inputFocus: inputFocus && !busy }), overlays.active === 'atfile' && overlays.atQuery !== null && (_jsx(AtFileComplete, { cwd: props.cwd, query: overlays.atQuery, onPick: handleAtPick, onCancel: () => { overlays.setAtQuery(null); overlays.setActive(null); } })), overlays.active === 'slash' && overlays.slashQuery !== null && (_jsx(SlashComplete, { commands: slashCommands, query: overlays.slashQuery, onPick: handleSlashPick, onCancel: () => { overlays.setSlashQuery(null); overlays.setActive(null); } })), overlays.active === 'models' && (_jsx(ModelPicker, { models: models, current: currentModel, onPick: handleModelPick, onCancel: overlays.closeOverlay })), overlays.active === 'help' && (_jsx(HelpOverlay, { slashCommands: slashCommands, onClose: overlays.closeOverlay })), overlays.active === 'theme' && (_jsx(ThemePicker, { current: themeName, onPick: handleThemePick, onCancel: overlays.closeOverlay })), _jsx(StatusBar, { model: currentModel, provider: providerIdForModel(currentModel), inputTokens: projection.totals.inputTokens, outputTokens: projection.totals.outputTokens, costUsd: projection.totals.costUsd, cwd: props.cwd, busy: busy, mode: props.config.mode ?? 'act', contextWindow: contextWindowFor(currentModel), liveOutputTokens: liveOutputTokens, liveDurationMs: liveDurationMs })] }) }));
+    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: [{ key: 'logo' }], children: (_item) => _jsx(Logo, { version: VERSION }, "logo") }), _jsxs(Box, { flexDirection: "column", children: [transcript.map(item => (_jsx(TranscriptRow, { item: item }, item.id))), projection.liveItems.map(item => (_jsx(TranscriptRow, { item: item }, item.id)))] }), _jsx(PromptQueueIndicator, { queued: promptQueue }), _jsx(InputBox, { value: input, onChange: setInput, onSubmit: handleSubmit, busy: busy, vimMode: props.config.vimMode === true, onAtQueryChange: overlays.setAtQuery, onSlashQueryChange: overlays.setSlashQuery, onRequestOverlay: overlays.openOverlay, inputFocus: inputFocus }), overlays.active === 'atfile' && overlays.atQuery !== null && (_jsx(AtFileComplete, { cwd: props.cwd, query: overlays.atQuery, onPick: handleAtPick, onCancel: () => { overlays.setAtQuery(null); overlays.setActive(null); } })), overlays.active === 'slash' && overlays.slashQuery !== null && (_jsx(SlashComplete, { commands: slashCommands, query: overlays.slashQuery, onPick: handleSlashPick, onCancel: () => { overlays.setSlashQuery(null); overlays.setActive(null); } })), overlays.active === 'models' && (_jsx(ModelPicker, { models: models, current: currentModel, onPick: handleModelPick, onCancel: overlays.closeOverlay })), overlays.active === 'help' && (_jsx(HelpOverlay, { slashCommands: slashCommands, onClose: overlays.closeOverlay })), overlays.active === 'theme' && (_jsx(ThemePicker, { current: themeName, onPick: handleThemePick, onCancel: overlays.closeOverlay })), _jsx(StatusBar, { model: currentModel, provider: providerIdForModel(currentModel), inputTokens: projection.totals.inputTokens, outputTokens: projection.totals.outputTokens, costUsd: projection.totals.costUsd, cwd: props.cwd, busy: busy, mode: props.config.mode ?? 'act', contextWindow: contextWindowFor(currentModel), liveOutputTokens: liveOutputTokens, liveDurationMs: liveDurationMs })] }) }));
 }
 function TranscriptRow({ item }) {
     switch (item.kind) {

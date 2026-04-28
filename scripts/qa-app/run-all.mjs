@@ -32,6 +32,8 @@ const only = (args.find(a => a.startsWith('--only='))?.split('=')[1] ?? '').toLo
 
 const SUITES = [
   { name: 'ink',        file: 'ink_unit_test.mjs',  needs: 'none',                desc: 'Ink TUI projection' },
+  { name: 'ink-ctrlc',  file: 'ink_ctrlc_queue_test.mjs', needs: 'none',          desc: 'Ctrl+C clears buffer / arms exit on empty buffer' },
+  { name: 'ink-queue',  file: 'ink_queue_e2e_test.mjs',   needs: 'none',          desc: 'Prompt queue while busy: indicator, drain, FIFO' },
   { name: 'slash',      file: 'slash_audit.mjs',    needs: 'none',                desc: 'Every built-in slash command' },
   { name: 'tools',      file: 'tools_smoke.mjs',    needs: 'none',                desc: 'Every built-in tool' },
   { name: 'checkpoint', file: 'checkpoint_test.mjs',needs: 'none',                desc: 'Checkpoint save/list/restore/delete' },

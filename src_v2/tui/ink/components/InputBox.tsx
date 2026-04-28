@@ -132,8 +132,17 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
   }, [props]);
 
   useInput((inputCh, key) => {
-    // Ctrl+C handling (two-press exit) — highest priority.
+    // Ctrl+C handling — highest priority.
+    //   1. If the buffer has text → clear it (don't arm exit).
+    //   2. If the buffer is empty → arm exit; second press within 1.5s exits.
+    // This matches the muscle memory most shells / Claude Code use.
     if (key.ctrl && inputCh === 'c') {
+      if (props.value.length > 0) {
+        props.onChange('');
+        setCtrlCArmed(false);
+        if (armTimerRef.current) { clearTimeout(armTimerRef.current); armTimerRef.current = null; }
+        return;
+      }
       if (ctrlCArmed) { exit(); return; }
       setCtrlCArmed(true);
       if (armTimerRef.current) clearTimeout(armTimerRef.current);
@@ -197,7 +206,7 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
               onChange={handleChange}
               onSubmit={props.onSubmit}
               placeholder={props.placeholder ?? 'Ask dirgha anything…'}
-              showCursor={!props.busy && !vimActive}
+              showCursor={!vimActive}
               focus={focus && !vimActive}
             />
           )}
