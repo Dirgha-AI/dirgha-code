@@ -126,16 +126,27 @@ jobs:
           echo "=== OPENROUTER_API_KEY length ==="
           echo "${#OPENROUTER_API_KEY} chars"
           echo "=== tmux: spawn dirgha REPL, send /help, capture ==="
-          tmux new-session -d -s diag -x 120 -y 32 "dirgha"
-          sleep 3
+          # Wrap dirgha so we can capture stderr after it exits/errors.
+          tmux new-session -d -s diag -x 120 -y 32 "dirgha 2>/tmp/dirgha.err; echo '--- DIRGHA EXITED rc=$? ---'; cat /tmp/dirgha.err; sleep 60"
+          sleep 4
           tmux send-keys -t diag -l "/help"
           sleep 1
           tmux send-keys -t diag "Enter"
           sleep 4
-          tmux capture-pane -t diag -p | head -32
+          echo "=== full pane capture ==="
+          tmux capture-pane -t diag -p
+          echo "=== dirgha.err ==="
+          cat /tmp/dirgha.err || true
           tmux kill-session -t diag || true
           echo "=== freeze version ==="
           freeze --version || true
+          echo "=== node + npm versions ==="
+          node --version
+          npm --version
+          echo "=== install path of @dirgha/code ==="
+          ls -la /opt/hostedtoolcache/node/22.22.2/x64/lib/node_modules/@dirgha/code 2>&1 | head -5
+          echo "=== try non-tty dirgha doctor ==="
+          DIRGHA_NO_INK=1 dirgha doctor 2>&1 | head -20
 
       - name: Smoke matrix (tier=all, release-blocking)
         env:
