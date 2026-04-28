@@ -48,6 +48,11 @@ export const PRICES: PricePoint[] = [
   // NVIDIA NIM — verified live on the integrate.api.nvidia.com endpoint
   { provider: 'nvidia', model: 'deepseek-ai/deepseek-v4-pro', inputPerM: 0, outputPerM: 0 },
   { provider: 'nvidia', model: 'deepseek-ai/deepseek-v4-flash', inputPerM: 0, outputPerM: 0 },
+
+  // DeepSeek native API (api.deepseek.com) — own quota, no shared 429s.
+  // Cache hits priced at ~10% of base; passed through usage.cached_tokens.
+  { provider: 'deepseek', model: 'deepseek-chat', inputPerM: 0.27, outputPerM: 1.10, cachedInputPerM: 0.07, contextWindow: 128_000, family: 'deepseek' },
+  { provider: 'deepseek', model: 'deepseek-reasoner', inputPerM: 0.55, outputPerM: 2.19, cachedInputPerM: 0.14, contextWindow: 128_000, supportsThinking: true, family: 'deepseek' },
   { provider: 'nvidia', model: 'moonshotai/kimi-k2-instruct', inputPerM: 0.15, outputPerM: 0.60 },
   { provider: 'nvidia', model: 'qwen/qwen3-next-80b-a3b-instruct', inputPerM: 0.08, outputPerM: 0.30 },
   { provider: 'nvidia', model: 'meta/llama-3.3-70b-instruct', inputPerM: 0.20, outputPerM: 0.80 },

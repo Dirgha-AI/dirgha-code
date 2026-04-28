@@ -15,6 +15,7 @@ import { GeminiProvider } from './gemini.js';
 import { OllamaProvider } from './ollama.js';
 import { LlamaCppProvider } from './llamacpp.js';
 import { FireworksProvider } from './fireworks.js';
+import { DeepSeekProvider } from './deepseek.js';
 
 export * from './iface.js';
 export * from './dispatch.js';
@@ -26,6 +27,7 @@ export { GeminiProvider } from './gemini.js';
 export { OllamaProvider } from './ollama.js';
 export { LlamaCppProvider } from './llamacpp.js';
 export { FireworksProvider } from './fireworks.js';
+export { DeepSeekProvider } from './deepseek.js';
 
 export interface ProviderRegistryConfig {
   nvidia?: ProviderConfig;
@@ -36,6 +38,7 @@ export interface ProviderRegistryConfig {
   ollama?: ProviderConfig;
   llamacpp?: ProviderConfig;
   fireworks?: ProviderConfig;
+  deepseek?: ProviderConfig;
 }
 
 export class ProviderRegistry {
@@ -62,6 +65,7 @@ export class ProviderRegistry {
       case 'ollama': return new OllamaProvider(this.config.ollama ?? {});
       case 'llamacpp': return new LlamaCppProvider(this.config.llamacpp ?? {});
       case 'fireworks': return new FireworksProvider(this.config.fireworks ?? {});
+      case 'deepseek': return new DeepSeekProvider(this.config.deepseek ?? {});
     }
   }
 }

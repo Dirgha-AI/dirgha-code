@@ -15,6 +15,7 @@ export { GeminiProvider } from './gemini.js';
 export { OllamaProvider } from './ollama.js';
 export { LlamaCppProvider } from './llamacpp.js';
 export { FireworksProvider } from './fireworks.js';
+export { DeepSeekProvider } from './deepseek.js';
 export interface ProviderRegistryConfig {
     nvidia?: ProviderConfig;
     openrouter?: ProviderConfig & {
@@ -31,6 +32,7 @@ export interface ProviderRegistryConfig {
     ollama?: ProviderConfig;
     llamacpp?: ProviderConfig;
     fireworks?: ProviderConfig;
+    deepseek?: ProviderConfig;
 }
 export declare class ProviderRegistry {
     private config;

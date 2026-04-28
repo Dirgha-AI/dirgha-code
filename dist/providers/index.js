@@ -13,6 +13,7 @@ import { GeminiProvider } from './gemini.js';
 import { OllamaProvider } from './ollama.js';
 import { LlamaCppProvider } from './llamacpp.js';
 import { FireworksProvider } from './fireworks.js';
+import { DeepSeekProvider } from './deepseek.js';
 export * from './iface.js';
 export * from './dispatch.js';
 export { NvidiaProvider } from './nvidia.js';
@@ -23,6 +24,7 @@ export { GeminiProvider } from './gemini.js';
 export { OllamaProvider } from './ollama.js';
 export { LlamaCppProvider } from './llamacpp.js';
 export { FireworksProvider } from './fireworks.js';
+export { DeepSeekProvider } from './deepseek.js';
 export class ProviderRegistry {
     config;
     cache = new Map();
@@ -48,6 +50,7 @@ export class ProviderRegistry {
             case 'ollama': return new OllamaProvider(this.config.ollama ?? {});
             case 'llamacpp': return new LlamaCppProvider(this.config.llamacpp ?? {});
             case 'fireworks': return new FireworksProvider(this.config.fireworks ?? {});
+            case 'deepseek': return new DeepSeekProvider(this.config.deepseek ?? {});
         }
     }
 }

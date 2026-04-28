@@ -15,6 +15,8 @@
  */
 import { stdout, stderr } from 'node:process';
 import { randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { parseFlags } from '../flags.js';
 import { loadConfig } from '../config.js';
 import { ProviderRegistry } from '../../providers/index.js';
@@ -30,10 +32,19 @@ export const askSubcommand = {
         const { flags, positionals } = parseFlags(argv);
         const prompt = positionals.join(' ').trim();
         if (!prompt) {
-            stderr.write('usage: dirgha ask "your prompt" [-m <model>] [-s <system>] [--max-turns N] [--json]\n');
+            stderr.write('usage: dirgha ask "your prompt" [-m <model>] [-s <system>] [--max-turns N] [--cwd <dir>] [--json]\n');
             return 1;
         }
-        const config = await loadConfig(ctx.cwd);
+        // Honour --cwd so callers can scope tool calls to a specific directory
+        // without spawning the whole process under that dir. Falls back to the
+        // SubcommandCtx-supplied cwd (which is process.cwd()).
+        const cwdFlag = typeof flags.cwd === 'string' ? flags.cwd : undefined;
+        const cwd = cwdFlag ? resolve(cwdFlag) : ctx.cwd;
+        if (cwdFlag && !existsSync(cwd)) {
+            stderr.write(`--cwd: directory does not exist: ${cwd}\n`);
+            return 1;
+        }
+        const config = await loadConfig(cwd);
         const { resolveModelAlias } = await import('../../intelligence/prices.js');
         const rawModel = typeof flags.model === 'string' ? flags.model
             : typeof flags.m === 'string' ? flags.m
@@ -54,7 +65,7 @@ export const askSubcommand = {
             events.subscribe(ev => { stdout.write(`${JSON.stringify(ev)}\n`); });
         else
             events.subscribe(renderStreamingEvents({ showThinking: config.showThinking }));
-        const executor = createToolExecutor({ registry, cwd: ctx.cwd, sessionId });
+        const executor = createToolExecutor({ registry, cwd, sessionId });
         const sanitized = registry.sanitize({ descriptionLimit: 200 });
         const messages = [];
         if (system)

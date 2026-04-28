@@ -28,6 +28,11 @@ const RULES = [
     { match: id => id.startsWith('ollama/'), provider: 'ollama' },
     { match: id => id.startsWith('llamacpp/'), provider: 'llamacpp' },
     { match: id => id.startsWith('fireworks/'), provider: 'fireworks' },
+    // DeepSeek native API — bare canonical ids (deepseek-chat, deepseek-reasoner)
+    // and the explicit deepseek-native: prefix. Vendor-prefixed `deepseek/...`
+    // slugs still go to OpenRouter unless DIRGHA_PROVIDER=deepseek is set.
+    { match: id => /^deepseek-(chat|reasoner|coder)$/.test(id), provider: 'deepseek' },
+    { match: id => id.startsWith('deepseek-native/'), provider: 'deepseek' },
     // Catch-all: any vendor-prefixed slug or `:free` variant goes via
     // OpenRouter (anthropic/, openai/, google/, deepseek/, moonshotai/,
     // minimax/, qwen/, tencent/, z-ai/, inclusionai/, etc.).
@@ -43,6 +48,6 @@ export function routeModel(modelId) {
 export function isKnownProvider(id) {
     return (id === 'anthropic' || id === 'openai' || id === 'gemini'
         || id === 'openrouter' || id === 'nvidia' || id === 'ollama'
-        || id === 'llamacpp' || id === 'fireworks');
+        || id === 'llamacpp' || id === 'fireworks' || id === 'deepseek');
 }
 //# sourceMappingURL=dispatch.js.map
