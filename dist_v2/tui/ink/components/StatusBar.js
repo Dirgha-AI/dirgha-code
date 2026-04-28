@@ -62,6 +62,23 @@ export function StatusBar(props) {
     const contextMeter = props.contextWindow && props.contextWindow > 0 && totalTokens > 0
         ? `${formatTokens(totalTokens)}/${formatTokens(props.contextWindow)}`
         : '';
+    // tok/s readout — only meaningful while a turn is streaming AND we
+    // have at least one token + non-zero elapsed time. Below 250ms we'd
+    // get extreme rates from a single chunk, so suppress until warmed up.
+    const tokRateLabel = (() => {
+        const t = props.liveOutputTokens;
+        const ms = props.liveDurationMs;
+        if (!props.busy)
+            return '';
+        if (typeof t !== 'number' || typeof ms !== 'number')
+            return '';
+        if (t <= 0 || ms <= 0)
+            return '';
+        if (ms < 250)
+            return ''; // warmup: avoid spurious 1000+ tok/s readings
+        const rate = Math.round((t / ms) * 1000);
+        return `${rate} tok/s`;
+    })();
     // Mode badge: ALWAYS visible so the user knows what posture the
     // agent is in. YOLO surfaces in the palette's error colour as a
     // danger reminder; PLAN/ASK in accent; ACT in muted to stay calm.
@@ -75,6 +92,6 @@ export function StatusBar(props) {
     // Slim status bar — only what's load-bearing:
     //   left:  ⏵⏵ MODE · cwd
     //   right: spinner (when busy) · short model · context-meter or cost
-    return (_jsxs(Box, { width: cols, paddingX: 1, justifyContent: "space-between", children: [_jsxs(Box, { gap: 1, children: [_jsxs(Text, { color: modeColour, bold: true, children: [ms.symbol, " ", ms.label] }), _jsx(Text, { color: palette.textMuted, dimColor: true, children: "\u00B7" }), _jsx(Text, { color: palette.textMuted, children: cwdLabel(props.cwd) })] }), _jsxs(Box, { gap: 1, children: [props.busy && _jsx(Text, { color: palette.brand, children: SPINNER_FRAMES[frame] }), _jsx(Text, { color: palette.brand, children: modelDisplay }), props.busy && _jsx(Text, { color: palette.textMuted, dimColor: true, children: "\u00B7 Ctrl+C to stop" }), contextMeter !== '' && _jsx(Text, { color: palette.textMuted, dimColor: true, children: contextMeter }), costLabel !== '' && _jsx(Text, { color: palette.textMuted, dimColor: true, children: costLabel })] })] }));
+    return (_jsxs(Box, { width: cols, paddingX: 1, justifyContent: "space-between", children: [_jsxs(Box, { gap: 1, children: [_jsxs(Text, { color: modeColour, bold: true, children: [ms.symbol, " ", ms.label] }), _jsx(Text, { color: palette.textMuted, dimColor: true, children: "\u00B7" }), _jsx(Text, { color: palette.textMuted, children: cwdLabel(props.cwd) })] }), _jsxs(Box, { gap: 1, children: [props.busy && _jsx(Text, { color: palette.brand, children: SPINNER_FRAMES[frame] }), _jsx(Text, { color: palette.brand, children: modelDisplay }), props.busy && _jsx(Text, { color: palette.textMuted, dimColor: true, children: "\u00B7 Ctrl+C to stop" }), tokRateLabel !== '' && _jsx(Text, { color: palette.textMuted, dimColor: true, children: tokRateLabel }), contextMeter !== '' && _jsx(Text, { color: palette.textMuted, dimColor: true, children: contextMeter }), costLabel !== '' && _jsx(Text, { color: palette.textMuted, dimColor: true, children: costLabel })] })] }));
 }
 //# sourceMappingURL=StatusBar.js.map

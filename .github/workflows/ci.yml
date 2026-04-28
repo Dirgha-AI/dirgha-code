@@ -62,6 +62,13 @@ jobs:
           node dist_v2/cli/main.js --version
           node dist_v2/cli/main.js --help
 
+      - name: Headless Ink unit tests (release-blocking)
+        # CI-2: ink_unit_test mounts App into a fake stdout buffer and
+        # drives /help, /theme, /models slash overlays via FakeStdin. No
+        # tmux, no Chrome, no real TTY — runs identically on Linux,
+        # macOS, and Windows.
+        run: npm run test:cli:offline
+
       - name: Doctor (cross-OS)
         # `dirgha doctor` exercises the env-detection codepaths on each OS.
         # It must exit 0 even with no creds — it's diagnostic, not auth-gated.

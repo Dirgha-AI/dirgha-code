@@ -56,19 +56,35 @@ const stdout = new CaptureStream();
 const stderr = new CaptureStream();
 
 // Fake stdin so InputBox's useInput hook doesn't crash demanding raw mode.
+// FakeStdin must mimic a TTY Readable stream — Ink uses
+// `stdin.addListener('readable', ...)` and pulls bytes via `stdin.read()`.
+// A bare EventEmitter doesn't satisfy that contract; the slash-command
+// journey assertions below rely on this push() + read() cycle to deliver
+// keystrokes into Ink's input parser.
 class FakeStdin extends EventEmitter {
   constructor() {
     super();
     this.isTTY = true;
+    this._buf = [];
   }
   setEncoding() {}
-  read() { return null; }
+  read() {
+    // Ink calls .read() inside its 'readable' handler. Return the
+    // earliest queued chunk (Buffer) or null if nothing pending.
+    return this._buf.shift() ?? null;
+  }
   resume() {}
   pause() {}
   setRawMode() { return this; }
   ref() {}
   unref() {}
   on(...args) { return super.on(...args); }
+  /** Test hook — push a chunk + emit readable so Ink picks it up. */
+  pushChunk(chunk) {
+    const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk), 'utf8');
+    this._buf.push(buf);
+    this.emit('readable');
+  }
 }
 const stdin = new FakeStdin();
 
@@ -148,9 +164,57 @@ try {
   events.emit({ type: 'agent_end', sessionId: 'test', stopReason: 'end_turn', usage: { inputTokens: 200, outputTokens: 10, cachedTokens: 0, costUsd: 0 } });
   await flush();
 
-  assert('tool_exec_end transitions tool to done (✓)', /✓\s*Shell|✓ Shell/.test(everSeen()));
+  // ToolBox renders ✓ + tool-icon glyph (∂ for shell) + the tool label,
+  // e.g. "✓ ∂ Shell". Allow the icon column between ✓ and Shell.
+  assert('tool_exec_end transitions tool to done (✓)', /✓\s*\S?\s*Shell/.test(everSeen()));
   assert('tool output preview rendered (file1)', /file1/.test(everSeen()));
   assert('streamed text persists across tool turn', everSeen().match(/Hello, world!/g)?.length >= 1);
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Slash-command UI journeys — drive the App via FakeStdin, assert the
+  // overlay rendered. This is the SOTA replacement for tmux+freeze
+  // smoke: runs in CI without a real terminal because Ink's render is
+  // captured into the CaptureStream above.
+  // ─────────────────────────────────────────────────────────────────────
+
+  const stdoutFrameCountBefore = stdout.frames.length;
+  // Ink listens on stdin's 'readable' event and pulls bytes via
+  // stdin.read(). FakeStdin.pushChunk() queues + signals.
+  const send = (s) => stdin.pushChunk(s);
+  const typeSlash = async (cmd) => {
+    for (const ch of cmd) {
+      send(ch);
+      await sleep(30);
+    }
+    // Press Enter (\r is what raw stdin sends on most TTYs).
+    send('\r');
+    await sleep(300);
+  };
+
+  // /help should open the help overlay (HelpOverlay component).
+  await typeSlash('/help');
+  const afterHelp = strip(stdout.frames.slice(stdoutFrameCountBefore).join(''));
+  assert('/help opens help overlay', /help \d+ commands|Slash commands|↑↓|filter|esc/i.test(afterHelp));
+
+  // Press Esc to close the overlay before the next journey.
+  stdin.emit('data', '');
+  await sleep(150);
+
+  // /theme should open the theme picker overlay.
+  const beforeTheme = stdout.frames.length;
+  await typeSlash('/theme');
+  const afterTheme = strip(stdout.frames.slice(beforeTheme).join(''));
+  assert('/theme opens theme picker', /theme picker|↑↓|███|dark.*light|cabinet/i.test(afterTheme));
+  stdin.emit('data', '');
+  await sleep(150);
+
+  // /models should open the model picker overlay.
+  const beforeModels = stdout.frames.length;
+  await typeSlash('/models');
+  const afterModels = strip(stdout.frames.slice(beforeModels).join(''));
+  assert('/models opens model picker', /kimi|gpt|deepseek|moonshot|claude|model picker|↑↓/i.test(afterModels));
+  stdin.emit('data', '');
+  await sleep(150);
 
 } finally {
   ink.unmount();
