@@ -26,11 +26,6 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           cache: npm
 
-      # Trusted Publisher (OIDC) requires npm CLI ≥ 11.5.1. Node 22 ships
-      # npm 10.x; pin to a known-good version that supports OIDC auth.
-      - name: Pin npm CLI ≥ 11.5.1 (for trusted publisher OIDC)
-        run: npm install -g npm@latest
-
       - name: Verify tag matches package.json version
         run: |
           PKG_VER=$(node -p "require('./package.json').version")
@@ -58,8 +53,11 @@ jobs:
       - name: Verify install
         run: npm run verify-install
 
-      # No NODE_AUTH_TOKEN — Trusted Publisher (OIDC) authenticates via
-      # the workflow's id-token. Setting an empty NPM_TOKEN secret would
-      # leave .npmrc with `_authToken=` and confuse the OIDC handshake.
-      - name: Publish
-        run: npm publish --access public --provenance
+      # Publish with a pinned npm CLI ≥ 11.5.1 — required for Trusted
+      # Publisher OIDC auth. Node 22 ships npm 10.x; rather than break
+      # the bundled npm via `npm install -g npm@latest` (which has a
+      # known issue where the install pulls a broken tarball missing
+      # promise-retry), shell out via npx for the publish step only.
+      # No NODE_AUTH_TOKEN — the OIDC id-token authenticates the session.
+      - name: Publish (via pinned npm 11)
+        run: npx -y npm@11.5.1 publish --access public --provenance
