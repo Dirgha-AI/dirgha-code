@@ -31,6 +31,11 @@ describe('installNpmSkill — spec validation', () => {
     'npm:@scope/pkg@1.2.3',
     'npm:@scope/pkg@beta',
   ])('accepts %s and proceeds to npm pack', async (spec) => {
-    await expect(installNpmSkill(spec)).rejects.toThrow(/npm pack|Unexpected npm pack output|404|HTTP/);
+    // The package doesn't exist on the registry, so npm pack must fail.
+    // We don't pin on the exact error message — Node/npm worded it
+    // differently on each platform/version. We just need to confirm the
+    // function got past spec validation and actually invoked npm pack.
+    // Linux: 'npm pack ... 404 ...'; Windows wraps as 'Command failed: npm.cmd pack ...'.
+    await expect(installNpmSkill(spec)).rejects.toThrow(/npm(?:\.cmd)?\s+pack|Unexpected npm pack output|404|HTTP|Command failed/);
   });
 });
