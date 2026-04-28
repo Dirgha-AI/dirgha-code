@@ -45,6 +45,12 @@ jobs:
       - name: License audit
         run: npm run license-check
 
+      - name: CVE audit (npm audit, fail on high+)
+        # CI-5: blocks merge on a known high/critical CVE in production
+        # deps. Dev-deps (vitest, eslint) are excluded — they don't
+        # ship in the tarball.
+        run: npm audit --audit-level=high --omit=dev
+
       - name: Typecheck
         run: npm run typecheck
 

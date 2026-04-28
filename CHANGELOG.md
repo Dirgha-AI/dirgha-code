@@ -1,5 +1,71 @@
 # Dirgha CLI — Changelog
 
+All notable changes are tracked here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); we use [Semantic Versioning](https://semver.org/).
+
+## Unreleased — CI-5 supply-chain hardening
+
+- `npm audit --audit-level=high --omit=dev` is now a CI gate (blocks PRs with high+ CVEs).
+- SBOM emitted on every release in CycloneDX + SPDX formats; both attached to GitHub Releases.
+- Bundle-size budget enforced at 600 KB tarball.
+- Dependabot weekly PRs (grouped: eslint, ink, types, vitest stack).
+- OpenSSF Scorecard runs weekly + on push to main; result published to scorecard.dev.
+- This CHANGELOG.md committed.
+
+## 1.7.12 — 2026-04-28
+
+**CI-6 — Posthog telemetry endpoint live + minimal-data schema.**
+
+### Added
+- `src_v2/telemetry/sender.ts` — Posthog-compatible sender, fires events on subcommand exit (when opt-in).
+- 1s `Promise.race` cap so a slow Posthog never blocks the user.
+
+### Changed
+- Telemetry payload tightened to **5 fields** for command events (event, version, command, os, node) — no more `os_release`, `arch`, `duration_ms`. **6 fields** on errors (+ `error_class`).
+- `docs/privacy/CLI-TELEMETRY.md` updated with the exact minimum data table.
+
+## 1.7.11 — 2026-04-28
+
+**CI-3 + CI-4 — multi-agent UX scorer + telemetry scaffold.**
+
+### Added
+- `tools/ux-scorer/run.mjs` — N-judge fleet records 5 scripted journeys via tmux, scores against `tools/ux-scorer/rubric.md`. Median ≥ 7.0 release-blocking.
+- Default judge: `inclusionai/ling-2.6-1t:free`. Optional: `tencent/hy3-preview:free`, `deepseek-v4-pro`, `kimi-k2`.
+- `dirgha telemetry <status|enable|disable|endpoint>` subcommand. Default OFF.
+
+### Fixed
+- ux-scorer unsets `CI`/`GITHUB_ACTIONS`/`CONTINUOUS_INTEGRATION` before launching `dirgha` inside tmux so Ink doesn't suppress dynamic output (`is-in-ci` detection).
+
+## 1.7.10 — 2026-04-28
+
+**CI-2 — headless Ink overlay tests + StatusBar tok/s.**
+
+### Added
+- `scripts/qa-app/ink_unit_test.mjs` extended to 11 assertions — `/help`, `/theme`, `/models` slash overlay journeys.
+- `FakeStdin` upgraded to a Readable-stream mimic (Ink listens on `'readable'`, not `'data'`).
+- StatusBar now actually computes `tok/s` (was a declared-but-unused prop). 4 cases covered: arithmetic, idle, zero-output, sub-250ms warmup.
+
+### Fixed
+- `tool_exec_end → done` Ink test regex allows the tool icon glyph between ✓ and "Shell".
+- Ink CI-mode suppressed dynamic output → `debug:true` escape.
+- `kb` test reclassified `needs: 'NETWORK'` (was sneakily network-bound).
+
+## 1.7.9 — 2026-04-28
+
+**CI-1 — production-grade pre-release gates + `/theme` bug fix.**
+
+### Fixed
+- `/theme` overlay race condition (1.7.8 regression): SlashComplete `onPick` and InputBox `onSubmit` both fire on Enter; explicit `setActive(null)` was overwriting `openOverlay('theme')`. Removed the explicit clear; the `useEffect` on `slashQuery=null` handles cleanup safely.
+
+### Added
+- ESLint flat config + `npm run lint` (max-warnings 25 baseline).
+- `npm run license-check` (fails on GPL/AGPL/LGPL).
+- Cross-OS CI matrix: ubuntu × macos × windows × Node 20/22.
+- Smoke matrix tier1 gained `/theme`, `/update`, and a tool-call cell.
+
+## 1.7.8 — never published
+
+Tagged but pulled when `/theme` overlay race surfaced. Fixed in 1.7.9.
+
 ## 1.7.7 — 2026-04-27
 
 ### Fixed (P0 — install)

@@ -47,6 +47,9 @@ jobs:
       - name: License audit
         run: npm run license-check
 
+      - name: CVE audit (npm audit, fail on high+)
+        run: npm audit --audit-level=high --omit=dev
+
       - name: Typecheck
         run: npm run typecheck
 
@@ -133,6 +136,32 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
+      - name: Bundle size budget (CI-5)
+        # Allow 600 KB tarball; current 1.7.12 is ~454 KB. Growth above
+        # 600 KB requires a justification line in the release marker.
+        # Hard cap: bundle-size regression should be a deliberate decision.
+        run: |
+          npm pack --dry-run 2>/dev/null
+          npm pack >/dev/null
+          BYTES=$(stat -c%s dirgha-code-*.tgz)
+          BUDGET=614400  # 600 KB
+          echo "Tarball size: $BYTES bytes (budget: $BUDGET)"
+          if [ "$BYTES" -gt "$BUDGET" ]; then
+            echo "::error::Bundle size $BYTES exceeds budget $BUDGET — bump deliberately"
+            exit 1
+          fi
+
+      - name: Generate SBOM (CycloneDX + SPDX)
+        # CI-5: emits both formats so downstream consumers (Anchore,
+        # Snyk, Dependency-Track for CycloneDX; tooling for SPDX) all
+        # work without us having to pick a side. npm 11.5.1 has both
+        # built-in. Production deps only — dev-deps don't ship.
+        run: |
+          npx -y npm@11.5.1 sbom --sbom-format=cyclonedx --omit=dev > sbom.cdx.json
+          npx -y npm@11.5.1 sbom --sbom-format=spdx --omit=dev > sbom.spdx.json
+          echo "CycloneDX SBOM: $(wc -c < sbom.cdx.json) bytes"
+          echo "SPDX SBOM:      $(wc -c < sbom.spdx.json) bytes"
+
       # Publish with a pinned npm CLI ≥ 11.5.1 — required for Trusted
       # Publisher OIDC auth. Node 22 ships npm 10.x; rather than break
       # the bundled npm via `npm install -g npm@latest` (which has a
@@ -141,3 +170,17 @@ jobs:
       # No NODE_AUTH_TOKEN — the OIDC id-token authenticates the session.
       - name: Publish (via pinned npm 11)
         run: npx -y npm@11.5.1 publish --access public --provenance
+
+      - name: Attach tarball + SBOMs to GitHub Release (CI-5)
+        # Release notes auto-populate from the commit body; SBOM files
+        # are downloadable evidence for security auditors.
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dirgha-code-*.tgz
+            sbom.cdx.json
+            sbom.spdx.json
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

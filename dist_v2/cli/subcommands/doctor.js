@@ -105,6 +105,13 @@ export const doctorSubcommand = {
     name: 'doctor',
     description: 'Environment diagnostics (node, git, providers)',
     async run(argv) {
+        // CI-6b: --send-crash-report builds a sanitised bundle of doctor
+        // output + audit log tail + recent error, shows the user a preview,
+        // and only sends with explicit consent.
+        if (argv.includes('--send-crash-report')) {
+            const { runCrashReport } = await import('../../telemetry/crash-report.js');
+            return runCrashReport({ argv });
+        }
         const json = argv.includes('--json');
         const results = [];
         results.push(await checkNode());

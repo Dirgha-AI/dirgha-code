@@ -1,0 +1,42 @@
+# Dependabot — weekly PRs to keep deps fresh + CVE-free.
+# Grouped to avoid PR storm: 5+ eslint deps in one PR, ink stack in one PR.
+# CI-5 sprint, 2026-04-28.
+
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Asia/Kolkata
+    open-pull-requests-limit: 8
+    labels: ["dependencies", "automated"]
+    groups:
+      eslint:
+        patterns:
+          - "eslint*"
+          - "@typescript-eslint/*"
+          - "typescript-eslint"
+      ink:
+        patterns:
+          - "ink"
+          - "ink-*"
+          - "@inkjs/*"
+      types:
+        patterns:
+          - "@types/*"
+      vitest:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+      time: "07:00"
+      timezone: Asia/Kolkata
+    open-pull-requests-limit: 4
+    labels: ["dependencies", "github-actions", "automated"]

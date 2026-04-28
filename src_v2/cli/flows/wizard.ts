@@ -397,11 +397,66 @@ export async function runWizard(argv: string[]): Promise<number> {
     const model = await pickModel(provider, rl);
     if (!model) return 1;
     await persistDefaultModel(model);
+    // CI-7 — one-time telemetry consent prompt. Default OFF; user
+    // must type 'y' to opt in. Choice persists so this never asks
+    // again. Privacy doc shown on 'r'.
+    await askTelemetryConsent(rl);
     printCompletion(provider, model);
     return 0;
   } finally {
     rl.close();
   }
+}
+
+async function askTelemetryConsent(rl: { question: (q: string) => Promise<string> } | { question: (q: string, cb: (a: string) => void) => void }): Promise<void> {
+  // If the user has already explicitly enabled or disabled telemetry,
+  // don't re-prompt. We track this via a `telemetry.consentSeen` flag.
+  const { readTelemetryConfig, writeTelemetryConfig } = await import('../subcommands/telemetry.js');
+  const { existsSync, readFileSync, writeFileSync } = await import('node:fs');
+  const { homedir } = await import('node:os');
+  const { join } = await import('node:path');
+  const cfgPath = join(homedir(), '.dirgha', 'config.json');
+  let cfg: any = {};
+  try { if (existsSync(cfgPath)) cfg = JSON.parse(readFileSync(cfgPath, 'utf8')); } catch { /* */ }
+  if (cfg?.telemetry?.consentSeen === true) return;
+
+  stdout.write(`\n  ${style(defaultTheme.accent, '◈ Anonymous usage telemetry?')}\n`);
+  stdout.write(`  ${style(defaultTheme.muted, 'Help us catch regressions — send 5 fields per command:')}\n`);
+  stdout.write(`  ${style(defaultTheme.muted, '    version, command, os bucket (linux/macos/win), node major, error class')}\n`);
+  stdout.write(`  ${style(defaultTheme.muted, 'Never sent: prompts, responses, file contents, API key values.')}\n`);
+  stdout.write(`  ${style(defaultTheme.muted, 'Read more: docs/privacy/CLI-TELEMETRY.md')}\n\n`);
+
+  const ask = (q: string): Promise<string> => new Promise((resolve) => {
+    // readline's question is async-cb in Node ≤ 20, async in Node 21+. Handle both.
+    const r = rl as { question: (q: string, cb: (a: string) => void) => void };
+    r.question(q, (a) => resolve(a));
+  });
+  const answer = (await ask(`  ${style(defaultTheme.accent, 'Enable telemetry? [y / N / r=read full policy]:')} `)).trim().toLowerCase();
+
+  if (answer === 'r') {
+    stdout.write(`\n  ${style(defaultTheme.muted, 'See https://github.com/Dirgha-AI/dirgha-code/blob/main/docs/privacy/CLI-TELEMETRY.md')}\n`);
+    const followUp = (await ask(`  ${style(defaultTheme.accent, 'Enable telemetry? [y / N]:')} `)).trim().toLowerCase();
+    if (followUp === 'y') {
+      writeTelemetryConfig({ enabled: true });
+      stdout.write(`  ${style(defaultTheme.muted, '✓ telemetry enabled. Disable any time with `dirgha telemetry disable`.')}\n`);
+    } else {
+      writeTelemetryConfig({ enabled: false });
+      stdout.write(`  ${style(defaultTheme.muted, '✓ telemetry disabled. Nothing leaves your machine.')}\n`);
+    }
+  } else if (answer === 'y') {
+    writeTelemetryConfig({ enabled: true });
+    stdout.write(`  ${style(defaultTheme.muted, '✓ telemetry enabled. Disable any time with `dirgha telemetry disable`.')}\n`);
+  } else {
+    writeTelemetryConfig({ enabled: false });
+    stdout.write(`  ${style(defaultTheme.muted, '✓ telemetry disabled. Nothing leaves your machine.')}\n`);
+  }
+
+  // Persist consentSeen so we never re-ask.
+  try {
+    if (existsSync(cfgPath)) cfg = JSON.parse(readFileSync(cfgPath, 'utf8'));
+    cfg.telemetry = { ...(cfg.telemetry ?? {}), consentSeen: true };
+    writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
+  } catch { /* */ }
 }
 
 export const wizardSubcommand: Subcommand = {
