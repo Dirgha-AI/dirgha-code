@@ -32,11 +32,16 @@ export async function installNpmSkill(spec, nameOverride) {
     try {
         // npm pack — `--` separator before pkgSpec so even if a future regex
         // gap let through a "-flag-like" name, npm treats it as positional.
-        // Windows: `npm` is `npm.cmd`; `execFile` doesn't auto-search for
-        // `.cmd` extensions. Pin the platform-specific binary name so the
-        // Windows CI runner stops failing with `spawn npm ENOENT`.
-        const npmBin = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-        const { stdout } = await execFile(npmBin, ['pack', '--silent', '--pack-destination', '.', '--', pkgSpec], { cwd: tempDir });
+        // Windows: `npm` is `npm.cmd`. Two compounding constraints:
+        //   1. execFile doesn't auto-search PATHEXT for `.cmd` extensions
+        //      → pin `npmBin` to npm.cmd on win32.
+        //   2. Node 18.20+ (CVE-2024-27980) requires `shell: true` to
+        //      spawn .cmd/.bat files at all → opt in conditionally.
+        // pkgSpec is regex-validated above so `shell: true` introduces no
+        // injection risk; the `--` separator before pkgSpec is belt-and-braces.
+        const isWin = process.platform === 'win32';
+        const npmBin = isWin ? 'npm.cmd' : 'npm';
+        const { stdout } = await execFile(npmBin, ['pack', '--silent', '--pack-destination', '.', '--', pkgSpec], { cwd: tempDir, shell: isWin });
         const lines = stdout.trim().split('\n');
         const tgzName = lines[lines.length - 1].trim();
         if (!tgzName.endsWith('.tgz')) {

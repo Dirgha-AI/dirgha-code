@@ -187,10 +187,13 @@ async function runUpgradeSelf(yes) {
     }
     void appendAudit({ kind: 'update', summary: `self ${current} → ${check.latest}`, target: 'self', from: current, to: check.latest ?? '?' });
     try {
-        // Same Windows-quirk fix as src_v2/skills/install-npm.ts —
-        // `npm` is `npm.cmd` on Windows and execFile won't auto-resolve.
-        const npmBin = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-        execFileSync(npmBin, ['i', '-g', `${PKG}@latest`], { stdio: 'inherit' });
+        // Windows quirks: npm is npm.cmd (no PATHEXT auto-resolve in
+        // execFile) AND Node 18.20+ blocks .cmd spawn without shell:true
+        // (CVE-2024-27980). PKG is the literal '@dirgha/code' constant
+        // so shell:true is safe — no user input.
+        const isWin = process.platform === 'win32';
+        const npmBin = isWin ? 'npm.cmd' : 'npm';
+        execFileSync(npmBin, ['i', '-g', `${PKG}@latest`], { stdio: 'inherit', shell: isWin });
         stdout.write(style(defaultTheme.success, `✓ ${PKG} upgraded to ${check.latest}\n`));
         return 0;
     }
