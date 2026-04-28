@@ -1,0 +1,51 @@
+# Probot Settings app configuration for Dirgha CLI
+# See: https://probot.github.io/apps/settings/
+#
+# This file documents the desired branch protection settings as code.
+# If the Probot Settings app is installed on the Dirgha-AI/dirgha-code
+# repository, it will enforce these settings automatically.
+#
+# Without the app, this file serves as declarative documentation of the
+# required branch protection state. Use scripts/apply-branch-protection.sh
+# to apply these settings manually via the GitHub API.
+
+repository:
+  # Repository-level settings can also be declared here.
+  # For now, we only declare branch protection.
+  name: dirgha-code
+  description: "CLI coding agent for complex agentic workflows and long-horizon development"
+
+branches:
+  - name: main
+    protection:
+      # PR review requirements
+      required_pull_request_reviews:
+        required_approving_review_count: 1
+        dismiss_stale_reviews: true
+        require_code_owner_reviews: false
+
+      # Required status checks (must pass before merge)
+      # These context names must match exactly what GitHub reports.
+      # Our ci.yml workflow produces: "Test (ubuntu-latest · Node 22)" etc.
+      required_status_checks:
+        strict: false
+        contexts:
+          - "Test (ubuntu-latest · Node 22)"
+          - "Test (macos-latest · Node 22)"
+          - "Test (windows-latest · Node 22)"
+
+      # Enforce these rules even for admins (Salik must follow the rule too)
+      enforce_admins: true
+
+      # No merge commits allowed — enforces linear history
+      required_linear_history: true
+
+      # Prevent force-push and branch deletion
+      allow_force_pushes: false
+      allow_deletions: false
+
+      # Not requiring signed commits (would block external contributors)
+      # Note: This setting is not available via the REST API v3 branch
+      # protection endpoint. It requires admin UI or GraphQL API.
+      # Including here for documentation purposes only.
+      # required_signatures: false

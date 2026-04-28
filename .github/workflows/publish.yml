@@ -6,8 +6,8 @@ on:
       - 'v*.*.*'
 
 permissions:
-  id-token: write
-  contents: read
+  id-token: write   # OIDC for npm trusted publisher + cosign keyless
+  contents: write   # create/update the GitHub Release (attach SBOM, .sig, .pem)
 
 jobs:
   publish:
@@ -162,6 +162,28 @@ jobs:
           echo "CycloneDX SBOM: $(wc -c < sbom.cdx.json) bytes"
           echo "SPDX SBOM:      $(wc -c < sbom.spdx.json) bytes"
 
+      - name: Install cosign
+        # Keyless OIDC signing — uses the same GitHub OIDC token that
+        # npm provenance uses. No private key to manage.
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign SBOMs with cosign (keyless OIDC)
+        # Creates sbom.cdx.json.sig, sbom.spdx.json.sig + .pem cert files.
+        # Verifiable via `cosign verify-blob --cert <cert> --signature <sig> <file>`
+        env:
+          COSIGN_EXPERIMENTAL: 1
+        run: |
+          cosign sign-blob --yes \
+            --output-signature sbom.cdx.json.sig \
+            --output-certificate sbom.cdx.json.pem \
+            sbom.cdx.json
+          cosign sign-blob --yes \
+            --output-signature sbom.spdx.json.sig \
+            --output-certificate sbom.spdx.json.pem \
+            sbom.spdx.json
+          echo "Signed SBOMs:"
+          ls -la sbom.*.{sig,pem} 2>/dev/null || true
+
       # Publish with a pinned npm CLI ≥ 11.5.1 — required for Trusted
       # Publisher OIDC auth. Node 22 ships npm 10.x; rather than break
       # the bundled npm via `npm install -g npm@latest` (which has a
@@ -171,15 +193,20 @@ jobs:
       - name: Publish (via pinned npm 11)
         run: npx -y npm@11.5.1 publish --access public --provenance
 
-      - name: Attach tarball + SBOMs to GitHub Release (CI-5)
+      - name: Attach tarball + SBOMs + signatures to GitHub Release (CI-5)
         # Release notes auto-populate from the commit body; SBOM files
-        # are downloadable evidence for security auditors.
+        # and their cosign signatures are downloadable evidence for
+        # security auditors. The .pem certs allow offline verification.
         uses: softprops/action-gh-release@v2
         with:
           files: |
             dirgha-code-*.tgz
             sbom.cdx.json
             sbom.spdx.json
+            sbom.cdx.json.sig
+            sbom.spdx.json.sig
+            sbom.cdx.json.pem
+            sbom.spdx.json.pem
           tag_name: ${{ github.ref_name }}
           generate_release_notes: true
         env:
