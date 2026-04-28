@@ -69,7 +69,7 @@ const SUITES = [
   { name: 'update',     file: 'update_test.mjs',    needs: 'none',                desc: 'dirgha update: compareSemver / checkLatestVersion (injected fetch) / listInstalledPacks' },
   { name: 'models-rfs', file: 'models_refresh_test.mjs', needs: 'none',           desc: 'dirgha models refresh: parallel fetch / cache / TTL / per-provider error isolation' },
   { name: 'extensions', file: 'extensions_test.mjs', needs: 'none',               desc: 'Extensions API: register tool/slash/sub + on(event) + emit + loadExtensions' },
-  { name: 'kb',         file: 'kb_test.mjs',        needs: 'none',                desc: 'dirgha kb wrapper: headless init / ingest skip / unknown sub' },
+  { name: 'kb',         file: 'kb_test.mjs',        needs: 'NETWORK',             desc: 'dirgha kb wrapper: headless init / ingest skip / unknown sub' },
   { name: 'skill-scan', file: 'skill_scanner_test.mjs', needs: 'none',            desc: 'Skill scanner: prompt-injection / supply-chain heuristics, verdict gate' },
   { name: 'hooks',      file: 'hooks_test.mjs',     needs: 'OPENROUTER_API_KEY',  desc: 'Kernel hooks lifecycle', heavy: true },
   { name: 'cancel',     file: 'cancel_test.mjs',    needs: 'OPENROUTER_API_KEY',  desc: 'AbortController mid-stream', heavy: true },
@@ -86,6 +86,11 @@ function envSatisfies(needs) {
   if (needs === 'none') return true;
   if (needs === 'any-provider-key') {
     return Boolean(process.env.OPENROUTER_API_KEY || process.env.NVIDIA_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY);
+  }
+  if (needs === 'NETWORK') {
+    // Network-bound suites (e.g. kb wrapper hits an openkb tool that
+    // tries to fetch). Skip in --offline runs and on minimal CI runners.
+    return !offline;
   }
   return Boolean(process.env[needs]);
 }

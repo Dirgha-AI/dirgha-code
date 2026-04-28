@@ -104,13 +104,19 @@ const element = React.createElement(App, {
   events, registry, providers, sessions, config, cwd: '/tmp', slashCommands: [],
 });
 
+// debug:true is the *capture-all-frames* mode. Ink also has a "CI mode"
+// (gated by the `is-in-ci` package — env CI=true on every GH Actions
+// runner) that suppresses dynamic output and only writes the final
+// static prefix. That breaks frame-substring assertions because the
+// transcript + input box + status bar never reach stdout. debug mode
+// disables the CI suppression so our CaptureStream sees every frame.
 const ink = render(element, {
   stdout,
   stderr,
   stdin,
   exitOnCtrlC: false,
   patchConsole: false,
-  debug: false,
+  debug: true,
 });
 
 const lastFrame = () => strip(stdout.frames.at(-1) ?? '');
