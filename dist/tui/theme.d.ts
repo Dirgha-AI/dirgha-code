@@ -18,7 +18,7 @@ export interface Theme {
 export declare const darkTheme: Theme;
 export declare const lightTheme: Theme;
 export declare const defaultTheme: Theme;
-export type ThemeName = 'readable' | 'dark' | 'light' | 'none' | 'midnight' | 'ocean' | 'solarized' | 'warm' | 'violet-storm' | 'cosmic' | 'nord' | 'ember' | 'sakura' | 'obsidian-gold' | 'crimson';
+export type ThemeName = 'readable' | 'dark' | 'light' | 'none' | 'midnight' | 'ocean' | 'solarized' | 'warm' | 'violet-storm' | 'cosmic' | 'nord' | 'ember' | 'sakura' | 'obsidian-gold' | 'crimson' | 'dracula' | 'github-dark' | 'tokyonight' | 'atom-one-dark' | 'ayu-dark';
 /**
  * Hex-colour palette for Ink components and downstream renderers that
  * support truecolor output. The escape-code `Theme` above remains the
@@ -29,13 +29,66 @@ export type ThemeName = 'readable' | 'dark' | 'light' | 'none' | 'midnight' | 'o
  * Ported from the v1 `src/tui/themes.ts` catalogue so users who set
  * `/theme cosmic` etc. don't lose their name back to "unknown theme".
  */
-export interface Palette {
+/**
+ * Semantic colour tokens — gemini-cli style. Use these for new components.
+ * Group meaning rather than role:
+ *   text.*       — content; primary > secondary > accent
+ *   status.*     — pass/warn/fail signalling
+ *   ui.*         — chrome elements (active state, dim separators, comments)
+ *   border.*     — frame chrome
+ *   background.* — fill (rendered as colour-by-bg in supported terminals)
+ * Each named theme provides a SemanticColors block; the legacy flat
+ * `Palette` keys (brand/accent/textPrimary/...) are projected from these
+ * so existing call sites keep working through the migration.
+ */
+export interface SemanticColors {
+    text: {
+        primary: string;
+        secondary: string;
+        accent: string;
+        link: string;
+        response: string;
+    };
+    status: {
+        success: string;
+        warning: string;
+        error: string;
+    };
+    ui: {
+        active: string;
+        comment: string;
+        symbol: string;
+        focus: string;
+        dark: string;
+        /** Optional gradient pair for logo / banner art. */
+        gradient?: [string, string];
+    };
+    border: {
+        default: string;
+    };
+    background: {
+        primary: string;
+        diff: {
+            added: string;
+            removed: string;
+        };
+    };
+}
+/** Legacy flat palette. New code should reach for SemanticColors via Palette.text/.status/.ui. */
+export interface Palette extends SemanticColors {
+    /** @deprecated use ui.focus or status.success */
     brand: string;
+    /** @deprecated use text.accent */
     accent: string;
+    /** @deprecated use status.error */
     error: string;
+    /** @deprecated use text.primary */
     textPrimary: string;
+    /** @deprecated use text.secondary */
     textMuted: string;
+    /** @deprecated use ui.active */
     borderActive: string;
+    /** @deprecated use border.default */
     borderIdle: string;
     logoA: string;
     logoB: string;

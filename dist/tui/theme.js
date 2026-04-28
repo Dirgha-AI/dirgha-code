@@ -33,26 +33,75 @@ export const lightTheme = {
 };
 // Backward-compat alias — existing call sites use `defaultTheme`.
 export const defaultTheme = darkTheme;
+/**
+ * Compact theme builder — one row per palette, semantic tokens explicit.
+ * Args:
+ *   t = [primary, secondary, accent] text colours
+ *   s = [success, warning, error] status colours
+ *   u = [active, comment, symbol, focus, dark] ui chrome
+ *   b = border-default
+ *   bg = [primary, diffAdded, diffRemoved] background colours
+ *   logo = [logoA, logoB] gradient pair
+ */
+function buildPalette(t, s, u, b, bg, logo, link) {
+    const [primary, secondary, accent] = t;
+    const [success, warning, error] = s;
+    const [active, comment, symbol, focus, dark] = u;
+    const [bgPrimary, diffAdded, diffRemoved] = bg;
+    return {
+        text: { primary, secondary, accent, link: link ?? active, response: primary },
+        status: { success, warning, error },
+        ui: { active, comment, symbol, focus, dark, gradient: logo },
+        border: { default: b },
+        background: { primary: bgPrimary, diff: { added: diffAdded, removed: diffRemoved } },
+        // Legacy flat aliases:
+        brand: focus,
+        accent,
+        error,
+        textPrimary: primary,
+        textMuted: secondary,
+        borderActive: active,
+        borderIdle: b,
+        logoA: logo[0],
+        logoB: logo[1],
+    };
+}
 export const PALETTES = {
     // Default. Tuned for legibility on common terminal backgrounds —
     // muted text stays above WCAG AA (~5.9:1 on #1F2937), border-idle
     // visible without dominating, accent + brand differentiate without
     // alarming. Replaces `dark` as the on-boot default.
-    readable: { brand: '#5EEAD4', accent: '#FCD34D', error: '#F87171', textPrimary: '#F3F4F6', textMuted: '#9CA3AF', borderActive: '#5EEAD4', borderIdle: '#374151', logoA: '#5EEAD4', logoB: '#A78BFA' },
-    dark: { brand: '#22C55E', accent: '#F59E0B', error: '#EF4444', textPrimary: '#E5E7EB', textMuted: '#9CA3AF', borderActive: '#22C55E', borderIdle: '#374151', logoA: '#22C55E', logoB: '#60A5FA' },
-    light: { brand: '#16A34A', accent: '#D97706', error: '#DC2626', textPrimary: '#111827', textMuted: '#6B7280', borderActive: '#16A34A', borderIdle: '#E5E7EB', logoA: '#16A34A', logoB: '#2563EB' },
-    none: { brand: '#FFFFFF', accent: '#FFFFFF', error: '#FFFFFF', textPrimary: '#FFFFFF', textMuted: '#FFFFFF', borderActive: '#FFFFFF', borderIdle: '#FFFFFF', logoA: '#FFFFFF', logoB: '#FFFFFF' },
-    midnight: { brand: '#8B5CF6', accent: '#F59E0B', error: '#EF4444', textPrimary: '#E2E8F0', textMuted: '#64748B', borderActive: '#8B5CF6', borderIdle: '#1E293B', logoA: '#8B5CF6', logoB: '#60A5FA' },
-    ocean: { brand: '#06B6D4', accent: '#F59E0B', error: '#EF4444', textPrimary: '#ECFEFF', textMuted: '#22D3EE', borderActive: '#06B6D4', borderIdle: '#164E63', logoA: '#06B6D4', logoB: '#7DD3FC' },
-    solarized: { brand: '#859900', accent: '#CB4B16', error: '#DC322F', textPrimary: '#EEE8D5', textMuted: '#657B83', borderActive: '#859900', borderIdle: '#073642', logoA: '#268BD2', logoB: '#859900' },
-    warm: { brand: '#F59E0B', accent: '#EF4444', error: '#DC2626', textPrimary: '#FEF3C7', textMuted: '#D97706', borderActive: '#F59E0B', borderIdle: '#1C0A00', logoA: '#F59E0B', logoB: '#EF4444' },
-    'violet-storm': { brand: '#8B5CF6', accent: '#A78BFA', error: '#EF4444', textPrimary: '#EDE9FE', textMuted: '#A78BFA', borderActive: '#8B5CF6', borderIdle: '#1E1B4B', logoA: '#8B5CF6', logoB: '#A78BFA' },
-    cosmic: { brand: '#FF006E', accent: '#FB5607', error: '#EF4444', textPrimary: '#FFFFFF', textMuted: '#FFBE0B', borderActive: '#FF006E', borderIdle: '#1A1A1A', logoA: '#FF006E', logoB: '#FB5607' },
-    nord: { brand: '#88C0D0', accent: '#81A1C1', error: '#BF616A', textPrimary: '#ECEFF4', textMuted: '#4C566A', borderActive: '#88C0D0', borderIdle: '#2E3440', logoA: '#88C0D0', logoB: '#81A1C1' },
-    ember: { brand: '#FF4500', accent: '#FFD700', error: '#DC2626', textPrimary: '#FFF176', textMuted: '#FF8C00', borderActive: '#FF4500', borderIdle: '#1A0F00', logoA: '#FF4500', logoB: '#FFD700' },
-    sakura: { brand: '#C4306A', accent: '#FF85A1', error: '#EF4444', textPrimary: '#FFF0F3', textMuted: '#FF5C8D', borderActive: '#C4306A', borderIdle: '#1F000A', logoA: '#C4306A', logoB: '#FF85A1' },
-    'obsidian-gold': { brand: '#C47C0A', accent: '#F5C518', error: '#EF4444', textPrimary: '#FFF8E7', textMuted: '#E8A015', borderActive: '#C47C0A', borderIdle: '#1A1100', logoA: '#C47C0A', logoB: '#F5C518' },
-    crimson: { brand: '#C10023', accent: '#FF2952', error: '#DC143C', textPrimary: '#FFB3C1', textMuted: '#FF2952', borderActive: '#C10023', borderIdle: '#1A0005', logoA: '#C10023', logoB: '#FF2952' },
+    readable: buildPalette(['#F3F4F6', '#9CA3AF', '#FCD34D'], ['#22C55E', '#FCD34D', '#F87171'], ['#5EEAD4', '#6B7280', '#9CA3AF', '#5EEAD4', '#1F2937'], '#374151', ['#0F172A', '#15803D', '#991B1B'], ['#5EEAD4', '#A78BFA'], '#60A5FA'),
+    dark: buildPalette(['#E5E7EB', '#9CA3AF', '#F59E0B'], ['#22C55E', '#F59E0B', '#EF4444'], ['#22C55E', '#6B7280', '#9CA3AF', '#22C55E', '#1F2937'], '#374151', ['#0F172A', '#15803D', '#991B1B'], ['#22C55E', '#60A5FA']),
+    light: buildPalette(['#111827', '#6B7280', '#D97706'], ['#16A34A', '#D97706', '#DC2626'], ['#16A34A', '#6B7280', '#374151', '#16A34A', '#9CA3AF'], '#E5E7EB', ['#FFFFFF', '#D1FAE5', '#FECACA'], ['#16A34A', '#2563EB']),
+    none: buildPalette(['#FFFFFF', '#FFFFFF', '#FFFFFF'], ['#FFFFFF', '#FFFFFF', '#FFFFFF'], ['#FFFFFF', '#FFFFFF', '#FFFFFF', '#FFFFFF', '#FFFFFF'], '#FFFFFF', ['#000000', '#FFFFFF', '#FFFFFF'], ['#FFFFFF', '#FFFFFF']),
+    midnight: buildPalette(['#E2E8F0', '#64748B', '#F59E0B'], ['#22C55E', '#F59E0B', '#EF4444'], ['#8B5CF6', '#475569', '#94A3B8', '#8B5CF6', '#1E293B'], '#1E293B', ['#020617', '#14532D', '#7F1D1D'], ['#8B5CF6', '#60A5FA']),
+    ocean: buildPalette(['#ECFEFF', '#22D3EE', '#F59E0B'], ['#22C55E', '#F59E0B', '#EF4444'], ['#06B6D4', '#0E7490', '#67E8F9', '#06B6D4', '#164E63'], '#164E63', ['#042F2E', '#14532D', '#7F1D1D'], ['#06B6D4', '#7DD3FC']),
+    solarized: buildPalette(['#EEE8D5', '#657B83', '#CB4B16'], ['#859900', '#B58900', '#DC322F'], ['#859900', '#586E75', '#93A1A1', '#268BD2', '#073642'], '#073642', ['#002B36', '#3F4D2E', '#5C2424'], ['#268BD2', '#859900']),
+    warm: buildPalette(['#FEF3C7', '#D97706', '#EF4444'], ['#84CC16', '#F59E0B', '#DC2626'], ['#F59E0B', '#92400E', '#FBBF24', '#F59E0B', '#1C0A00'], '#1C0A00', ['#1C0A00', '#3F2C00', '#3F0A0A'], ['#F59E0B', '#EF4444']),
+    'violet-storm': buildPalette(['#EDE9FE', '#A78BFA', '#A78BFA'], ['#22C55E', '#FBBF24', '#EF4444'], ['#8B5CF6', '#5B21B6', '#C4B5FD', '#8B5CF6', '#1E1B4B'], '#1E1B4B', ['#0F0A2A', '#14532D', '#7F1D1D'], ['#8B5CF6', '#A78BFA']),
+    cosmic: buildPalette(['#FFFFFF', '#FFBE0B', '#FB5607'], ['#3A86FF', '#FFBE0B', '#FF006E'], ['#FF006E', '#8338EC', '#FFBE0B', '#FF006E', '#1A1A1A'], '#1A1A1A', ['#000000', '#10B981', '#EF4444'], ['#FF006E', '#FB5607']),
+    nord: buildPalette(['#ECEFF4', '#4C566A', '#81A1C1'], ['#A3BE8C', '#EBCB8B', '#BF616A'], ['#88C0D0', '#4C566A', '#81A1C1', '#88C0D0', '#2E3440'], '#2E3440', ['#2E3440', '#3F4D2E', '#5C2424'], ['#88C0D0', '#81A1C1']),
+    ember: buildPalette(['#FFF176', '#FF8C00', '#FFD700'], ['#84CC16', '#FFD700', '#DC2626'], ['#FF4500', '#92400E', '#FBBF24', '#FF4500', '#1A0F00'], '#1A0F00', ['#1A0F00', '#3F2C00', '#3F0A0A'], ['#FF4500', '#FFD700']),
+    sakura: buildPalette(['#FFF0F3', '#FF5C8D', '#FF85A1'], ['#22C55E', '#FBBF24', '#EF4444'], ['#C4306A', '#831843', '#FBCFE8', '#C4306A', '#1F000A'], '#1F000A', ['#1F000A', '#14532D', '#7F1D1D'], ['#C4306A', '#FF85A1']),
+    'obsidian-gold': buildPalette(['#FFF8E7', '#E8A015', '#F5C518'], ['#84CC16', '#F5C518', '#EF4444'], ['#C47C0A', '#78350F', '#FBBF24', '#C47C0A', '#1A1100'], '#1A1100', ['#1A1100', '#3F2C00', '#3F0A0A'], ['#C47C0A', '#F5C518']),
+    crimson: buildPalette(['#FFB3C1', '#FF2952', '#FF2952'], ['#84CC16', '#FBBF24', '#DC143C'], ['#C10023', '#7F1D1D', '#FBA5B5', '#C10023', '#1A0005'], '#1A0005', ['#1A0005', '#14532D', '#7F1D1D'], ['#C10023', '#FF2952']),
+    // ─────────────────────────────────────────────────────────────────
+    // Ports from gemini-cli (Apache-2.0). Original colour palettes
+    // preserved — only the token shape was adapted to dirgha's schema.
+    // Sources: gemini-cli/packages/cli/src/ui/themes/builtin/dark/*.ts
+    // ─────────────────────────────────────────────────────────────────
+    dracula: buildPalette(['#a3afb7', '#6272a4', '#ff79c6'], // text: primary, secondary, accent
+    ['#50fa7b', '#fff783', '#ff5555'], // status: success, warning, error
+    ['#8be9fd', '#6272a4', '#a3afb7', '#ff79c6', '#44475a'], // ui: active, comment, symbol, focus, dark
+    '#44475a', // border
+    ['#282a36', '#11431d', '#6e1818'], // background: primary, diffAdded, diffRemoved
+    ['#ff79c6', '#8be9fd'], // logo gradient
+    '#8be9fd'),
+    'github-dark': buildPalette(['#c0c4c8', '#6A737D', '#79B8FF'], ['#85E89D', '#FFAB70', '#F97583'], ['#79B8FF', '#6A737D', '#c0c4c8', '#B392F0', '#444c56'], '#444c56', ['#24292e', '#3C4636', '#502125'], ['#79B8FF', '#85E89D'], '#79B8FF'),
+    tokyonight: buildPalette(['#c0caf5', '#565f89', '#bb9af7'], ['#9ece6a', '#e0af68', '#f7768e'], ['#7aa2f7', '#565f89', '#a9b1d6', '#bb9af7', '#3b4261'], '#3b4261', ['#1a1b26', '#1c3328', '#3c1e2a'], ['#bb9af7', '#7aa2f7'], '#7aa2f7'),
+    'atom-one-dark': buildPalette(['#abb2bf', '#5c6370', '#c678dd'], ['#98c379', '#e6c07b', '#e06c75'], ['#61aeee', '#5c6370', '#abb2bf', '#c678dd', '#3e4451'], '#3e4451', ['#282c34', '#1c3328', '#3c1e2a'], ['#c678dd', '#61aeee'], '#61aeee'),
+    'ayu-dark': buildPalette(['#aeaca6', '#646A71', '#D2A6FF'], ['#AAD94C', '#FFB454', '#F26D78'], ['#39BAE6', '#646A71', '#aeaca6', '#D2A6FF', '#3D4149'], '#3D4149', ['#0b0e14', '#1c3328', '#3c1e2a'], ['#D2A6FF', '#39BAE6'], '#39BAE6'),
 };
 export function paletteFor(name) {
     if (name && name in PALETTES)
@@ -81,6 +130,11 @@ export const themes = {
     sakura: darkTheme,
     'obsidian-gold': darkTheme,
     crimson: darkTheme,
+    dracula: darkTheme,
+    'github-dark': darkTheme,
+    tokyonight: darkTheme,
+    'atom-one-dark': darkTheme,
+    'ayu-dark': darkTheme,
 };
 /** Look up a theme by name; unknown names fall back to dark. */
 export function getTheme(name) {

@@ -28,13 +28,15 @@ export interface DirghaConfig {
    */
   vimMode?: boolean;
   /**
-   * TUI colour palette. Defaults to 'dark'. Users switch via /theme at
+   * TUI colour palette. Defaults to 'readable'. Users switch via /theme at
    * runtime; the preference is persisted to ~/.dirgha/config.json.
-   * Accepts the full 12-theme catalogue from `src/tui/theme.ts`.
+   * Accepts the full 20-theme catalogue from `src/tui/theme.ts` (15 native
+   * + 5 ports from gemini-cli).
    */
-  theme?: 'dark' | 'light' | 'none' | 'midnight' | 'ocean' | 'solarized'
-    | 'warm' | 'violet-storm' | 'cosmic' | 'nord' | 'ember' | 'sakura'
-    | 'obsidian-gold' | 'crimson';
+  theme?: 'readable' | 'dark' | 'light' | 'none' | 'midnight' | 'ocean'
+    | 'solarized' | 'warm' | 'violet-storm' | 'cosmic' | 'nord' | 'ember'
+    | 'sakura' | 'obsidian-gold' | 'crimson'
+    | 'dracula' | 'github-dark' | 'tokyonight' | 'atom-one-dark' | 'ayu-dark';
   /**
    * Persisted execution mode. Defaults to 'act' (normal execution).
    * Changed live via /mode; also honoured by fresh sessions.
