@@ -178,7 +178,10 @@ async function runUpgradeSelf(yes: boolean): Promise<number> {
   }
   void appendAudit({ kind: 'update', summary: `self ${current} → ${check.latest}`, target: 'self', from: current, to: check.latest ?? '?' });
   try {
-    execFileSync('npm', ['i', '-g', `${PKG}@latest`], { stdio: 'inherit' });
+    // Same Windows-quirk fix as src_v2/skills/install-npm.ts —
+    // `npm` is `npm.cmd` on Windows and execFile won't auto-resolve.
+    const npmBin = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+    execFileSync(npmBin, ['i', '-g', `${PKG}@latest`], { stdio: 'inherit' });
     stdout.write(style(defaultTheme.success, `✓ ${PKG} upgraded to ${check.latest}\n`));
     return 0;
   } catch (err) {

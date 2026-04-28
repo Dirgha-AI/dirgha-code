@@ -32,7 +32,11 @@ export async function installNpmSkill(spec, nameOverride) {
     try {
         // npm pack — `--` separator before pkgSpec so even if a future regex
         // gap let through a "-flag-like" name, npm treats it as positional.
-        const { stdout } = await execFile('npm', ['pack', '--silent', '--pack-destination', '.', '--', pkgSpec], { cwd: tempDir });
+        // Windows: `npm` is `npm.cmd`; `execFile` doesn't auto-search for
+        // `.cmd` extensions. Pin the platform-specific binary name so the
+        // Windows CI runner stops failing with `spawn npm ENOENT`.
+        const npmBin = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+        const { stdout } = await execFile(npmBin, ['pack', '--silent', '--pack-destination', '.', '--', pkgSpec], { cwd: tempDir });
         const lines = stdout.trim().split('\n');
         const tgzName = lines[lines.length - 1].trim();
         if (!tgzName.endsWith('.tgz')) {
