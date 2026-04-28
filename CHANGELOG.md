@@ -11,6 +11,13 @@ All notable changes are tracked here. Format loosely follows [Keep a Changelog](
 - OpenSSF Scorecard runs weekly + on push to main; result published to scorecard.dev.
 - This CHANGELOG.md committed.
 
+## [1.12.3](https://github.com/Dirgha-AI/dirgha-code/compare/v1.12.2...v1.12.3) (2026-04-28)
+
+
+### Bug Fixes
+
+* **slash:** /provider list reads from dispatch — adds 8 missing providers ([5a2741e](https://github.com/Dirgha-AI/dirgha-code/commit/5a2741e9177d325731292dd5302841cf6ff16565))
+
 ## [1.12.2](https://github.com/Dirgha-AI/dirgha-code/compare/v1.12.1...v1.12.2) (2026-04-28)
 
 
