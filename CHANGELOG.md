@@ -11,6 +11,14 @@ All notable changes are tracked here. Format loosely follows [Keep a Changelog](
 - OpenSSF Scorecard runs weekly + on push to main; result published to scorecard.dev.
 - This CHANGELOG.md committed.
 
+## [1.8.1](https://github.com/Dirgha-AI/dirgha-code/compare/v1.8.0...v1.8.1) (2026-04-28)
+
+
+### Bug Fixes
+
+* **ci:** pin ossf/scorecard-action to correct v2.4.3 SHA ([b92f002](https://github.com/Dirgha-AI/dirgha-code/commit/b92f0022877a531d7b16edc9442b839e25ab518f))
+* **ci:** repin three actions to verified-real SHAs ([491e799](https://github.com/Dirgha-AI/dirgha-code/commit/491e799ba239a60996a3a770052d2792be10d523))
+
 ## [1.8.0](https://github.com/Dirgha-AI/dirgha-code/compare/v1.7.15...v1.8.0) (2026-04-28)
 
 
