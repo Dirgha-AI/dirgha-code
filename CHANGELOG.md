@@ -11,6 +11,13 @@ All notable changes are tracked here. Format loosely follows [Keep a Changelog](
 - OpenSSF Scorecard runs weekly + on push to main; result published to scorecard.dev.
 - This CHANGELOG.md committed.
 
+## [1.12.2](https://github.com/Dirgha-AI/dirgha-code/compare/v1.12.1...v1.12.2) (2026-04-28)
+
+
+### Bug Fixes
+
+* **windows:** cross-platform shell + auto readline-fallback + mount banner ([ecef403](https://github.com/Dirgha-AI/dirgha-code/commit/ecef4038249961fe3da6f73925d9a0851df2c7b0))
+
 ## [1.12.1](https://github.com/Dirgha-AI/dirgha-code/compare/v1.12.0...v1.12.1) (2026-04-28)
 
 
