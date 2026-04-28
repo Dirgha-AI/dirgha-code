@@ -111,7 +111,12 @@ jobs:
       - name: Diagnostic — confirm CLI + env before smoke
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          # tmux refuses to start a server without TERM. GH Actions runners
+          # don't set one by default ("dumb" or unset). Pin a real terminal.
+          TERM: xterm-256color
         run: |
+          echo "=== TERM ==="
+          echo "TERM=$TERM"
           echo "=== which dirgha ==="
           which dirgha || true
           echo "=== dirgha --version ==="
@@ -120,17 +125,22 @@ jobs:
           ls -la "$HOME/.dirgha"
           echo "=== OPENROUTER_API_KEY length ==="
           echo "${#OPENROUTER_API_KEY} chars"
-          echo "=== tmux test ==="
-          tmux new-session -d -s diag -x 120 -y 32 "dirgha doctor; sleep 2"
+          echo "=== tmux: spawn dirgha REPL, send /help, capture ==="
+          tmux new-session -d -s diag -x 120 -y 32 "dirgha"
+          sleep 3
+          tmux send-keys -t diag -l "/help"
+          sleep 1
+          tmux send-keys -t diag "Enter"
           sleep 4
-          tmux capture-pane -t diag -p | head -20
+          tmux capture-pane -t diag -p | head -32
           tmux kill-session -t diag || true
-          echo "=== freeze test ==="
+          echo "=== freeze version ==="
           freeze --version || true
 
       - name: Smoke matrix (tier=all, release-blocking)
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          TERM: xterm-256color
         run: |
           # Smoke matrix drives /theme, /update, /help, /init, /keys, /models,
           # /clear, /login, /setup, /status, /memory, /compact, plus the
