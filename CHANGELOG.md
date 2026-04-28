@@ -11,6 +11,14 @@ All notable changes are tracked here. Format loosely follows [Keep a Changelog](
 - OpenSSF Scorecard runs weekly + on push to main; result published to scorecard.dev.
 - This CHANGELOG.md committed.
 
+## [1.8.0](https://github.com/Dirgha-AI/dirgha-code/compare/v1.7.15...v1.8.0) (2026-04-28)
+
+
+### Features
+
+* **scaffold:** dirgha scaffold "&lt;prompt&gt;" — instant Vite/Hono starter ([1ff456b](https://github.com/Dirgha-AI/dirgha-code/commit/1ff456b6defda145881509963b723a69b8e343bb))
+* **tui:** Ctrl+C clears buffer + non-disruptive prompt queue ([12fe781](https://github.com/Dirgha-AI/dirgha-code/commit/12fe7817b16f8710fbf99f8900f3ba6fd9fc6579))
+
 ## 1.7.12 — 2026-04-28
 
 **CI-6 — Posthog telemetry endpoint live + minimal-data schema.**
