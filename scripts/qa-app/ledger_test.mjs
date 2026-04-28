@@ -10,6 +10,8 @@ import { join } from 'node:path';
 
 const home = mkdtempSync(join(tmpdir(), 'ledger-home-'));
 process.env.HOME = home;
+// Windows: os.homedir() reads %USERPROFILE%, not $HOME — set both.
+process.env.USERPROFILE = home;
 
 import { fileURLToPath as _toPath, pathToFileURL as _toUrl } from 'node:url';
 import { dirname as _dn, resolve as _rs, join as _join } from 'node:path';

@@ -31,6 +31,8 @@ const { createSessionStore } = await import(_toUrl(_join(ROOT, 'context/session.
 // Scratch HOME so the session JSONL we append to ends up in a tmp.
 const home = mkdtempSync(join(tmpdir(), 'cancel-home-'));
 process.env.HOME = home;
+// Windows: os.homedir() reads %USERPROFILE%, not $HOME — set both.
+process.env.USERPROFILE = home;
 mkdirSync(join(home, '.dirgha', 'sessions'), { recursive: true });
 
 const sandbox = mkdtempSync(join(tmpdir(), 'cancel-sandbox-'));

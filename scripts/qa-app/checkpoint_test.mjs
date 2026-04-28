@@ -11,6 +11,8 @@ import { join } from 'node:path';
 
 const scratchHome = mkdtempSync(join(tmpdir(), 'dirgha-home-'));
 process.env.HOME = scratchHome;
+// Windows: os.homedir() reads %USERPROFILE%, not $HOME — set both.
+process.env.USERPROFILE = scratchHome;
 mkdirSync(join(scratchHome, '.dirgha', 'sessions'), { recursive: true });
 mkdirSync(join(scratchHome, '.dirgha', 'checkpoints'), { recursive: true });
 

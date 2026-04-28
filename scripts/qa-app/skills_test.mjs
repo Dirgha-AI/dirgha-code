@@ -13,6 +13,8 @@ import { join } from 'node:path';
 
 const home = mkdtempSync(join(tmpdir(), 'skills-home-'));
 process.env.HOME = home;
+// Windows: os.homedir() reads %USERPROFILE%, not $HOME — set both.
+process.env.USERPROFILE = home;
 const skillDir = join(home, '.dirgha', 'skills', 'lint-helper');
 mkdirSync(skillDir, { recursive: true });
 writeFileSync(join(skillDir, 'SKILL.md'), `---

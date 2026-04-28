@@ -92,6 +92,11 @@ for (const r of results) {
 }
 console.log(`\nsummary: ${results.length - stubs - errors}/${results.length} ok, ${stubs} stubs, ${errors} errors`);
 
-writeFileSync('/tmp/slash-audit.json', JSON.stringify(results, null, 2));
-console.log('full report: /tmp/slash-audit.json');
+// Use os.tmpdir() so the path resolves on Windows (where C:\tmp doesn't
+// exist by default; tmpdir is C:\Users\<user>\AppData\Local\Temp).
+import { tmpdir as _tmpdir } from 'node:os';
+import { join as _joinReport } from 'node:path';
+const _reportPath = _joinReport(_tmpdir(), 'slash-audit.json');
+writeFileSync(_reportPath, JSON.stringify(results, null, 2));
+console.log(`full report: ${_reportPath}`);
 process.exit(stubs + errors > 0 ? 1 : 0);

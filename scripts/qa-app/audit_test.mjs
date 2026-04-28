@@ -14,7 +14,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const sandbox = mkdtempSync(join(tmpdir(), 'audit-test-'));
+// On Linux/macOS, Node's os.homedir() reads $HOME. On Windows, it
+// reads %USERPROFILE% — setting HOME alone has no effect there. Set
+// both so the sandbox isolates the test on every OS.
 process.env.HOME = sandbox;
+process.env.USERPROFILE = sandbox;
 
 import { fileURLToPath as _toPath, pathToFileURL as _toUrl } from 'node:url';
 import { dirname as _dn, resolve as _rs, join as _join } from 'node:path';
