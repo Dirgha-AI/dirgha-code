@@ -204,6 +204,6 @@ function BusyHint({ palette }) {
     const label = elapsed < 60 ? `${elapsed}s`
         : elapsed < 3600 ? `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`
             : `${Math.floor(elapsed / 3600)}h ${Math.floor((elapsed % 3600) / 60)}m`;
-    return (_jsxs(Text, { color: palette.textMuted, children: ["esc cancel \u00B7 ", label, " \u00B7 ctrl+c\u00D72 exit"] }));
+    return (_jsxs(Text, { color: palette.textMuted, children: ["esc cancel \u00B7 ", label, " \u00B7 ctrl+c clear"] }));
 }
 //# sourceMappingURL=InputBox.js.map

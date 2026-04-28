@@ -258,7 +258,7 @@ function BusyHint({ palette }: { palette: ReturnType<typeof useTheme> }): React.
     : `${Math.floor(elapsed / 3600)}h ${Math.floor((elapsed % 3600) / 60)}m`;
   return (
     <Text color={palette.textMuted}>
-      esc cancel · {label} · ctrl+c×2 exit
+      esc cancel · {label} · ctrl+c clear
     </Text>
   );
 }
