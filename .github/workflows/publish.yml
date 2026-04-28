@@ -165,7 +165,7 @@ jobs:
       - name: Install cosign
         # Keyless OIDC signing — uses the same GitHub OIDC token that
         # npm provenance uses. No private key to manage.
-        uses: sigstore/cosign-installer@f713795cb21599bc4e5c4b58cbad1da852d7eeb9 # v3
+        uses: sigstore/cosign-installer@7e8b541eb2e61bf99390e1afd4be13a184e9ebc5 # v3.10.1
 
       - name: Sign SBOMs with cosign (keyless OIDC)
         # Creates sbom.cdx.json.sig, sbom.spdx.json.sig + .pem cert files.
