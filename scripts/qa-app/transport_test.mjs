@@ -16,7 +16,7 @@
 
 import { fileURLToPath as _toPath, pathToFileURL as _toUrl } from 'node:url';
 import { dirname as _dn, resolve as _rs, join as _join } from 'node:path';
-const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist_v2');
+const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist');
 const presets = await import(_toUrl(_join(ROOT, 'providers/presets.js')).href);
 const { defineOpenAICompatProvider } = await import(_toUrl(_join(ROOT, 'providers/define-openai-compat.js')).href);
 

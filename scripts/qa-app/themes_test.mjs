@@ -11,7 +11,7 @@ import { join } from 'node:path';
 
 import { fileURLToPath as _toPath, pathToFileURL as _toUrl } from 'node:url';
 import { dirname as _dn, resolve as _rs, join as _join } from 'node:path';
-const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist_v2');
+const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist');
 const { resolveThemeByName, listAvailableThemes } = await import(_toUrl(_join(ROOT, 'tui/theme-loader.js')).href);
 const { darkTheme, lightTheme } = await import(_toUrl(_join(ROOT, 'tui/theme.js')).href);
 

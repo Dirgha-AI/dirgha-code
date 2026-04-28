@@ -42,7 +42,7 @@ It is **free-tier-first**: the same machinery runs on free OpenRouter `:free` mo
 ## Architecture
 
 ```
-src_v2/
+src/
 ├── kernel/           agent loop, message types, event stream, projection
 ├── providers/        wire transports + provider classes; rate-limit middleware
 ├── intelligence/     model catalogue, cost tracker, error classifier, models refresh

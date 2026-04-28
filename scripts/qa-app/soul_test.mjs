@@ -19,7 +19,7 @@ mkdirSync(join(sandbox, '.dirgha'), { recursive: true });
 
 import { fileURLToPath as _toPath, pathToFileURL as _toUrl } from 'node:url';
 import { dirname as _dn, resolve as _rs, join as _join } from 'node:path';
-const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist_v2');
+const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist');
 const { loadSoul, userSoulOverridePath } = await import(_toUrl(_join(ROOT, 'context/soul.js')).href);
 const { composeSystemPrompt } = await import(_toUrl(_join(ROOT, 'context/primer.js')).href);
 

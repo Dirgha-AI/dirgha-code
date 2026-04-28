@@ -12,7 +12,7 @@ import { join } from 'node:path';
 
 import { fileURLToPath as _toPath, pathToFileURL as _toUrl } from 'node:url';
 import { dirname as _dn, resolve as _rs, join as _join } from 'node:path';
-const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist_v2');
+const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist');
 const { builtInTools, createToolExecutor, createToolRegistry } = await import(_toUrl(_join(ROOT, 'tools/index.js')).href);
 
 // Playwright reachability check.

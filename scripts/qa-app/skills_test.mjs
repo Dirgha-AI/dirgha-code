@@ -33,7 +33,7 @@ const projDir = mkdtempSync(join(tmpdir(), 'skills-proj-'));
 
 import { fileURLToPath as _toPath, pathToFileURL as _toUrl } from 'node:url';
 import { dirname as _dn, resolve as _rs, join as _join } from 'node:path';
-const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist_v2');
+const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist');
 const { loadSkills } = await import(_toUrl(_join(ROOT, 'skills/loader.js')).href);
 const { matchSkills } = await import(_toUrl(_join(ROOT, 'skills/matcher.js')).href);
 const { injectSkills } = await import(_toUrl(_join(ROOT, 'skills/runtime.js')).href);

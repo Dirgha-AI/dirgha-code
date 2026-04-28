@@ -24,7 +24,7 @@ The shipped state and the binding contract for what comes next.
 ## In flight
 
 - Sprint 5 — **Hyperframes recon complete.** Apache 2.0, runs locally, requires Node ≥ 22 (we have 20). Enables Sprint 7.
-- Sprint 6 — hy3 audits the entire `src_v2/` + `scripts/qa-app/`, surfaces dead code / weak assertions / contradictions, output to `docs/audits/HY3-AUDIT-<date>.md`.
+- Sprint 6 — hy3 audits the entire `src/` + `scripts/qa-app/`, surfaces dead code / weak assertions / contradictions, output to `docs/audits/HY3-AUDIT-<date>.md`.
 - Sprint 7 — promo asciinema demo + a 45–60 s rendered video via hyperframes.
 - Sprint 8 — `npm publish 1.4.0` (needs OTP from user) + tweet draft referencing only what's shipped + tested + green.
 

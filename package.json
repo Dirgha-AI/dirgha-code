@@ -3,13 +3,13 @@
   "version": "1.8.0",
   "description": "CLI coding agent for complex agentic workflows and long-horizon development. Local models (llama.cpp / Ollama), BYOK across 17 providers, parallel agents, persistent memory, scanned skills.",
   "type": "module",
-  "main": "./dist_v2/index.js",
-  "types": "./dist_v2/index.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "bin": {
-    "dirgha": "./dist_v2/cli/main.js"
+    "dirgha": "./dist/cli/main.js"
   },
   "files": [
-    "dist_v2/",
+    "dist/",
     "scaffold-templates/",
     "README.md",
     "LICENSE",
@@ -17,20 +17,20 @@
     "CHANGELOG.md"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.v2.json && cp src_v2/context/default-soul.md dist_v2/context/default-soul.md",
-    "build:watch": "tsc -p tsconfig.v2.json --watch",
-    "clean": "rm -rf ./dist_v2",
-    "test": "vitest run --dir src_v2",
+    "build": "tsc -p tsconfig.json && cp src/context/default-soul.md dist/context/default-soul.md",
+    "build:watch": "tsc -p tsconfig.json --watch",
+    "clean": "rm -rf ./dist",
+    "test": "vitest run --dir src",
     "test:cli": "node scripts/qa-app/run-all.mjs",
     "test:cli:offline": "node scripts/qa-app/run-all.mjs --offline",
     "test:tui": "bash scripts/qa-app/picker-flow.sh",
     "test:smoke": "bash scripts/smoke-matrix.sh all",
-    "typecheck": "tsc -p tsconfig.v2.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "verify-install": "bash scripts/verify-install.sh",
     "prepublish-guard": "bash scripts/prepublish-guard.sh",
     "prepublishOnly": "npm run prepublish-guard && npm run build && npm run verify-install",
-    "lint": "eslint src_v2 --max-warnings 25",
-    "lint:fix": "eslint src_v2 --fix --max-warnings 25",
+    "lint": "eslint src --max-warnings 25",
+    "lint:fix": "eslint src --fix --max-warnings 25",
     "license-check": "license-checker --production --excludePackages 'argparse@1.0.10' --failOn 'GPL;AGPL;LGPL'"
   },
   "dependencies": {

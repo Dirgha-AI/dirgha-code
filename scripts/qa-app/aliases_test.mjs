@@ -10,7 +10,7 @@
 
 import { fileURLToPath as _toPath, pathToFileURL as _toUrl } from 'node:url';
 import { dirname as _dn, resolve as _rs, join as _join } from 'node:path';
-const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist_v2');
+const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist');
 const { resolveModelAlias, listModelAliases, findPrice, contextWindowFor } = await import(_toUrl(_join(ROOT, 'intelligence/prices.js')).href);
 const { routeModel } = await import(_toUrl(_join(ROOT, 'providers/dispatch.js')).href);
 

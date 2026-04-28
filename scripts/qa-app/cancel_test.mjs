@@ -21,7 +21,7 @@ if (!process.env.OPENROUTER_API_KEY) { console.log('SKIP: OPENROUTER_API_KEY uns
 
 import { fileURLToPath as _toPath, pathToFileURL as _toUrl } from 'node:url';
 import { dirname as _dn, resolve as _rs, join as _join } from 'node:path';
-const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist_v2');
+const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist');
 const { runAgentLoop } = await import(_toUrl(_join(ROOT, 'kernel/agent-loop.js')).href);
 const { createEventStream } = await import(_toUrl(_join(ROOT, 'kernel/event-stream.js')).href);
 const { ProviderRegistry } = await import(_toUrl(_join(ROOT, 'providers/index.js')).href);

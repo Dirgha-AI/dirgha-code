@@ -10,7 +10,6 @@ import js from '@eslint/js';
 export default tseslint.config(
   {
     ignores: [
-      'dist_v2/**',
       'dist/**',
       '_legacy_v1/**',
       'node_modules/**',
@@ -20,20 +19,20 @@ export default tseslint.config(
       // Test files live outside the v2 tsconfig project; type-aware lint
       // rules can't run on them without spinning up a separate project,
       // and vitest already type-checks them at run time.
-      'src_v2/**/__tests__/**',
-      'src_v2/**/*.test.ts',
-      'src_v2/**/*.spec.ts',
+      'src/**/__tests__/**',
+      'src/**/*.test.ts',
+      'src/**/*.spec.ts',
     ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ['src_v2/**/*.{ts,tsx}'],
+    files: ['src/**/*.{ts,tsx}'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'module',
       parserOptions: {
-        project: './tsconfig.v2.json',
+        project: './tsconfig.json',
       },
     },
     rules: {

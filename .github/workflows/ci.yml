@@ -65,8 +65,8 @@ jobs:
         # OS × Node combination. Regressions like "fs.realpath case sensitivity
         # broke Windows" surface here, before they reach a tag push.
         run: |
-          node dist_v2/cli/main.js --version
-          node dist_v2/cli/main.js --help
+          node dist/cli/main.js --version
+          node dist/cli/main.js --help
 
       - name: Headless Ink unit tests (release-blocking)
         # CI-2: ink_unit_test mounts App into a fake stdout buffer and
@@ -78,5 +78,5 @@ jobs:
       - name: Doctor (cross-OS)
         # `dirgha doctor` exercises the env-detection codepaths on each OS.
         # It must exit 0 even with no creds — it's diagnostic, not auth-gated.
-        run: node dist_v2/cli/main.js doctor
+        run: node dist/cli/main.js doctor
         continue-on-error: true

@@ -15,7 +15,7 @@ Cheap to write = noisy. Expensive to write = curated. This shape forces lower la
 
 Three hard rules in the codebase keep individual files from sprawling:
 
-- **Every `src_v2/*.ts` ≤ 200 lines.** Verified in audit. When a file approaches the cap, it's a refactor signal, not an exception.
+- **Every `src/*.ts` ≤ 200 lines.** Verified in audit. When a file approaches the cap, it's a refactor signal, not an exception.
 - **Every system-prompt section is capped.** Soul 4 KB, primer 8 KB, git_state 4 KB. A blown-up section can't drown the others.
 - **Every parity-matrix row closure cites code + test.** No row closes without a runnable assertion. Blocks the "we said we did it but didn't" rot.
 

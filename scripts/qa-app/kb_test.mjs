@@ -16,7 +16,7 @@ import { fileURLToPath as _toPath } from 'node:url';
 import { dirname as _dn, resolve as _rs } from 'node:path';
 
 const ROOT_TS = _rs(_dn(_toPath(import.meta.url)), '..', '..');
-const BIN = join(ROOT_TS, 'dist_v2', 'cli', 'main.js');
+const BIN = join(ROOT_TS, 'dist', 'cli', 'main.js');
 
 const sandbox = mkdtempSync(join(tmpdir(), 'kb-wrap-test-'));
 mkdirSync(sandbox, { recursive: true });

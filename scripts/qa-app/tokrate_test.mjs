@@ -17,7 +17,7 @@ import { render } from 'ink';
 
 import { fileURLToPath as _toPath, pathToFileURL as _toUrl } from 'node:url';
 import { dirname as _dn, resolve as _rs, join as _join } from 'node:path';
-const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist_v2');
+const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist');
 const { StatusBar } = await import(_toUrl(_join(ROOT, 'tui/ink/components/StatusBar.js')).href);
 
 let pass = 0, fail = 0;

@@ -20,7 +20,7 @@ import { render } from 'ink';
 import { fileURLToPath as _toPath, pathToFileURL as _toUrl } from 'node:url';
 import { dirname as _dn, resolve as _rs, join as _join } from 'node:path';
 
-const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist_v2');
+const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist');
 const _imp = (rel) => import(_toUrl(_join(ROOT, rel)).href);
 const { App } = await _imp('tui/ink/App.js');
 const { createEventStream } = await _imp('kernel/event-stream.js');

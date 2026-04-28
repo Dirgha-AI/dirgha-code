@@ -25,7 +25,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const BIN = resolve(__dirname, '../../dist_v2/cli/main.js');
+const BIN = resolve(__dirname, '../../dist/cli/main.js');
 
 const sandbox = mkdtempSync(join(tmpdir(), 'skills-install-test-'));
 const fakeHome = join(sandbox, 'home');

@@ -67,7 +67,7 @@ The interactive TUI is `dirgha` with no args. Resume a session with `dirgha resu
 | **18 subcommands** | `audit`, `audit-codebase`, `cost`, `kb`, `keys`, `ledger`, `login`, `models`, `resume`, `skills`, `undo`, `update`, `verify`, … |
 | **4 modes** | `act` · `plan` (read-only thinking) · `verify` (read-only audit) · `ask` (read-only Q&A) |
 | **MCP** | stdio + HTTP/SSE + `bearerProvider` async OAuth rotation |
-| **Source** | ~14.5 K LOC across 23 modules in `src_v2/`. Hard rule: every src file ≤ 200 lines. |
+| **Source** | ~14.5 K LOC across 23 modules in `src/`. Hard rule: every src file ≤ 200 lines. |
 
 ## Numbers worth checking
 

@@ -33,7 +33,7 @@ const check = (label, ok, detail) => {
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const BIN = resolve(__dirname, '../../dist_v2/cli/main.js');
+const BIN = resolve(__dirname, '../../dist/cli/main.js');
 
 function run(args) {
   const env = { ...process.env, HOME: fakeHome, USERPROFILE: fakeHome };
