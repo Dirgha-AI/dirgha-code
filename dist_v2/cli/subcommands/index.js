@@ -24,6 +24,7 @@ import { updateSubcommand } from './update.js';
 import { auditCodebaseSubcommand } from './audit-codebase.js';
 import { kbSubcommand } from './kb.js';
 import { hardwareSubcommand } from './hardware.js';
+import { webSubcommand } from './web.js';
 export const subcommands = [
     doctorSubcommand,
     loginSubcommand,
@@ -51,6 +52,7 @@ export const subcommands = [
     importSessionSubcommand,
     resumeSubcommand,
     hardwareSubcommand,
+    webSubcommand,
 ];
 export function findSubcommand(verb) {
     return subcommands.find(cmd => cmd.name === verb || (cmd.aliases ?? []).includes(verb));

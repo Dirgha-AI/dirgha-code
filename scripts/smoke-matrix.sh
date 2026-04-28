@@ -104,6 +104,7 @@ slash_smoke "/setup"    "/setup ENTER"    3500 "provider|key|wizard|setup"
 slash_smoke "/status"   "/status ENTER"   3500 "model|session|provider|account"
 slash_smoke "/memory"   "/memory ENTER"   3500 "memory|/.dirgha|file|empty"
 slash_smoke "/compact"  "/compact ENTER"  3500 "compact|nothing|summari|0 turns"
+slash_smoke "/update"   "/update ENTER"   5000 "@dirgha/code|up to date|newer available|registry|update check"
 
 if [[ "$TIER" == "all" ]]; then
   # /mode toggles ACT↔PLAN inline (hardcoded branch in App.tsx)

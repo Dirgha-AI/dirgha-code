@@ -26,6 +26,7 @@ import { sessionCommand } from './session.js';
 import { setupCommand } from './setup.js';
 import { statusCommand } from './status.js';
 import { themeCommand } from './theme.js';
+import { updateCommand } from './update.js';
 import { upgradeCommand } from './upgrade.js';
 
 export const builtinSlashCommands: SlashCommand[] = [
@@ -47,6 +48,7 @@ export const builtinSlashCommands: SlashCommand[] = [
   themeCommand,
   fleetCommand,
   accountCommand,
+  updateCommand,
   upgradeCommand,
   configCommand,
 ];
@@ -75,5 +77,6 @@ export {
   setupCommand,
   statusCommand,
   themeCommand,
+  updateCommand,
   upgradeCommand,
 };

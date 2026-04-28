@@ -499,6 +499,7 @@ Subcommands:
   export-session <id> [path|-]        Dump session JSON
   import-session <path>               Load session JSON into the store
   login / logout / setup              Auth + first-run wizard
+  update [--check] [--yes]            Check for + install latest @dirgha/code
   submit-paper <doi>                  Fetch Crossref metadata, emit JSON
 
 Options:

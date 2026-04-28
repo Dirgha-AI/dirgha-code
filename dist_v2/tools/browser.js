@@ -29,9 +29,12 @@ async function ensureBrowser() {
         return page;
     let chromium;
     try {
-        // Dynamic import — resolved at runtime so typecheck does not require
-        // the playwright package to live inside this tsconfig's rootDir.
-        const mod = await import('playwright');
+        // Dynamic import — resolved at runtime. Playwright is intentionally
+        // not in package.json deps (heavy + optional). Hiding the literal
+        // string behind a variable keeps TS's module resolver from looking
+        // for type definitions for an absent package.
+        const pwModuleId = 'playwright';
+        const mod = await import(pwModuleId);
         chromium = mod.chromium ?? mod.default?.chromium;
         if (!chromium || typeof chromium.launch !== 'function') {
             throw new Error('playwright module shape unexpected (no chromium.launch)');

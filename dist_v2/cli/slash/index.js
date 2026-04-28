@@ -23,6 +23,7 @@ import { sessionCommand } from './session.js';
 import { setupCommand } from './setup.js';
 import { statusCommand } from './status.js';
 import { themeCommand } from './theme.js';
+import { updateCommand } from './update.js';
 import { upgradeCommand } from './upgrade.js';
 export const builtinSlashCommands = [
     initCommand,
@@ -43,10 +44,11 @@ export const builtinSlashCommands = [
     themeCommand,
     fleetCommand,
     accountCommand,
+    updateCommand,
     upgradeCommand,
     configCommand,
 ];
 // Wire /help so it can introspect the full list without a circular import.
 registerHelpSource(builtinSlashCommands);
-export { accountCommand, clearCommand, compactCommand, configCommand, exitCommand, fleetCommand, helpCommand, historyCommand, initCommand, keysCommand, loginCommand, memoryCommand, modeCommand, modelsCommand, resumeCommand, sessionCommand, setupCommand, statusCommand, themeCommand, upgradeCommand, };
+export { accountCommand, clearCommand, compactCommand, configCommand, exitCommand, fleetCommand, helpCommand, historyCommand, initCommand, keysCommand, loginCommand, memoryCommand, modeCommand, modelsCommand, resumeCommand, sessionCommand, setupCommand, statusCommand, themeCommand, updateCommand, upgradeCommand, };
 //# sourceMappingURL=index.js.map
