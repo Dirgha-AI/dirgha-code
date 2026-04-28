@@ -60,9 +60,13 @@ const FLEET = [
   { id: 'kimi-k2',        label: 'Kimi K2',         key: 'GROQ_API_KEY',       model: 'moonshotai/kimi-k2-instruct',     baseUrl: 'https://api.groq.com/openai/v1' },
 ];
 
+// Default fleet excludes hy3 because its `tencent/hy3-preview:free`
+// emits long reasoning prefixes that often don't include parseable JSON.
+// Pass --fleet=hy3 explicitly to opt in. ling is primary.
+const DEFAULT_RELIABLE = new Set(['ling', 'deepseek-v4', 'kimi-k2']);
 const fleet = fleetArg
   ? FLEET.filter(j => j.id === fleetArg)
-  : FLEET.filter(j => Boolean(process.env[j.key]));
+  : FLEET.filter(j => DEFAULT_RELIABLE.has(j.id) && Boolean(process.env[j.key]));
 
 // ────────────────────────────────────────────────────────────────────────────
 // Journeys — each is a sequence of tmux send-keys steps, captured into a
@@ -152,7 +156,13 @@ async function recordJourney(j) {
   if (!existsSync(`${process.env.HOME}/.dirgha/keys.json`)) {
     spawnSync('bash', [join(HERE, '..', 'vhs', 'seed-home.sh')], { env, stdio: 'inherit' });
   }
-  spawnSync('tmux', ['new-session', '-d', '-s', sess, '-x', '120', '-y', '32', 'dirgha'], { env });
+  // CRITICAL: unset CI before launching dirgha so Ink's `is-in-ci`
+  // detection doesn't suppress dynamic output. Without this, every
+  // captured journey is just the static banner — the REPL never
+  // renders InputBox / overlays — and judges score 0/0/0.
+  spawnSync('tmux', ['new-session', '-d', '-s', sess, '-x', '120', '-y', '32',
+    'env', '-u', 'CI', '-u', 'GITHUB_ACTIONS', '-u', 'CONTINUOUS_INTEGRATION',
+    'dirgha'], { env });
   for (const step of j.steps) {
     if (step.type === 'wait') {
       await new Promise(r => setTimeout(r, step.ms));
