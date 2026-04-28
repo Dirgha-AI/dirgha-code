@@ -141,6 +141,20 @@ async function main(): Promise<void> {
       const verbIdx = rawArgs.indexOf(verb);
       const tail = verbIdx >= 0 ? rawArgs.slice(verbIdx + 1) : positionals.slice(1);
       const code = await cmd.run(tail, { cwd: cwd() });
+      // Telemetry — only sends when user opted in via `dirgha telemetry
+      // enable`. We cap the wait at 1s so a slow Posthog response (cold
+      // DNS, lossy link) never blocks the user. Opt-out users pay zero
+      // latency: the sender returns immediately when config.enabled is
+      // false. Events that don't land within 1s drop silently — the
+      // sender's internal 8s budget keeps the request alive in case
+      // Node's event loop survives long enough for it to flush.
+      try {
+        const { trackCommand } = await import('../telemetry/sender.js');
+        await Promise.race([
+          trackCommand(verb, PKG_VERSION),
+          new Promise(r => setTimeout(r, 1000)),
+        ]);
+      } catch { /* telemetry must never affect the user's command */ }
       exit(code);
     }
   }

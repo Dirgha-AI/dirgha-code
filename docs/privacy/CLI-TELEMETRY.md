@@ -12,23 +12,28 @@
 - **Crash reports are a separate prompt** that fires only when `dirgha doctor --send-crash-report` is run by you.
 - You can disable telemetry at any time with `dirgha telemetry disable`.
 
-## What we send (when enabled)
+## What we send (when enabled) — the *minimum* possible
 
-Each ping is a single HTTP POST to `${DIRGHA_TELEMETRY_URL}` (defaults to a Posthog-compatible endpoint). The body contains:
+Each ping is a single HTTP POST to `${DIRGHA_TELEMETRY_URL}` (defaults to Posthog Cloud). The body contains exactly these fields and no others:
 
-```json
-{
-  "event": "cli_use",
-  "version": "1.7.11",
-  "os": "linux",
-  "node": "22.22.2",
-  "command": "ask",
-  "session_id": "anon-2f3a91...",
-  "ts": 1777366200
-}
-```
+| Field | Example | Why we need it |
+|---|---|---|
+| `event` | `"cli_command"` or `"cli_error"` | Tells us what kind of ping this is |
+| `version` | `"1.7.12"` | To detect when a release regresses |
+| `command` | `"ask"`, `"doctor"`, `"telemetry"` | To know which features are used |
+| `os` | `"linux"`, `"macos"`, or `"win"` | OS-specific bug triage. Coarse — never a kernel version. |
+| `node` | `"v22"`, `"v20"` | Major only. Never the patch version. |
+| `error_class` | `"TypeError"`, `"AbortError"` | **Only on error events.** No message, no stack. |
+| `distinct_id` | hash of session id (16 hex) | Counts unique users. |
 
-`session_id` is a random UUID generated once per install and stored at `~/.dirgha/telemetry-id`. It is NOT linked to any account, IP, or hardware identifier. Delete the file to reset.
+**Six fields** (five for command events, six for error events). That's it. We deliberately do NOT send:
+
+- `os_release` (kernel version) — too granular, fingerprintable
+- `arch` (x64 / arm64) — useful for arm64 bugs but rare; ask via `doctor` if needed
+- `duration_ms` — interesting but not crucial for v1
+- IP, hostname, MAC address, machine UUID, hardware fingerprint — all NEVER
+
+`distinct_id` is `sha256(sessionId).slice(0, 16)`. The session id itself never leaves the machine — only the hash does.
 
 We use the metric to:
 - Detect when a release is regressing (e.g. version X has 5× the error rate of version X-1)
