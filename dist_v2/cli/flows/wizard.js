@@ -407,11 +407,11 @@ export async function runWizard(argv) {
 async function askTelemetryConsent(rl) {
     // If the user has already explicitly enabled or disabled telemetry,
     // don't re-prompt. We track this via a `telemetry.consentSeen` flag.
-    const { readTelemetryConfig, writeTelemetryConfig } = await import('../subcommands/telemetry.js');
+    const { writeTelemetryConfig } = await import('../subcommands/telemetry.js');
     const { existsSync, readFileSync, writeFileSync } = await import('node:fs');
-    const { homedir } = await import('node:os');
-    const { join } = await import('node:path');
-    const cfgPath = join(homedir(), '.dirgha', 'config.json');
+    const homeMod = await import('node:os');
+    const pathMod = await import('node:path');
+    const cfgPath = pathMod.join(homeMod.homedir(), '.dirgha', 'config.json');
     let cfg = {};
     try {
         if (existsSync(cfgPath))

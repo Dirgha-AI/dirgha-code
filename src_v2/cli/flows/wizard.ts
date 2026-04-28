@@ -411,11 +411,11 @@ export async function runWizard(argv: string[]): Promise<number> {
 async function askTelemetryConsent(rl: { question: (q: string) => Promise<string> } | { question: (q: string, cb: (a: string) => void) => void }): Promise<void> {
   // If the user has already explicitly enabled or disabled telemetry,
   // don't re-prompt. We track this via a `telemetry.consentSeen` flag.
-  const { readTelemetryConfig, writeTelemetryConfig } = await import('../subcommands/telemetry.js');
+  const { writeTelemetryConfig } = await import('../subcommands/telemetry.js');
   const { existsSync, readFileSync, writeFileSync } = await import('node:fs');
-  const { homedir } = await import('node:os');
-  const { join } = await import('node:path');
-  const cfgPath = join(homedir(), '.dirgha', 'config.json');
+  const homeMod = await import('node:os');
+  const pathMod = await import('node:path');
+  const cfgPath = pathMod.join(homeMod.homedir(), '.dirgha', 'config.json');
   let cfg: any = {};
   try { if (existsSync(cfgPath)) cfg = JSON.parse(readFileSync(cfgPath, 'utf8')); } catch { /* */ }
   if (cfg?.telemetry?.consentSeen === true) return;
