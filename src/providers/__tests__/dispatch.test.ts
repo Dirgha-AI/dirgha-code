@@ -60,8 +60,11 @@ describe('routeModel', () => {
     it('minimaxai/minimax-m2 → openrouter', () => {
       expect(routeModel('minimaxai/minimax-m2')).toBe('openrouter');
     });
-    it('z-ai/glm-5.1 → openrouter', () => {
-      expect(routeModel('z-ai/glm-5.1')).toBe('openrouter');
+    it('z-ai/glm-5.1 → zai (1.10.1: native Z.AI provider)', () => {
+      // Used to fall through to openrouter; 1.10.1 added native Z.AI dispatch
+      // via the explicit `z-ai/` prefix rule. Falls back to openrouter only
+      // for slugs that don't start with the registered prefix.
+      expect(routeModel('z-ai/glm-5.1')).toBe('zai');
     });
     it('meta/llama-3.1-70b-instruct → openrouter (3.1, not on NIM whitelist)', () => {
       expect(routeModel('meta/llama-3.1-70b-instruct')).toBe('openrouter');

@@ -33,6 +33,14 @@ export interface ProviderRegistryConfig {
     llamacpp?: ProviderConfig;
     fireworks?: ProviderConfig;
     deepseek?: ProviderConfig;
+    mistral?: ProviderConfig;
+    cohere?: ProviderConfig;
+    cerebras?: ProviderConfig;
+    together?: ProviderConfig;
+    perplexity?: ProviderConfig;
+    xai?: ProviderConfig;
+    groq?: ProviderConfig;
+    zai?: ProviderConfig;
 }
 export declare class ProviderRegistry {
     private config;

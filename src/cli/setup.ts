@@ -29,6 +29,14 @@ const PROVIDERS: ProviderEntry[] = [
   { label: 'Anthropic',   env: 'ANTHROPIC_API_KEY',  helpUrl: 'https://console.anthropic.com/settings/keys', suggested: ['claude-opus-4-7', 'claude-sonnet-4-6', 'claude-haiku-4-5'] },
   { label: 'OpenAI',      env: 'OPENAI_API_KEY',     helpUrl: 'https://platform.openai.com/api-keys',        suggested: ['gpt-5.5-pro', 'gpt-5.5', 'gpt-5', 'gpt-5-mini', 'gpt-4o-mini', 'o1'] },
   { label: 'Google AI',   env: 'GEMINI_API_KEY',     helpUrl: 'https://aistudio.google.com/apikey',          suggested: ['gemini-2.5-pro', 'gemini-2.5-flash'] },
+  { label: 'Mistral',     env: 'MISTRAL_API_KEY',    helpUrl: 'https://console.mistral.ai/api-keys',         suggested: ['mistral/mistral-large-latest', 'mistral/mistral-medium-latest', 'mistral/codestral-latest'] },
+  { label: 'Cohere',      env: 'COHERE_API_KEY',     helpUrl: 'https://dashboard.cohere.com/api-keys',       suggested: ['cohere/command-a-03-2025', 'cohere/command-r-plus'] },
+  { label: 'Cerebras',    env: 'CEREBRAS_API_KEY',   helpUrl: 'https://cloud.cerebras.ai/platform/keys',     suggested: ['cerebras/llama-3.3-70b', 'cerebras/qwen-3-32b'] },
+  { label: 'Together AI', env: 'TOGETHER_API_KEY',   helpUrl: 'https://api.together.ai/settings/api-keys',   suggested: ['meta-llama/Llama-3.3-70B-Instruct-Turbo', 'Qwen/Qwen2.5-Coder-32B-Instruct'] },
+  { label: 'Perplexity',  env: 'PERPLEXITY_API_KEY', helpUrl: 'https://www.perplexity.ai/settings/api',      suggested: ['perplexity/sonar', 'perplexity/sonar-pro'] },
+  { label: 'xAI (Grok)',  env: 'XAI_API_KEY',        helpUrl: 'https://console.x.ai/team/api-keys',          suggested: ['grok-4-fast', 'grok-4'] },
+  { label: 'Groq',        env: 'GROQ_API_KEY',       helpUrl: 'https://console.groq.com/keys',               suggested: ['groq/llama-3.3-70b-versatile', 'groq/qwen-3-32b'] },
+  { label: 'Z.AI / GLM',  env: 'ZAI_API_KEY',        helpUrl: 'https://docs.z.ai/devpack/tool/openai',       suggested: ['zai/glm-4.6', 'zai/glm-4.5-air'] },
 ];
 
 export interface SetupOptions {

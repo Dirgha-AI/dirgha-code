@@ -18,7 +18,15 @@ export type ProviderId =
   | 'ollama'
   | 'llamacpp'
   | 'fireworks'
-  | 'deepseek';
+  | 'deepseek'
+  | 'mistral'
+  | 'cohere'
+  | 'cerebras'
+  | 'together'
+  | 'perplexity'
+  | 'xai'
+  | 'groq'
+  | 'zai';
 
 interface RoutingRule {
   match: (id: string) => boolean;
@@ -48,6 +56,18 @@ const RULES: RoutingRule[] = [
   { match: id => id.startsWith('ollama/'), provider: 'ollama' },
   { match: id => id.startsWith('llamacpp/'), provider: 'llamacpp' },
   { match: id => id.startsWith('fireworks/'), provider: 'fireworks' },
+  // Extra OpenAI-compat providers (1.10.1). These are explicit-prefix —
+  // the user types `mistral/...`, `cohere/...`, etc. to dispatch here
+  // rather than fall through to OpenRouter's catch-all. Lets users pick
+  // the native API for lower latency / better quotas vs the OR mirror.
+  { match: id => id.startsWith('mistral/'),    provider: 'mistral' },
+  { match: id => id.startsWith('cohere/'),     provider: 'cohere' },
+  { match: id => id.startsWith('cerebras/'),   provider: 'cerebras' },
+  { match: id => id.startsWith('together/') || id.startsWith('togetherai/'), provider: 'together' },
+  { match: id => id.startsWith('perplexity/'), provider: 'perplexity' },
+  { match: id => id.startsWith('xai/') || id.startsWith('x-ai/') || /^grok-/i.test(id), provider: 'xai' },
+  { match: id => id.startsWith('groq/'),       provider: 'groq' },
+  { match: id => id.startsWith('zai/') || id.startsWith('z-ai/') || id.startsWith('glm/'), provider: 'zai' },
   // DeepSeek native API — bare canonical ids (deepseek-chat, deepseek-reasoner)
   // and the explicit deepseek-native: prefix. Vendor-prefixed `deepseek/...`
   // slugs still go to OpenRouter unless DIRGHA_PROVIDER=deepseek is set.
@@ -76,5 +96,8 @@ export function isKnownProvider(id: string): id is ProviderId {
     id === 'anthropic' || id === 'openai' || id === 'gemini'
     || id === 'openrouter' || id === 'nvidia' || id === 'ollama'
     || id === 'llamacpp' || id === 'fireworks' || id === 'deepseek'
+    || id === 'mistral' || id === 'cohere' || id === 'cerebras'
+    || id === 'together' || id === 'perplexity' || id === 'xai'
+    || id === 'groq' || id === 'zai'
   );
 }

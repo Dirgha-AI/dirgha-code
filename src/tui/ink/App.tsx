@@ -414,9 +414,27 @@ export function App(props: AppProps): React.JSX.Element {
       if (prev === id) return prev;
       const note: TranscriptItem = { kind: 'notice', id: randomUUID(), text: `Model set to ${id}` };
       setTranscript(t => [...t, note]);
+
+      // 1.10.1 — Warn the user inline if the new model's provider has
+      // no API key configured. Without this, the next ask silently
+      // 401s and the user is left wondering why nothing happens.
+      // Best-effort: provider construction throws ProviderError when
+      // the env var is missing; we catch + render the missing-env hint.
+      try {
+        props.providers.forModel(id);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        const m = /([A-Z][A-Z0-9_]+_API_KEY) is required/.exec(msg);
+        const envName = m?.[1] ?? 'API key';
+        setTranscript(t => [...t, {
+          kind: 'notice',
+          id: randomUUID(),
+          text: `! ${envName} not set. Add it with: dirgha keys add ${envName} <key>  (or rerun \`dirgha setup\`)`,
+        }]);
+      }
       return id;
     });
-  }, [overlays]);
+  }, [overlays, props.providers]);
 
   const handleAtPick = React.useCallback((path: string): void => {
     setInput(current => overlays.spliceAtSelection(current, path));

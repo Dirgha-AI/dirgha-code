@@ -18,10 +18,17 @@ export class SlashRegistry {
     async dispatch(line, ctx) {
         if (!line.startsWith('/'))
             return { handled: false };
-        const stripped = line.slice(1).trim();
+        // Strip leading slash + ALL control chars (\x00-\x1F + DEL \x7F).
+        // Windows terminals on some setups inject stray bytes into ink's
+        // input stream — without sanitising, /mode comes through as
+        // /mode and fails the registry lookup. We trim whitespace
+        // afterwards so a buffer of just the slash + ws still no-ops.
+        // eslint-disable-next-line no-control-regex
+        const stripped = line.slice(1).replace(/[\x00-\x1F\x7F]+/g, '').trim();
         if (stripped.length === 0)
             return { handled: false };
-        const [name, ...args] = stripped.split(/\s+/);
+        const [rawName, ...args] = stripped.split(/\s+/);
+        const name = rawName.toLowerCase();
         const handler = this.handlers.get(name);
         if (!handler)
             return { handled: true, output: `Unknown slash command: /${name}. Try /help.` };
