@@ -100,6 +100,39 @@ jobs:
         # 40 cells / 0 failures locally on 1.7.9.
         run: npm run test:cli:offline
 
+      - name: Install tmux + TERM for ux-scorer journey recording
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y tmux
+
+      - name: Multi-agent UX scorer (release-blocking, threshold ≥ 7)
+        # CI-3 sprint: spawns N judge LLMs against the installed dirgha
+        # binary, records 5 scripted journeys via tmux, asks each judge
+        # to score against the rubric (tools/ux-scorer/rubric.md). Median
+        # across journeys × judges must be ≥ 7.0. Default fleet is the
+        # `ling-2.6-1t:free` judge — free, reliable JSON output.
+        # NVIDIA_API_KEY and GROQ_API_KEY auto-add deepseek-v4 / kimi-k2
+        # judges to the fleet. Missing all keys → run records but skips
+        # scoring (gate auto-passes for forks without secrets).
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          TERM: xterm-256color
+        run: |
+          # Seed ~/.dirgha so the wizard skips inside the recorded sessions.
+          bash tools/vhs/seed-home.sh
+          node tools/ux-scorer/run.mjs --threshold=7.0
+
+      - name: Upload ux-scorer artefacts (transcripts + report)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ux-scorer-${{ github.ref_name }}
+          path: /tmp/dirgha-ux-*/
+          retention-days: 14
+          if-no-files-found: ignore
+
       # Publish with a pinned npm CLI ≥ 11.5.1 — required for Trusted
       # Publisher OIDC auth. Node 22 ships npm 10.x; rather than break
       # the bundled npm via `npm install -g npm@latest` (which has a

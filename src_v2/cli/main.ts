@@ -500,6 +500,7 @@ Subcommands:
   import-session <path>               Load session JSON into the store
   login / logout / setup              Auth + first-run wizard
   update [--check] [--yes]            Check for + install latest @dirgha/code
+  telemetry <status|enable|...>      Anonymous usage opt-in (default: OFF)
   submit-paper <doi>                  Fetch Crossref metadata, emit JSON
 
 Options:
