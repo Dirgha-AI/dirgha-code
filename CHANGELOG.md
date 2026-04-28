@@ -11,6 +11,13 @@ All notable changes are tracked here. Format loosely follows [Keep a Changelog](
 - OpenSSF Scorecard runs weekly + on push to main; result published to scorecard.dev.
 - This CHANGELOG.md committed.
 
+## [1.12.0](https://github.com/Dirgha-AI/dirgha-code/compare/v1.11.0...v1.12.0) (2026-04-28)
+
+
+### Features
+
+* **tui:** two-step provider→model picker + 2026-04-28 OpenRouter top models ([ceaa720](https://github.com/Dirgha-AI/dirgha-code/commit/ceaa720d93d4de00d97717516a06f3154ef510b8))
+
 ## [1.11.0](https://github.com/Dirgha-AI/dirgha-code/compare/v1.10.0...v1.11.0) (2026-04-28)
 
 
