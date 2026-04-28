@@ -17,8 +17,12 @@ import { mkdtempSync, mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
+// `file://` URL builder that works on Windows (where bare backslash
+// paths are invalid in URL syntax). pathToFileURL().href produces e.g.
+// "file:///C:/Users/..." vs the broken "file://C:\Users\...".
+const fileUrl = (p) => pathToFileURL(p).href;
 const BIN = resolve(__dirname, '../../dist_v2/cli/main.js');
 
 const sandbox = mkdtempSync(join(tmpdir(), 'skills-install-test-'));
@@ -58,7 +62,7 @@ function runSkills(args) {
 
 console.log('\n=== skills install: clones a remote with a SKILL.md ===');
 const goodRemote = makeFakeRemote('helper', true);
-const r1 = runSkills(['install', `file://${goodRemote}`]);
+const r1 = runSkills(['install', fileUrl(goodRemote)]);
 check('install exits 0',                        r1.status === 0);
 check('skill dir created',                      existsSync(join(fakeHome, '.dirgha', 'skills', 'remote-helper')));
 check('SKILL.md present at target',             existsSync(join(fakeHome, '.dirgha', 'skills', 'remote-helper', 'SKILL.md')));
@@ -66,24 +70,24 @@ check('install confirms via stdout',            /installed/.test(r1.stdout) || /
 
 console.log('\n=== skills install: explicit name ===');
 const remote2 = makeFakeRemote('lint', true);
-const r2 = runSkills(['install', `file://${remote2}`, 'my-linter']);
+const r2 = runSkills(['install', fileUrl(remote2), 'my-linter']);
 check('install <url> <name> exits 0',           r2.status === 0);
 check('skill dir uses explicit name',           existsSync(join(fakeHome, '.dirgha', 'skills', 'my-linter')));
 
 console.log('\n=== skills install: existing target rejected ===');
-const r3 = runSkills(['install', `file://${remote2}`, 'my-linter']);
+const r3 = runSkills(['install', fileUrl(remote2), 'my-linter']);
 check('repeat install exits non-zero',          r3.status !== 0);
 check('error mentions already installed',        /already installed/.test(r3.stderr));
 
 console.log('\n=== skills install: clone without SKILL.md rejected ===');
 const badRemote = makeFakeRemote('not-a-skill', false);
-const r4 = runSkills(['install', `file://${badRemote}`]);
+const r4 = runSkills(['install', fileUrl(badRemote)]);
 check('no-SKILL.md install exits non-zero',     r4.status !== 0);
 // Directory may or may not be kept depending on impl; just check the warning.
 check('error mentions no SKILL.md',              /no SKILL\.md/.test(r4.stderr));
 
 console.log('\n=== skills install: invalid name rejected ===');
-const r5 = runSkills(['install', `file://${goodRemote}`, 'bad name with spaces']);
+const r5 = runSkills(['install', fileUrl(goodRemote), 'bad name with spaces']);
 check('invalid name exits non-zero',            r5.status !== 0);
 check('error mentions invalid name',            /Invalid skill name/.test(r5.stderr));
 

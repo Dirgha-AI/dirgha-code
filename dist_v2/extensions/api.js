@@ -21,6 +21,7 @@
  */
 import { readdir, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 const NAME_RE = /^[a-zA-Z][a-zA-Z0-9_-]*$/;
 export function createExtensionAPI() {
     const registry = {
@@ -94,7 +95,10 @@ export async function loadExtensions(opts) {
         }
         const indexPath = join(extDir, 'index.mjs');
         try {
-            const mod = await import(indexPath);
+            // ESM dynamic import requires a `file://` URL on Windows; bare
+            // absolute paths throw ERR_UNSUPPORTED_ESM_URL_SCHEME there.
+            // pathToFileURL handles both POSIX and Windows correctly.
+            const mod = await import(pathToFileURL(indexPath).href);
             const fn = typeof mod.default === 'function' ? mod.default : mod;
             if (typeof fn !== 'function')
                 throw new Error(`no default export in ${indexPath}`);
