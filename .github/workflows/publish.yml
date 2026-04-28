@@ -83,6 +83,31 @@ jobs:
           npm install -g --force ./dirgha-code-*.tgz
           dirgha --version
 
+      - name: Seed ~/.dirgha so the first-run wizard skips
+        # Without this, dirgha sees an empty ~/.dirgha and launches the
+        # interactive setup wizard on every smoke-matrix tmux session,
+        # which never reaches the slash-command surface — every cell
+        # FAILs identically. Seeding a minimal config + keys file with
+        # the OPENROUTER key tells the CLI it's already set up.
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          mkdir -p "$HOME/.dirgha"
+          cat > "$HOME/.dirgha/config.json" <<'JSON'
+          {
+            "version": "1.0.0",
+            "project": { "name": "ci", "root": "$HOME", "type": "node" },
+            "context": { "files": [] }
+          }
+          JSON
+          if [ -n "${OPENROUTER_API_KEY:-}" ]; then
+            python3 -c "import json,os; json.dump({'OPENROUTER_API_KEY': os.environ['OPENROUTER_API_KEY']}, open(os.path.expanduser('~/.dirgha/keys.json'), 'w'))"
+          else
+            # Stub keys.json so isFirstRun returns false even without the secret.
+            echo '{}' > "$HOME/.dirgha/keys.json"
+          fi
+          ls -la "$HOME/.dirgha/"
+
       - name: Smoke matrix (tier=all, release-blocking)
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
