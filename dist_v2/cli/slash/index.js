@@ -18,6 +18,7 @@ import { loginCommand } from './login.js';
 import { memoryCommand } from './memory.js';
 import { modeCommand } from './mode.js';
 import { modelsCommand } from './models.js';
+import { pasteCommand } from './paste.js';
 import { resumeCommand } from './resume.js';
 import { sessionCommand } from './session.js';
 import { setupCommand } from './setup.js';
@@ -44,6 +45,7 @@ export const builtinSlashCommands = [
     themeCommand,
     fleetCommand,
     accountCommand,
+    pasteCommand,
     updateCommand,
     upgradeCommand,
     configCommand,
