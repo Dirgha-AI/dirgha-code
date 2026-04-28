@@ -300,7 +300,7 @@ function unescapeValue(s: string): string {
 }
 
 function assertValidKey(key: string): void {
-  if (!key || !/^[a-zA-Z0-9][a-zA-Z0-9_\-\.]*$/.test(key)) {
+  if (!key || !/^[a-zA-Z0-9][a-zA-Z0-9_\-.]*$/.test(key)) {
     throw new Error(`Invalid memory key "${key}". Use alphanumeric, dash, dot, underscore.`);
   }
 }

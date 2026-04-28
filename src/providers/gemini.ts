@@ -6,7 +6,7 @@
  * envelopes, so this adapter has its own ingest loop.
  */
 
-import type { AgentEvent, Message, ContentPart, ToolDefinition } from '../kernel/types.js';
+import type { AgentEvent, ContentPart, ToolDefinition } from '../kernel/types.js';
 import type { Provider, StreamRequest, ProviderConfig } from './iface.js';
 import { ProviderError } from './iface.js';
 

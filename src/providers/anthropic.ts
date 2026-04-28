@@ -5,7 +5,7 @@
  * mapping is bespoke; it does not share the openai-compat adapter.
  */
 
-import type { AgentEvent, Message, ToolDefinition, ContentPart } from '../kernel/types.js';
+import type { AgentEvent, Message, ContentPart } from '../kernel/types.js';
 import type { Provider, StreamRequest, ProviderConfig } from './iface.js';
 import { ProviderError } from './iface.js';
 import { streamSSE } from './http.js';

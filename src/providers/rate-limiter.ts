@@ -47,7 +47,6 @@ class TokenBucket {
     const deadline = Date.now() + maxWaitMs;
     // Spin loop with sleep based on deficit — bounded by the deadline.
     // This keeps the implementation simple without a queue.
-    // eslint-disable-next-line no-constant-condition
     while (true) {
       this.refill();
       if (this.tokens >= 1) { this.tokens -= 1; return; }

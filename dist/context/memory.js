@@ -237,7 +237,7 @@ function unescapeValue(s) {
     return s;
 }
 function assertValidKey(key) {
-    if (!key || !/^[a-zA-Z0-9][a-zA-Z0-9_\-\.]*$/.test(key)) {
+    if (!key || !/^[a-zA-Z0-9][a-zA-Z0-9_\-.]*$/.test(key)) {
         throw new Error(`Invalid memory key "${key}". Use alphanumeric, dash, dot, underscore.`);
     }
 }

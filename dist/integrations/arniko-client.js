@@ -33,7 +33,7 @@ export function createArnikoClient(opts = {}) {
                 timeoutMs,
             });
         },
-        async scanPath(path, opts = {}) {
+        async scanPath(path, scanOpts = {}) {
             const abs = resolve(path);
             const info = await stat(abs).catch(() => undefined);
             if (!info)
@@ -43,20 +43,20 @@ export function createArnikoClient(opts = {}) {
                 path: '/api/arniko/scans',
                 method: 'POST',
                 body: {
-                    tools: opts.tools ?? ['semgrep', 'trufflehog'],
+                    tools: scanOpts.tools ?? ['semgrep', 'trufflehog'],
                     target: { type: 'path', identifier: abs, metadata: {} },
                 },
                 timeoutMs,
             });
         },
-        async scanDiff(diffPath, opts = {}) {
+        async scanDiff(diffPath, diffOpts = {}) {
             const diff = await readFile(diffPath, 'utf8');
             return jsonRequest({
                 baseUrl,
                 path: '/api/arniko/scans',
                 method: 'POST',
                 body: {
-                    tools: opts.tools ?? ['semgrep', 'trufflehog'],
+                    tools: diffOpts.tools ?? ['semgrep', 'trufflehog'],
                     target: { type: 'diff', identifier: diffPath, metadata: { diff } },
                 },
                 timeoutMs,

@@ -175,7 +175,7 @@ function firstParagraph(text: string): string | null {
 }
 
 function assertValidSlug(slug: string): void {
-  if (!slug || !/^[a-zA-Z0-9][a-zA-Z0-9_\-\.]*$/.test(slug)) {
+  if (!slug || !/^[a-zA-Z0-9][a-zA-Z0-9_\-.]*$/.test(slug)) {
     throw new Error(`Invalid knowledge slug "${slug}". Use alphanumeric, dash, dot, underscore.`);
   }
 }

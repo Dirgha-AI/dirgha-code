@@ -174,8 +174,8 @@ export const skillsSubcommand = {
         }
         if (op === 'audit') {
             const target = argv[1];
-            const skills = await loadSkills({ cwd: process.cwd() });
-            const matches = target ? skills.filter(s => s.meta.name === target) : skills;
+            const auditSkills = await loadSkills({ cwd: process.cwd() });
+            const matches = target ? auditSkills.filter(s => s.meta.name === target) : auditSkills;
             if (matches.length === 0) {
                 stderr.write(target ? `Skill "${target}" not found.\n` : '(no skills installed)\n');
                 return target ? 1 : 0;

@@ -54,13 +54,13 @@ async function readTurnEnds(): Promise<AuditEntry[]> {
   return out;
 }
 
-function tokensToCost(model: string, usage: NonNullable<AuditEntry['usage']>): number {
+function tokensToCost(model: string, u: NonNullable<AuditEntry['usage']>): number {
   const provider = routeModel(model);
   const price = findPrice(provider, model);
   if (!price) return 0;
-  const i = (usage.inputTokens  ?? 0) / 1_000_000 * price.inputPerM;
-  const o = (usage.outputTokens ?? 0) / 1_000_000 * price.outputPerM;
-  const c = (usage.cachedTokens ?? 0) / 1_000_000 * (price.cachedInputPerM ?? 0);
+  const i = (u.inputTokens  ?? 0) / 1_000_000 * price.inputPerM;
+  const o = (u.outputTokens ?? 0) / 1_000_000 * price.outputPerM;
+  const c = (u.cachedTokens ?? 0) / 1_000_000 * (price.cachedInputPerM ?? 0);
   return i + o + c;
 }
 

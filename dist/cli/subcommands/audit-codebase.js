@@ -63,7 +63,7 @@ async function listImmediateModules(root) {
 async function runOneAudit(opts) {
     const t0 = Date.now();
     const fullPrompt = `Audit the directory ${opts.module.path}. ${opts.promptHeader}\n\nWhen done, write your findings table to ${join(opts.outDir, opts.module.name + '.md')} via fs_write, then report 'done' with the absolute path.`;
-    return new Promise(resolve => {
+    return new Promise(resolveTask => {
         const child = spawn('node', [opts.cliBin, fullPrompt, '-m', opts.model, '--print', `--max-turns=${opts.maxTurns}`], {
             stdio: ['ignore', 'pipe', 'pipe'],
             env: process.env,
@@ -77,9 +77,9 @@ async function runOneAudit(opts) {
                 markdown = await readFile(join(opts.outDir, opts.module.name + '.md'), 'utf8');
             }
             catch { /* missing */ }
-            resolve({ module: opts.module.name, ok: code === 0 && markdown.length > 0, markdown, durationMs: Date.now() - t0 });
+            resolveTask({ module: opts.module.name, ok: code === 0 && markdown.length > 0, markdown, durationMs: Date.now() - t0 });
         });
-        child.on('error', () => resolve({ module: opts.module.name, ok: false, markdown: buf.slice(-500), durationMs: Date.now() - t0 }));
+        child.on('error', () => resolveTask({ module: opts.module.name, ok: false, markdown: buf.slice(-500), durationMs: Date.now() - t0 }));
     });
 }
 async function runWithLimit(items, limit, fn) {

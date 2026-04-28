@@ -14,7 +14,6 @@
  *   6. Optional cleanup of worktrees.
  */
 
-import { randomUUID } from 'node:crypto';
 import { runAgentLoop } from '../kernel/agent-loop.js';
 import { createEventStream, type EventStream } from '../kernel/event-stream.js';
 import { extractText } from '../kernel/message.js';

@@ -29,8 +29,8 @@
     "verify-install": "bash scripts/verify-install.sh",
     "prepublish-guard": "bash scripts/prepublish-guard.sh",
     "prepublishOnly": "npm run prepublish-guard && npm run build && npm run verify-install",
-    "lint": "eslint src --max-warnings 25",
-    "lint:fix": "eslint src --fix --max-warnings 25",
+    "lint": "eslint src --max-warnings 0",
+    "lint:fix": "eslint src --fix --max-warnings 0",
     "license-check": "license-checker --production --excludePackages 'argparse@1.0.10' --failOn 'GPL;AGPL;LGPL'"
   },
   "dependencies": {

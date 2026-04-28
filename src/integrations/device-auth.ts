@@ -69,7 +69,7 @@ function credentialsPath(): string {
 
 function redact(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err);
-  return message.replace(/Bearer\s+[\w.\-]+/gi, 'Bearer [REDACTED]');
+  return message.replace(/Bearer\s+[\w.-]+/gi, 'Bearer [REDACTED]');
 }
 
 export async function startDeviceAuth(apiBase?: string): Promise<DeviceAuthStart> {

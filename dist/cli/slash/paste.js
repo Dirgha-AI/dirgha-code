@@ -29,7 +29,6 @@ function readClipboardImage() {
         const tmp = join(tmpdir(), `dirgha-paste-${randomUUID()}.png`);
         const png = spawnSync('pngpaste', [tmp]);
         if (png.status === 0) {
-            const bytes = Buffer.from('').length; // we'll stat below
             try {
                 const fs = require('node:fs');
                 const st = fs.statSync(tmp);

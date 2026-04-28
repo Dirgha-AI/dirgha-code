@@ -27,10 +27,10 @@ export interface ArnikoClientOptions {
 export declare function createArnikoClient(opts?: ArnikoClientOptions): {
     isAvailable(): Promise<boolean>;
     scanCode(code: string, taskId?: string): Promise<ScanResult>;
-    scanPath(path: string, opts?: {
+    scanPath(path: string, scanOpts?: {
         tools?: string[];
     }): Promise<ScanResult>;
-    scanDiff(diffPath: string, opts?: {
+    scanDiff(diffPath: string, diffOpts?: {
         tools?: string[];
     }): Promise<ScanResult>;
     bootstrap(composePath: string): Promise<{

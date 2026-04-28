@@ -15,7 +15,6 @@
  * tool for the older `agent-browser` shell-out implementation this tool
  * supersedes.
  */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { mkdir } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
@@ -160,7 +159,7 @@ async function doScreenshot(input: Input): Promise<ToolResult<BrowserOutput>> {
   return ok({ action: 'screenshot', path: outPath }, `screenshot saved: ${outPath}`);
 }
 
-async function doContent(input: Input): Promise<ToolResult<BrowserOutput>> {
+async function doContent(_input: Input): Promise<ToolResult<BrowserOutput>> {
   const p = await ensureBrowser();
   const text = await p.innerText('body').catch(async () => {
     // Fallback to raw HTML stripped of tags if body isn't available yet.

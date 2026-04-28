@@ -34,7 +34,6 @@ import { createCompactionTransform } from '../context/compaction.js';
 import { contextWindowFor, findPrice, findFailover, resolveModelAlias } from '../intelligence/prices.js';
 import { routeModel } from '../providers/dispatch.js';
 import { loadProjectPrimer, composeSystemPrompt } from '../context/primer.js';
-import { probeGitState, renderGitState } from '../context/git-state.js';
 import { loadSoul } from '../context/soul.js';
 import { modePreamble, resolveMode, isAutoApprove, type Mode } from '../context/mode.js';
 import { enforceMode, composeHooks } from '../context/mode-enforcement.js';

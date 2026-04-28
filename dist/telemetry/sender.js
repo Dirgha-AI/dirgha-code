@@ -110,7 +110,6 @@ export async function sendEvent(ev) {
         // none of it should bubble up to the user. Telemetry is non-essential.
         if (process.env.DIRGHA_TELEMETRY_DEBUG) {
             // Diagnostic-only path; default builds keep this silent.
-            // eslint-disable-next-line no-console
             console.error('[telemetry] send failed:', e.message);
         }
         return false;

@@ -13,7 +13,7 @@
 
 import { stdout, stderr } from 'node:process';
 import { execFileSync } from 'node:child_process';
-import { mkdir, rm, stat, readFile, cp } from 'node:fs/promises';
+import { mkdir, rm, stat, cp } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { isAbsolute, join, basename } from 'node:path';
 import { loadSkills } from '../../skills/loader.js';
@@ -164,8 +164,8 @@ export const skillsSubcommand: Subcommand = {
 
     if (op === 'audit') {
       const target = argv[1];
-      const skills = await loadSkills({ cwd: process.cwd() });
-      const matches = target ? skills.filter(s => s.meta.name === target) : skills;
+      const auditSkills = await loadSkills({ cwd: process.cwd() });
+      const matches = target ? auditSkills.filter(s => s.meta.name === target) : auditSkills;
       if (matches.length === 0) {
         stderr.write(target ? `Skill "${target}" not found.\n` : '(no skills installed)\n');
         return target ? 1 : 0;

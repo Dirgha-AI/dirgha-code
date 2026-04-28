@@ -15,7 +15,7 @@
  * coverage, security, contradictions, cross-platform bugs, perf.
  */
 
-import { mkdir, writeFile, readFile, readdir, stat } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, readdir } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { homedir } from 'node:os';
 import { join, basename, resolve } from 'node:path';
@@ -75,7 +75,7 @@ async function runOneAudit(opts: {
 }): Promise<PartialResult> {
   const t0 = Date.now();
   const fullPrompt = `Audit the directory ${opts.module.path}. ${opts.promptHeader}\n\nWhen done, write your findings table to ${join(opts.outDir, opts.module.name + '.md')} via fs_write, then report 'done' with the absolute path.`;
-  return new Promise(resolve => {
+  return new Promise(resolveTask => {
     const child = spawn('node', [opts.cliBin, fullPrompt, '-m', opts.model, '--print', `--max-turns=${opts.maxTurns}`], {
       stdio: ['ignore', 'pipe', 'pipe'],
       env: process.env,
@@ -86,9 +86,9 @@ async function runOneAudit(opts: {
     child.on('close', async code => {
       let markdown = '';
       try { markdown = await readFile(join(opts.outDir, opts.module.name + '.md'), 'utf8'); } catch { /* missing */ }
-      resolve({ module: opts.module.name, ok: code === 0 && markdown.length > 0, markdown, durationMs: Date.now() - t0 });
+      resolveTask({ module: opts.module.name, ok: code === 0 && markdown.length > 0, markdown, durationMs: Date.now() - t0 });
     });
-    child.on('error', () => resolve({ module: opts.module.name, ok: false, markdown: buf.slice(-500), durationMs: Date.now() - t0 }));
+    child.on('error', () => resolveTask({ module: opts.module.name, ok: false, markdown: buf.slice(-500), durationMs: Date.now() - t0 }));
   });
 }
 

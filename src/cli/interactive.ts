@@ -25,7 +25,7 @@ import { buildAgentHooksFromConfig } from '../hooks/config-bridge.js';
 import { createDefaultSlashRegistry, registerBuiltinSlashCommands, type SlashContext } from './slash.js';
 import type { DirghaConfig } from './config.js';
 import { loadToken, migrateLegacyAuth, type Token } from '../integrations/device-auth.js';
-import { applyMode, resolveMode, type Mode } from '../context/mode.js';
+import { resolveMode, type Mode } from '../context/mode.js';
 import { loadProjectPrimer, composeSystemPrompt } from '../context/primer.js';
 import { probeGitState, renderGitState } from '../context/git-state.js';
 import { loadSoul } from '../context/soul.js';

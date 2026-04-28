@@ -6,7 +6,7 @@
 
 import { readFile, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import type { Tool, ToolContext } from './registry.js';
+import type { Tool } from './registry.js';
 import type { ToolResult } from '../kernel/types.js';
 
 interface Input {

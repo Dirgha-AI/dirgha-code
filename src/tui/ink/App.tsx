@@ -37,7 +37,6 @@ import type { SessionStore } from '../../context/session.js';
 import type { DirghaConfig } from '../../cli/config.js';
 import type { SlashRegistry, SlashContext } from '../../cli/slash.js';
 import type { Mode } from '../../context/mode.js';
-import { appendFileSync } from 'node:fs';
 import { PRICES } from '../../intelligence/prices.js';
 import { Logo } from './components/Logo.js';
 import { StatusBar } from './components/StatusBar.js';

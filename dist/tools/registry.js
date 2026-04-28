@@ -11,7 +11,7 @@
 export class ToolRegistry {
     tools = new Map();
     register(tool) {
-        if (!tool.name || !/^[a-zA-Z][a-zA-Z0-9_\-]*$/.test(tool.name)) {
+        if (!tool.name || !/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(tool.name)) {
             throw new Error(`Invalid tool name: ${tool.name}`);
         }
         if (this.tools.has(tool.name)) {

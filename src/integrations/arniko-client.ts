@@ -56,7 +56,7 @@ export function createArnikoClient(opts: ArnikoClientOptions = {}) {
         timeoutMs,
       });
     },
-    async scanPath(path: string, opts: { tools?: string[] } = {}): Promise<ScanResult> {
+    async scanPath(path: string, scanOpts: { tools?: string[] } = {}): Promise<ScanResult> {
       const abs = resolve(path);
       const info = await stat(abs).catch(() => undefined);
       if (!info) throw new IntegrationError(`Path does not exist: ${path}`);
@@ -65,20 +65,20 @@ export function createArnikoClient(opts: ArnikoClientOptions = {}) {
         path: '/api/arniko/scans',
         method: 'POST',
         body: {
-          tools: opts.tools ?? ['semgrep', 'trufflehog'],
+          tools: scanOpts.tools ?? ['semgrep', 'trufflehog'],
           target: { type: 'path', identifier: abs, metadata: {} },
         },
         timeoutMs,
       });
     },
-    async scanDiff(diffPath: string, opts: { tools?: string[] } = {}): Promise<ScanResult> {
+    async scanDiff(diffPath: string, diffOpts: { tools?: string[] } = {}): Promise<ScanResult> {
       const diff = await readFile(diffPath, 'utf8');
       return jsonRequest<ScanResult>({
         baseUrl,
         path: '/api/arniko/scans',
         method: 'POST',
         body: {
-          tools: opts.tools ?? ['semgrep', 'trufflehog'],
+          tools: diffOpts.tools ?? ['semgrep', 'trufflehog'],
           target: { type: 'diff', identifier: diffPath, metadata: { diff } },
         },
         timeoutMs,

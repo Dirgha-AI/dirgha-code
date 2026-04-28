@@ -7,7 +7,7 @@
  * With a token it runs `gh api` to fork + branch + PR.
  */
 
-import { stdout, stderr, env, exit } from 'node:process';
+import { stdout, stderr, env } from 'node:process';
 import { writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';

@@ -42,7 +42,7 @@ export class ToolRegistry {
   private readonly tools = new Map<string, Tool>();
 
   register(tool: Tool): void {
-    if (!tool.name || !/^[a-zA-Z][a-zA-Z0-9_\-]*$/.test(tool.name)) {
+    if (!tool.name || !/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(tool.name)) {
       throw new Error(`Invalid tool name: ${tool.name}`);
     }
     if (this.tools.has(tool.name)) {
