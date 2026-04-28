@@ -34,7 +34,7 @@
     "license-check": "license-checker --production --excludePackages 'argparse@1.0.10' --failOn 'GPL;AGPL;LGPL'"
   },
   "dependencies": {
-    "ink": "^5.0.0",
+    "ink": "^7.0.1",
     "ink-text-input": "^6.0.0",
     "react": "^18.3.0"
   },
