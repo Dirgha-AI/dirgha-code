@@ -58,3 +58,25 @@ export const TRANSCRIPT_GLYPHS = {
   ok: '✓',
   error: '✗',
 } as const;
+
+/**
+ * Tool-call status glyphs. Mirror gemini-cli's TOOL_STATUS set so dirgha's
+ * tool stream reads with the same lexicon. The executing glyph rotates
+ * via a tiny spinner ring.
+ *   o  pending — about to start
+ *   ⊷  executing — model called the tool, waiting on result (spinner-paired)
+ *   ✓  success — tool returned cleanly
+ *   ✗  error — tool returned non-zero / threw
+ *   ?  confirming — awaiting user approval
+ *   -  canceled — aborted before it could run
+ */
+export const TOOL_STATUS = {
+  PENDING: 'o',
+  EXECUTING: '⊷',
+  SUCCESS: '✓',
+  ERROR: '✗',
+  CONFIRMING: '?',
+  CANCELED: '-',
+} as const;
+
+export type ToolStatusGlyph = (typeof TOOL_STATUS)[keyof typeof TOOL_STATUS];

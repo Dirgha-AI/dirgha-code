@@ -44,6 +44,7 @@ import { StatusBar } from './components/StatusBar.js';
 import { StreamingText } from './components/StreamingText.js';
 import { ThinkingBlock } from './components/ThinkingBlock.js';
 import { ToolBox } from './components/ToolBox.js';
+import { ToolGroup, type ToolItem } from './components/ToolGroup.js';
 import { InputBox } from './components/InputBox.js';
 import { PromptQueueIndicator } from './components/PromptQueueIndicator.js';
 import { ModelPicker, type ModelEntry } from './components/ModelPicker.js';
@@ -459,12 +460,7 @@ export function App(props: AppProps): React.JSX.Element {
         {(_item): React.JSX.Element => <Logo key="logo" version={VERSION} />}
       </Static>
       <Box flexDirection="column">
-        {transcript.map(item => (
-          <TranscriptRow key={item.id} item={item} />
-        ))}
-        {projection.liveItems.map(item => (
-          <TranscriptRow key={item.id} item={item} />
-        ))}
+        {renderTranscript([...transcript, ...projection.liveItems])}
       </Box>
       <PromptQueueIndicator queued={promptQueue} />
       <InputBox
@@ -533,6 +529,44 @@ export function App(props: AppProps): React.JSX.Element {
   );
 }
 
+/**
+ * Walk the transcript and fold consecutive `tool` items into a single
+ * <ToolGroup>. Non-tool items render via <TranscriptRow>. The grouping
+ * is intentionally simple — we look at adjacency, not assistant-turn
+ * boundaries, because the projection emits tools contiguously between
+ * `text` spans of the same turn.
+ */
+function renderTranscript(items: TranscriptItem[]): React.ReactNode[] {
+  const out: React.ReactNode[] = [];
+  let toolBuf: ToolItem[] = [];
+  let groupKeyCounter = 0;
+
+  const flushTools = (): void => {
+    if (toolBuf.length === 0) return;
+    out.push(<ToolGroup key={`tg-${groupKeyCounter++}`} tools={toolBuf} />);
+    toolBuf = [];
+  };
+
+  for (const item of items) {
+    if (item.kind === 'tool') {
+      toolBuf.push({
+        id: item.id,
+        name: item.name,
+        status: item.status,
+        argSummary: item.argSummary,
+        outputPreview: item.outputPreview,
+        startedAt: item.startedAt,
+        durationMs: item.durationMs,
+      });
+      continue;
+    }
+    flushTools();
+    out.push(<TranscriptRow key={item.id} item={item} />);
+  }
+  flushTools();
+  return out;
+}
+
 function TranscriptRow({ item }: { item: TranscriptItem }): React.JSX.Element | null {
   switch (item.kind) {
     case 'user':
@@ -547,6 +581,9 @@ function TranscriptRow({ item }: { item: TranscriptItem }): React.JSX.Element | 
     case 'thinking':
       return <ThinkingBlock content={item.content} />;
     case 'tool':
+      // Should not be reached — tools are folded by renderTranscript() into
+      // <ToolGroup>. Kept as a safety net so an unexpected tool item still
+      // renders something rather than nothing.
       return (
         <ToolBox
           name={item.name}

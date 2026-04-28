@@ -35,6 +35,7 @@ import { StatusBar } from './components/StatusBar.js';
 import { StreamingText } from './components/StreamingText.js';
 import { ThinkingBlock } from './components/ThinkingBlock.js';
 import { ToolBox } from './components/ToolBox.js';
+import { ToolGroup } from './components/ToolGroup.js';
 import { InputBox } from './components/InputBox.js';
 import { PromptQueueIndicator } from './components/PromptQueueIndicator.js';
 import { ModelPicker } from './components/ModelPicker.js';
@@ -416,7 +417,43 @@ export function App(props) {
     // streaming text appears now, the Static-around-transcript pattern
     // was suppressing the live region updates. If still not, the bug
     // is upstream in useEventProjection.
-    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: [{ key: 'logo' }], children: (_item) => _jsx(Logo, { version: VERSION }, "logo") }), _jsxs(Box, { flexDirection: "column", children: [transcript.map(item => (_jsx(TranscriptRow, { item: item }, item.id))), projection.liveItems.map(item => (_jsx(TranscriptRow, { item: item }, item.id)))] }), _jsx(PromptQueueIndicator, { queued: promptQueue }), _jsx(InputBox, { value: input, onChange: setInput, onSubmit: handleSubmit, busy: busy, vimMode: props.config.vimMode === true, onAtQueryChange: overlays.setAtQuery, onSlashQueryChange: overlays.setSlashQuery, onRequestOverlay: overlays.openOverlay, inputFocus: inputFocus }), overlays.active === 'atfile' && overlays.atQuery !== null && (_jsx(AtFileComplete, { cwd: props.cwd, query: overlays.atQuery, onPick: handleAtPick, onCancel: () => { overlays.setAtQuery(null); overlays.setActive(null); } })), overlays.active === 'slash' && overlays.slashQuery !== null && (_jsx(SlashComplete, { commands: slashCommands, query: overlays.slashQuery, onPick: handleSlashPick, onCancel: () => { overlays.setSlashQuery(null); overlays.setActive(null); } })), overlays.active === 'models' && (_jsx(ModelPicker, { models: models, current: currentModel, onPick: handleModelPick, onCancel: overlays.closeOverlay })), overlays.active === 'help' && (_jsx(HelpOverlay, { slashCommands: slashCommands, onClose: overlays.closeOverlay })), overlays.active === 'theme' && (_jsx(ThemePicker, { current: themeName, onPick: handleThemePick, onCancel: overlays.closeOverlay })), _jsx(StatusBar, { model: currentModel, provider: providerIdForModel(currentModel), inputTokens: projection.totals.inputTokens, outputTokens: projection.totals.outputTokens, costUsd: projection.totals.costUsd, cwd: props.cwd, busy: busy, mode: props.config.mode ?? 'act', contextWindow: contextWindowFor(currentModel), liveOutputTokens: liveOutputTokens, liveDurationMs: liveDurationMs })] }) }));
+    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: [{ key: 'logo' }], children: (_item) => _jsx(Logo, { version: VERSION }, "logo") }), _jsx(Box, { flexDirection: "column", children: renderTranscript([...transcript, ...projection.liveItems]) }), _jsx(PromptQueueIndicator, { queued: promptQueue }), _jsx(InputBox, { value: input, onChange: setInput, onSubmit: handleSubmit, busy: busy, vimMode: props.config.vimMode === true, onAtQueryChange: overlays.setAtQuery, onSlashQueryChange: overlays.setSlashQuery, onRequestOverlay: overlays.openOverlay, inputFocus: inputFocus }), overlays.active === 'atfile' && overlays.atQuery !== null && (_jsx(AtFileComplete, { cwd: props.cwd, query: overlays.atQuery, onPick: handleAtPick, onCancel: () => { overlays.setAtQuery(null); overlays.setActive(null); } })), overlays.active === 'slash' && overlays.slashQuery !== null && (_jsx(SlashComplete, { commands: slashCommands, query: overlays.slashQuery, onPick: handleSlashPick, onCancel: () => { overlays.setSlashQuery(null); overlays.setActive(null); } })), overlays.active === 'models' && (_jsx(ModelPicker, { models: models, current: currentModel, onPick: handleModelPick, onCancel: overlays.closeOverlay })), overlays.active === 'help' && (_jsx(HelpOverlay, { slashCommands: slashCommands, onClose: overlays.closeOverlay })), overlays.active === 'theme' && (_jsx(ThemePicker, { current: themeName, onPick: handleThemePick, onCancel: overlays.closeOverlay })), _jsx(StatusBar, { model: currentModel, provider: providerIdForModel(currentModel), inputTokens: projection.totals.inputTokens, outputTokens: projection.totals.outputTokens, costUsd: projection.totals.costUsd, cwd: props.cwd, busy: busy, mode: props.config.mode ?? 'act', contextWindow: contextWindowFor(currentModel), liveOutputTokens: liveOutputTokens, liveDurationMs: liveDurationMs })] }) }));
+}
+/**
+ * Walk the transcript and fold consecutive `tool` items into a single
+ * <ToolGroup>. Non-tool items render via <TranscriptRow>. The grouping
+ * is intentionally simple — we look at adjacency, not assistant-turn
+ * boundaries, because the projection emits tools contiguously between
+ * `text` spans of the same turn.
+ */
+function renderTranscript(items) {
+    const out = [];
+    let toolBuf = [];
+    let groupKeyCounter = 0;
+    const flushTools = () => {
+        if (toolBuf.length === 0)
+            return;
+        out.push(_jsx(ToolGroup, { tools: toolBuf }, `tg-${groupKeyCounter++}`));
+        toolBuf = [];
+    };
+    for (const item of items) {
+        if (item.kind === 'tool') {
+            toolBuf.push({
+                id: item.id,
+                name: item.name,
+                status: item.status,
+                argSummary: item.argSummary,
+                outputPreview: item.outputPreview,
+                startedAt: item.startedAt,
+                durationMs: item.durationMs,
+            });
+            continue;
+        }
+        flushTools();
+        out.push(_jsx(TranscriptRow, { item: item }, item.id));
+    }
+    flushTools();
+    return out;
 }
 function TranscriptRow({ item }) {
     switch (item.kind) {
@@ -427,6 +464,9 @@ function TranscriptRow({ item }) {
         case 'thinking':
             return _jsx(ThinkingBlock, { content: item.content });
         case 'tool':
+            // Should not be reached — tools are folded by renderTranscript() into
+            // <ToolGroup>. Kept as a safety net so an unexpected tool item still
+            // renders something rather than nothing.
             return (_jsx(ToolBox, { name: item.name, status: item.status, argSummary: item.argSummary, outputPreview: item.outputPreview, startedAt: item.startedAt, durationMs: item.durationMs }));
         case 'error':
             return (_jsxs(Box, { gap: 1, marginBottom: 1, children: [_jsx(Text, { color: "red", bold: true, children: "\u2717" }), _jsx(Text, { color: "red", children: item.message })] }));
