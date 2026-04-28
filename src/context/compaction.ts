@@ -10,6 +10,7 @@
 
 import type { Provider, Message, UsageTotal } from '../kernel/types.js';
 import { estimateTokens, normaliseContent } from '../kernel/message.js';
+import { resolveModelForDispatch } from '../providers/dispatch.js';
 import type { Session } from './session.js';
 import type { HookRegistry } from '../hooks/registry.js';
 
@@ -100,7 +101,7 @@ async function summarise(cfg: CompactionConfig, historical: Message[]): Promise<
   ];
 
   let summary = '';
-  for await (const ev of cfg.summarizer.stream({ model: cfg.summaryModel, messages: prompt })) {
+  for await (const ev of cfg.summarizer.stream({ model: resolveModelForDispatch(cfg.summaryModel), messages: prompt })) {
     if (ev.type === 'text_delta') summary += ev.delta;
   }
   return summary.trim() || '[Empty summary]';

@@ -226,7 +226,7 @@ export function App(props) {
                 },
                 getMode: () => mode,
                 setMode: (m) => setMode(m),
-                getTheme: () => (props.config.theme ?? 'dark'),
+                getTheme: () => (props.config.theme ?? 'readable'),
                 setTheme: () => undefined,
                 getSession: () => null,
                 getSessionStore: () => props.sessions,
@@ -391,7 +391,7 @@ export function App(props) {
     // Active theme name — driven by local state so the picker can flip it
     // live. Initial value comes from config; subsequent changes are
     // persisted to ~/.dirgha/config.json so future sessions pick it up.
-    const [themeName, setThemeName] = React.useState((props.config.theme ?? 'dark'));
+    const [themeName, setThemeName] = React.useState((props.config.theme ?? 'readable'));
     const handleThemePick = React.useCallback((name) => {
         overlays.closeOverlay();
         setThemeName(name);

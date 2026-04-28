@@ -21,10 +21,10 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { darkTheme, lightTheme, noColour, themes } from './theme.js';
-const BAKED_IN = new Set(['dark', 'light', 'none']);
+const BAKED_IN = new Set(['readable', 'dark', 'light', 'none']);
 /** All theme names visible to the user (baked-in + user-defined). */
 export function listAvailableThemes(home = homedir()) {
-    const out = ['dark', 'light', 'none'];
+    const out = ['readable', 'dark', 'light', 'none'];
     try {
         const dir = join(home, '.dirgha', 'themes');
         const entries = readdirSync(dir, { withFileTypes: true });

@@ -8,6 +8,7 @@
  * written to the session so the operation is auditable.
  */
 import { estimateTokens, normaliseContent } from '../kernel/message.js';
+import { resolveModelForDispatch } from '../providers/dispatch.js';
 export async function maybeCompact(messages, cfg, session) {
     const tokensBefore = messages.reduce((acc, m) => acc + estimateTokens(flatten(m)), 0);
     if (tokensBefore < cfg.triggerTokens) {
@@ -64,7 +65,7 @@ async function summarise(cfg, historical) {
         },
     ];
     let summary = '';
-    for await (const ev of cfg.summarizer.stream({ model: cfg.summaryModel, messages: prompt })) {
+    for await (const ev of cfg.summarizer.stream({ model: resolveModelForDispatch(cfg.summaryModel), messages: prompt })) {
         if (ev.type === 'text_delta')
             summary += ev.delta;
     }

@@ -34,7 +34,12 @@ export const lightTheme = {
 // Backward-compat alias — existing call sites use `defaultTheme`.
 export const defaultTheme = darkTheme;
 export const PALETTES = {
-    dark: { brand: '#22C55E', accent: '#F59E0B', error: '#EF4444', textPrimary: '#E5E7EB', textMuted: '#6B7280', borderActive: '#22C55E', borderIdle: '#1F2937', logoA: '#22C55E', logoB: '#60A5FA' },
+    // Default. Tuned for legibility on common terminal backgrounds —
+    // muted text stays above WCAG AA (~5.9:1 on #1F2937), border-idle
+    // visible without dominating, accent + brand differentiate without
+    // alarming. Replaces `dark` as the on-boot default.
+    readable: { brand: '#5EEAD4', accent: '#FCD34D', error: '#F87171', textPrimary: '#F3F4F6', textMuted: '#9CA3AF', borderActive: '#5EEAD4', borderIdle: '#374151', logoA: '#5EEAD4', logoB: '#A78BFA' },
+    dark: { brand: '#22C55E', accent: '#F59E0B', error: '#EF4444', textPrimary: '#E5E7EB', textMuted: '#9CA3AF', borderActive: '#22C55E', borderIdle: '#374151', logoA: '#22C55E', logoB: '#60A5FA' },
     light: { brand: '#16A34A', accent: '#D97706', error: '#DC2626', textPrimary: '#111827', textMuted: '#6B7280', borderActive: '#16A34A', borderIdle: '#E5E7EB', logoA: '#16A34A', logoB: '#2563EB' },
     none: { brand: '#FFFFFF', accent: '#FFFFFF', error: '#FFFFFF', textPrimary: '#FFFFFF', textMuted: '#FFFFFF', borderActive: '#FFFFFF', borderIdle: '#FFFFFF', logoA: '#FFFFFF', logoB: '#FFFFFF' },
     midnight: { brand: '#8B5CF6', accent: '#F59E0B', error: '#EF4444', textPrimary: '#E2E8F0', textMuted: '#64748B', borderActive: '#8B5CF6', borderIdle: '#1E293B', logoA: '#8B5CF6', logoB: '#60A5FA' },
@@ -61,6 +66,7 @@ export function paletteFor(name) {
  * is consumed by Ink components that opt into `paletteFor()`.
  */
 export const themes = {
+    readable: darkTheme,
     dark: darkTheme,
     light: lightTheme,
     none: Object.fromEntries(Object.keys(darkTheme).map(k => [k, ''])),

@@ -7,7 +7,7 @@ import { jsx as _jsx } from "react/jsx-runtime";
 import { createContext, useContext } from 'react';
 import { paletteFor } from '../theme.js';
 const ThemeContext = createContext({
-    palette: paletteFor('dark'),
+    palette: paletteFor('readable'),
 });
 export function ThemeProvider({ activeTheme, children }) {
     const palette = paletteFor(activeTheme);

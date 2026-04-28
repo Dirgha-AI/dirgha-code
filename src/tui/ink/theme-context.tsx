@@ -13,7 +13,7 @@ interface ThemeContextValue {
 }
 
 const ThemeContext = createContext<ThemeContextValue>({
-  palette: paletteFor('dark'),
+  palette: paletteFor('readable'),
 });
 
 interface ThemeProviderProps {

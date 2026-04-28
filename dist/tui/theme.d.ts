@@ -18,7 +18,7 @@ export interface Theme {
 export declare const darkTheme: Theme;
 export declare const lightTheme: Theme;
 export declare const defaultTheme: Theme;
-export type ThemeName = 'dark' | 'light' | 'none' | 'midnight' | 'ocean' | 'solarized' | 'warm' | 'violet-storm' | 'cosmic' | 'nord' | 'ember' | 'sakura' | 'obsidian-gold' | 'crimson';
+export type ThemeName = 'readable' | 'dark' | 'light' | 'none' | 'midnight' | 'ocean' | 'solarized' | 'warm' | 'violet-storm' | 'cosmic' | 'nord' | 'ember' | 'sakura' | 'obsidian-gold' | 'crimson';
 /**
  * Hex-colour palette for Ink components and downstream renderers that
  * support truecolor output. The escape-code `Theme` above remains the

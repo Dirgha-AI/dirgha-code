@@ -255,7 +255,7 @@ export function App(props: AppProps): React.JSX.Element {
         },
         getMode: () => mode,
         setMode: (m: Mode) => setMode(m),
-        getTheme: () => ((props.config.theme as ThemeName | undefined) ?? 'dark'),
+        getTheme: () => ((props.config.theme as ThemeName | undefined) ?? 'readable'),
         setTheme: () => undefined,
         getSession: () => null,
         getSessionStore: () => props.sessions,
@@ -425,7 +425,7 @@ export function App(props: AppProps): React.JSX.Element {
   // live. Initial value comes from config; subsequent changes are
   // persisted to ~/.dirgha/config.json so future sessions pick it up.
   const [themeName, setThemeName] = React.useState<ThemeName>(
-    (props.config.theme ?? 'dark') as ThemeName,
+    (props.config.theme ?? 'readable') as ThemeName,
   );
 
   const handleThemePick = React.useCallback((name: ThemeName): void => {

@@ -12,6 +12,7 @@
  *      turn before the provider call, never mid-stream.
  */
 import { assembleTurn, extractToolUses, appendToolResults } from './message.js';
+import { resolveModelForDispatch } from '../providers/dispatch.js';
 export async function runAgentLoop(cfg) {
     const events = cfg.events;
     const history = [...cfg.messages];
@@ -40,8 +41,9 @@ export async function runAgentLoop(cfg) {
                 : history;
             const streamEvents = [];
             try {
+                const dispatchModel = resolveModelForDispatch(cfg.model);
                 for await (const ev of cfg.provider.stream({
-                    model: cfg.model,
+                    model: dispatchModel,
                     messages: messagesForCall,
                     tools: cfg.tools,
                     signal: cfg.signal,

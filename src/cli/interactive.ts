@@ -68,7 +68,7 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
     }
   });
   let currentMode: Mode = await resolveMode();
-  let currentThemeName: ThemeName = ((opts.config.theme as ThemeName | undefined) ?? 'dark');
+  let currentThemeName: ThemeName = ((opts.config.theme as ThemeName | undefined) ?? 'readable');
   let currentTheme: Theme = getTheme(currentThemeName);
 
   const initial: Message[] = [...(opts.initialMessages ?? [])];

@@ -6,6 +6,7 @@
  * "nvidia/..."); bare ids fall through to the catch-all rules at the
  * end.
  */
+import { migrateDeprecatedModel } from '../intelligence/prices.js';
 // Specific model IDs that NVIDIA NIM serves. The vendor-prefix on these
 // IDs (e.g. `moonshotai/`, `qwen/`, `meta/`) is shared with OpenRouter,
 // so we route by exact ID rather than prefix to avoid sending OR-only
@@ -39,11 +40,15 @@ const RULES = [
     { match: id => id.includes('/') || id.includes(':free'), provider: 'openrouter' },
 ];
 export function routeModel(modelId) {
+    const migrated = migrateDeprecatedModel(modelId);
     for (const rule of RULES) {
-        if (rule.match(modelId))
+        if (rule.match(migrated))
             return rule.provider;
     }
-    throw new Error(`No provider configured for model "${modelId}". Add a routing rule in providers/dispatch.ts.`);
+    throw new Error(`No provider configured for model "${migrated}". Add a routing rule in providers/dispatch.ts.`);
+}
+export function resolveModelForDispatch(modelId) {
+    return migrateDeprecatedModel(modelId);
 }
 export function isKnownProvider(id) {
     return (id === 'anthropic' || id === 'openai' || id === 'gemini'

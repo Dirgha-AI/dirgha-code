@@ -224,6 +224,11 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
               pasted block expanded (Ctrl+E collapse)
             </Text>
           )}
+          {props.busy && (
+            <Text color={palette.textMuted}>
+              esc cancel · ctrl+c×2 exit
+            </Text>
+          )}
         </Box>
         {ctrlCArmed && <Text color={palette.accent} bold>Press Ctrl+C again to exit.</Text>}
       </Box>

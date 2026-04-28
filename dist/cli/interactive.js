@@ -50,7 +50,7 @@ export async function runInteractive(opts) {
         }
     });
     let currentMode = await resolveMode();
-    let currentThemeName = (opts.config.theme ?? 'dark');
+    let currentThemeName = (opts.config.theme ?? 'readable');
     let currentTheme = getTheme(currentThemeName);
     const initial = [...(opts.initialMessages ?? [])];
     // System prompt is rebuilt per turn below so mode changes apply live.

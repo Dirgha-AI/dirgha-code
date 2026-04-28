@@ -30,8 +30,11 @@ describe('routeModel', () => {
     it('deepseek-ai/deepseek-v4-flash → nvidia', () => {
       expect(routeModel('deepseek-ai/deepseek-v4-flash')).toBe('nvidia');
     });
-    it('moonshotai/kimi-k2-instruct → nvidia', () => {
-      expect(routeModel('moonshotai/kimi-k2-instruct')).toBe('nvidia');
+    it('moonshotai/kimi-k2-instruct → openrouter (deprecated; auto-migrated to kimi-k2.5)', () => {
+      // The legacy NVIDIA NIM ID was deprecated upstream; routeModel
+      // now applies migrateDeprecatedModel, sending the request to
+      // OpenRouter on `moonshotai/kimi-k2.5` instead of 400ing on NIM.
+      expect(routeModel('moonshotai/kimi-k2-instruct')).toBe('openrouter');
     });
     it('qwen/qwen3-next-80b-a3b-instruct → nvidia', () => {
       expect(routeModel('qwen/qwen3-next-80b-a3b-instruct')).toBe('nvidia');

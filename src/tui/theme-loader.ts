@@ -24,11 +24,11 @@ import { homedir } from 'node:os';
 import type { Theme } from './theme.js';
 import { darkTheme, lightTheme, noColour, themes } from './theme.js';
 
-const BAKED_IN = new Set(['dark', 'light', 'none']);
+const BAKED_IN = new Set(['readable', 'dark', 'light', 'none']);
 
 /** All theme names visible to the user (baked-in + user-defined). */
 export function listAvailableThemes(home: string = homedir()): string[] {
-  const out: string[] = ['dark', 'light', 'none'];
+  const out: string[] = ['readable', 'dark', 'light', 'none'];
   try {
     const dir = join(home, '.dirgha', 'themes');
     const entries = readdirSync(dir, { withFileTypes: true });

@@ -5,10 +5,11 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
+import { migrateDeprecatedModel } from '../intelligence/prices.js';
 export const DEFAULT_CONFIG = {
-    model: 'moonshotai/kimi-k2-instruct',
+    model: 'moonshotai/kimi-k2.5',
     cheapModel: 'meta/llama-3.1-8b-instruct',
-    summaryModel: 'moonshotai/kimi-k2-instruct',
+    summaryModel: 'moonshotai/kimi-k2.5',
     maxTurns: 16,
     showThinking: false,
     autoApproveTools: ['fs_read', 'fs_ls', 'search_grep', 'search_glob', 'git'],
@@ -23,7 +24,13 @@ export async function loadConfig(cwd = process.cwd()) {
     const userPartial = await readJson(userPath);
     const projectPartial = await readJson(projectPath);
     const envPartial = readEnvOverrides();
-    return merge(DEFAULT_CONFIG, userPartial, projectPartial, envPartial);
+    const merged = merge(DEFAULT_CONFIG, userPartial, projectPartial, envPartial);
+    // Migrate any model IDs the upstream provider has dropped, so users
+    // with stale `~/.dirgha/config.json` don't 400 on every call.
+    merged.model = migrateDeprecatedModel(merged.model);
+    merged.cheapModel = migrateDeprecatedModel(merged.cheapModel);
+    merged.summaryModel = migrateDeprecatedModel(merged.summaryModel);
+    return merged;
 }
 async function readJson(path) {
     const text = await readFile(path, 'utf8').catch(() => undefined);

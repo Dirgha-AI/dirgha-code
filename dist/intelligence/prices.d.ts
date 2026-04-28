@@ -52,6 +52,7 @@ export declare function findContextWindow(modelId: string): number | undefined;
 export declare const DEFAULT_CONTEXT_WINDOW = 32000;
 export declare function contextWindowFor(modelId: string): number;
 export declare function findFailover(modelId: string): string | undefined;
+export declare function migrateDeprecatedModel(modelId: string): string;
 export declare function resolveModelAlias(input: string): string;
 export declare function listModelAliases(): Array<{
     alias: string;

@@ -29,6 +29,7 @@ import type {
 } from './types.js';
 import type { EventStream } from './event-stream.js';
 import { assembleTurn, extractToolUses, appendToolResults } from './message.js';
+import { resolveModelForDispatch } from '../providers/dispatch.js';
 
 export interface AgentLoopConfig {
   sessionId: string;
@@ -83,8 +84,9 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
 
       const streamEvents: AgentEvent[] = [];
       try {
+        const dispatchModel = resolveModelForDispatch(cfg.model);
         for await (const ev of cfg.provider.stream({
-          model: cfg.model,
+          model: dispatchModel,
           messages: messagesForCall,
           tools: cfg.tools,
           signal: cfg.signal,

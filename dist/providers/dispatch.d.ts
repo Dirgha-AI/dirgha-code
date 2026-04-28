@@ -8,4 +8,5 @@
  */
 export type ProviderId = 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'nvidia' | 'ollama' | 'llamacpp' | 'fireworks' | 'deepseek';
 export declare function routeModel(modelId: string): ProviderId;
+export declare function resolveModelForDispatch(modelId: string): string;
 export declare function isKnownProvider(id: string): id is ProviderId;

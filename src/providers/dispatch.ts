@@ -7,6 +7,8 @@
  * end.
  */
 
+import { migrateDeprecatedModel } from '../intelligence/prices.js';
+
 export type ProviderId =
   | 'anthropic'
   | 'openai'
@@ -58,10 +60,15 @@ const RULES: RoutingRule[] = [
 ];
 
 export function routeModel(modelId: string): ProviderId {
+  const migrated = migrateDeprecatedModel(modelId);
   for (const rule of RULES) {
-    if (rule.match(modelId)) return rule.provider;
+    if (rule.match(migrated)) return rule.provider;
   }
-  throw new Error(`No provider configured for model "${modelId}". Add a routing rule in providers/dispatch.ts.`);
+  throw new Error(`No provider configured for model "${migrated}". Add a routing rule in providers/dispatch.ts.`);
+}
+
+export function resolveModelForDispatch(modelId: string): string {
+  return migrateDeprecatedModel(modelId);
 }
 
 export function isKnownProvider(id: string): id is ProviderId {

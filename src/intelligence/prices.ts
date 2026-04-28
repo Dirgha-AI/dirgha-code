@@ -256,6 +256,27 @@ export function findFailover(modelId: string): string | undefined {
 }
 
 /**
+ * Model IDs the upstream provider has dropped (returns 400 "not a
+ * valid model ID" or equivalent on every call). These are migrated
+ * silently at config-load and dispatch time to the failover ID, so
+ * existing users with stale `~/.dirgha/config.json` and ad-hoc
+ * `-m <stale-id>` invocations don't crash on first use. Distinct
+ * from `findFailover` (runtime swap on transient error) — these are
+ * permanent rewrites.
+ */
+const DEPRECATED_MODELS = new Set<string>([
+  'moonshotai/kimi-k2-instruct',  // NVIDIA NIM dropped 2026-04
+]);
+
+export function migrateDeprecatedModel(modelId: string): string {
+  if (DEPRECATED_MODELS.has(modelId)) {
+    const replacement = MODEL_FAILOVERS[modelId];
+    if (replacement) return replacement;
+  }
+  return modelId;
+}
+
+/**
  * Short model aliases — let users type `dirgha -m kimi` instead of the
  * full canonical id. Lookup is case-insensitive and runs before any
  * provider routing, so the alias is invisible past resolveModelAlias.
