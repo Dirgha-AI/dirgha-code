@@ -1,44 +1,65 @@
-# Temporary: uses @salikshah until @dirghaai/maintainers team is created on GitHub.
-# When teams exist, sed -i 's#@salikshah#@dirghaai/maintainers#' then commit.
-
 # Dirgha Code — code owners
-# GitHub uses this to auto-request reviews on PRs.
-# Order matters: later patterns override earlier ones for overlapping paths.
+#
+# GitHub uses this to auto-request reviews on PRs touching listed paths.
+# Combined with branch protection's `require_code_owner_reviews=true`,
+# the listed owner's review becomes MANDATORY for sensitive paths.
+#
+# Supply-chain safety:
+#   - Release infrastructure changes ALWAYS go through Salik.
+#   - Telemetry / auth / tool-registry / provider-routing changes too —
+#     these are the paths an attacker would target to redirect the CLI
+#     to a hostile endpoint or exfiltrate credentials.
+#
+# Order matters — later patterns override earlier ones for overlapping paths.
 
 # Default owner for everything not matched below
-*                               @salikshah
+*                                                  @salikshah
 
-# Provider layer — keep routing logic stable
-/src/providers/                 @salikshah
-/src/providers/dispatch.ts      @salikshah
-/src/providers/detection.ts     @salikshah
-/src/providers/http.ts          @salikshah
+# Source — TypeScript (canonical lives in src_v2; legacy v1 is quarantined)
+/src_v2/                                           @salikshah
+/src_v2/tui/ink/App.tsx                            @salikshah
+/src_v2/cli/main.ts                                @salikshah
 
-# Agent loop — high blast radius
-/src/agent/                     @salikshah
-/src/agent/loop.ts              @salikshah
-/src/agent/context.ts           @salikshah
-/src/agent/tool-execution.ts    @salikshah
-/src/agent/model-fallback.ts    @salikshah
+# Release + signing infrastructure — never merge without owner review
+/.github/workflows/                                @salikshah
+/.github/dependabot.yml                            @salikshah
+/.github/settings.yml                              @salikshah
+/.github/CODEOWNERS                                @salikshah
+/release-please-config.json                        @salikshah
+/.release-please-manifest.json                     @salikshah
+/scripts/apply-branch-protection.sh                @salikshah
+/scripts/prepublish-guard.sh                       @salikshah
+/scripts/verify-install.sh                         @salikshah
 
-# TUI — App.tsx is off-limits to mechanical refactors (see feedback memory)
-/src/tui/                       @salikshah
-/src/tui/App.tsx                @salikshah
+# Telemetry — privacy-sensitive
+/src_v2/telemetry/                                 @salikshah
+/docs/privacy/                                     @salikshah
 
-# Tools layer
-/src/tools/                     @salikshah
+# Auth + BYOK keystore — credentials surface
+/src_v2/cli/subcommands/keys.ts                    @salikshah
+/src_v2/cli/subcommands/login.ts                   @salikshah
+/src_v2/cli/subcommands/logout.ts                  @salikshah
+/src_v2/cli/subcommands/telemetry.ts               @salikshah
+/src_v2/integrations/                              @salikshah
 
-# Billing + security-sensitive
-/src/billing/                   @salikshah
-/src/permission/                @salikshah
-/src/security/                  @salikshah
+# Tools registry + skill loader — supply-chain attack surface
+/src_v2/tools/registry.ts                          @salikshah
+/src_v2/tools/index.ts                             @salikshah
+/src_v2/skills/install-npm.ts                      @salikshah
+/src_v2/skills/                                    @salikshah
 
-# CI and release
-/.github/workflows/             @salikshah
-/build.mjs                      @salikshah
-/package.json                   @salikshah
+# Provider routing + model catalogue — pinning prevents prompt-injection
+# attacks that redirect users to a hostile LLM endpoint
+/src_v2/providers/                                 @salikshah
+/src_v2/intelligence/                              @salikshah
 
-# Docs are lower barrier — drive-by fixes welcome
-/docs/                          @salikshah
-/README.md                      @salikshah
-/CONTRIBUTING.md                @salikshah
+# Test infrastructure — owner reviews changes that could mask regressions
+/scripts/qa-app/                                   @salikshah
+/scripts/smoke-matrix.sh                           @salikshah
+/tools/ux-scorer/                                  @salikshah
+
+# Docs lower-barrier (drive-by typo fixes welcome) but owner FYI
+/docs/                                             @salikshah
+/README.md                                         @salikshah
+/CONTRIBUTING.md                                   @salikshah
+/CHANGELOG.md                                      @salikshah

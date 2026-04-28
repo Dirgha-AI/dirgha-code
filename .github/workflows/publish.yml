@@ -15,12 +15,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
@@ -129,7 +129,7 @@ jobs:
 
       - name: Upload ux-scorer artefacts (transcripts + report)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ux-scorer-${{ github.ref_name }}
           path: /tmp/dirgha-ux-*/
@@ -165,7 +165,7 @@ jobs:
       - name: Install cosign
         # Keyless OIDC signing — uses the same GitHub OIDC token that
         # npm provenance uses. No private key to manage.
-        uses: sigstore/cosign-installer@v3
+        uses: sigstore/cosign-installer@f713795cb21599bc4e5c4b58cbad1da852d7eeb9 # v3
 
       - name: Sign SBOMs with cosign (keyless OIDC)
         # Creates sbom.cdx.json.sig, sbom.spdx.json.sig + .pem cert files.
@@ -197,7 +197,7 @@ jobs:
         # Release notes auto-populate from the commit body; SBOM files
         # and their cosign signatures are downloadable evidence for
         # security auditors. The .pem certs allow offline verification.
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           files: |
             dirgha-code-*.tgz
