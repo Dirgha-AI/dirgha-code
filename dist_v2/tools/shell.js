@@ -26,10 +26,15 @@ export const shellTool = {
         const input = rawInput;
         const cwd = input.cwd ?? ctx.cwd;
         const timeoutMs = input.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-        const child = spawn('/bin/sh', ['-c', input.command], {
+        // Cross-platform shell: spawn with `shell: true` invokes the user's
+        // default shell — /bin/sh on Linux/macOS, cmd.exe on Windows. The
+        // command string is passed through verbatim. Hardcoding /bin/sh
+        // broke the Windows leg of the cross-OS CI matrix.
+        const child = spawn(input.command, {
             cwd,
             env: ctx.env,
             stdio: ['ignore', 'pipe', 'pipe'],
+            shell: true,
         });
         const stdoutChunks = [];
         const stderrChunks = [];

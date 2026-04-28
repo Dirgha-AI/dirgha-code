@@ -49,7 +49,7 @@ function makeFakeRemote(name, withSkill) {
 }
 
 function runSkills(args) {
-  const env = { ...process.env, HOME: fakeHome };
+  const env = { ...process.env, HOME: fakeHome, USERPROFILE: fakeHome };
   const res = spawnSync('node',
     [BIN, 'skills', ...args],
     { env, encoding: 'utf8' });

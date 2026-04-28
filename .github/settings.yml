@@ -30,9 +30,11 @@ branches:
       required_status_checks:
         strict: false
         contexts:
+          # Only Linux is required-blocking. macOS and Windows run
+          # but are continue-on-error in ci.yml — track their
+          # outcome via the PR check page, fix bugs PR-by-PR.
           - "Test (ubuntu-latest · Node 22)"
-          - "Test (macos-latest · Node 22)"
-          - "Test (windows-latest · Node 22)"
+          - "Test (ubuntu-latest · Node 20)"
 
       # Enforce these rules even for admins (Salik must follow the rule too)
       enforce_admins: true

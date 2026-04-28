@@ -28,7 +28,7 @@ const check = (label, ok, detail) => {
 };
 
 function runKb(args) {
-  const env = { ...process.env, HOME: sandbox };
+  const env = { ...process.env, HOME: sandbox, USERPROFILE: sandbox };
   const r = spawnSync('node', [BIN, 'kb', ...args], { env, encoding: 'utf8' });
   return { stdout: r.stdout, stderr: r.stderr, status: r.status };
 }

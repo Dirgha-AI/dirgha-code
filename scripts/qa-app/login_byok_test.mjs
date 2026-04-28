@@ -36,7 +36,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const BIN = resolve(__dirname, '../../dist_v2/cli/main.js');
 
 function run(args) {
-  const env = { ...process.env, HOME: fakeHome };
+  const env = { ...process.env, HOME: fakeHome, USERPROFILE: fakeHome };
   const res = spawnSync('node', [BIN, ...args], { env, encoding: 'utf8' });
   return { stdout: res.stdout, stderr: res.stderr, status: res.status };
 }

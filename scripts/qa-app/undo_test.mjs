@@ -51,7 +51,8 @@ function rebuildSession(turns) {
 }
 
 function runUndo(args) {
-  const env = { ...process.env, HOME: sandbox };
+  // Windows: os.homedir() reads %USERPROFILE%, not $HOME.
+  const env = { ...process.env, HOME: sandbox, USERPROFILE: sandbox };
   const res = spawnSync('node',
     [BIN, 'undo', ...args],
     { env, encoding: 'utf8' });
