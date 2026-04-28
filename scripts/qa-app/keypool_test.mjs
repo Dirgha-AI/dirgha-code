@@ -19,10 +19,10 @@ import { join } from 'node:path';
 const sandbox = mkdtempSync(join(tmpdir(), 'keypool-test-'));
 mkdirSync(join(sandbox, '.dirgha'), { recursive: true });
 
-import { fileURLToPath as _toPath } from 'node:url';
-import { dirname as _dn, resolve as _rs } from 'node:path';
+import { fileURLToPath as _toPath, pathToFileURL as _toUrl } from 'node:url';
+import { dirname as _dn, resolve as _rs, join as _join } from 'node:path';
 const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist_v2');
-const kp = await import(`${ROOT}/auth/keypool.js`);
+const kp = await import(_toUrl(_join(ROOT, 'auth/keypool.js')).href);
 
 let pass = 0, fail = 0;
 const check = (label, ok, detail) => {

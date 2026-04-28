@@ -18,13 +18,13 @@ if (!process.env.OPENROUTER_API_KEY) {
   process.exit(0);
 }
 
-import { fileURLToPath as _toPath } from 'node:url';
-import { dirname as _dn, resolve as _rs } from 'node:path';
+import { fileURLToPath as _toPath, pathToFileURL as _toUrl } from 'node:url';
+import { dirname as _dn, resolve as _rs, join as _join } from 'node:path';
 const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist_v2');
-const { runAgentLoop } = await import(`${ROOT}/kernel/agent-loop.js`);
-const { createEventStream } = await import(`${ROOT}/kernel/event-stream.js`);
-const { ProviderRegistry } = await import(`${ROOT}/providers/index.js`);
-const { builtInTools, createToolRegistry, createToolExecutor } = await import(`${ROOT}/tools/index.js`);
+const { runAgentLoop } = await import(_toUrl(_join(ROOT, 'kernel/agent-loop.js')).href);
+const { createEventStream } = await import(_toUrl(_join(ROOT, 'kernel/event-stream.js')).href);
+const { ProviderRegistry } = await import(_toUrl(_join(ROOT, 'providers/index.js')).href);
+const { builtInTools, createToolRegistry, createToolExecutor } = await import(_toUrl(_join(ROOT, 'tools/index.js')).href);
 
 const sandbox = mkdtempSync(join(tmpdir(), 'hooks-test-'));
 process.chdir(sandbox);

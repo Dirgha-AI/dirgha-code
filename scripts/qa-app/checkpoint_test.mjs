@@ -14,11 +14,11 @@ process.env.HOME = scratchHome;
 mkdirSync(join(scratchHome, '.dirgha', 'sessions'), { recursive: true });
 mkdirSync(join(scratchHome, '.dirgha', 'checkpoints'), { recursive: true });
 
-import { fileURLToPath as _toPath } from 'node:url';
-import { dirname as _dn, resolve as _rs } from 'node:path';
+import { fileURLToPath as _toPath, pathToFileURL as _toUrl } from 'node:url';
+import { dirname as _dn, resolve as _rs, join as _join } from 'node:path';
 const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist_v2');
-const { builtInTools, createToolExecutor, createToolRegistry } = await import(`${ROOT}/tools/index.js`);
-const { createSessionStore } = await import(`${ROOT}/context/session.js`);
+const { builtInTools, createToolExecutor, createToolRegistry } = await import(_toUrl(_join(ROOT, 'tools/index.js')).href);
+const { createSessionStore } = await import(_toUrl(_join(ROOT, 'context/session.js')).href);
 
 const sandbox = mkdtempSync(join(tmpdir(), 'checkpoint-test-'));
 process.chdir(sandbox);

@@ -11,10 +11,10 @@ import { join } from 'node:path';
 const home = mkdtempSync(join(tmpdir(), 'ledger-home-'));
 process.env.HOME = home;
 
-import { fileURLToPath as _toPath } from 'node:url';
-import { dirname as _dn, resolve as _rs } from 'node:path';
+import { fileURLToPath as _toPath, pathToFileURL as _toUrl } from 'node:url';
+import { dirname as _dn, resolve as _rs, join as _join } from 'node:path';
 const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist_v2');
-const { ledgerScope, appendLedger, readLedger, searchLedger, readDigest, writeDigest, renderLedgerContext } = await import(`${ROOT}/context/ledger.js`);
+const { ledgerScope, appendLedger, readLedger, searchLedger, readDigest, writeDigest, renderLedgerContext } = await import(_toUrl(_join(ROOT, 'context/ledger.js')).href);
 
 let pass = 0, fail = 0;
 const check = (label, ok, detail) => {

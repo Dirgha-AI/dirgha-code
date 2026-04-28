@@ -19,13 +19,13 @@ import { mkdtempSync, writeFileSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { fileURLToPath as _toPath } from 'node:url';
-import { dirname as _dn, resolve as _rs } from 'node:path';
+import { fileURLToPath as _toPath, pathToFileURL as _toUrl } from 'node:url';
+import { dirname as _dn, resolve as _rs, join as _join } from 'node:path';
 const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist_v2');
-const { StdioTransport, HttpTransport } = await import(`${ROOT}/mcp/transport.js`);
-const { DefaultMcpClient } = await import(`${ROOT}/mcp/client.js`);
-const { bridgeMcpTools } = await import(`${ROOT}/mcp/tool-bridge.js`);
-const { loadMcpServers } = await import(`${ROOT}/mcp/loader.js`);
+const { StdioTransport, HttpTransport } = await import(_toUrl(_join(ROOT, 'mcp/transport.js')).href);
+const { DefaultMcpClient } = await import(_toUrl(_join(ROOT, 'mcp/client.js')).href);
+const { bridgeMcpTools } = await import(_toUrl(_join(ROOT, 'mcp/tool-bridge.js')).href);
+const { loadMcpServers } = await import(_toUrl(_join(ROOT, 'mcp/loader.js')).href);
 
 let pass = 0, fail = 0;
 const check = (label, ok, detail) => {

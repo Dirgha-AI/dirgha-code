@@ -21,14 +21,19 @@ import { render } from 'ink';
 
 // Use the monorepo's compiled v2 modules — testing the same code path
 // the published binary would run.
-import { fileURLToPath as _toPath } from 'node:url';
-import { dirname as _dn, resolve as _rs } from 'node:path';
+//
+// Windows: dynamic import() of an absolute path requires a `file://` URL
+// (Node ≥ 20 hard-rejects bare drive paths with ERR_UNSUPPORTED_ESM_URL_SCHEME).
+// `pathToFileURL().href` does the right thing on every OS.
+import { fileURLToPath as _toPath, pathToFileURL as _toUrl } from 'node:url';
+import { dirname as _dn, resolve as _rs, join as _join } from 'node:path';
 const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist_v2');
-const { App } = await import(`${ROOT}/tui/ink/App.js`);
-const { createEventStream } = await import(`${ROOT}/kernel/event-stream.js`);
-const { ProviderRegistry } = await import(`${ROOT}/providers/index.js`);
-const { createToolRegistry, builtInTools } = await import(`${ROOT}/tools/index.js`);
-const { createSessionStore } = await import(`${ROOT}/context/session.js`);
+const _imp = (rel) => import(_toUrl(_join(ROOT, rel)).href);
+const { App } = await _imp('tui/ink/App.js');
+const { createEventStream } = await _imp('kernel/event-stream.js');
+const { ProviderRegistry } = await _imp('providers/index.js');
+const { createToolRegistry, builtInTools } = await _imp('tools/index.js');
+const { createSessionStore } = await _imp('context/session.js');
 
 // ANSI stripper.
 const ANSI = /\x1b\[[0-9;?]*[A-Za-z]|\x1b\][^\x07]*\x07|\x1b[=>]/g;

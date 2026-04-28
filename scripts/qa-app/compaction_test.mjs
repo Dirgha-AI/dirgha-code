@@ -10,11 +10,11 @@
  * the test is offline and 100% reproducible.
  */
 
-import { fileURLToPath as _toPath } from 'node:url';
-import { dirname as _dn, resolve as _rs } from 'node:path';
+import { fileURLToPath as _toPath, pathToFileURL as _toUrl } from 'node:url';
+import { dirname as _dn, resolve as _rs, join as _join } from 'node:path';
 const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist_v2');
-const { maybeCompact } = await import(`${ROOT}/context/compaction.js`);
-const { createHookRegistry } = await import(`${ROOT}/hooks/registry.js`);
+const { maybeCompact } = await import(_toUrl(_join(ROOT, 'context/compaction.js')).href);
+const { createHookRegistry } = await import(_toUrl(_join(ROOT, 'hooks/registry.js')).href);
 
 let pass = 0, fail = 0;
 const check = (label, ok, detail) => {

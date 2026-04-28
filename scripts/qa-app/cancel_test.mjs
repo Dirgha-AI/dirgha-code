@@ -19,14 +19,14 @@ import { join } from 'node:path';
 
 if (!process.env.OPENROUTER_API_KEY) { console.log('SKIP: OPENROUTER_API_KEY unset'); process.exit(0); }
 
-import { fileURLToPath as _toPath } from 'node:url';
-import { dirname as _dn, resolve as _rs } from 'node:path';
+import { fileURLToPath as _toPath, pathToFileURL as _toUrl } from 'node:url';
+import { dirname as _dn, resolve as _rs, join as _join } from 'node:path';
 const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist_v2');
-const { runAgentLoop } = await import(`${ROOT}/kernel/agent-loop.js`);
-const { createEventStream } = await import(`${ROOT}/kernel/event-stream.js`);
-const { ProviderRegistry } = await import(`${ROOT}/providers/index.js`);
-const { builtInTools, createToolRegistry, createToolExecutor } = await import(`${ROOT}/tools/index.js`);
-const { createSessionStore } = await import(`${ROOT}/context/session.js`);
+const { runAgentLoop } = await import(_toUrl(_join(ROOT, 'kernel/agent-loop.js')).href);
+const { createEventStream } = await import(_toUrl(_join(ROOT, 'kernel/event-stream.js')).href);
+const { ProviderRegistry } = await import(_toUrl(_join(ROOT, 'providers/index.js')).href);
+const { builtInTools, createToolRegistry, createToolExecutor } = await import(_toUrl(_join(ROOT, 'tools/index.js')).href);
+const { createSessionStore } = await import(_toUrl(_join(ROOT, 'context/session.js')).href);
 
 // Scratch HOME so the session JSONL we append to ends up in a tmp.
 const home = mkdtempSync(join(tmpdir(), 'cancel-home-'));

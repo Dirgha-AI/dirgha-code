@@ -9,11 +9,11 @@
  *   - unknown provider/model yields zero cost (graceful fallback)
  */
 
-import { fileURLToPath as _toPath } from 'node:url';
-import { dirname as _dn, resolve as _rs } from 'node:path';
+import { fileURLToPath as _toPath, pathToFileURL as _toUrl } from 'node:url';
+import { dirname as _dn, resolve as _rs, join as _join } from 'node:path';
 const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist_v2');
-const { createCostTracker } = await import(`${ROOT}/intelligence/cost.js`);
-const { findPrice } = await import(`${ROOT}/intelligence/prices.js`);
+const { createCostTracker } = await import(_toUrl(_join(ROOT, 'intelligence/cost.js')).href);
+const { findPrice } = await import(_toUrl(_join(ROOT, 'intelligence/prices.js')).href);
 
 let pass = 0, fail = 0;
 const check = (label, ok, detail) => {

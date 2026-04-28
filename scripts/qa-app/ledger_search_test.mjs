@@ -15,10 +15,10 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { fileURLToPath as _toPath } from 'node:url';
-import { dirname as _dn, resolve as _rs } from 'node:path';
+import { fileURLToPath as _toPath, pathToFileURL as _toUrl } from 'node:url';
+import { dirname as _dn, resolve as _rs, join as _join } from 'node:path';
 const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist_v2');
-const { ledgerScope, appendLedger, searchLedgerRanked } = await import(`${ROOT}/context/ledger.js`);
+const { ledgerScope, appendLedger, searchLedgerRanked } = await import(_toUrl(_join(ROOT, 'context/ledger.js')).href);
 
 let pass = 0, fail = 0;
 const check = (label, ok, detail) => {

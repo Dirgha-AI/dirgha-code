@@ -16,10 +16,10 @@ import { join } from 'node:path';
 const sandbox = mkdtempSync(join(tmpdir(), 'audit-test-'));
 process.env.HOME = sandbox;
 
-import { fileURLToPath as _toPath } from 'node:url';
-import { dirname as _dn, resolve as _rs } from 'node:path';
+import { fileURLToPath as _toPath, pathToFileURL as _toUrl } from 'node:url';
+import { dirname as _dn, resolve as _rs, join as _join } from 'node:path';
 const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist_v2');
-const { appendAudit } = await import(`${ROOT}/audit/writer.js`);
+const { appendAudit } = await import(_toUrl(_join(ROOT, 'audit/writer.js')).href);
 
 let pass = 0, fail = 0;
 const check = (label, ok, detail) => {

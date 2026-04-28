@@ -29,12 +29,12 @@ and then fixing each error manually.
 
 const projDir = mkdtempSync(join(tmpdir(), 'skills-proj-'));
 
-import { fileURLToPath as _toPath } from 'node:url';
-import { dirname as _dn, resolve as _rs } from 'node:path';
+import { fileURLToPath as _toPath, pathToFileURL as _toUrl } from 'node:url';
+import { dirname as _dn, resolve as _rs, join as _join } from 'node:path';
 const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist_v2');
-const { loadSkills } = await import(`${ROOT}/skills/loader.js`);
-const { matchSkills } = await import(`${ROOT}/skills/matcher.js`);
-const { injectSkills } = await import(`${ROOT}/skills/runtime.js`);
+const { loadSkills } = await import(_toUrl(_join(ROOT, 'skills/loader.js')).href);
+const { matchSkills } = await import(_toUrl(_join(ROOT, 'skills/matcher.js')).href);
+const { injectSkills } = await import(_toUrl(_join(ROOT, 'skills/runtime.js')).href);
 
 let pass = 0, fail = 0;
 const check = (label, ok, detail) => {

@@ -14,11 +14,11 @@
  * No network: we never call .stream(); we only inspect the metadata.
  */
 
-import { fileURLToPath as _toPath } from 'node:url';
-import { dirname as _dn, resolve as _rs } from 'node:path';
+import { fileURLToPath as _toPath, pathToFileURL as _toUrl } from 'node:url';
+import { dirname as _dn, resolve as _rs, join as _join } from 'node:path';
 const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist_v2');
-const presets = await import(`${ROOT}/providers/presets.js`);
-const { defineOpenAICompatProvider } = await import(`${ROOT}/providers/define-openai-compat.js`);
+const presets = await import(_toUrl(_join(ROOT, 'providers/presets.js')).href);
+const { defineOpenAICompatProvider } = await import(_toUrl(_join(ROOT, 'providers/define-openai-compat.js')).href);
 
 let pass = 0, fail = 0;
 const check = (label, ok, detail) => {

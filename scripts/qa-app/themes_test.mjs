@@ -9,11 +9,11 @@ import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { fileURLToPath as _toPath } from 'node:url';
-import { dirname as _dn, resolve as _rs } from 'node:path';
+import { fileURLToPath as _toPath, pathToFileURL as _toUrl } from 'node:url';
+import { dirname as _dn, resolve as _rs, join as _join } from 'node:path';
 const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist_v2');
-const { resolveThemeByName, listAvailableThemes } = await import(`${ROOT}/tui/theme-loader.js`);
-const { darkTheme, lightTheme } = await import(`${ROOT}/tui/theme.js`);
+const { resolveThemeByName, listAvailableThemes } = await import(_toUrl(_join(ROOT, 'tui/theme-loader.js')).href);
+const { darkTheme, lightTheme } = await import(_toUrl(_join(ROOT, 'tui/theme.js')).href);
 
 const home = mkdtempSync(join(tmpdir(), 'theme-home-'));
 mkdirSync(join(home, '.dirgha', 'themes'), { recursive: true });

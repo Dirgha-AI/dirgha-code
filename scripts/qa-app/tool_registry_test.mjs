@@ -11,11 +11,11 @@
  *     `<server>_<tool>` naming convention
  */
 
-import { fileURLToPath as _toPath } from 'node:url';
-import { dirname as _dn, resolve as _rs } from 'node:path';
+import { fileURLToPath as _toPath, pathToFileURL as _toUrl } from 'node:url';
+import { dirname as _dn, resolve as _rs, join as _join } from 'node:path';
 const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist_v2');
-const { ToolRegistry, createToolRegistry } = await import(`${ROOT}/tools/registry.js`);
-const { bridgeMcpTools } = await import(`${ROOT}/mcp/tool-bridge.js`);
+const { ToolRegistry, createToolRegistry } = await import(_toUrl(_join(ROOT, 'tools/registry.js')).href);
+const { bridgeMcpTools } = await import(_toUrl(_join(ROOT, 'mcp/tool-bridge.js')).href);
 
 let pass = 0, fail = 0;
 const check = (label, ok, detail) => {

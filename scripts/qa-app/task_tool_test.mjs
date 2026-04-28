@@ -17,14 +17,14 @@
  *   - toolAllowlist trims the sub-agent's tool surface
  */
 
-import { fileURLToPath as _toPath } from 'node:url';
-import { dirname as _dn, resolve as _rs } from 'node:path';
+import { fileURLToPath as _toPath, pathToFileURL as _toUrl } from 'node:url';
+import { dirname as _dn, resolve as _rs, join as _join } from 'node:path';
 const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist_v2');
-const { runAgentLoop } = await import(`${ROOT}/kernel/agent-loop.js`);
-const { createEventStream } = await import(`${ROOT}/kernel/event-stream.js`);
-const { createToolRegistry, createToolExecutor, builtInTools } = await import(`${ROOT}/tools/index.js`);
-const { SubagentDelegator } = await import(`${ROOT}/subagents/delegator.js`);
-const { createTaskTool } = await import(`${ROOT}/tools/task.js`);
+const { runAgentLoop } = await import(_toUrl(_join(ROOT, 'kernel/agent-loop.js')).href);
+const { createEventStream } = await import(_toUrl(_join(ROOT, 'kernel/event-stream.js')).href);
+const { createToolRegistry, createToolExecutor, builtInTools } = await import(_toUrl(_join(ROOT, 'tools/index.js')).href);
+const { SubagentDelegator } = await import(_toUrl(_join(ROOT, 'subagents/delegator.js')).href);
+const { createTaskTool } = await import(_toUrl(_join(ROOT, 'tools/task.js')).href);
 
 let pass = 0, fail = 0;
 const check = (label, ok, detail) => {
