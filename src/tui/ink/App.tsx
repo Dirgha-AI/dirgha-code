@@ -48,6 +48,7 @@ import { InputBox } from './components/InputBox.js';
 import { PromptQueueIndicator } from './components/PromptQueueIndicator.js';
 import { ModelPicker, type ModelEntry } from './components/ModelPicker.js';
 import { ModelSwitchPrompt } from './components/ModelSwitchPrompt.js';
+import { ProviderPicker, type ProviderEntry as ProviderPickerEntry } from './components/ProviderPicker.js';
 import { HelpOverlay, type HelpSlashCommand } from './components/HelpOverlay.js';
 import { AtFileComplete } from './components/AtFileComplete.js';
 import { SlashComplete } from './components/SlashComplete.js';
@@ -104,6 +105,12 @@ export function App(props: AppProps): React.JSX.Element {
   // drain FIFO when the turn finishes (see useEffect below).
   const [promptQueue, setPromptQueue] = React.useState<string[]>([]);
   const [currentModel, setCurrentModel] = React.useState(props.config.model);
+  // Multi-step picker stage. Stage 1 = ProviderPicker (default when
+  // overlays.active === 'models'); stage 2 = ModelPicker filtered to
+  // the picked provider. Resets to 'provider' on every fresh open.
+  const [pickerStage, setPickerStage] = React.useState<'provider' | 'model'>('provider');
+  const [pickerProvider, setPickerProvider] = React.useState<string | null>(null);
+
   // Pending model-switch prompt — set when the kernel emits an error
   // with a `failoverModel` hint. Cleared when the user answers
   // [y|n|p]. While set, an inline ModelSwitchPrompt renders below
@@ -442,24 +449,38 @@ export function App(props: AppProps): React.JSX.Element {
     overlays.setActive(null);
   }, [overlays]);
 
+  // Slash commands that take no arguments — pressing Enter on the
+  // autocomplete suggestion submits them immediately instead of forcing
+  // a second Enter. Anything that DOES take args (model, theme, mode,
+  // memory, session, ...) gets a trailing space and waits for the arg.
+  const ARGLESS_SLASH = React.useMemo(() => new Set([
+    'help', 'exit', 'quit', 'clear', 'compact',
+    'models', 'theme', 'cost', 'status', 'history',
+    'login', 'logout', 'setup', 'upgrade', 'update',
+  ]), []);
+
   const handleSlashPick = React.useCallback((name: string): void => {
-    // Replace the leading /<typed> with /<picked> + a trailing space so
-    // the user can immediately type arguments. If there's already a
-    // tail (rare — only if they pasted), preserve it.
+    // Replace the leading /<typed> with /<picked>. For commands that
+    // need an argument we append a trailing space and wait for the user
+    // to type it. For argless commands (1.12.0 fix) we submit immediately
+    // — without this, /models<Enter> required pressing Enter TWICE: once
+    // to "pick" the autocomplete suggestion, again to submit.
+    let spliced = '';
     setInput(current => {
-      const spliced = overlays.spliceSlashSelection(current, name);
-      return spliced === `/${name}` ? `${spliced} ` : spliced;
+      spliced = overlays.spliceSlashSelection(current, name);
+      if (spliced === `/${name}` && !ARGLESS_SLASH.has(name)) {
+        return `${spliced} `;  // ready for arg input
+      }
+      return spliced;
     });
-    // Clear the slash query — the useEffect in use-overlays then closes
-    // the picker overlay automatically. We deliberately do NOT call
-    // `overlays.setActive(null)` here: when the user presses Enter, both
-    // SlashComplete (this onPick) and InputBox (its onSubmit) fire in
-    // the same batched render. If onSubmit calls openOverlay('theme'),
-    // an explicit setActive(null) from this handler would race and
-    // overwrite it — that's the bug that shipped to v1.7.8 and made
-    // /theme silently no-op.
     overlays.setSlashQuery(null);
-  }, [overlays]);
+    // Argless command — fire submit on the next tick so React commits
+    // the setInput state first. handleSubmit's `value === '/models'`
+    // branch then opens the overlay correctly.
+    if (ARGLESS_SLASH.has(name)) {
+      setTimeout(() => handleSubmit(spliced || `/${name}`), 0);
+    }
+  }, [overlays, ARGLESS_SLASH, handleSubmit]);
 
   const inputFocus = overlays.active === null || overlays.active === 'atfile' || overlays.active === 'slash';
 
@@ -551,12 +572,44 @@ export function App(props: AppProps): React.JSX.Element {
           onCancel={(): void => { overlays.setSlashQuery(null); overlays.setActive(null); }}
         />
       )}
-      {overlays.active === 'models' && (
+      {overlays.active === 'models' && pickerStage === 'provider' && (() => {
+        // Build provider entries — only include providers that actually have
+        // models in our catalogue. Without this, the picker shows providers
+        // with 0 models and the user lands on an empty model list.
+        const providers = buildProviderEntries(models, currentModel);
+        if (providers.length === 0) {
+          // Fall through to flat ModelPicker if no providers (catalogue empty).
+          return null;
+        }
+        return (
+          <ProviderPicker
+            providers={providers}
+            onPick={(providerId): void => {
+              setPickerProvider(providerId);
+              setPickerStage('model');
+            }}
+            onCancel={(): void => {
+              setPickerStage('provider');
+              setPickerProvider(null);
+              overlays.closeOverlay();
+            }}
+          />
+        );
+      })()}
+      {overlays.active === 'models' && pickerStage === 'model' && (
         <ModelPicker
-          models={models}
+          models={models.filter(m => m.provider === pickerProvider)}
           current={currentModel}
-          onPick={handleModelPick}
-          onCancel={overlays.closeOverlay}
+          onPick={(id): void => {
+            handleModelPick(id);
+            setPickerStage('provider');
+            setPickerProvider(null);
+          }}
+          onCancel={(): void => {
+            // Esc inside ModelPicker → back to ProviderPicker (NOT close).
+            setPickerStage('provider');
+            setPickerProvider(null);
+          }}
         />
       )}
       {overlays.active === 'help' && (
@@ -701,6 +754,96 @@ function providerIdForModel(model: string): string {
   if (model.includes('fireworks')) return 'fireworks';
   if (model.includes('/')) return 'openrouter';
   return 'local';
+}
+
+const PROVIDER_BLURB: Record<string, string> = {
+  anthropic: 'Claude — Opus, Sonnet, Haiku',
+  openai: 'GPT family — gpt-5.5, o1/o3',
+  gemini: 'Google — Gemini Pro, Flash',
+  openrouter: 'Aggregator — 370+ models, free tier',
+  nvidia: 'NIM — Kimi K2.5, DeepSeek V4, Qwen 3',
+  ollama: 'Local Ollama models',
+  llamacpp: 'Local llama.cpp models',
+  fireworks: 'Hosted open models',
+  deepseek: 'DeepSeek native — V3.2, reasoner',
+  mistral: 'Mistral — Codestral, Magistral',
+  cohere: 'Cohere — Command R / Command A',
+  cerebras: 'Wafer-scale — Qwen3, Llama 4',
+  together: 'Open-source hub — Llama, Qwen',
+  perplexity: 'Sonar — search-grounded',
+  xai: 'Grok 4 family — code + reasoning',
+  groq: 'LPU — very low latency',
+  zai: 'GLM-4.6 — long-context',
+  local: 'Local models',
+};
+
+const PROVIDER_ENV: Record<string, string> = {
+  anthropic: 'ANTHROPIC_API_KEY',
+  openai: 'OPENAI_API_KEY',
+  gemini: 'GEMINI_API_KEY',
+  openrouter: 'OPENROUTER_API_KEY',
+  nvidia: 'NVIDIA_API_KEY',
+  fireworks: 'FIREWORKS_API_KEY',
+  deepseek: 'DEEPSEEK_API_KEY',
+  mistral: 'MISTRAL_API_KEY',
+  cohere: 'COHERE_API_KEY',
+  cerebras: 'CEREBRAS_API_KEY',
+  together: 'TOGETHER_API_KEY',
+  perplexity: 'PERPLEXITY_API_KEY',
+  xai: 'XAI_API_KEY',
+  groq: 'GROQ_API_KEY',
+  zai: 'ZAI_API_KEY',
+};
+
+const PROVIDER_LABEL: Record<string, string> = {
+  anthropic: 'Anthropic',
+  openai: 'OpenAI',
+  gemini: 'Google AI',
+  openrouter: 'OpenRouter',
+  nvidia: 'NVIDIA NIM',
+  ollama: 'Ollama (local)',
+  llamacpp: 'llama.cpp (local)',
+  fireworks: 'Fireworks',
+  deepseek: 'DeepSeek',
+  mistral: 'Mistral',
+  cohere: 'Cohere',
+  cerebras: 'Cerebras',
+  together: 'Together AI',
+  perplexity: 'Perplexity',
+  xai: 'xAI (Grok)',
+  groq: 'Groq',
+  zai: 'Z.AI / GLM',
+  local: 'Local',
+};
+
+/**
+ * Group the flat model catalogue into per-provider entries for stage 1
+ * of the picker. Skips providers with zero models in the catalogue.
+ */
+function buildProviderEntries(models: ModelEntry[], currentModel: string): ProviderPickerEntry[] {
+  const buckets = new Map<string, ModelEntry[]>();
+  for (const m of models) {
+    const list = buckets.get(m.provider) ?? [];
+    list.push(m);
+    buckets.set(m.provider, list);
+  }
+  const currentProvider = models.find(m => m.id === currentModel)?.provider;
+  const out: ProviderPickerEntry[] = [];
+  for (const [id, items] of buckets) {
+    const env = PROVIDER_ENV[id];
+    const hasKey = env ? !!process.env[env] : true; // local providers don't need keys
+    out.push({
+      id,
+      label: PROVIDER_LABEL[id] ?? id,
+      modelCount: items.length,
+      hasKey,
+      blurb: PROVIDER_BLURB[id],
+      isCurrent: id === currentProvider,
+    });
+  }
+  // Sort by hasKey desc (configured first), then by name.
+  out.sort((a, b) => Number(b.hasKey) - Number(a.hasKey) || a.label.localeCompare(b.label));
+  return out;
 }
 
 function defaultModelCatalogue(): ModelEntry[] {

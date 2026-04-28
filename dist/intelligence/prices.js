@@ -34,10 +34,29 @@ export const PRICES = [
     { provider: 'nvidia', model: 'qwen/qwen3-next-80b-a3b-instruct', inputPerM: 0.08, outputPerM: 0.30 },
     { provider: 'nvidia', model: 'meta/llama-3.3-70b-instruct', inputPerM: 0.20, outputPerM: 0.80 },
     // OpenRouter — premium frontier (priced as OR charges)
+    // 2026-04-28 refresh: `~vendor/...-latest` aliases auto-track the
+    // vendor's newest stable model. Concrete vNs kept for reproducibility.
+    { provider: 'openrouter', model: '~anthropic/claude-opus-latest', inputPerM: 5, outputPerM: 25 },
+    { provider: 'openrouter', model: '~anthropic/claude-sonnet-latest', inputPerM: 3, outputPerM: 15 },
+    { provider: 'openrouter', model: '~anthropic/claude-haiku-latest', inputPerM: 1, outputPerM: 5 },
+    { provider: 'openrouter', model: 'anthropic/claude-opus-4.7', inputPerM: 5, outputPerM: 25 },
+    { provider: 'openrouter', model: '~openai/gpt-latest', inputPerM: 5, outputPerM: 30 },
+    { provider: 'openrouter', model: '~openai/gpt-mini-latest', inputPerM: 0.75, outputPerM: 4.50 },
     { provider: 'openrouter', model: 'openai/gpt-5.5-pro', inputPerM: 30, outputPerM: 180 },
     { provider: 'openrouter', model: 'openai/gpt-5.5', inputPerM: 5, outputPerM: 30 },
+    { provider: 'openrouter', model: '~google/gemini-pro-latest', inputPerM: 2, outputPerM: 12 },
+    { provider: 'openrouter', model: '~google/gemini-flash-latest', inputPerM: 0.5, outputPerM: 3 },
     { provider: 'openrouter', model: 'google/gemini-3.1-pro-preview', inputPerM: 2, outputPerM: 12 },
     { provider: 'openrouter', model: 'google/gemini-3-flash-preview', inputPerM: 0.5, outputPerM: 3 },
+    { provider: 'openrouter', model: '~moonshotai/kimi-latest', inputPerM: 0.74, outputPerM: 4.66 },
+    { provider: 'openrouter', model: 'deepseek/deepseek-v4-pro', inputPerM: 0.43, outputPerM: 0.87 },
+    { provider: 'openrouter', model: 'deepseek/deepseek-v4-flash', inputPerM: 0.14, outputPerM: 0.28 },
+    { provider: 'openrouter', model: 'qwen/qwen3.6-max-preview', inputPerM: 1.04, outputPerM: 6.24 },
+    { provider: 'openrouter', model: 'qwen/qwen3.6-flash', inputPerM: 0.25, outputPerM: 1.50 },
+    { provider: 'openrouter', model: 'qwen/qwen3.6-35b-a3b', inputPerM: 0.16, outputPerM: 0.97 },
+    { provider: 'openrouter', model: 'qwen/qwen3.5-plus-20260420', inputPerM: 0.40, outputPerM: 2.40 },
+    { provider: 'openrouter', model: 'x-ai/grok-4.20-multi-agent', inputPerM: 2, outputPerM: 6 },
+    { provider: 'openrouter', model: 'x-ai/grok-4.20', inputPerM: 2, outputPerM: 6 },
     // OpenRouter — Moonshot / Kimi
     { provider: 'openrouter', model: 'moonshotai/kimi-k2.6', inputPerM: 0.74, outputPerM: 4.66 },
     { provider: 'openrouter', model: 'moonshotai/kimi-k2.5', inputPerM: 0.44, outputPerM: 2 },
@@ -61,12 +80,66 @@ export const PRICES = [
     { provider: 'openrouter', model: 'z-ai/glm-5', inputPerM: 0.60, outputPerM: 2.08 },
     { provider: 'openrouter', model: 'z-ai/glm-4.7', inputPerM: 0.38, outputPerM: 1.74 },
     { provider: 'openrouter', model: 'z-ai/glm-4.7-flash', inputPerM: 0.06, outputPerM: 0.40 },
-    // OpenRouter — Free tier
+    // OpenRouter — Free tier (2026-04-28 refresh — top-of-list per OR registry)
+    { provider: 'openrouter', model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free', inputPerM: 0, outputPerM: 0, supportsThinking: true, family: 'nemotron' },
+    { provider: 'openrouter', model: 'poolside/laguna-xs.2:free', inputPerM: 0, outputPerM: 0, family: 'poolside' },
+    { provider: 'openrouter', model: 'poolside/laguna-m.1:free', inputPerM: 0, outputPerM: 0, family: 'poolside' },
     { provider: 'openrouter', model: 'inclusionai/ling-2.6-1t:free', inputPerM: 0, outputPerM: 0 },
     { provider: 'openrouter', model: 'tencent/hy3-preview:free', inputPerM: 0, outputPerM: 0 },
+    { provider: 'openrouter', model: 'inclusionai/ling-2.6-flash:free', inputPerM: 0, outputPerM: 0 },
     { provider: 'openrouter', model: 'minimax/minimax-m2.5:free', inputPerM: 0, outputPerM: 0 },
     { provider: 'openrouter', model: 'qwen/qwen3-coder:free', inputPerM: 0, outputPerM: 0 },
     { provider: 'openrouter', model: 'z-ai/glm-4.5-air:free', inputPerM: 0, outputPerM: 0 },
+    { provider: 'openrouter', model: 'google/gemma-4-31b-it:free', inputPerM: 0, outputPerM: 0 },
+    { provider: 'openrouter', model: 'google/gemma-4-26b-a4b-it:free', inputPerM: 0, outputPerM: 0 },
+    // ─────────────────────────────────────────────────────────────────
+    // Native providers added in 1.10.1 / catalogue refreshed 2026-04-28
+    // ─────────────────────────────────────────────────────────────────
+    // Mistral — native API. Latest tier as of 2026-04.
+    { provider: 'mistral', model: 'mistral/mistral-large-latest', inputPerM: 2, outputPerM: 6, contextWindow: 128_000, family: 'mistral' },
+    { provider: 'mistral', model: 'mistral/mistral-medium-latest', inputPerM: 0.4, outputPerM: 2, contextWindow: 128_000, family: 'mistral' },
+    { provider: 'mistral', model: 'mistral/mistral-small-latest', inputPerM: 0.1, outputPerM: 0.3, contextWindow: 128_000, family: 'mistral' },
+    { provider: 'mistral', model: 'mistral/codestral-latest', inputPerM: 0.3, outputPerM: 0.9, contextWindow: 256_000, family: 'mistral' },
+    { provider: 'mistral', model: 'mistral/magistral-medium-latest', inputPerM: 2, outputPerM: 5, contextWindow: 128_000, supportsThinking: true, family: 'mistral' },
+    { provider: 'mistral', model: 'mistral/ministral-8b-latest', inputPerM: 0.10, outputPerM: 0.10, contextWindow: 128_000, family: 'mistral' },
+    // Cohere — native API. command-a-* is the latest 2025 generation.
+    { provider: 'cohere', model: 'cohere/command-a-03-2025', inputPerM: 2.5, outputPerM: 10, contextWindow: 256_000, family: 'cohere' },
+    { provider: 'cohere', model: 'cohere/command-a-vision-07-2025', inputPerM: 2.5, outputPerM: 10, contextWindow: 256_000, family: 'cohere' },
+    { provider: 'cohere', model: 'cohere/command-r-plus', inputPerM: 2.5, outputPerM: 10, contextWindow: 128_000, family: 'cohere' },
+    { provider: 'cohere', model: 'cohere/command-r7b-12-2024', inputPerM: 0.0375, outputPerM: 0.15, contextWindow: 128_000, family: 'cohere' },
+    // Cerebras — wafer-scale inference. Free during 2025 preview tier.
+    { provider: 'cerebras', model: 'cerebras/qwen-3-235b-instruct', inputPerM: 0, outputPerM: 0, contextWindow: 65_000, family: 'qwen' },
+    { provider: 'cerebras', model: 'cerebras/qwen-3-coder-480b', inputPerM: 0, outputPerM: 0, contextWindow: 256_000, family: 'qwen' },
+    { provider: 'cerebras', model: 'cerebras/llama-4-maverick-17b-128e', inputPerM: 0, outputPerM: 0, contextWindow: 1_000_000, family: 'llama' },
+    { provider: 'cerebras', model: 'cerebras/llama-3.3-70b', inputPerM: 0, outputPerM: 0, contextWindow: 128_000, family: 'llama' },
+    { provider: 'cerebras', model: 'cerebras/gpt-oss-120b', inputPerM: 0, outputPerM: 0, contextWindow: 128_000, family: 'gpt-oss' },
+    // Together AI — open-source model hub.
+    { provider: 'together', model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', inputPerM: 0.88, outputPerM: 0.88, contextWindow: 128_000, family: 'llama' },
+    { provider: 'together', model: 'deepseek-ai/DeepSeek-V3.1', inputPerM: 0.27, outputPerM: 1.10, contextWindow: 128_000, family: 'deepseek' },
+    { provider: 'together', model: 'Qwen/Qwen3-235B-A22B-Instruct', inputPerM: 0.20, outputPerM: 0.60, contextWindow: 128_000, family: 'qwen' },
+    { provider: 'together', model: 'Qwen/Qwen3-Coder-32B-Instruct', inputPerM: 0.18, outputPerM: 0.18, contextWindow: 128_000, family: 'qwen' },
+    { provider: 'together', model: 'moonshotai/Kimi-K2-Instruct', inputPerM: 0.15, outputPerM: 0.60, contextWindow: 128_000, family: 'kimi' },
+    // Perplexity — Sonar (search-grounded). 5 USD per 1k searches included.
+    { provider: 'perplexity', model: 'perplexity/sonar', inputPerM: 1, outputPerM: 1, contextWindow: 128_000, family: 'sonar' },
+    { provider: 'perplexity', model: 'perplexity/sonar-pro', inputPerM: 3, outputPerM: 15, contextWindow: 200_000, family: 'sonar' },
+    { provider: 'perplexity', model: 'perplexity/sonar-reasoning', inputPerM: 1, outputPerM: 5, contextWindow: 128_000, supportsThinking: true, family: 'sonar' },
+    { provider: 'perplexity', model: 'perplexity/sonar-reasoning-pro', inputPerM: 2, outputPerM: 8, contextWindow: 200_000, supportsThinking: true, family: 'sonar' },
+    // xAI (Grok) — native API. grok-4 is the current top reasoning model.
+    { provider: 'xai', model: 'grok-4', inputPerM: 3, outputPerM: 15, contextWindow: 256_000, supportsThinking: true, family: 'grok' },
+    { provider: 'xai', model: 'grok-4-fast', inputPerM: 0.20, outputPerM: 0.50, contextWindow: 2_000_000, family: 'grok' },
+    { provider: 'xai', model: 'grok-code-fast-1', inputPerM: 0.20, outputPerM: 1.50, contextWindow: 256_000, family: 'grok' },
+    { provider: 'xai', model: 'grok-3', inputPerM: 3, outputPerM: 15, contextWindow: 131_000, family: 'grok' },
+    // Groq — LPU-accelerated inference. Free tier exists for most models.
+    { provider: 'groq', model: 'groq/llama-3.3-70b-versatile', inputPerM: 0.59, outputPerM: 0.79, contextWindow: 128_000, family: 'llama' },
+    { provider: 'groq', model: 'groq/llama-4-maverick-17b-128e-instruct', inputPerM: 0.20, outputPerM: 0.60, contextWindow: 1_000_000, family: 'llama' },
+    { provider: 'groq', model: 'groq/llama-4-scout-17b-16e-instruct', inputPerM: 0.11, outputPerM: 0.34, contextWindow: 131_000, family: 'llama' },
+    { provider: 'groq', model: 'groq/qwen-3-32b', inputPerM: 0.29, outputPerM: 0.59, contextWindow: 131_000, family: 'qwen' },
+    { provider: 'groq', model: 'groq/moonshotai/kimi-k2-instruct-0905', inputPerM: 1, outputPerM: 3, contextWindow: 256_000, family: 'kimi' },
+    { provider: 'groq', model: 'groq/openai/gpt-oss-120b', inputPerM: 0.15, outputPerM: 0.75, contextWindow: 131_000, family: 'gpt-oss' },
+    // Z.AI / GLM — native API. Lower latency than the OpenRouter mirror.
+    { provider: 'zai', model: 'zai/glm-4.6', inputPerM: 0.60, outputPerM: 2.20, contextWindow: 200_000, family: 'glm' },
+    { provider: 'zai', model: 'zai/glm-4.6-flash', inputPerM: 0.06, outputPerM: 0.40, contextWindow: 128_000, family: 'glm' },
+    { provider: 'zai', model: 'zai/glm-4.5-air', inputPerM: 0, outputPerM: 0, contextWindow: 128_000, family: 'glm' },
 ];
 export function findPrice(provider, model) {
     return PRICES.find(p => p.provider === provider && p.model === model);
