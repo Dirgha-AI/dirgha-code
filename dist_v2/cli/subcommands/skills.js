@@ -12,9 +12,9 @@
  */
 import { stdout, stderr } from 'node:process';
 import { execFileSync } from 'node:child_process';
-import { mkdir, rm, stat } from 'node:fs/promises';
+import { mkdir, rm, stat, cp } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { join, basename } from 'node:path';
+import { isAbsolute, join, basename } from 'node:path';
 import { loadSkills } from '../../skills/loader.js';
 import { scanSkillBody, summariseScan } from '../../security/skill-scanner.js';
 import { appendAudit } from '../../audit/writer.js';
@@ -25,7 +25,7 @@ const HELP = [
     '  dirgha skills list                     Same as above',
     '  dirgha skills show <name>              Print one skill\'s body',
     '  dirgha skills where                    Show search roots',
-    '  dirgha skills install <git-url> [name] Clone a remote skill pack (scanned before install)',
+    '  dirgha skills install <git-url|dir> [name] Clone a remote skill pack or copy a local dir (scanned before install)',
     '  dirgha skills uninstall <name>         Remove a user-global skill directory',
     '  dirgha skills audit [name]             Re-scan installed skills for prompt-injection / supply-chain risk',
 ].join('\n');
@@ -33,7 +33,9 @@ function userSkillsDir() {
     return join(homedir(), '.dirgha', 'skills');
 }
 function deriveName(url) {
-    const last = url.split('/').filter(Boolean).pop() ?? 'skill';
+    // Use POSIX-or-backslash split so a Windows path like
+    // C:\Users\me\skills\helper still derives "helper" not the whole drive.
+    const last = url.split(/[\\/]/).filter(Boolean).pop() ?? 'skill';
     return last.replace(/\.git$/, '').replace(/[^a-zA-Z0-9_-]/g, '-');
 }
 async function dirExists(p) {
@@ -102,7 +104,7 @@ export const skillsSubcommand = {
         if (op === 'install') {
             const url = argv[1];
             if (!url) {
-                stderr.write(`Missing git URL.\n${HELP}\n`);
+                stderr.write(`Missing git URL or directory path.\n${HELP}\n`);
                 return 2;
             }
             // Defense in depth: even though we use the array form of execFile,
@@ -125,17 +127,28 @@ export const skillsSubcommand = {
                 stderr.write(`Skill "${name}" already installed at ${target}. Uninstall first.\n`);
                 return 1;
             }
+            // If `url` is an absolute path to an existing directory, treat it as
+            // a local skill pack and recursively copy it. This sidesteps the
+            // cross-OS pain of `git clone file:///C:/...` on Windows and lets
+            // the test harness exercise install/uninstall without a real git
+            // remote. Anything else is treated as a git URL and cloned.
+            const isLocalDir = isAbsolute(url) && await dirExists(url);
             try {
-                execFileSync('git', ['clone', '--depth=1', url, target], { stdio: ['ignore', 'pipe', 'pipe'] });
+                if (isLocalDir) {
+                    await cp(url, target, { recursive: true, errorOnExist: true, force: false });
+                }
+                else {
+                    execFileSync('git', ['clone', '--depth=1', url, target], { stdio: ['ignore', 'pipe', 'pipe'] });
+                }
             }
             catch (err) {
-                stderr.write(`git clone failed: ${err instanceof Error ? err.message : String(err)}\n`);
+                stderr.write(`${isLocalDir ? 'local copy' : 'git clone'} failed: ${err instanceof Error ? err.message : String(err)}\n`);
                 return 1;
             }
             const reloaded = await loadSkills({ cwd: process.cwd() });
             const found = reloaded.find(s => s.path.startsWith(target));
             if (!found) {
-                stderr.write(`Cloned ${url} but no SKILL.md was found inside ${target}. The directory was kept.\n`);
+                stderr.write(`Installed from ${url} but no SKILL.md was found inside ${target}. The directory was kept.\n`);
                 return 1;
             }
             // Layer-1 prompt-injection / supply-chain scan. Critical findings
