@@ -11,6 +11,18 @@ All notable changes are tracked here. Format loosely follows [Keep a Changelog](
 - OpenSSF Scorecard runs weekly + on push to main; result published to scorecard.dev.
 - This CHANGELOG.md committed.
 
+## [1.9.0](https://github.com/Dirgha-AI/dirgha-code/compare/v1.8.1...v1.9.0) (2026-04-28)
+
+
+### Features
+
+* **providers,ask:** DeepSeek native provider + dirgha ask --cwd ([ab4351f](https://github.com/Dirgha-AI/dirgha-code/commit/ab4351f8cd9ae76973fc4af1afdfd3b3c0135ce9))
+
+
+### Bug Fixes
+
+* **audit-codebase,gitignore:** add --help handler + un-ignore dist/ ([76c3c0a](https://github.com/Dirgha-AI/dirgha-code/commit/76c3c0a31dbb9337710f195c24b2e52497d154b7))
+
 ## [1.8.1](https://github.com/Dirgha-AI/dirgha-code/compare/v1.8.0...v1.8.1) (2026-04-28)
 
 
