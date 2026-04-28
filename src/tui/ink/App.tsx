@@ -32,7 +32,8 @@ import { createErrorClassifier } from '../../intelligence/error-classifier.js';
 import type { ProviderRegistry } from '../../providers/index.js';
 import type { ToolRegistry } from '../../tools/registry.js';
 import { createToolExecutor } from '../../tools/exec.js';
-import { createTuiApprovalBus } from '../approval.js';
+import { createInkApprovalBus, type InkApprovalBus } from './ink-approval-bus.js';
+import { ApprovalPrompt, type ApprovalRequest } from './components/ApprovalPrompt.js';
 import type { SessionStore } from '../../context/session.js';
 import type { DirghaConfig } from '../../cli/config.js';
 import type { SlashRegistry, SlashContext } from '../../cli/slash.js';
@@ -122,6 +123,20 @@ export function App(props: AppProps): React.JSX.Element {
     lastPrompt: string;
   } | null>(null);
   const lastUserPromptRef = React.useRef<string>('');
+  // Approval bus — single instance per App so subscriptions persist across
+  // turns. Replaces the legacy `createTuiApprovalBus` that wrote prompts
+  // direct to stdout (overdrawn by Ink) and read stdin raw (hung on
+  // Windows). See `ink-approval-bus.ts` for the full rationale.
+  const approvalBusRef = React.useRef<InkApprovalBus>();
+  if (!approvalBusRef.current) {
+    approvalBusRef.current = createInkApprovalBus(new Set(props.config.autoApproveTools));
+  }
+  const [pendingApproval, setPendingApproval] = React.useState<ApprovalRequest | null>(null);
+  React.useEffect(() => {
+    const bus = approvalBusRef.current;
+    if (!bus) return;
+    return bus.subscribe(req => setPendingApproval(req));
+  }, []);
   // Mode state: SlashContext.setMode flips it live so /mode plan|act|verify|ask
   // takes effect on the next turn (system-prompt rebuild downstream picks it up).
   const [mode, setMode] = React.useState<Mode>(
@@ -337,7 +352,7 @@ export function App(props: AppProps): React.JSX.Element {
       });
       const sanitized = props.registry.sanitize({ descriptionLimit: 200 });
       const provider = props.providers.forModel(currentModel);
-      const approvalBus = createTuiApprovalBus(new Set(props.config.autoApproveTools));
+      const approvalBus = approvalBusRef.current!;
 
       // Context-aware compaction: trigger at 75 % of the active model's
       // window. Same machinery as the readline + one-shot paths so the
@@ -524,6 +539,14 @@ export function App(props: AppProps): React.JSX.Element {
       <Box flexDirection="column">
         {renderTranscript([...transcript, ...projection.liveItems])}
       </Box>
+      {pendingApproval !== null && approvalBusRef.current && (
+        <ApprovalPrompt
+          request={pendingApproval}
+          onResolve={(decision): void => {
+            approvalBusRef.current?.resolve(pendingApproval.id, decision);
+          }}
+        />
+      )}
       {pendingFailover !== null && (
         <ModelSwitchPrompt
           failedModel={pendingFailover.failedModel}

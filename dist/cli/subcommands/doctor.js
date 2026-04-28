@@ -30,6 +30,30 @@ async function checkNode() {
         return { name: 'node', status: 'fail', detail: `${process.version} (need ≥ v${MIN_NODE_MAJOR})` };
     return { name: 'node', status: 'pass', detail: process.version };
 }
+/**
+ * Terminal compatibility — Ink raw-mode + ink-text-input on Windows
+ * legacy console (cmd.exe / pre-2019 PowerShell) drops Backspace and
+ * fights stdin handoff. Surface a warn when we detect that combo so
+ * users can either upgrade to Windows Terminal or run with --readline
+ * (DIRGHA_NO_INK=1) which avoids raw mode entirely.
+ */
+function checkTerminal() {
+    if (process.platform !== 'win32') {
+        return { name: 'terminal', status: 'pass', detail: `${process.platform} · ${process.env.TERM ?? 'unknown'}` };
+    }
+    // WT_SESSION is set by Windows Terminal; ConEmuANSI by ConEmu/Cmder.
+    // Both behave correctly with ink raw mode. Their absence on Windows
+    // implies legacy cmd.exe or PowerShell ISE — known to break Backspace.
+    const isModern = process.env['WT_SESSION'] || process.env['ConEmuANSI'] === 'ON' || process.env['TERM_PROGRAM'] === 'vscode';
+    if (isModern) {
+        return { name: 'terminal', status: 'pass', detail: 'Windows · modern terminal detected' };
+    }
+    return {
+        name: 'terminal',
+        status: 'warn',
+        detail: 'Windows legacy console — Backspace / arrow keys may misfire. Run inside Windows Terminal, VS Code terminal, or set DIRGHA_NO_INK=1 for the readline fallback.',
+    };
+}
 async function checkGit(cwd) {
     const info = await stat(join(cwd, '.git')).catch(() => undefined);
     if (info?.isDirectory())
@@ -117,6 +141,7 @@ export const doctorSubcommand = {
         results.push(await checkNode());
         results.push(await checkGit(process.cwd()));
         results.push(await checkDirgaDir());
+        results.push(checkTerminal());
         const probes = await Promise.all(PROVIDER_PROBES.map(probeProvider));
         results.push(...probes);
         const locals = await Promise.all(LOCAL_PROBES.map(probeLocal));

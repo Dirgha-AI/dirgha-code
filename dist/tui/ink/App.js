@@ -28,7 +28,8 @@ import { modePreamble } from '../../context/mode.js';
 import { runAgentLoop } from '../../kernel/agent-loop.js';
 import { createErrorClassifier } from '../../intelligence/error-classifier.js';
 import { createToolExecutor } from '../../tools/exec.js';
-import { createTuiApprovalBus } from '../approval.js';
+import { createInkApprovalBus } from './ink-approval-bus.js';
+import { ApprovalPrompt } from './components/ApprovalPrompt.js';
 import { PRICES } from '../../intelligence/prices.js';
 import { Logo } from './components/Logo.js';
 import { StatusBar } from './components/StatusBar.js';
@@ -89,6 +90,21 @@ export function App(props) {
     // the input box; submitting any other prompt also clears it.
     const [pendingFailover, setPendingFailover] = React.useState(null);
     const lastUserPromptRef = React.useRef('');
+    // Approval bus — single instance per App so subscriptions persist across
+    // turns. Replaces the legacy `createTuiApprovalBus` that wrote prompts
+    // direct to stdout (overdrawn by Ink) and read stdin raw (hung on
+    // Windows). See `ink-approval-bus.ts` for the full rationale.
+    const approvalBusRef = React.useRef();
+    if (!approvalBusRef.current) {
+        approvalBusRef.current = createInkApprovalBus(new Set(props.config.autoApproveTools));
+    }
+    const [pendingApproval, setPendingApproval] = React.useState(null);
+    React.useEffect(() => {
+        const bus = approvalBusRef.current;
+        if (!bus)
+            return;
+        return bus.subscribe(req => setPendingApproval(req));
+    }, []);
     // Mode state: SlashContext.setMode flips it live so /mode plan|act|verify|ask
     // takes effect on the next turn (system-prompt rebuild downstream picks it up).
     const [mode, setMode] = React.useState(props.config.mode ?? 'act');
@@ -301,7 +317,7 @@ export function App(props) {
             });
             const sanitized = props.registry.sanitize({ descriptionLimit: 200 });
             const provider = props.providers.forModel(currentModel);
-            const approvalBus = createTuiApprovalBus(new Set(props.config.autoApproveTools));
+            const approvalBus = approvalBusRef.current;
             // Context-aware compaction: trigger at 75 % of the active model's
             // window. Same machinery as the readline + one-shot paths so the
             // Ink TUI doesn't 400-overflow on long sessions.
@@ -473,7 +489,9 @@ export function App(props) {
     // streaming text appears now, the Static-around-transcript pattern
     // was suppressing the live region updates. If still not, the bug
     // is upstream in useEventProjection.
-    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: [{ key: 'logo' }], children: (_item) => _jsx(Logo, { version: VERSION }, "logo") }), _jsx(Box, { flexDirection: "column", children: renderTranscript([...transcript, ...projection.liveItems]) }), pendingFailover !== null && (_jsx(ModelSwitchPrompt, { failedModel: pendingFailover.failedModel, failoverModel: pendingFailover.failoverModel, onAccept: (failover) => {
+    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: [{ key: 'logo' }], children: (_item) => _jsx(Logo, { version: VERSION }, "logo") }), _jsx(Box, { flexDirection: "column", children: renderTranscript([...transcript, ...projection.liveItems]) }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
+                        approvalBusRef.current?.resolve(pendingApproval.id, decision);
+                    } })), pendingFailover !== null && (_jsx(ModelSwitchPrompt, { failedModel: pendingFailover.failedModel, failoverModel: pendingFailover.failoverModel, onAccept: (failover) => {
                         const lastPrompt = pendingFailover.lastPrompt;
                         setCurrentModel(failover);
                         setPendingFailover(null);
