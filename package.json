@@ -10,6 +10,7 @@
   },
   "files": [
     "dist_v2/",
+    "scaffold-templates/",
     "README.md",
     "LICENSE",
     "CREDITS.md",

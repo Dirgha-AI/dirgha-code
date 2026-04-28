@@ -42,6 +42,7 @@ import { resumeSubcommand } from './resume.js';
 import { skillsSubcommand } from './skills.js';
 import { ledgerSubcommand } from './ledger.js';
 import { costSubcommand } from './cost.js';
+import { scaffoldSubcommand } from './scaffold.js';
 import { telemetrySubcommand } from './telemetry.js';
 import { undoSubcommand } from './undo.js';
 import { updateSubcommand } from './update.js';
@@ -64,6 +65,7 @@ export const subcommands: Subcommand[] = [
   memorySubcommand,
   ledgerSubcommand,
   costSubcommand,
+  scaffoldSubcommand,
   telemetrySubcommand,
   undoSubcommand,
   updateSubcommand,

@@ -523,6 +523,7 @@ Subcommands:
   login / logout / setup              Auth + first-run wizard
   update [--check] [--yes]            Check for + install latest @dirgha/code
   telemetry <status|enable|...>      Anonymous usage opt-in (default: OFF)
+  scaffold "<prompt>" [--serve]      Spin up a new project from a prompt
   submit-paper <doi>                  Fetch Crossref metadata, emit JSON
 
 Options:
