@@ -22,7 +22,9 @@ First-class llama.cpp and Ollama support. The setup wizard auto-probes `localhos
 
 ### BYOK across 17 providers
 
-Anthropic, OpenAI, Gemini, OpenRouter, NVIDIA, Fireworks, DeepSeek, Groq, Cerebras, Together, DeepInfra, Mistral, xAI, Perplexity, Cohere, Kimi, Z.AI. Drop multiple keys per provider into a pool — Dirgha rotates with priority + LRU + cooldown when one hits a 429. When a model dies mid-turn, registered backups take over and the agent continues from the partial transcript intact. Other tools restart the conversation.
+Anthropic, OpenAI, Gemini, OpenRouter, NVIDIA NIM, Fireworks, DeepSeek (native), Mistral, Cohere, Cerebras, Together, Perplexity, xAI (Grok), Groq, Z.AI / GLM, plus local Ollama and llama.cpp. Drop multiple keys per provider into a pool — Dirgha rotates with priority + LRU + cooldown when one hits a 429. When a model 4xx/5xxs mid-turn, an inline `[y/n/p=picker]` failover prompt suggests a known-good substitute (via `findFailover` in `prices.ts`) and re-runs the failed turn against it. Other tools just dead-end.
+
+The model picker is two-step (gemini-cli style): pick a provider card → pick a model within that provider. 104 models in the catalogue, refreshed against the live OpenRouter registry on every release.
 
 ### Persistent memory that compounds
 
