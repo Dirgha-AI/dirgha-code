@@ -11,6 +11,13 @@ All notable changes are tracked here. Format loosely follows [Keep a Changelog](
 - OpenSSF Scorecard runs weekly + on push to main; result published to scorecard.dev.
 - This CHANGELOG.md committed.
 
+## [1.12.1](https://github.com/Dirgha-AI/dirgha-code/compare/v1.12.0...v1.12.1) (2026-04-28)
+
+
+### Bug Fixes
+
+* **tui:** Ink-native approval prompt — fixes tool-stall on Windows ([2612454](https://github.com/Dirgha-AI/dirgha-code/commit/26124547222fe8d556fec10b294627bdb8c7361e))
+
 ## [1.12.0](https://github.com/Dirgha-AI/dirgha-code/compare/v1.11.0...v1.12.0) (2026-04-28)
 
 
