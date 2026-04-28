@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
-# Pre-publish guard: refuse to publish if the working tree is the
-# private monorepo (where v1 source lives quarantined) OR if any
-# dependency is a workspace: ref (which is unresolvable on npm).
-#
-# The single-source-of-truth rule: only /root/dirgha-code-release/
-# publishes. Both conditions catch a developer who tries to publish
-# from /root/dirgha-ai/domains/10-computer/cli/ by mistake.
+# Pre-publish guard: refuse to publish if the working tree appears
+# to be a development checkout (legacy v1 source still present, or
+# any dependency declared with a `workspace:` ref that npm can't
+# resolve). Catches a developer who runs `npm publish` from the
+# wrong directory by mistake.
 #
 # Wired into package.json `prepublishOnly` so it runs BEFORE pack +
 # publish. `npm pack` and `npm install` skip prepublishOnly, so this
@@ -17,7 +15,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 if [ -d "$REPO_ROOT/_legacy_v1" ]; then
   echo "prepublish-guard: refusing to publish — _legacy_v1/ present at $REPO_ROOT/_legacy_v1" >&2
-  echo "prepublish-guard: this looks like the private monorepo. Publish from /root/dirgha-code-release/ instead." >&2
+  echo "prepublish-guard: this looks like a development checkout, not the published-tree clone. Publish from a fresh clone of Dirgha-AI/dirgha-code instead." >&2
   exit 1
 fi
 

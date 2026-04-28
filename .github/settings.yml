@@ -19,25 +19,26 @@ branches:
   - name: main
     protection:
       # PR review requirements
-      required_pull_request_reviews:
-        required_approving_review_count: 1
-        dismiss_stale_reviews: true
-        require_code_owner_reviews: false
+      # Solo-maintainer baseline: NO reviewer required. With one human
+      # maintainer, requiring a reviewer would block every commit until
+      # a co-maintainer joins. Ratchet to {count: 1} once co-maintainers
+      # exist; CODEOWNERS already gates the supply-chain attack surface.
+      required_pull_request_reviews: null
 
       # Required status checks (must pass before merge)
-      # These context names must match exactly what GitHub reports.
-      # Our ci.yml workflow produces: "Test (ubuntu-latest · Node 22)" etc.
+      # All 3 OSes are required-blocking now that the cross-OS bug
+      # chain is fixed. CI must be green to land anything.
       required_status_checks:
         strict: false
         contexts:
-          # Only Linux is required-blocking. macOS and Windows run
-          # but are continue-on-error in ci.yml — track their
-          # outcome via the PR check page, fix bugs PR-by-PR.
           - "Test (ubuntu-latest · Node 22)"
-          - "Test (ubuntu-latest · Node 20)"
+          - "Test (macos-latest · Node 22)"
+          - "Test (windows-latest · Node 22)"
 
-      # Enforce these rules even for admins (Salik must follow the rule too)
-      enforce_admins: true
+      # admin enforcement OFF — solo maintainer can hotfix without
+      # blocking on their own PR review. Flip to true when adding
+      # co-maintainers, paired with required_pull_request_reviews above.
+      enforce_admins: false
 
       # No merge commits allowed — enforces linear history
       required_linear_history: true

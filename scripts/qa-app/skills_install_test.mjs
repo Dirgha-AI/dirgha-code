@@ -20,20 +20,13 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// TODO(windows): 3 of 15 assertions fail on the Windows runner around
-// `git clone --depth=1 file:///C:/.../remote-helper <target>`. We
-// suspect Git-for-Windows on the runner handles file:// URLs to local
-// repos differently than POSIX git. The production feature
-// (`dirgha skills install`) works on Windows: the in-process vitest at
-// src_v2/skills/__tests__/install-npm.test.ts (npm:<pkg> path) passes,
-// and the spec-validation + rejection paths of THIS test pass too.
-// Only the live git-clone-from-file-URL path is broken in the harness,
-// not the production code. Skipping until someone with a Windows env
-// can repro + diagnose.
-if (platform() === 'win32') {
-  console.log('skills-pkg: skipped on Windows (TODO: git file:// URL repro on Win)');
-  process.exit(0);
-}
+// On Windows, `git clone --depth=1 file:///C:/.../remote-helper` historically
+// behaved differently than on POSIX (some Git-for-Windows builds defaulted
+// to local-clone-optimization which ignored --depth + emitted different
+// stdout). To survive both, we capture every spawn's stdout+stderr and dump
+// them on assertion failure so a failing CI run diagnoses itself instead of
+// requiring a Windows machine to repro.
+const IS_WIN = platform() === 'win32';
 // `file://` URL builder that works on Windows (where bare backslash
 // paths are invalid in URL syntax). pathToFileURL().href produces e.g.
 // "file:///C:/Users/..." vs the broken "file://C:\Users\...".
@@ -45,8 +38,16 @@ const fakeHome = join(sandbox, 'home');
 mkdirSync(fakeHome, { recursive: true });
 
 let pass = 0, fail = 0;
+let lastResult = null;  // captures the most recent runSkills() result
 const check = (label, ok, detail) => {
-  console.log(`  ${ok ? '✓' : '✗'} ${label}${detail ? `  ${detail}` : ''}`);
+  const tag = ok ? '✓' : '✗';
+  console.log(`  ${tag} ${label}${detail ? `  ${detail}` : ''}`);
+  if (!ok && lastResult) {
+    // Dump the spawn outcome on failure so CI tells us what git actually said.
+    console.log(`    └ runSkills exit=${lastResult.status}`);
+    if (lastResult.stdout) console.log(`    └ stdout: ${lastResult.stdout.slice(0, 600).replace(/\n/g, '\n      ')}`);
+    if (lastResult.stderr) console.log(`    └ stderr: ${lastResult.stderr.slice(0, 600).replace(/\n/g, '\n      ')}`);
+  }
   ok ? pass++ : fail++;
 };
 

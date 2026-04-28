@@ -78,6 +78,18 @@ echo "==> Applying protection settings..."
 # Note: The Node 20 matrix entries are excluded in ci.yml, so we only
 # require the Node 22 checks.
 
+# Solo-maintainer baseline. Trades "1-reviewer required" + admin enforcement
+# away because there's only one human maintainer today — those would block
+# every commit until a co-maintainer joined. Keeps the highest-impact controls:
+#   - status checks must pass (CI green required before merge)
+#   - no force-push, no branch deletion (history integrity)
+#   - linear history (clean log)
+#
+# Ratchet up when adding co-maintainers:
+#   1. set "required_pull_request_reviews": { required_approving_review_count: 1, ... }
+#   2. set "enforce_admins": true
+#   3. CODEOWNERS already in place to require code-owner review for
+#      release tooling, telemetry, auth, providers, tools, skills loader.
 PAYLOAD=$(cat <<'EOF'
 {
   "required_status_checks": {
@@ -88,12 +100,8 @@ PAYLOAD=$(cat <<'EOF'
       "Test (windows-latest · Node 22)"
     ]
   },
-  "enforce_admins": true,
-  "required_pull_request_reviews": {
-    "required_approving_review_count": 1,
-    "dismiss_stale_reviews": true,
-    "require_code_owner_reviews": false
-  },
+  "enforce_admins": false,
+  "required_pull_request_reviews": null,
   "allow_force_pushes": false,
   "allow_deletions": false,
   "required_linear_history": true,
