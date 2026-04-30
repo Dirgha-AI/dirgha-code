@@ -8,9 +8,9 @@
  * OpenAI-compatible dialect use this helper; they differ only in base
  * URL, model roster, and per-model request shaping.
  */
-import { streamSSE } from './http.js';
-import { ProviderError } from './iface.js';
-import { repairJSON } from '../utils/json-repair.js';
+import { streamSSE } from "./http.js";
+import { ProviderError } from "./iface.js";
+import { repairJSON } from "../utils/json-repair.js";
 export async function* streamChatCompletions(opts) {
     const body = {
         model: opts.model,
@@ -24,7 +24,7 @@ export async function* streamChatCompletions(opts) {
         body.max_tokens = opts.maxTokens;
     if (opts.tools && opts.tools.length > 0) {
         body.tools = toOpenAITools(opts.tools, opts.sanitizeToolDescriptions);
-        if (opts.toolChoice && opts.toolChoice !== 'auto')
+        if (opts.toolChoice && opts.toolChoice !== "auto")
             body.tool_choice = opts.toolChoice;
     }
     if (opts.extraBody)
@@ -39,7 +39,7 @@ export async function* streamChatCompletions(opts) {
         signal: opts.signal,
         timeoutMs: opts.timeoutMs,
     })) {
-        if (payload === '[DONE]')
+        if (payload === "[DONE]")
             break;
         let chunk;
         try {
@@ -58,52 +58,63 @@ export async function* streamChatCompletions(opts) {
 function toOpenAIMessages(messages) {
     const out = [];
     for (const msg of messages) {
-        if (msg.role === 'tool')
+        if (msg.role === "tool")
             continue;
-        if (typeof msg.content === 'string') {
-            out.push({ role: msg.role === 'assistant' ? 'assistant' : msg.role, content: msg.content });
+        if (typeof msg.content === "string") {
+            out.push({
+                role: msg.role === "assistant" ? "assistant" : msg.role,
+                content: msg.content,
+            });
             continue;
         }
         const parts = msg.content;
-        if (msg.role === 'assistant') {
+        if (msg.role === "assistant") {
             const texts = [];
             const thinkings = [];
             const toolCalls = [];
             for (const p of parts) {
-                if (p.type === 'text')
+                if (p.type === "text")
                     texts.push(p.text);
-                else if (p.type === 'thinking')
+                else if (p.type === "thinking")
                     thinkings.push(p.text);
-                else if (p.type === 'tool_use') {
+                else if (p.type === "tool_use") {
                     toolCalls.push({
                         id: p.id,
-                        type: 'function',
-                        function: { name: p.name, arguments: JSON.stringify(p.input ?? {}) },
+                        type: "function",
+                        function: {
+                            name: p.name,
+                            arguments: JSON.stringify(p.input ?? {}),
+                        },
                     });
                 }
             }
             const assistantMsg = {
-                role: 'assistant',
-                content: texts.length > 0 ? texts.join('') : null,
+                role: "assistant",
+                content: texts.length > 0 ? texts.join("") : null,
                 ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
                 // DeepSeek / OpenAI-compat thinking models require reasoning_content
                 // to be echoed back verbatim in multi-turn — omitting it causes 400.
-                ...(thinkings.length > 0 ? { reasoning_content: thinkings.join('') } : {}),
+                ...(thinkings.length > 0
+                    ? { reasoning_content: thinkings.join("") }
+                    : {}),
             };
             out.push(assistantMsg);
             continue;
         }
-        const results = parts.filter(p => p.type === 'tool_result');
+        const results = parts.filter((p) => p.type === "tool_result");
         const texts = parts
-            .filter((p) => p.type === 'text')
-            .map(p => p.text);
+            .filter((p) => p.type === "text")
+            .map((p) => p.text);
         if (texts.length > 0)
-            out.push({ role: msg.role === 'system' ? 'system' : 'user', content: texts.join('') });
+            out.push({
+                role: msg.role === "system" ? "system" : "user",
+                content: texts.join(""),
+            });
         for (const r of results) {
-            if (r.type !== 'tool_result')
+            if (r.type !== "tool_result")
                 continue;
             out.push({
-                role: 'tool',
+                role: "tool",
                 tool_call_id: r.toolUseId,
                 content: r.content,
             });
@@ -112,12 +123,12 @@ function toOpenAIMessages(messages) {
     return out;
 }
 function toOpenAITools(tools, sanitize) {
-    return tools.map(t => ({
-        type: 'function',
+    return tools.map((t) => ({
+        type: "function",
         function: {
             name: t.name,
             description: sanitize ? sanitize(t.description) : t.description,
-            parameters: t.inputSchema ?? { type: 'object', properties: {} },
+            parameters: t.inputSchema ?? { type: "object", properties: {} },
         },
     }));
 }
@@ -132,13 +143,13 @@ class StreamState {
     // chunks. Once we see the open tag, accumulate until the close tag
     // arrives. Anything before/after is text.
     inThinkBlock = false;
-    thinkBuffer = '';
+    thinkBuffer = "";
     static THINK_OPEN_RE = /<(?:think|thinking|reasoning|thought|REASONING_SCRATCHPAD)>/i;
     static THINK_CLOSE_RE = /<\/(?:think|thinking|reasoning|thought|REASONING_SCRATCHPAD)>/i;
     /** Split a content delta into text + thinking pieces, honoring open <think> blocks across chunks. */
     routeContent(input) {
-        let text = '';
-        let thinking = '';
+        let text = "";
+        let thinking = "";
         let s = input;
         while (s.length > 0) {
             if (this.inThinkBlock) {
@@ -146,11 +157,11 @@ class StreamState {
                 if (!close || close.index === undefined) {
                     thinking += s;
                     this.thinkBuffer += s;
-                    s = '';
+                    s = "";
                     break;
                 }
                 thinking += s.slice(0, close.index);
-                this.thinkBuffer = '';
+                this.thinkBuffer = "";
                 this.inThinkBlock = false;
                 s = s.slice(close.index + close[0].length);
             }
@@ -158,7 +169,7 @@ class StreamState {
                 const open = s.match(StreamState.THINK_OPEN_RE);
                 if (!open || open.index === undefined) {
                     text += s;
-                    s = '';
+                    s = "";
                     break;
                 }
                 text += s.slice(0, open.index);
@@ -184,27 +195,41 @@ class StreamState {
         // the `reasoning` channel and dirgha sees zero text → empty reply.
         if (this.includeThinking) {
             const d = delta;
-            const r = (typeof d.reasoning_content === 'string' && d.reasoning_content)
-                || (typeof d.reasoning === 'string' && d.reasoning)
-                || '';
+            const r = (typeof d.reasoning_content === "string" && d.reasoning_content) ||
+                (typeof d.reasoning === "string" && d.reasoning) ||
+                "";
             if (r.length > 0) {
                 if (!this.thinkingOpen) {
-                    yield { type: 'thinking_start' };
+                    yield { type: "thinking_start" };
                     this.thinkingOpen = true;
                 }
-                yield { type: 'thinking_delta', delta: r };
+                yield { type: "thinking_delta", delta: r };
             }
         }
-        if (typeof delta.content === 'string' && delta.content.length > 0) {
-            if (this.thinkingOpen) {
-                yield { type: 'thinking_end' };
-                this.thinkingOpen = false;
+        if (typeof delta.content === "string" && delta.content.length > 0) {
+            const routed = this.routeContent(delta.content);
+            if (routed.text.length > 0) {
+                if (this.thinkingOpen) {
+                    yield { type: "thinking_end" };
+                    this.thinkingOpen = false;
+                }
+                if (!this.textOpen) {
+                    yield { type: "text_start" };
+                    this.textOpen = true;
+                }
+                yield { type: "text_delta", delta: routed.text };
             }
-            if (!this.textOpen) {
-                yield { type: 'text_start' };
-                this.textOpen = true;
+            if (routed.thinking.length > 0) {
+                if (this.textOpen) {
+                    yield { type: "text_end" };
+                    this.textOpen = false;
+                }
+                if (!this.thinkingOpen) {
+                    yield { type: "thinking_start" };
+                    this.thinkingOpen = true;
+                }
+                yield { type: "thinking_delta", delta: routed.thinking };
             }
-            yield { type: 'text_delta', delta: delta.content };
         }
         if (delta.tool_calls) {
             for (const tc of delta.tool_calls) {
@@ -218,26 +243,26 @@ class StreamState {
                     continue;
                 let entry = this.toolOpen.get(id);
                 if (!entry) {
-                    const name = tc.function?.name ?? '';
-                    entry = { name, bufferedJson: '' };
+                    const name = tc.function?.name ?? "";
+                    entry = { name, bufferedJson: "" };
                     this.toolOpen.set(id, entry);
                     if (this.textOpen) {
-                        yield { type: 'text_end' };
+                        yield { type: "text_end" };
                         this.textOpen = false;
                     }
                     if (this.thinkingOpen) {
-                        yield { type: 'thinking_end' };
+                        yield { type: "thinking_end" };
                         this.thinkingOpen = false;
                     }
-                    yield { type: 'toolcall_start', id, name };
+                    yield { type: "toolcall_start", id, name };
                 }
                 else if (!entry.name && tc.function?.name) {
                     entry.name = tc.function.name;
                 }
-                const argsDelta = tc.function?.arguments ?? '';
+                const argsDelta = tc.function?.arguments ?? "";
                 if (argsDelta.length > 0) {
                     entry.bufferedJson += argsDelta;
-                    yield { type: 'toolcall_delta', id, deltaJson: argsDelta };
+                    yield { type: "toolcall_delta", id, deltaJson: argsDelta };
                 }
             }
         }
@@ -251,16 +276,16 @@ class StreamState {
     }
     *closeOpen() {
         if (this.textOpen) {
-            yield { type: 'text_end' };
+            yield { type: "text_end" };
             this.textOpen = false;
         }
         if (this.thinkingOpen) {
-            yield { type: 'thinking_end' };
+            yield { type: "thinking_end" };
             this.thinkingOpen = false;
         }
         for (const [id, entry] of this.toolOpen) {
             const input = parseArguments(entry.bufferedJson);
-            yield { type: 'toolcall_end', id, input };
+            yield { type: "toolcall_end", id, input };
         }
         this.toolOpen.clear();
     }
@@ -272,7 +297,7 @@ class StreamState {
             return;
         this.usageEmitted = true;
         yield {
-            type: 'usage',
+            type: "usage",
             inputTokens: usage.prompt_tokens ?? 0,
             outputTokens: usage.completion_tokens ?? 0,
             cachedTokens: usage.prompt_tokens_details?.cached_tokens ?? 0,

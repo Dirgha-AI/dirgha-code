@@ -612,6 +612,7 @@ async function main(): Promise<void> {
     contextTransform: compactionTransform,
     errorClassifier,
     autoApprove,
+    costCalculator: computeCost,
     ...(composedHooks !== undefined ? { hooks: composedHooks } : {}),
   });
   // v1.15.0: no mid-session runtime failover — model switches during a

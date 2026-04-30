@@ -101,6 +101,9 @@ export async function runAgentLoop(cfg) {
             totals.inputTokens += assembled.inputTokens;
             totals.outputTokens += assembled.outputTokens;
             totals.cachedTokens += assembled.cachedTokens;
+            if (cfg.costCalculator) {
+                totals.costUsd += cfg.costCalculator(assembled.inputTokens, assembled.outputTokens, assembled.cachedTokens);
+            }
             history.push(assembled.message);
             const toolUses = extractToolUses(assembled.message);
             if (toolUses.length === 0) {

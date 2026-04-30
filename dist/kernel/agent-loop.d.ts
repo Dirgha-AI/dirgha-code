@@ -36,5 +36,6 @@ export interface AgentLoopConfig {
      * git mutations, etc.).
      */
     autoApprove?: boolean;
+    costCalculator?: (input: number, output: number, cached: number) => number;
 }
 export declare function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult>;

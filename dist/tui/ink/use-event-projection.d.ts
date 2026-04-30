@@ -29,6 +29,7 @@ export type TranscriptItem = {
     name: string;
     status: ToolStatus;
     argSummary: string;
+    argJson?: string;
     outputPreview: string;
     startedAt: number;
     durationMs?: number;

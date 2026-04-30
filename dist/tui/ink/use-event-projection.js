@@ -94,6 +94,14 @@ export function useEventProjection(events) {
                     setLiveItems((prev) => [...prev, item]);
                     return;
                 }
+                case "toolcall_delta": {
+                    setLiveItems((prev) => prev.map((it) => it.kind === "tool" &&
+                        it.id === event.id &&
+                        it.status === "pending"
+                        ? { ...it, argJson: (it.argJson ?? "") + event.deltaJson }
+                        : it));
+                    return;
+                }
                 case "toolcall_end":
                     // Remove the pending "generating..." placeholder when the
                     // tool call JSON is fully received. tool_exec_start follows

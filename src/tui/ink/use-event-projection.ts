@@ -25,6 +25,7 @@ export type TranscriptItem =
       name: string;
       status: ToolStatus;
       argSummary: string;
+      argJson?: string;
       outputPreview: string;
       startedAt: number;
       durationMs?: number;
@@ -132,6 +133,18 @@ export function useEventProjection(events: EventStream): EventProjection {
             startedAt: Date.now(),
           };
           setLiveItems((prev) => [...prev, item]);
+          return;
+        }
+        case "toolcall_delta": {
+          setLiveItems((prev) =>
+            prev.map((it) =>
+              it.kind === "tool" &&
+              it.id === event.id &&
+              it.status === "pending"
+                ? { ...it, argJson: (it.argJson ?? "") + event.deltaJson }
+                : it,
+            ),
+          );
           return;
         }
         case "toolcall_end":

@@ -8,7 +8,7 @@
  * OpenAI-compatible dialect use this helper; they differ only in base
  * URL, model roster, and per-model request shaping.
  */
-import type { AgentEvent, Message, ToolDefinition } from '../kernel/types.js';
+import type { AgentEvent, Message, ToolDefinition } from "../kernel/types.js";
 export interface OpenAICompatCallOptions {
     providerName: string;
     endpoint: string;
@@ -18,7 +18,7 @@ export interface OpenAICompatCallOptions {
     tools?: ToolDefinition[];
     temperature?: number;
     maxTokens?: number;
-    toolChoice?: 'auto' | 'required' | 'none';
+    toolChoice?: "auto" | "required" | "none";
     extraHeaders?: Record<string, string>;
     extraBody?: Record<string, unknown>;
     signal?: AbortSignal;
