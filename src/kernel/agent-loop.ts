@@ -10,12 +10,10 @@
  *      before any retry decision; there is no string matching.
  *   4. Context transform (compaction, skill injection) is invoked once per
  *      turn before the provider call, never mid-stream.
- *   5. Steering and follow-up queues allow mid-flight control (see queues.ts).
  */
 
 import type {
   Message,
-  AgentMessage,
   AgentEvent,
   AgentResult,
   ToolCall,
@@ -30,114 +28,66 @@ import type {
   AgentHooks,
 } from './types.js';
 import type { EventStream } from './event-stream.js';
-import { assembleTurn, extractToolUses, appendToolResults, convertToLlm } from './message.js';
-import { SteeringQueue, FollowUpQueue } from './queues.js';
-
-/**
- * Controller interface for mid-flight agent steering and follow-up.
- *
- * Exposed via `cfg.controller` so callers can inject messages without
- * changing the return type of `runAgentLoop` (which remains
- * `Promise<AgentResult>` for backwards compatibility).
- *
- * Usage:
- *   const controller = { steer: (msg) => {}, followUp: (msg) => {} };
- *   const result = await runAgentLoop({ ...cfg, controller });
- *   // Later, from another context:
- *   controller.steer({ role: 'user', content: 'Stop and do this instead' });
- */
-export interface AgentController {
-  /** Queue a steering message (drain mode: all). Replaces current turn. */
-  steer: (msg: AgentMessage) => void;
-  /** Queue a follow-up message (drain mode: one-at-a-time). Runs after current turn. */
-  followUp: (msg: AgentMessage) => void;
-}
+import { assembleTurn, extractToolUses, appendToolResults } from './message.js';
+import { resolveModelForDispatch } from '../providers/dispatch.js';
+import { findFailover } from '../intelligence/prices.js';
 
 export interface AgentLoopConfig {
   sessionId: string;
   model: string;
-  /**
-   * Initial transcript. Plain `Message[]` is accepted (a `Message` is a
-   * structural `AgentMessage` since `ui` and `hidden` are optional), so
-   * existing callers keep working unchanged.
-   */
-  messages: AgentMessage[];
+  messages: Message[];
   tools: ToolDefinition[];
   maxTurns: number;
   provider: Provider;
   toolExecutor: ToolExecutor;
   events: EventStream;
   approvalBus?: ApprovalBus;
-  /**
-   * When true, every tool call is auto-approved without going through
-   * the ApprovalBus. Set by `dirgha --yolo` or by the YOLO mode
-   * preamble. The ApprovalBus is otherwise the sole gate.
-   */
-  autoApprove?: boolean;
   errorClassifier?: ErrorClassifier;
   hooks?: AgentHooks;
-  /**
-   * Per-turn context transform. Receives the full transcript (post-projection
-   * to `Message[]`) and returns the messages to actually send to the model.
-   * Kept on `Message[]` so existing transforms (compaction, etc.) need no
-   * changes.
-   */
   contextTransform?: (messages: Message[]) => Promise<Message[]>;
   toolConcurrency?: 'serial' | 'parallel';
   signal?: AbortSignal;
   /**
-   * Optional controller for mid-flight steering and follow-up.
-   * When provided, the caller can inject messages via `steer()` and `followUp()`.
-   * The controller object is populated with function references during loop
-   * initialisation (mutated in-place so the caller sees them).
+   * When true, every approval-required tool call is auto-granted
+   * without going through the ApprovalBus. Set by `dirgha --yolo` or
+   * by the YOLO mode preamble. The ApprovalBus is otherwise the
+   * canonical gate for risky operations (writes outside cwd, shell,
+   * git mutations, etc.).
    */
-  controller?: AgentController;
+  autoApprove?: boolean;
 }
 
 export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
   const events = cfg.events;
-  const history: AgentMessage[] = [...cfg.messages];
+  const history: Message[] = [...cfg.messages];
   const totals: UsageTotal = { inputTokens: 0, outputTokens: 0, cachedTokens: 0, costUsd: 0 };
   let stopReason: StopReason = 'end_turn';
   let turnCount = 0;
 
-  // Initialise steering and follow-up queues.
-  const steeringQueue = new SteeringQueue();
-  const followUpQueue = new FollowUpQueue();
-
-  // Populate the controller object in-place so the caller can use it.
-  if (cfg.controller) {
-    cfg.controller.steer = (msg) => steeringQueue.enqueue(msg);
-    cfg.controller.followUp = (msg) => followUpQueue.enqueue(msg);
-  }
-
   events.emit({ type: 'agent_start', sessionId: cfg.sessionId, model: cfg.model });
 
   try {
-    for (let turnIndex = 0; turnIndex < cfg.maxTurns; ) {
+    for (let turnIndex = 0; turnIndex < cfg.maxTurns; turnIndex++) {
       if (cfg.signal?.aborted) { stopReason = 'aborted'; break; }
 
       if (cfg.hooks?.beforeTurn) {
-        // Project to Message[] so hooks observe exactly what the LLM does
-        // (no ui/hidden leakage via covariant assignability).
-        const decision = await cfg.hooks.beforeTurn(turnIndex, convertToLlm(history));
+        const decision = await cfg.hooks.beforeTurn(turnIndex, history);
         if (decision === 'abort') { stopReason = 'aborted'; break; }
       }
 
+      turnCount = turnIndex + 1;
       const turnId = `t${turnIndex}-${Date.now().toString(36)}`;
       events.emit({ type: 'turn_start', turnId, turnIndex });
 
-      // Projection boundary: strip UI-only metadata + drop hidden messages
-      // before either the optional contextTransform or the provider call.
-      const llmMessages = convertToLlm(history);
       const messagesForCall = cfg.contextTransform
-        ? await cfg.contextTransform(llmMessages)
-        : llmMessages;
+        ? await cfg.contextTransform(history)
+        : history;
 
       const streamEvents: AgentEvent[] = [];
       try {
+        const dispatchModel = resolveModelForDispatch(cfg.model);
         for await (const ev of cfg.provider.stream({
-          model: cfg.model,
+          model: dispatchModel,
           messages: messagesForCall,
           tools: cfg.tools,
           signal: cfg.signal,
@@ -146,12 +96,34 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
           events.emit(ev);
         }
       } catch (err) {
+        // An AbortError mid-stream is a clean cancellation, not a
+        // failure. Distinguish so callers (and `dirgha audit`) see
+        // `stopReason: 'aborted'` instead of misleading 'error'.
+        const isAbort = (
+          (err instanceof Error && (err.name === 'AbortError' || /aborted|abort/i.test(err.message)))
+          || cfg.signal?.aborted === true
+        );
+        if (isAbort) {
+          stopReason = 'aborted';
+          events.emit({ type: 'turn_end', turnId, stopReason });
+          break;
+        }
         const classified = cfg.errorClassifier?.classify(err, cfg.provider.id, cfg.model);
+        // Suggest a known-good fallback model so the TUI can prompt the
+        // user to switch instead of just dead-ending the turn. Only
+        // fires for errors that look fixable by swapping models —
+        // bad-id (400 "not a valid model"), deprecated, rate-limit,
+        // or 5xx upstream failures.
+        const errMsg = err instanceof Error ? err.message : String(err);
+        const looksFixable =
+          /not a valid model id|deprecated|model_not_found|rate.?limit|429\b|5\d\d\b|bad.?gateway|upstream/i.test(errMsg);
+        const failover = looksFixable ? findFailover(cfg.model) : undefined;
         events.emit({
           type: 'error',
-          message: String(err instanceof Error ? err.message : err),
+          message: errMsg,
           reason: classified?.reason,
           retryable: classified?.retryable ?? false,
+          ...(failover !== undefined ? { failoverModel: failover } : {}),
         });
         stopReason = 'error';
         events.emit({ type: 'turn_end', turnId, stopReason });
@@ -164,46 +136,13 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
       totals.cachedTokens += assembled.cachedTokens;
       history.push(assembled.message);
 
-      // After provider stream completes, drain steering queue.
-      // If non-empty, push steered messages to history and continue looping
-      // (don't break on end_turn — the steered message becomes the next prompt).
-      const steeredMessages = steeringQueue.drain();
-      if (steeredMessages && steeredMessages.length > 0) {
-        // Remove the assistant message we just added (the steered message replaces it).
-        history.pop();
-        // Push the steered messages instead.
-        history.push(...steeredMessages);
-        // Re-run the loop without incrementing turnIndex
-        // (the steered message is the new prompt for the same turn).
-        events.emit({ type: 'turn_end', turnId, stopReason: 'tool_use' });
-        await cfg.hooks?.afterTurn?.(turnIndex, totals);
-        continue;
-      }
-
-      // No steering — check if we're done or need tool execution.
       const toolUses = extractToolUses(assembled.message);
       if (toolUses.length === 0) {
-        // Check for follow-up messages before breaking.
-        // If a follow-up exists, it becomes the next turn.
-        const followUpMessages = followUpQueue.drain();
-        if (followUpMessages) {
-          history.push(...followUpMessages);
-          turnCount = turnIndex + 1;
-          events.emit({ type: 'turn_end', turnId, stopReason: 'tool_use' });
-          await cfg.hooks?.afterTurn?.(turnIndex, totals);
-          turnIndex++;
-          continue;
-        }
-
-        // No follow-up, we're done.
-        turnCount = turnIndex + 1;
         events.emit({ type: 'turn_end', turnId, stopReason: 'end_turn' });
         await cfg.hooks?.afterTurn?.(turnIndex, totals);
         break;
       }
 
-      // Execute tool calls and continue to next turn.
-      turnCount = turnIndex + 1;
       const toolResults = await executeToolCalls(toolUses, cfg, events);
       const appended = appendToolResults(history, toolResults.map(r => ({
         toolUseId: r.call.id,
@@ -215,17 +154,12 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
 
       events.emit({ type: 'turn_end', turnId, stopReason: 'tool_use' });
       await cfg.hooks?.afterTurn?.(turnIndex, totals);
-
-      // Only increment turnIndex if we're not being steered.
-      turnIndex++;
     }
   } finally {
     events.emit({ type: 'agent_end', sessionId: cfg.sessionId, stopReason, usage: totals });
   }
 
-  // Project to Message[] on return — AgentResult.messages is typed Message[],
-  // so honor that contract here. Sprint B/C can widen later if needed.
-  return { messages: convertToLlm(history), usage: totals, stopReason, turnCount, sessionId: cfg.sessionId };
+  return { messages: history, usage: totals, stopReason, turnCount, sessionId: cfg.sessionId };
 }
 
 async function executeToolCalls(

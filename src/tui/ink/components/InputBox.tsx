@@ -154,7 +154,7 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
         // immediately before each occurrence.
         let result = prev;
         for (const ch of next) {
-          if (ch === DEL || ch === BS) {
+          if (ch === "\x7f" || ch === "\x08") {
             // Delete the last character (if any) for each backspace.
             if (result.length > 0) result = result.slice(0, -1);
           } else {

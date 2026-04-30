@@ -28,23 +28,28 @@ import { modePreamble } from "../../context/mode.js";
 import { runAgentLoop } from "../../kernel/agent-loop.js";
 import { createErrorClassifier } from "../../intelligence/error-classifier.js";
 import { createToolExecutor } from "../../tools/exec.js";
-import { createTuiApprovalBus } from "../approval.js";
+import { createInkApprovalBus, } from "./ink-approval-bus.js";
+import { ApprovalPrompt, } from "./components/ApprovalPrompt.js";
 import { PRICES } from "../../intelligence/prices.js";
 import { Logo } from "./components/Logo.js";
 import { StatusBar } from "./components/StatusBar.js";
 import { StreamingText } from "./components/StreamingText.js";
 import { ThinkingBlock } from "./components/ThinkingBlock.js";
 import { ToolBox } from "./components/ToolBox.js";
+import { ToolGroup } from "./components/ToolGroup.js";
 import { InputBox } from "./components/InputBox.js";
+import { PromptQueueIndicator } from "./components/PromptQueueIndicator.js";
 import { ModelPicker } from "./components/ModelPicker.js";
+import { ModelSwitchPrompt } from "./components/ModelSwitchPrompt.js";
+import { ProviderPicker, } from "./components/ProviderPicker.js";
 import { HelpOverlay, } from "./components/HelpOverlay.js";
+import { KeySetOverlay } from "./components/KeySetOverlay.js";
+import { saveKey } from "../../auth/keystore.js";
 import { AtFileComplete } from "./components/AtFileComplete.js";
 import { SlashComplete } from "./components/SlashComplete.js";
 import { ThemePicker } from "./components/ThemePicker.js";
-import { KeySetOverlay } from "./components/KeySetOverlay.js";
 import { ThemeProvider } from "./theme-context.js";
 import { writeFile, mkdir, readFile } from "node:fs/promises";
-import { saveKey } from "../../auth/keystore.js";
 import { homedir } from "node:os";
 import { join as pathJoin } from "node:path";
 import { useEventProjection, } from "./use-event-projection.js";
@@ -68,15 +73,43 @@ export function App(props) {
     const sessionIdRef = React.useRef(randomUUID());
     const historyRef = React.useRef(initialHistory(props));
     const abortRef = React.useRef(null);
-    const pendingInputRef = React.useRef("");
     const [transcript, setTranscript] = React.useState([]);
     const [input, setInput] = React.useState("");
     const [busy, setBusy] = React.useState(false);
+    // Prompt queue: while a turn is streaming the user can still type and
+    // press Enter. Submissions land here instead of being dropped, then
+    // drain FIFO when the turn finishes (see useEffect below).
+    const [promptQueue, setPromptQueue] = React.useState([]);
     const [currentModel, setCurrentModel] = React.useState(props.config.model);
-    // pendingKey: when a ProviderError fires for a missing API key, we surface
-    // a KeySetOverlay. On save the key is written to ~/.dirgha/keys.json and
-    // the original prompt is automatically retried.
+    // Inline key entry: set when a provider throws "X_API_KEY is required"
+    // (either at model-pick time or when a turn fires). Cleared on save/cancel.
     const [pendingKey, setPendingKey] = React.useState(null);
+    // Multi-step picker stage. Stage 1 = ProviderPicker (default when
+    // overlays.active === 'models'); stage 2 = ModelPicker filtered to
+    // the picked provider. Resets to 'provider' on every fresh open.
+    const [pickerStage, setPickerStage] = React.useState("provider");
+    const [pickerProvider, setPickerProvider] = React.useState(null);
+    // Pending model-switch prompt — set when the kernel emits an error
+    // with a `failoverModel` hint. Cleared when the user answers
+    // [y|n|p]. While set, an inline ModelSwitchPrompt renders below
+    // the input box; submitting any other prompt also clears it.
+    const [pendingFailover, setPendingFailover] = React.useState(null);
+    const lastUserPromptRef = React.useRef("");
+    // Approval bus — single instance per App so subscriptions persist across
+    // turns. Replaces the legacy `createTuiApprovalBus` that wrote prompts
+    // direct to stdout (overdrawn by Ink) and read stdin raw (hung on
+    // Windows). See `ink-approval-bus.ts` for the full rationale.
+    const approvalBusRef = React.useRef();
+    if (!approvalBusRef.current) {
+        approvalBusRef.current = createInkApprovalBus(new Set(props.config.autoApproveTools));
+    }
+    const [pendingApproval, setPendingApproval] = React.useState(null);
+    React.useEffect(() => {
+        const bus = approvalBusRef.current;
+        if (!bus)
+            return;
+        return bus.subscribe((req) => setPendingApproval(req));
+    }, []);
     // Mode state: SlashContext.setMode flips it live so /mode plan|act|verify|ask
     // takes effect on the next turn (system-prompt rebuild downstream picks it up).
     const [mode, setMode] = React.useState(props.config.mode ?? "act");
@@ -153,6 +186,13 @@ export function App(props) {
                     actor: sessionIdRef.current,
                     summary: ev.message,
                 });
+                if (ev.failoverModel) {
+                    setPendingFailover({
+                        failedModel: currentModel,
+                        failoverModel: ev.failoverModel,
+                        lastPrompt: lastUserPromptRef.current,
+                    });
+                }
             }
         });
         return unsub;
@@ -161,9 +201,23 @@ export function App(props) {
     const slashCommands = props.slashCommands ?? [];
     const handleSubmit = React.useCallback((raw) => {
         const value = raw.trim();
-        if (value.length === 0 || busy)
+        if (value.length === 0)
             return;
+        // Non-disruptive queue: if a turn is still streaming, push the new
+        // prompt onto the queue and clear the input so the user can keep
+        // typing. The drain-effect below submits queued prompts FIFO once
+        // `busy` flips false.
+        if (busy) {
+            setPromptQueue((q) => [...q, value]);
+            setInput("");
+            return;
+        }
         setInput("");
+        // Remember the last user prompt so we can re-submit it after a
+        // failover model swap (D2 — auto-prompt model switch on failure).
+        lastUserPromptRef.current = value;
+        // A new submission supersedes any pending failover prompt.
+        setPendingFailover(null);
         if (value === "/exit" || value === "/quit") {
             exit();
             return;
@@ -256,7 +310,7 @@ export function App(props) {
                 },
                 getMode: () => mode,
                 setMode: (m) => setMode(m),
-                getTheme: () => props.config.theme ?? "dark",
+                getTheme: () => props.config.theme ?? "readable",
                 setTheme: () => undefined,
                 getSession: () => null,
                 getSessionStore: () => props.sessions,
@@ -304,7 +358,6 @@ export function App(props) {
         };
         setTranscript((prev) => [...prev, userItem]);
         historyRef.current.push({ role: "user", content: value });
-        pendingInputRef.current = value;
         void runTurn();
     }, [busy, exit, props, projection, overlays]);
     const runTurn = async () => {
@@ -319,7 +372,7 @@ export function App(props) {
             });
             const sanitized = props.registry.sanitize({ descriptionLimit: 200 });
             const provider = props.providers.forModel(currentModel);
-            const approvalBus = createTuiApprovalBus(new Set(props.config.autoApproveTools));
+            const approvalBus = approvalBusRef.current;
             // Context-aware compaction: trigger at 75 % of the active model's
             // window. Same machinery as the readline + one-shot paths so the
             // Ink TUI doesn't 400-overflow on long sessions.
@@ -349,12 +402,11 @@ export function App(props) {
         }
         catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
-            // Detect missing API key: "DEEPSEEK_API_KEY is required" / "OPENAI_API_KEY is required"
             const keyMatch = /^([A-Z][A-Z0-9_]+_API_KEY) is required/.exec(msg);
             if (keyMatch?.[1]) {
                 setPendingKey({
                     keyName: keyMatch[1],
-                    retryInput: pendingInputRef.current,
+                    retryInput: lastUserPromptRef.current,
                 });
             }
             else {
@@ -373,6 +425,20 @@ export function App(props) {
             abortRef.current = null;
         }
     };
+    // Drain the prompt queue when a turn finishes. Pops the oldest queued
+    // prompt and re-submits it through handleSubmit (which transitions
+    // back into busy=true via runTurn). Guarded on `!busy` so we never
+    // race against an already-active turn.
+    React.useEffect(() => {
+        if (busy)
+            return;
+        if (promptQueue.length === 0)
+            return;
+        const [next, ...rest] = promptQueue;
+        setPromptQueue(rest);
+        if (next !== undefined)
+            handleSubmit(next);
+    }, [busy, promptQueue, handleSubmit]);
     // Global Esc handler. Priority order:
     //   1. If an overlay (other than @-file) is open → close it.
     //   2. If a turn is streaming → abort it (cancels the in-flight LLM
@@ -402,12 +468,22 @@ export function App(props) {
     });
     const handleModelPick = React.useCallback((id) => {
         overlays.closeOverlay();
+        // Dedupe: a stale picker callback firing after the model is already
+        // set should not spam the transcript with redundant notices.
         setCurrentModel((prev) => {
             if (prev === id)
                 return prev;
-            // Check if the selected model's provider has its API key configured.
-            // If not, open the inline KeySetOverlay so the user can enter it right
-            // here without hunting for "dirgha keys add …" in a separate terminal.
+            const note = {
+                kind: "notice",
+                id: randomUUID(),
+                text: `Model set to ${id}`,
+            };
+            setTranscript((t) => [...t, note]);
+            // 1.10.1 — Warn the user inline if the new model's provider has
+            // no API key configured. Without this, the next ask silently
+            // 401s and the user is left wondering why nothing happens.
+            // Best-effort: provider construction throws ProviderError when
+            // the env var is missing; we catch + render the missing-env hint.
             try {
                 props.providers.forModel(id);
             }
@@ -415,20 +491,17 @@ export function App(props) {
                 const msg = err instanceof Error ? err.message : String(err);
                 const m = /([A-Z][A-Z0-9_]+_API_KEY) is required/.exec(msg);
                 if (m?.[1]) {
+                    // Open inline key entry instead of a static hint — the user can
+                    // paste their key right here without leaving the REPL.
                     setPendingKey({ keyName: m[1], retryInput: "" });
-                    return prev; // Don't switch model until key is saved
+                    return prev; // Don't switch model until the key is saved
                 }
             }
-            const note = {
-                kind: "notice",
-                id: randomUUID(),
-                text: `Model set to ${id}`,
-            };
-            setTranscript((t) => [...t, note]);
             return id;
         });
     }, [overlays, props.providers]);
-    const handleKeySetSave = React.useCallback((keyName, value) => {
+    const handleKeySetSave = React.useCallback((value) => {
+        const keyName = pendingKey?.keyName ?? "";
         void (async () => {
             try {
                 await saveKey(keyName, value);
@@ -439,55 +512,81 @@ export function App(props) {
                     {
                         kind: "notice",
                         id: randomUUID(),
-                        text: `Saved ${keyName}. Retrying...`,
+                        text: `Saved ${keyName}. Model ready.`,
                     },
                 ]);
                 if (retryText) {
-                    historyRef.current.push({ role: "user", content: retryText });
-                    pendingInputRef.current = retryText;
-                    void runTurn();
+                    setInput(retryText);
                 }
             }
             catch (err) {
                 setPendingKey(null);
-                projection.appendLive({
-                    kind: "error",
-                    id: randomUUID(),
-                    message: `Failed to save key: ${err instanceof Error ? err.message : String(err)}`,
-                });
+                setTranscript((prev) => [
+                    ...prev,
+                    {
+                        kind: "error",
+                        id: randomUUID(),
+                        message: `Failed to save key: ${err instanceof Error ? err.message : String(err)}`,
+                    },
+                ]);
             }
         })();
-    }, [pendingKey, projection]);
+    }, [pendingKey]);
     const handleAtPick = React.useCallback((path) => {
         setInput((current) => overlays.spliceAtSelection(current, path));
         overlays.setAtQuery(null);
         overlays.setActive(null);
     }, [overlays]);
+    // Slash commands that take no arguments — pressing Enter on the
+    // autocomplete suggestion submits them immediately instead of forcing
+    // a second Enter. Anything that DOES take args (model, theme, mode,
+    // memory, session, ...) gets a trailing space and waits for the arg.
+    const ARGLESS_SLASH = React.useMemo(() => new Set([
+        "help",
+        "exit",
+        "quit",
+        "clear",
+        "compact",
+        "models",
+        "theme",
+        "cost",
+        "status",
+        "history",
+        "login",
+        "logout",
+        "setup",
+        "upgrade",
+        "update",
+    ]), []);
     const handleSlashPick = React.useCallback((name) => {
-        // Replace the leading /<typed> with /<picked> + a trailing space so
-        // the user can immediately type arguments. If there's already a
-        // tail (rare — only if they pasted), preserve it.
+        // Replace the leading /<typed> with /<picked>. For commands that
+        // need an argument we append a trailing space and wait for the user
+        // to type it. For argless commands (1.12.0 fix) we submit immediately
+        // — without this, /models<Enter> required pressing Enter TWICE: once
+        // to "pick" the autocomplete suggestion, again to submit.
+        let spliced = "";
         setInput((current) => {
-            const spliced = overlays.spliceSlashSelection(current, name);
-            return spliced === `/${name}` ? `${spliced} ` : spliced;
+            spliced = overlays.spliceSlashSelection(current, name);
+            if (spliced === `/${name}` && !ARGLESS_SLASH.has(name)) {
+                return `${spliced} `; // ready for arg input
+            }
+            return spliced;
         });
-        // Clear the slash query — the useEffect in use-overlays then closes
-        // the picker overlay automatically. We deliberately do NOT call
-        // `overlays.setActive(null)` here: when the user presses Enter, both
-        // SlashComplete (this onPick) and InputBox (its onSubmit) fire in
-        // the same batched render. If onSubmit calls openOverlay('theme'),
-        // an explicit setActive(null) from this handler would race and
-        // overwrite it — that's the bug that shipped to v1.7.8 and made
-        // /theme silently no-op.
         overlays.setSlashQuery(null);
-    }, [overlays]);
+        // Argless command — fire submit on the next tick so React commits
+        // the setInput state first. handleSubmit's `value === '/models'`
+        // branch then opens the overlay correctly.
+        if (ARGLESS_SLASH.has(name)) {
+            setTimeout(() => handleSubmit(spliced || `/${name}`), 0);
+        }
+    }, [overlays, ARGLESS_SLASH, handleSubmit]);
     const inputFocus = overlays.active === null ||
         overlays.active === "atfile" ||
         overlays.active === "slash";
     // Active theme name — driven by local state so the picker can flip it
     // live. Initial value comes from config; subsequent changes are
     // persisted to ~/.dirgha/config.json so future sessions pick it up.
-    const [themeName, setThemeName] = React.useState((props.config.theme ?? "dark"));
+    const [themeName, setThemeName] = React.useState((props.config.theme ?? "readable"));
     const handleThemePick = React.useCallback((name) => {
         overlays.closeOverlay();
         setThemeName(name);
@@ -518,7 +617,20 @@ export function App(props) {
     // streaming text appears now, the Static-around-transcript pattern
     // was suppressing the live region updates. If still not, the bug
     // is upstream in useEventProjection.
-    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: [{ key: "logo" }], children: (_item) => _jsx(Logo, { version: VERSION }, "logo") }), _jsxs(Box, { flexDirection: "column", children: [transcript.map((item) => (_jsx(TranscriptRow, { item: item }, item.id))), projection.liveItems.map((item) => (_jsx(TranscriptRow, { item: item }, item.id)))] }), _jsx(InputBox, { value: input, onChange: setInput, onSubmit: handleSubmit, busy: busy, vimMode: props.config.vimMode === true, onAtQueryChange: overlays.setAtQuery, onSlashQueryChange: overlays.setSlashQuery, onRequestOverlay: overlays.openOverlay, inputFocus: inputFocus && !busy, onRequestYoloToggle: () => {
+    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: [{ key: "logo" }], children: (_item) => _jsx(Logo, { version: VERSION }, "logo") }), _jsx(Box, { flexDirection: "column", children: renderTranscript([...transcript, ...projection.liveItems]) }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
+                        approvalBusRef.current?.resolve(pendingApproval.id, decision);
+                    } })), pendingFailover !== null && (_jsx(ModelSwitchPrompt, { failedModel: pendingFailover.failedModel, failoverModel: pendingFailover.failoverModel, onAccept: (failover) => {
+                        const lastPrompt = pendingFailover.lastPrompt;
+                        setCurrentModel(failover);
+                        setPendingFailover(null);
+                        // Re-submit the failed prompt against the new model.
+                        if (lastPrompt) {
+                            setTimeout(() => handleSubmit(lastPrompt), 0);
+                        }
+                    }, onReject: () => setPendingFailover(null), onPicker: () => {
+                        setPendingFailover(null);
+                        overlays.openOverlay("models");
+                    } })), _jsx(PromptQueueIndicator, { queued: promptQueue }), _jsx(InputBox, { value: input, onChange: setInput, onSubmit: handleSubmit, busy: busy, vimMode: props.config.vimMode === true, onAtQueryChange: overlays.setAtQuery, onSlashQueryChange: overlays.setSlashQuery, onRequestOverlay: overlays.openOverlay, onRequestYoloToggle: () => {
                         const next = mode === "yolo" ? "act" : "yolo";
                         setMode(next);
                         setTranscript((prev) => [
@@ -531,13 +643,76 @@ export function App(props) {
                                     : "YOLO mode OFF — back to standard confirmation.",
                             },
                         ]);
-                    } }), overlays.active === "atfile" && overlays.atQuery !== null && (_jsx(AtFileComplete, { cwd: props.cwd, query: overlays.atQuery, onPick: handleAtPick, onCancel: () => {
+                    }, inputFocus: inputFocus }), overlays.active === "atfile" && overlays.atQuery !== null && (_jsx(AtFileComplete, { cwd: props.cwd, query: overlays.atQuery, onPick: handleAtPick, onCancel: () => {
                         overlays.setAtQuery(null);
                         overlays.setActive(null);
                     } })), overlays.active === "slash" && overlays.slashQuery !== null && (_jsx(SlashComplete, { commands: slashCommands, query: overlays.slashQuery, onPick: handleSlashPick, onCancel: () => {
                         overlays.setSlashQuery(null);
                         overlays.setActive(null);
-                    } })), overlays.active === "models" && (_jsx(ModelPicker, { models: models, current: currentModel, onPick: handleModelPick, onCancel: overlays.closeOverlay })), overlays.active === "help" && (_jsx(HelpOverlay, { slashCommands: slashCommands, onClose: overlays.closeOverlay })), overlays.active === "theme" && (_jsx(ThemePicker, { current: themeName, onPick: handleThemePick, onCancel: overlays.closeOverlay })), pendingKey !== null && (_jsx(KeySetOverlay, { keyName: pendingKey.keyName, onSave: (v) => handleKeySetSave(pendingKey.keyName, v), onCancel: () => setPendingKey(null) })), _jsx(StatusBar, { model: currentModel, provider: providerIdForModel(currentModel), inputTokens: projection.totals.inputTokens, outputTokens: projection.totals.outputTokens, costUsd: projection.totals.costUsd, cwd: props.cwd, busy: busy, mode: mode, contextWindow: contextWindowFor(currentModel), liveOutputTokens: liveOutputTokens, liveDurationMs: liveDurationMs })] }) }));
+                    } })), overlays.active === "models" &&
+                    pickerStage === "provider" &&
+                    (() => {
+                        // Build provider entries — only include providers that actually have
+                        // models in our catalogue. Without this, the picker shows providers
+                        // with 0 models and the user lands on an empty model list.
+                        const providers = buildProviderEntries(models, currentModel);
+                        if (providers.length === 0) {
+                            // Fall through to flat ModelPicker if no providers (catalogue empty).
+                            return null;
+                        }
+                        return (_jsx(ProviderPicker, { providers: providers, onPick: (providerId) => {
+                                setPickerProvider(providerId);
+                                setPickerStage("model");
+                            }, onCancel: () => {
+                                setPickerStage("provider");
+                                setPickerProvider(null);
+                                overlays.closeOverlay();
+                            } }));
+                    })(), overlays.active === "models" && pickerStage === "model" && (_jsx(ModelPicker, { models: models.filter((m) => m.provider === pickerProvider), current: currentModel, onPick: (id) => {
+                        handleModelPick(id);
+                        setPickerStage("provider");
+                        setPickerProvider(null);
+                    }, onCancel: () => {
+                        // Esc inside ModelPicker → back to ProviderPicker (NOT close).
+                        setPickerStage("provider");
+                        setPickerProvider(null);
+                    } })), overlays.active === "help" && (_jsx(HelpOverlay, { slashCommands: slashCommands, onClose: overlays.closeOverlay })), overlays.active === "theme" && (_jsx(ThemePicker, { current: themeName, onPick: handleThemePick, onCancel: overlays.closeOverlay })), pendingKey && (_jsx(KeySetOverlay, { keyName: pendingKey.keyName, onSave: handleKeySetSave, onCancel: () => setPendingKey(null) })), _jsx(StatusBar, { model: currentModel, provider: providerIdForModel(currentModel), inputTokens: projection.totals.inputTokens, outputTokens: projection.totals.outputTokens, costUsd: projection.totals.costUsd, cwd: props.cwd, busy: busy, mode: mode, contextWindow: contextWindowFor(currentModel), liveOutputTokens: liveOutputTokens, liveDurationMs: liveDurationMs })] }) }));
+}
+/**
+ * Walk the transcript and fold consecutive `tool` items into a single
+ * <ToolGroup>. Non-tool items render via <TranscriptRow>. The grouping
+ * is intentionally simple — we look at adjacency, not assistant-turn
+ * boundaries, because the projection emits tools contiguously between
+ * `text` spans of the same turn.
+ */
+function renderTranscript(items) {
+    const out = [];
+    let toolBuf = [];
+    let groupKeyCounter = 0;
+    const flushTools = () => {
+        if (toolBuf.length === 0)
+            return;
+        out.push(_jsx(ToolGroup, { tools: toolBuf }, `tg-${groupKeyCounter++}`));
+        toolBuf = [];
+    };
+    for (const item of items) {
+        if (item.kind === "tool") {
+            toolBuf.push({
+                id: item.id,
+                name: item.name,
+                status: item.status,
+                argSummary: item.argSummary,
+                outputPreview: item.outputPreview,
+                startedAt: item.startedAt,
+                durationMs: item.durationMs,
+            });
+            continue;
+        }
+        flushTools();
+        out.push(_jsx(TranscriptRow, { item: item }, item.id));
+    }
+    flushTools();
+    return out;
 }
 function TranscriptRow({ item, }) {
     switch (item.kind) {
@@ -548,6 +723,9 @@ function TranscriptRow({ item, }) {
         case "thinking":
             return _jsx(ThinkingBlock, { content: item.content });
         case "tool":
+            // Should not be reached — tools are folded by renderTranscript() into
+            // <ToolGroup>. Kept as a safety net so an unexpected tool item still
+            // renders something rather than nothing.
             return (_jsx(ToolBox, { name: item.name, status: item.status, argSummary: item.argSummary, outputPreview: item.outputPreview, startedAt: item.startedAt, durationMs: item.durationMs }));
         case "error":
             return (_jsxs(Box, { gap: 1, marginBottom: 1, children: [_jsx(Text, { color: "red", bold: true, children: "\u2717" }), _jsx(Text, { color: "red", children: item.message })] }));
@@ -593,6 +771,92 @@ function providerIdForModel(model) {
     if (model.includes("/"))
         return "openrouter";
     return "local";
+}
+const PROVIDER_BLURB = {
+    anthropic: "Claude — Opus, Sonnet, Haiku",
+    openai: "GPT family — gpt-5.5, o1/o3",
+    gemini: "Google — Gemini Pro, Flash",
+    openrouter: "Aggregator — 370+ models, free tier",
+    nvidia: "NIM — Kimi K2.5, DeepSeek V4, Qwen 3",
+    ollama: "Local Ollama models",
+    llamacpp: "Local llama.cpp models",
+    fireworks: "Hosted open models",
+    deepseek: "DeepSeek native — V3.2, reasoner",
+    mistral: "Mistral — Codestral, Magistral",
+    cohere: "Cohere — Command R / Command A",
+    cerebras: "Wafer-scale — Qwen3, Llama 4",
+    together: "Open-source hub — Llama, Qwen",
+    perplexity: "Sonar — search-grounded",
+    xai: "Grok 4 family — code + reasoning",
+    groq: "LPU — very low latency",
+    zai: "GLM-4.6 — long-context",
+    local: "Local models",
+};
+const PROVIDER_ENV = {
+    anthropic: "ANTHROPIC_API_KEY",
+    openai: "OPENAI_API_KEY",
+    gemini: "GEMINI_API_KEY",
+    openrouter: "OPENROUTER_API_KEY",
+    nvidia: "NVIDIA_API_KEY",
+    fireworks: "FIREWORKS_API_KEY",
+    deepseek: "DEEPSEEK_API_KEY",
+    mistral: "MISTRAL_API_KEY",
+    cohere: "COHERE_API_KEY",
+    cerebras: "CEREBRAS_API_KEY",
+    together: "TOGETHER_API_KEY",
+    perplexity: "PERPLEXITY_API_KEY",
+    xai: "XAI_API_KEY",
+    groq: "GROQ_API_KEY",
+    zai: "ZAI_API_KEY",
+};
+const PROVIDER_LABEL = {
+    anthropic: "Anthropic",
+    openai: "OpenAI",
+    gemini: "Google AI",
+    openrouter: "OpenRouter",
+    nvidia: "NVIDIA NIM",
+    ollama: "Ollama (local)",
+    llamacpp: "llama.cpp (local)",
+    fireworks: "Fireworks",
+    deepseek: "DeepSeek",
+    mistral: "Mistral",
+    cohere: "Cohere",
+    cerebras: "Cerebras",
+    together: "Together AI",
+    perplexity: "Perplexity",
+    xai: "xAI (Grok)",
+    groq: "Groq",
+    zai: "Z.AI / GLM",
+    local: "Local",
+};
+/**
+ * Group the flat model catalogue into per-provider entries for stage 1
+ * of the picker. Skips providers with zero models in the catalogue.
+ */
+function buildProviderEntries(models, currentModel) {
+    const buckets = new Map();
+    for (const m of models) {
+        const list = buckets.get(m.provider) ?? [];
+        list.push(m);
+        buckets.set(m.provider, list);
+    }
+    const currentProvider = models.find((m) => m.id === currentModel)?.provider;
+    const out = [];
+    for (const [id, items] of buckets) {
+        const env = PROVIDER_ENV[id];
+        const hasKey = env ? !!process.env[env] : true; // local providers don't need keys
+        out.push({
+            id,
+            label: PROVIDER_LABEL[id] ?? id,
+            modelCount: items.length,
+            hasKey,
+            blurb: PROVIDER_BLURB[id],
+            isCurrent: id === currentProvider,
+        });
+    }
+    // Sort by hasKey desc (configured first), then by name.
+    out.sort((a, b) => Number(b.hasKey) - Number(a.hasKey) || a.label.localeCompare(b.label));
+    return out;
 }
 function defaultModelCatalogue() {
     return PRICES.map((p) => ({

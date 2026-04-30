@@ -41,37 +41,6 @@ export interface Message {
   name?: string;
 }
 
-/**
- * UI-only metadata that may be attached to a message in agent state but
- * MUST NOT be sent to the LLM. Use `convertToLlm` (see `./message.ts`) at
- * the provider boundary to strip these fields.
- *
- * `kind` is the high-level provenance / role of the entry:
- *   - 'notification'    : transient UI banner (rate-limit, model-switch, etc.)
- *   - 'skill-injection' : marker for a skill-prompt injection event
- *   - 'fleet-supervisor': supervisor commentary in fleet/multi-agent runs
- *   - 'internal'        : free-form internal annotation
- *
- * `data` is opaque to the kernel; consumers (TUI, daemon, fleet) may shape
- * it as they wish.
- */
-export interface AgentMessageUi {
-  kind: 'notification' | 'skill-injection' | 'fleet-supervisor' | 'internal';
-  data?: unknown;
-}
-
-/**
- * `AgentMessage` is the in-kernel transcript entry. It is a `Message` plus
- * optional UI-only metadata. The agent loop stores `AgentMessage[]`; only
- * the projected `Message[]` (via `convertToLlm`) is sent to providers.
- *
- * `hidden: true` excludes the message from the LLM context entirely.
- */
-export interface AgentMessage extends Message {
-  ui?: AgentMessageUi;
-  hidden?: boolean;
-}
-
 export type StopReason =
   | 'end_turn'
   | 'tool_use'
@@ -105,7 +74,7 @@ export type AgentEvent =
   | { type: 'usage'; inputTokens: number; outputTokens: number; cachedTokens?: number }
   | { type: 'turn_end'; turnId: string; stopReason: StopReason }
   | { type: 'agent_end'; sessionId: string; stopReason: StopReason; usage: UsageTotal }
-  | { type: 'error'; message: string; reason?: string; retryable?: boolean };
+  | { type: 'error'; message: string; reason?: string; retryable?: boolean; failoverModel?: string };
 
 export interface ToolCall {
   id: string;
