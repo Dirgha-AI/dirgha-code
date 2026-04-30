@@ -11,6 +11,13 @@ All notable changes are tracked here. Format loosely follows [Keep a Changelog](
 - OpenSSF Scorecard runs weekly + on push to main; result published to scorecard.dev.
 - This CHANGELOG.md committed.
 
+## [1.13.1](https://github.com/Dirgha-AI/dirgha-code/compare/v1.13.0...v1.13.1) (2026-04-30)
+
+
+### Bug Fixes
+
+* reasoning_content multi-turn + /up alias ([9920e61](https://github.com/Dirgha-AI/dirgha-code/commit/9920e61a2b2244d7fde4debe2d5b5ff49c77b54b))
+
 ## [1.13.0](https://github.com/Dirgha-AI/dirgha-code/compare/v1.12.3...v1.13.0) (2026-04-30)
 
 
