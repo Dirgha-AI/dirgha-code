@@ -11,6 +11,13 @@ All notable changes are tracked here. Format loosely follows [Keep a Changelog](
 - OpenSSF Scorecard runs weekly + on push to main; result published to scorecard.dev.
 - This CHANGELOG.md committed.
 
+## [1.13.2](https://github.com/Dirgha-AI/dirgha-code/compare/v1.13.1...v1.13.2) (2026-04-30)
+
+
+### Bug Fixes
+
+* port 5 audit fixes from monorepo — SSE timeout, failover typos, email field, atomic token save ([d69ff40](https://github.com/Dirgha-AI/dirgha-code/commit/d69ff409ee17dba2c810c836d041ebdbf128004d))
+
 ## [1.13.1](https://github.com/Dirgha-AI/dirgha-code/compare/v1.13.0...v1.13.1) (2026-04-30)
 
 
