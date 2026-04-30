@@ -11,6 +11,19 @@ All notable changes are tracked here. Format loosely follows [Keep a Changelog](
 - OpenSSF Scorecard runs weekly + on push to main; result published to scorecard.dev.
 - This CHANGELOG.md committed.
 
+## [1.13.0](https://github.com/Dirgha-AI/dirgha-code/compare/v1.12.3...v1.13.0) (2026-04-30)
+
+
+### Features
+
+* **providers:** add DeepSeek native models + fix NVIDIA NIM routing ([48eb272](https://github.com/Dirgha-AI/dirgha-code/commit/48eb27211157a57d50cbc3e68ebeffb63f345239))
+
+
+### Bug Fixes
+
+* inline key setup overlay + pack update resilience + Windows update crash ([af259cc](https://github.com/Dirgha-AI/dirgha-code/commit/af259cc4112cd3be0641eeaf6253dd2e8de2f4e5))
+* **tests:** update dispatch tests + add DeepSeek V4/Prover prices ([1d4856f](https://github.com/Dirgha-AI/dirgha-code/commit/1d4856f1d18abca83ad301e3be4969143c136193))
+
 ## [1.12.3](https://github.com/Dirgha-AI/dirgha-code/compare/v1.12.2...v1.12.3) (2026-04-28)
 
 
