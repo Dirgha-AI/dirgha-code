@@ -332,8 +332,8 @@ const MODEL_FAILOVERS: Record<string, string> = {
   'deepseek-ai/deepseek-v4-flash':       'deepseek/deepseek-chat-v3.1',
   // Anthropic-native → OpenRouter mirror (no key needed if OR set)
   'claude-opus-4-7':                     'anthropic/claude-opus-4-7',
-  'claude-sonnet-4-6':                   'anthropic/claude-sonnet-4.6',
-  'claude-haiku-4-5':                    'anthropic/claude-haiku-4.5',
+  'claude-sonnet-4-6':                   'anthropic/claude-sonnet-4-6',
+  'claude-haiku-4-5':                    'anthropic/claude-haiku-4-5',
 };
 
 export function findFailover(modelId: string): string | undefined {

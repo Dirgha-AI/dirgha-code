@@ -12,11 +12,11 @@ import { migrateDeprecatedModel } from '../intelligence/prices.js';
 // so we route by exact ID rather than prefix to avoid sending OR-only
 // variants like `moonshotai/kimi-k2.5` to NIM (which 404s).
 const NVIDIA_NIM_MODELS = new Set([
-    'deepseek-ai/deepseek-v4-pro',
-    'deepseek-ai/deepseek-v4-flash',
     'moonshotai/kimi-k2-instruct',
     'qwen/qwen3-next-80b-a3b-instruct',
-    'meta/llama-3.3-70b-instruct',
+    'qwen/qwen3.5-122b-a10b',
+    'meta/llama-3.1-70b-instruct',
+    'minimaxai/minimax-m2.5',
 ]);
 const RULES = [
     // Specific NVIDIA NIM models (override the prefix-based OR fallback).
@@ -41,11 +41,12 @@ const RULES = [
     { match: id => id.startsWith('xai/') || id.startsWith('x-ai/') || /^grok-/i.test(id), provider: 'xai' },
     { match: id => id.startsWith('groq/'), provider: 'groq' },
     { match: id => id.startsWith('zai/') || id.startsWith('z-ai/') || id.startsWith('glm/'), provider: 'zai' },
-    // DeepSeek native API — bare canonical ids (deepseek-chat, deepseek-reasoner)
-    // and the explicit deepseek-native: prefix. Vendor-prefixed `deepseek/...`
-    // slugs still go to OpenRouter unless DIRGHA_PROVIDER=deepseek is set.
-    { match: id => /^deepseek-(chat|reasoner|coder)$/.test(id), provider: 'deepseek' },
+    // DeepSeek native API — bare canonical IDs and the deepseek-ai/ vendor prefix.
+    // These go direct to api.deepseek.com (lower latency, own quota, cache discount).
+    // Vendor-prefixed deepseek/ slugs (OpenRouter style) still go to OR.
+    { match: id => /^deepseek-(chat|reasoner|coder|v4-flash|v4-pro|r1|prover-v2)$/.test(id), provider: 'deepseek' },
     { match: id => id.startsWith('deepseek-native/'), provider: 'deepseek' },
+    { match: id => id.startsWith('deepseek-ai/'), provider: 'deepseek' },
     // Catch-all: any vendor-prefixed slug or `:free` variant goes via
     // OpenRouter (anthropic/, openai/, google/, deepseek/, moonshotai/,
     // minimax/, qwen/, tencent/, z-ai/, inclusionai/, etc.).

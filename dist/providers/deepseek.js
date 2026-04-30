@@ -16,12 +16,26 @@
 import { ProviderError } from './iface.js';
 import { streamChatCompletions } from './openai-compat.js';
 const DEFAULT_BASE = 'https://api.deepseek.com/v1';
-// Models that surface a separate reasoning channel.
+// Canonical model IDs served by api.deepseek.com as of 2026-04.
+// deepseek-chat   = V3/V4 (flagship, general purpose)
+// deepseek-v4-flash = lightweight fast variant
+// deepseek-v4-pro   = full MoE, best quality
+// deepseek-reasoner = R1 (thinking/chain-of-thought)
+// deepseek-prover-v2 = math/theorem proving
+export const DEEPSEEK_MODELS = [
+    { id: 'deepseek-chat', label: 'DeepSeek V3 (default)' },
+    { id: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash (fast)' },
+    { id: 'deepseek-v4-pro', label: 'DeepSeek V4 Pro (max quality)' },
+    { id: 'deepseek-reasoner', label: 'DeepSeek R1 (reasoning)' },
+    { id: 'deepseek-prover-v2', label: 'DeepSeek Prover V2 (math)' },
+];
+// Models that surface a reasoning/thinking channel.
 const THINKING_MODELS = new Set([
     'deepseek-reasoner',
     'deepseek-v4-pro',
     'deepseek-v4-flash',
     'deepseek-r1',
+    'deepseek-prover-v2',
 ]);
 export class DeepSeekProvider {
     id = 'deepseek';
@@ -41,13 +55,12 @@ export class DeepSeekProvider {
         return true;
     }
     supportsThinking(modelId) {
-        const base = modelId.replace(/^deepseek\//, '');
+        const base = modelId.replace(/^deepseek(?:-ai)?\//, '');
         return THINKING_MODELS.has(base);
     }
     stream(req) {
-        // Strip a leading `deepseek/` if the user typed the OR-style slug —
-        // the native API uses bare ids (`deepseek-chat`, `deepseek-reasoner`).
-        const model = req.model.replace(/^deepseek\//, '');
+        // Strip OR-style or vendor prefixes — the native API uses bare IDs.
+        const model = req.model.replace(/^deepseek(?:-ai)?\//, '');
         return streamChatCompletions({
             providerName: this.id,
             endpoint: `${this.baseUrl}/chat/completions`,

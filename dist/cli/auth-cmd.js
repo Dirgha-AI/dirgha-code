@@ -15,7 +15,7 @@ export async function runAuth(args) {
         case 'login': {
             try {
                 const token = await client.login();
-                print(style(defaultTheme.success, `\n✓ Signed in as ${token.userId}`));
+                print(style(defaultTheme.success, `\n✓ Signed in as ${token.email ?? token.userId}`));
                 print(`Scope: ${token.scope.join(', ') || '(none)'}`);
                 print(`Expires: ${token.expiresAt}`);
                 return 0;
@@ -45,7 +45,8 @@ export async function runAuth(args) {
 }
 function renderWhoami(token) {
     const lines = [
-        style(defaultTheme.accent, `Signed in as ${token.userId}`),
+        style(defaultTheme.accent, `Signed in as ${token.email || token.userId}`),
+        `  user id: ${token.userId}`,
         `  scope:   ${token.scope.join(', ') || '(none)'}`,
         `  expires: ${token.expiresAt}`,
     ];

@@ -12,7 +12,7 @@
  *   - CLI subcommands (`dirgha login`, `dirgha logout`).
  *   - Billing preflight (`preRequestCheck` reads the bearer).
  */
-import { chmod, mkdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, rename, stat, unlink, writeFile, open } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 const DEFAULT_API_BASE = 'https://api.dirgha.ai';
@@ -115,11 +115,30 @@ export async function saveToken(token, userId, email) {
         email,
         expiresAt: new Date(Date.now() + TOKEN_TTL_MS).toISOString(),
     };
-    await writeFile(path, JSON.stringify(payload, null, 2), 'utf8');
+    const tmp = `${path}.tmp`;
+    // Write to a temp file with 0600 permissions before it contains any token,
+    // then rename into place — avoids a world-readable window where any local
+    // process could read the JWT between writeFile and chmod.
     try {
-        await chmod(path, 0o600);
+        const fh = await open(tmp, 'w', 0o600);
+        try {
+            await fh.writeFile(JSON.stringify(payload, null, 2), 'utf8');
+        }
+        finally {
+            await fh.close();
+        }
+        await rename(tmp, path);
     }
-    catch { /* chmod may fail on Windows */ }
+    catch {
+        // Fallback path for platforms where open+mode isn't supported (e.g. Windows):
+        // write first, then chmod. The window is unavoidable there.
+        await writeFile(path, JSON.stringify(payload, null, 2), 'utf8');
+        try {
+            await chmod(path, 0o600);
+        }
+        catch { /* non-POSIX */ }
+        await unlink(tmp).catch(() => undefined);
+    }
 }
 export async function loadToken() {
     const path = credentialsPath();

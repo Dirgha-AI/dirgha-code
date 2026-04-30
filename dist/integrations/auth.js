@@ -15,7 +15,7 @@
  */
 import { clearToken, loadToken, migrateLegacyAuth, pollDeviceAuth, saveToken, startDeviceAuth, } from './device-auth.js';
 function toAuthToken(tok) {
-    return { jwt: tok.token, scope: [], expiresAt: tok.expiresAt, userId: tok.userId };
+    return { jwt: tok.token, scope: [], expiresAt: tok.expiresAt, userId: tok.userId, email: tok.email };
 }
 /**
  * @deprecated Prefer the functional API in `./device-auth.js`

@@ -63,32 +63,58 @@ export async function sseRequest(opts: RequestOptions): Promise<AsyncIterable<st
   if (opts.token) headers.Authorization = `Bearer ${opts.token}`;
   if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
 
-  const response = await fetch(url, {
-    method: opts.method ?? 'GET',
-    headers,
-    body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
-    signal: opts.signal,
-  });
+  // Wire a timeout controller so hung SSE connections don't block forever.
+  // Default 60 s; caller can shorten or lengthen via timeoutMs.
+  const timeoutMs = opts.timeoutMs ?? 60_000;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new Error(`SSE request timed out after ${timeoutMs}ms`)), timeoutMs);
+  // Chain any caller-provided signal so Ctrl+C / AbortController still works.
+  if (opts.signal) {
+    opts.signal.addEventListener('abort', () => controller.abort((opts.signal as AbortSignal).reason), { once: true });
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: opts.method ?? 'GET',
+      headers,
+      body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timer);
+    throw new IntegrationError(`Request failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
   if (!response.ok) {
+    clearTimeout(timer);
     throw new IntegrationError(`HTTP ${response.status} ${response.statusText}`, response.status);
   }
-  if (!response.body) throw new IntegrationError('No response body on SSE');
+  if (!response.body) {
+    clearTimeout(timer);
+    throw new IntegrationError('No response body on SSE');
+  }
 
   return (async function* sseIterator(): AsyncIterable<string> {
     const reader = (response.body as ReadableStream<Uint8Array>).getReader();
     const decoder = new TextDecoder('utf-8');
     let buffer = '';
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      let nl: number;
-      while ((nl = buffer.indexOf('\n')) >= 0) {
-        const raw = buffer.slice(0, nl);
-        buffer = buffer.slice(nl + 1);
-        const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw;
-        if (line.startsWith('data:')) yield line.slice(5).trim();
+    try {
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let nl: number;
+        while ((nl = buffer.indexOf('\n')) >= 0) {
+          const raw = buffer.slice(0, nl);
+          buffer = buffer.slice(nl + 1);
+          const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw;
+          if (line.startsWith('data:')) yield line.slice(5).trim();
+        }
       }
+    } finally {
+      clearTimeout(timer);
+      try { reader.releaseLock(); } catch { /* noop */ }
     }
   })();
 }

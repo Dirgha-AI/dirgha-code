@@ -32,6 +32,8 @@ export interface AuthToken {
   scope: string[];
   expiresAt: string;
   userId: string;
+  /** Email of the authenticated user. Empty string when unknown. */
+  email: string;
 }
 
 /** @deprecated Use the functional API in `./device-auth.js`. */
@@ -51,7 +53,7 @@ export interface AuthClientOptions {
 }
 
 function toAuthToken(tok: Token): AuthToken {
-  return { jwt: tok.token, scope: [], expiresAt: tok.expiresAt, userId: tok.userId };
+  return { jwt: tok.token, scope: [], expiresAt: tok.expiresAt, userId: tok.userId, email: tok.email };
 }
 
 /**
