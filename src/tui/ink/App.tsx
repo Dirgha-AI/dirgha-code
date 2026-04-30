@@ -51,6 +51,8 @@ import { ModelPicker, type ModelEntry } from './components/ModelPicker.js';
 import { ModelSwitchPrompt } from './components/ModelSwitchPrompt.js';
 import { ProviderPicker, type ProviderEntry as ProviderPickerEntry } from './components/ProviderPicker.js';
 import { HelpOverlay, type HelpSlashCommand } from './components/HelpOverlay.js';
+import { KeySetOverlay } from './components/KeySetOverlay.js';
+import { saveKey } from '../../auth/keystore.js';
 import { AtFileComplete } from './components/AtFileComplete.js';
 import { SlashComplete } from './components/SlashComplete.js';
 import { ThemePicker } from './components/ThemePicker.js';
@@ -106,6 +108,9 @@ export function App(props: AppProps): React.JSX.Element {
   // drain FIFO when the turn finishes (see useEffect below).
   const [promptQueue, setPromptQueue] = React.useState<string[]>([]);
   const [currentModel, setCurrentModel] = React.useState(props.config.model);
+  // Inline key entry: set when a provider throws "X_API_KEY is required"
+  // (either at model-pick time or when a turn fires). Cleared on save/cancel.
+  const [pendingKey, setPendingKey] = React.useState<{ keyName: string; retryInput: string } | null>(null);
   // Multi-step picker stage. Stage 1 = ProviderPicker (default when
   // overlays.active === 'models'); stage 2 = ModelPicker filtered to
   // the picked provider. Resets to 'provider' on every fresh open.
@@ -385,7 +390,12 @@ export function App(props: AppProps): React.JSX.Element {
       historyRef.current = result.messages;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      projection.appendLive({ kind: 'error', id: randomUUID(), message: msg });
+      const keyMatch = /^([A-Z][A-Z0-9_]+_API_KEY) is required/.exec(msg);
+      if (keyMatch?.[1]) {
+        setPendingKey({ keyName: keyMatch[1], retryInput: lastUserPromptRef.current });
+      } else {
+        projection.appendLive({ kind: 'error', id: randomUUID(), message: msg });
+      }
     } finally {
       const committed = projection.commitLive();
       if (committed.length > 0) setTranscript(prev => [...prev, ...committed]);
@@ -447,16 +457,34 @@ export function App(props: AppProps): React.JSX.Element {
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         const m = /([A-Z][A-Z0-9_]+_API_KEY) is required/.exec(msg);
-        const envName = m?.[1] ?? 'API key';
-        setTranscript(t => [...t, {
-          kind: 'notice',
-          id: randomUUID(),
-          text: `! ${envName} not set. Add it with: dirgha keys add ${envName} <key>  (or rerun \`dirgha setup\`)`,
-        }]);
+        if (m?.[1]) {
+          // Open inline key entry instead of a static hint — the user can
+          // paste their key right here without leaving the REPL.
+          setPendingKey({ keyName: m[1], retryInput: '' });
+          return prev; // Don't switch model until the key is saved
+        }
       }
       return id;
     });
   }, [overlays, props.providers]);
+
+  const handleKeySetSave = React.useCallback((value: string): void => {
+    const keyName = pendingKey?.keyName ?? '';
+    void (async () => {
+      try {
+        await saveKey(keyName, value);
+        const retryText = pendingKey?.retryInput ?? '';
+        setPendingKey(null);
+        setTranscript(prev => [...prev, { kind: 'notice', id: randomUUID(), text: `Saved ${keyName}. Model ready.` }]);
+        if (retryText) {
+          setInput(retryText);
+        }
+      } catch (err) {
+        setPendingKey(null);
+        setTranscript(prev => [...prev, { kind: 'error', id: randomUUID(), message: `Failed to save key: ${err instanceof Error ? err.message : String(err)}` }]);
+      }
+    })();
+  }, [pendingKey]);
 
   const handleAtPick = React.useCallback((path: string): void => {
     setInput(current => overlays.spliceAtSelection(current, path));
@@ -646,6 +674,13 @@ export function App(props: AppProps): React.JSX.Element {
           current={themeName}
           onPick={handleThemePick}
           onCancel={overlays.closeOverlay}
+        />
+      )}
+      {pendingKey && (
+        <KeySetOverlay
+          keyName={pendingKey.keyName}
+          onSave={handleKeySetSave}
+          onCancel={() => setPendingKey(null)}
         />
       )}
       <StatusBar

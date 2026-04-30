@@ -43,6 +43,8 @@ import { ModelPicker } from './components/ModelPicker.js';
 import { ModelSwitchPrompt } from './components/ModelSwitchPrompt.js';
 import { ProviderPicker } from './components/ProviderPicker.js';
 import { HelpOverlay } from './components/HelpOverlay.js';
+import { KeySetOverlay } from './components/KeySetOverlay.js';
+import { saveKey } from '../../auth/keystore.js';
 import { AtFileComplete } from './components/AtFileComplete.js';
 import { SlashComplete } from './components/SlashComplete.js';
 import { ThemePicker } from './components/ThemePicker.js';
@@ -79,6 +81,9 @@ export function App(props) {
     // drain FIFO when the turn finishes (see useEffect below).
     const [promptQueue, setPromptQueue] = React.useState([]);
     const [currentModel, setCurrentModel] = React.useState(props.config.model);
+    // Inline key entry: set when a provider throws "X_API_KEY is required"
+    // (either at model-pick time or when a turn fires). Cleared on save/cancel.
+    const [pendingKey, setPendingKey] = React.useState(null);
     // Multi-step picker stage. Stage 1 = ProviderPicker (default when
     // overlays.active === 'models'); stage 2 = ModelPicker filtered to
     // the picked provider. Resets to 'provider' on every fresh open.
@@ -347,7 +352,13 @@ export function App(props) {
         }
         catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
-            projection.appendLive({ kind: 'error', id: randomUUID(), message: msg });
+            const keyMatch = /^([A-Z][A-Z0-9_]+_API_KEY) is required/.exec(msg);
+            if (keyMatch?.[1]) {
+                setPendingKey({ keyName: keyMatch[1], retryInput: lastUserPromptRef.current });
+            }
+            else {
+                projection.appendLive({ kind: 'error', id: randomUUID(), message: msg });
+            }
         }
         finally {
             const committed = projection.commitLive();
@@ -414,16 +425,34 @@ export function App(props) {
             catch (err) {
                 const msg = err instanceof Error ? err.message : String(err);
                 const m = /([A-Z][A-Z0-9_]+_API_KEY) is required/.exec(msg);
-                const envName = m?.[1] ?? 'API key';
-                setTranscript(t => [...t, {
-                        kind: 'notice',
-                        id: randomUUID(),
-                        text: `! ${envName} not set. Add it with: dirgha keys add ${envName} <key>  (or rerun \`dirgha setup\`)`,
-                    }]);
+                if (m?.[1]) {
+                    // Open inline key entry instead of a static hint — the user can
+                    // paste their key right here without leaving the REPL.
+                    setPendingKey({ keyName: m[1], retryInput: '' });
+                    return prev; // Don't switch model until the key is saved
+                }
             }
             return id;
         });
     }, [overlays, props.providers]);
+    const handleKeySetSave = React.useCallback((value) => {
+        const keyName = pendingKey?.keyName ?? '';
+        void (async () => {
+            try {
+                await saveKey(keyName, value);
+                const retryText = pendingKey?.retryInput ?? '';
+                setPendingKey(null);
+                setTranscript(prev => [...prev, { kind: 'notice', id: randomUUID(), text: `Saved ${keyName}. Model ready.` }]);
+                if (retryText) {
+                    setInput(retryText);
+                }
+            }
+            catch (err) {
+                setPendingKey(null);
+                setTranscript(prev => [...prev, { kind: 'error', id: randomUUID(), message: `Failed to save key: ${err instanceof Error ? err.message : String(err)}` }]);
+            }
+        })();
+    }, [pendingKey]);
     const handleAtPick = React.useCallback((path) => {
         setInput(current => overlays.spliceAtSelection(current, path));
         overlays.setAtQuery(null);
@@ -527,7 +556,7 @@ export function App(props) {
                         // Esc inside ModelPicker → back to ProviderPicker (NOT close).
                         setPickerStage('provider');
                         setPickerProvider(null);
-                    } })), overlays.active === 'help' && (_jsx(HelpOverlay, { slashCommands: slashCommands, onClose: overlays.closeOverlay })), overlays.active === 'theme' && (_jsx(ThemePicker, { current: themeName, onPick: handleThemePick, onCancel: overlays.closeOverlay })), _jsx(StatusBar, { model: currentModel, provider: providerIdForModel(currentModel), inputTokens: projection.totals.inputTokens, outputTokens: projection.totals.outputTokens, costUsd: projection.totals.costUsd, cwd: props.cwd, busy: busy, mode: props.config.mode ?? 'act', contextWindow: contextWindowFor(currentModel), liveOutputTokens: liveOutputTokens, liveDurationMs: liveDurationMs })] }) }));
+                    } })), overlays.active === 'help' && (_jsx(HelpOverlay, { slashCommands: slashCommands, onClose: overlays.closeOverlay })), overlays.active === 'theme' && (_jsx(ThemePicker, { current: themeName, onPick: handleThemePick, onCancel: overlays.closeOverlay })), pendingKey && (_jsx(KeySetOverlay, { keyName: pendingKey.keyName, onSave: handleKeySetSave, onCancel: () => setPendingKey(null) })), _jsx(StatusBar, { model: currentModel, provider: providerIdForModel(currentModel), inputTokens: projection.totals.inputTokens, outputTokens: projection.totals.outputTokens, costUsd: projection.totals.costUsd, cwd: props.cwd, busy: busy, mode: props.config.mode ?? 'act', contextWindow: contextWindowFor(currentModel), liveOutputTokens: liveOutputTokens, liveDurationMs: liveDurationMs })] }) }));
 }
 /**
  * Walk the transcript and fold consecutive `tool` items into a single

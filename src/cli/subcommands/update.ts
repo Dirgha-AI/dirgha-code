@@ -151,9 +151,16 @@ async function runUpgradePackages(yes: boolean): Promise<number> {
   }
   let okCount = 0;
   for (const p of packs) {
-    const r = spawnSync('git', ['-C', p.path, 'pull', '--ff-only', '--depth=1'], { stdio: 'inherit' });
-    if (r.status === 0) okCount++;
-    else stderr.write(style(defaultTheme.danger, `✗ ${p.name}: git pull failed (exit ${r.status})\n`));
+    // Fetch then reset --hard so diverged branches (forced pushes, rebases)
+    // always update cleanly. `pull --ff-only` aborts when branches diverge.
+    const fetch = spawnSync('git', ['-C', p.path, 'fetch', 'origin', '--depth=1'], { stdio: 'inherit' });
+    const branch = spawnSync('git', ['-C', p.path, 'rev-parse', '--abbrev-ref', 'FETCH_HEAD'], { encoding: 'utf8' });
+    const remote = (branch.stdout?.trim() || 'origin/main');
+    const reset = fetch.status === 0
+      ? spawnSync('git', ['-C', p.path, 'reset', '--hard', remote], { stdio: 'inherit' })
+      : { status: fetch.status };
+    if (reset.status === 0) okCount++;
+    else stderr.write(style(defaultTheme.danger, `✗ ${p.name}: git pull failed (exit ${reset.status})\n`));
   }
   void appendAudit({ kind: 'update', summary: `packs ${okCount}/${packs.length} updated`, target: 'packs', updated: okCount, total: packs.length });
   stdout.write(style(defaultTheme.success, `✓ refreshed ${okCount}/${packs.length} packs\n`));
@@ -178,14 +185,16 @@ async function runUpgradeSelf(yes: boolean): Promise<number> {
   }
   void appendAudit({ kind: 'update', summary: `self ${current} → ${check.latest}`, target: 'self', from: current, to: check.latest ?? '?' });
   try {
-    // Windows quirks: npm is npm.cmd (no PATHEXT auto-resolve in
-    // execFile) AND Node 18.20+ blocks .cmd spawn without shell:true
-    // (CVE-2024-27980). PKG is the literal '@dirgha/code' constant
-    // so shell:true is safe — no user input.
+    // Windows: npm is npm.cmd (no PATHEXT in execFile). shell:true is safe
+    // because PKG is a hard-coded constant, not user input (CVE-2024-27980).
     const isWin = process.platform === 'win32';
     const npmBin = isWin ? 'npm.cmd' : 'npm';
     execFileSync(npmBin, ['i', '-g', `${PKG}@latest`], { stdio: 'inherit', shell: isWin });
     stdout.write(style(defaultTheme.success, `✓ ${PKG} upgraded to ${check.latest}\n`));
+    // On Windows, libuv emits an assertion error (UV_HANDLE_CLOSING) when
+    // the old binary exits after spawning npm. Force-exit cleanly here so
+    // that assertion never fires. The new binary takes over on next launch.
+    if (isWin) process.exit(0);
     return 0;
   } catch (err) {
     stderr.write(style(defaultTheme.danger, `✗ npm install failed: ${err instanceof Error ? err.message : String(err)}\n`));

@@ -18,3 +18,5 @@ export declare function readKeyStore(path?: string): Promise<KeyStore>;
  * names that were hydrated (useful for `--verbose` startup logs).
  */
 export declare function hydrateEnvFromKeyStore(env?: NodeJS.ProcessEnv, path?: string): Promise<string[]>;
+/** Persist a single key to ~/.dirgha/keys.json and hydrate process.env immediately. */
+export declare function saveKey(envVar: string, value: string, path?: string): Promise<void>;

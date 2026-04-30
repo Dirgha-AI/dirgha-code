@@ -8,7 +8,7 @@
  * a stored key for one invocation by exporting in the shell.
  */
 
-import { readFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -40,4 +40,14 @@ export async function hydrateEnvFromKeyStore(env: NodeJS.ProcessEnv = process.en
     }
   }
   return hydrated;
+}
+
+/** Persist a single key to ~/.dirgha/keys.json and hydrate process.env immediately. */
+export async function saveKey(envVar: string, value: string, path: string = keyStorePath()): Promise<void> {
+  const store = await readKeyStore(path);
+  store[envVar] = value;
+  await mkdir(join(homedir(), '.dirgha'), { recursive: true });
+  await writeFile(path, JSON.stringify(store, null, 2) + '\n', 'utf8');
+  try { await chmod(path, 0o600); } catch { /* non-POSIX (Windows) */ }
+  process.env[envVar] = value;
 }
