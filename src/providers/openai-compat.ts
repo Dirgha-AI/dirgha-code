@@ -83,9 +83,11 @@ function toOpenAIMessages(messages: Message[]): OpenAIMessage[] {
     const parts = msg.content;
     if (msg.role === 'assistant') {
       const texts: string[] = [];
+      const thinkings: string[] = [];
       const toolCalls: OpenAIAssistantToolCall[] = [];
       for (const p of parts) {
         if (p.type === 'text') texts.push(p.text);
+        else if (p.type === 'thinking') thinkings.push(p.text);
         else if (p.type === 'tool_use') {
           toolCalls.push({
             id: p.id,
@@ -94,11 +96,15 @@ function toOpenAIMessages(messages: Message[]): OpenAIMessage[] {
           });
         }
       }
-      out.push({
+      const assistantMsg: OpenAIMessage = {
         role: 'assistant',
         content: texts.length > 0 ? texts.join('') : null,
-        tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
-      });
+        ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
+        // DeepSeek / OpenAI-compat thinking models require reasoning_content
+        // to be echoed back verbatim in multi-turn — omitting it causes 400.
+        ...(thinkings.length > 0 ? { reasoning_content: thinkings.join('') } : {}),
+      };
+      out.push(assistantMsg);
       continue;
     }
     const results: ContentPart[] = parts.filter(p => p.type === 'tool_result');
@@ -299,6 +305,7 @@ interface OpenAIMessage {
   name?: string;
   tool_call_id?: string;
   tool_calls?: OpenAIAssistantToolCall[];
+  reasoning_content?: string;
 }
 
 interface OpenAITool {

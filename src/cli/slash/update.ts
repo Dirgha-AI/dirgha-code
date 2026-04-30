@@ -20,6 +20,7 @@ const CLI_VERSION: string = (() => {
 
 export const updateCommand: SlashCommand = {
   name: 'update',
+  aliases: ['up'],
   description: 'Check for a newer @dirgha/code on npm',
   async execute(_args, _ctx) {
     const result = await checkLatestVersion({ currentVersion: CLI_VERSION });
