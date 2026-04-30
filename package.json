@@ -41,7 +41,7 @@
   "devDependencies": {
     "@types/node": "^20.11.5",
     "@types/react": "^18.3.0",
-    "eslint": "^9.39.4",
+    "eslint": "^10.2.1",
     "license-checker": "^25.0.1",
     "typescript": "^5.3.3",
     "typescript-eslint": "^8.59.1",
