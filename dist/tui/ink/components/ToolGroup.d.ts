@@ -12,8 +12,8 @@
  * with name + arg summary at the top, output preview below, all
  * inside the connected region.
  */
-import * as React from 'react';
-import type { ToolStatus } from './ToolBox.js';
+import * as React from "react";
+import type { ToolStatus } from "./ToolBox.js";
 export interface ToolItem {
     id: string;
     name: string;

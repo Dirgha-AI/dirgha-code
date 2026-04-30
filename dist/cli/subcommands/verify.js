@@ -17,83 +17,136 @@
  *     --accept "curl -fs -H 'Origin: https://x' http://localhost:3000/api/health" \
  *     --retries 2
  */
-import { spawn } from 'node:child_process';
-import { stdout, stderr, exit as procExit } from 'node:process';
-import { randomUUID } from 'node:crypto';
-import { runAgentLoop } from '../../kernel/agent-loop.js';
-import { createEventStream } from '../../kernel/event-stream.js';
-import { ProviderRegistry } from '../../providers/index.js';
-import { builtInTools, createToolExecutor, createToolRegistry } from '../../tools/index.js';
-import { renderStreamingEvents } from '../../tui/renderer.js';
-import { loadConfig } from '../config.js';
-import { parseFlags } from '../flags.js';
-import { style, defaultTheme } from '../../tui/theme.js';
+import { spawn } from "node:child_process";
+import { stdout, stderr, exit as procExit } from "node:process";
+import { randomUUID } from "node:crypto";
+import { runAgentLoop } from "../../kernel/agent-loop.js";
+import { createEventStream } from "../../kernel/event-stream.js";
+import { ProviderRegistry } from "../../providers/index.js";
+import { builtInTools, createToolExecutor, createToolRegistry, } from "../../tools/index.js";
+import { renderStreamingEvents } from "../../tui/renderer.js";
+import { loadConfig } from "../config.js";
+import { parseFlags } from "../flags.js";
+import { style, defaultTheme } from "../../tui/theme.js";
 async function runShell(cmd, cwd, timeoutMs) {
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
         const child = spawn(cmd, { shell: true, cwd });
-        let out = '';
-        let err = '';
+        let out = "";
+        let err = "";
         let killed = false;
-        const t = setTimeout(() => { killed = true; child.kill('SIGTERM'); }, timeoutMs);
-        child.stdout.on('data', d => { out += d.toString('utf8'); });
-        child.stderr.on('data', d => { err += d.toString('utf8'); });
-        child.on('close', code => {
+        const t = setTimeout(() => {
+            killed = true;
+            child.kill("SIGTERM");
+        }, timeoutMs);
+        child.stdout.on("data", (d) => {
+            out += d.toString("utf8");
+        });
+        child.stderr.on("data", (d) => {
+            err += d.toString("utf8");
+        });
+        child.on("close", (code) => {
             clearTimeout(t);
             resolve({ exit: killed ? 124 : (code ?? 1), stdout: out, stderr: err });
         });
     });
 }
 export const verifySubcommand = {
-    name: 'verify',
-    description: 'Run an agent task and gate completion on an acceptance shell command',
+    name: "verify",
+    description: "Run an agent task and gate completion on an acceptance shell command",
     async run(argv) {
         const { flags, positionals } = parseFlags(argv);
-        const goal = (positionals[0] ?? '').trim();
-        const accept = typeof flags.accept === 'string' ? flags.accept : (typeof flags.a === 'string' ? flags.a : '');
+        const goal = (positionals[0] ?? "").trim();
+        const accept = typeof flags.accept === "string"
+            ? flags.accept
+            : typeof flags.a === "string"
+                ? flags.a
+                : "";
         if (!goal || !accept) {
             stderr.write('usage: dirgha verify "<goal>" --accept "<shell command>"\n');
             return 2;
         }
         const config = await loadConfig();
-        const { resolveModelAlias } = await import('../../intelligence/prices.js');
-        const rawModel = typeof flags.model === 'string' ? flags.model : (typeof flags.m === 'string' ? flags.m : config.model);
+        const { resolveModelAlias } = await import("../../intelligence/prices.js");
+        const rawModel = typeof flags.model === "string"
+            ? flags.model
+            : typeof flags.m === "string"
+                ? flags.m
+                : config.model;
         const model = resolveModelAlias(rawModel);
-        const maxTurns = typeof flags['max-turns'] === 'string' ? Number.parseInt(flags['max-turns'], 10) : config.maxTurns;
-        const retries = typeof flags.retries === 'string' ? Number.parseInt(flags.retries, 10) : 0;
-        const acceptTimeoutMs = typeof flags['accept-timeout'] === 'string' ? Number.parseInt(flags['accept-timeout'], 10) : 60_000;
+        const maxTurns = typeof flags["max-turns"] === "string"
+            ? Number.parseInt(flags["max-turns"], 10)
+            : config.maxTurns;
+        const retries = typeof flags.retries === "string"
+            ? Number.parseInt(flags.retries, 10)
+            : 0;
+        const acceptTimeoutMs = typeof flags["accept-timeout"] === "string"
+            ? Number.parseInt(flags["accept-timeout"], 10)
+            : 60_000;
         const json = flags.json === true;
         const providers = new ProviderRegistry();
         const registry = createToolRegistry(builtInTools);
+        const { SubagentDelegator } = await import("../../subagents/delegator.js");
+        const { createTaskTool } = await import("../../tools/task.js");
+        const taskDelegatorRef = { current: null };
+        registry.register(createTaskTool({
+            delegate: async (req) => {
+                if (!taskDelegatorRef.current)
+                    throw new Error("subagent delegator not yet initialised");
+                return taskDelegatorRef.current.delegate(req);
+            },
+        }));
         let lastResult = null;
         for (let attempt = 1; attempt <= retries + 1; attempt++) {
             const sessionId = randomUUID();
             const events = createEventStream();
             if (!json)
                 events.subscribe(renderStreamingEvents({ showThinking: config.showThinking }));
-            const executor = createToolExecutor({ registry, cwd: process.cwd(), sessionId });
+            const executor = createToolExecutor({
+                registry,
+                cwd: process.cwd(),
+                sessionId,
+            });
             const sanitized = registry.sanitize({ descriptionLimit: 200 });
             const messages = [
-                { role: 'system', content: `You are completing a goal that will be verified by an automated check after you finish. Use tools to make real changes. The check is: \`${accept}\` — when it exits 0, you have succeeded. Aim for the smallest change that passes the check.` },
-                { role: 'user', content: goal },
+                {
+                    role: "system",
+                    content: `You are completing a goal that will be verified by an automated check after you finish. Use tools to make real changes. The check is: \`${accept}\` — when it exits 0, you have succeeded. Aim for the smallest change that passes the check.`,
+                },
+                { role: "user", content: goal },
             ];
             stdout.write(style(defaultTheme.accent, `\nattempt ${attempt}/${retries + 1}: ${goal}\n`));
+            const provider = providers.forModel(model);
+            taskDelegatorRef.current = new SubagentDelegator({
+                registry,
+                provider,
+                defaultModel: model,
+                cwd: process.cwd(),
+                parentSessionId: sessionId,
+            });
             const result = await runAgentLoop({
                 sessionId,
                 model,
                 messages,
                 tools: sanitized.definitions,
                 maxTurns,
-                provider: providers.forModel(model),
+                provider,
                 toolExecutor: executor,
                 events,
-            }).catch(err => ({ stopReason: 'error', messages, usage: { inputTokens: 0, outputTokens: 0, cachedTokens: 0, costUsd: 0 }, turnCount: 0, sessionId, error: err }));
-            const agentOk = result.stopReason !== 'error' && result.stopReason !== 'aborted';
-            stdout.write('\n');
+            }).catch((err) => ({
+                stopReason: "error",
+                messages,
+                usage: { inputTokens: 0, outputTokens: 0, cachedTokens: 0, costUsd: 0 },
+                turnCount: 0,
+                sessionId,
+                error: err,
+            }));
+            const agentOk = result.stopReason !== "error" && result.stopReason !== "aborted";
+            stdout.write("\n");
             stdout.write(style(defaultTheme.muted, `agent: ${result.stopReason}\n`));
             stdout.write(style(defaultTheme.accent, `\nacceptance: ${accept}\n`));
             const accepted = await runShell(accept, process.cwd(), acceptTimeoutMs);
             const passed = accepted.exit === 0;
-            stdout.write(style(passed ? defaultTheme.success : defaultTheme.danger, `${passed ? '✓ PASS' : '✗ FAIL'} (exit=${accepted.exit})\n`));
+            stdout.write(style(passed ? defaultTheme.success : defaultTheme.danger, `${passed ? "✓ PASS" : "✗ FAIL"} (exit=${accepted.exit})\n`));
             if (accepted.stdout.trim())
                 stdout.write(`  stdout: ${accepted.stdout.trim().slice(0, 400)}\n`);
             if (accepted.stderr.trim())
@@ -110,7 +163,7 @@ export const verifySubcommand = {
             };
             if (passed) {
                 if (json)
-                    stdout.write(JSON.stringify(lastResult, null, 2) + '\n');
+                    stdout.write(JSON.stringify(lastResult, null, 2) + "\n");
                 return 0;
             }
             if (attempt <= retries) {
@@ -118,7 +171,7 @@ export const verifySubcommand = {
             }
         }
         if (json && lastResult)
-            stdout.write(JSON.stringify(lastResult, null, 2) + '\n');
+            stdout.write(JSON.stringify(lastResult, null, 2) + "\n");
         return 1;
     },
 };

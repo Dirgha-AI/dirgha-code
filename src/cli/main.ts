@@ -600,7 +600,7 @@ async function main(): Promise<void> {
   const userHooks = buildAgentHooksFromConfig(config);
   const composedHooks = composeHooks(enforceMode(mode), userHooks);
   const errorClassifier = createErrorClassifier();
-  let result = await runAgentLoop({
+  const result = await runAgentLoop({
     sessionId,
     model: activeModel,
     messages,
@@ -614,46 +614,16 @@ async function main(): Promise<void> {
     autoApprove,
     ...(composedHooks !== undefined ? { hooks: composedHooks } : {}),
   });
-  // Runtime failover: if the agent loop errored (5xx, timeout, etc.)
-  // and we have a registered fallback for the active model, swap and
-  // continue from the LAST PERSISTED HISTORY (not the original prompt)
-  // so multi-turn work doesn't lose progress. Skipped when we already
-  // failed over at construction time so we don't double-hop.
-  if (result.stopReason === "error" && activeModel === model) {
-    const fallback = findFailover(activeModel);
-    if (fallback) {
-      try {
-        const fallbackProvider = providers.forModel(fallback);
-        process.stderr.write(
-          `\n[failover] ${activeModel} → ${fallback} (mid-session at turn ${result.turnCount})\n`,
-        );
-        void appendAudit({
-          kind: "failover",
-          actor: sessionId,
-          summary: `${activeModel} → ${fallback} (turn ${result.turnCount})`,
-          from: activeModel,
-          to: fallback,
-          turn: result.turnCount,
-        });
-        result = await runAgentLoop({
-          sessionId,
-          model: fallback,
-          // Resume from whatever messages survived — partial work isn't lost.
-          messages: result.messages,
-          tools: sanitized.definitions,
-          maxTurns: Math.max(1, maxTurns - result.turnCount),
-          provider: fallbackProvider,
-          toolExecutor: executor,
-          events,
-          contextTransform: compactionTransform,
-          errorClassifier,
-          autoApprove,
-          ...(composedHooks !== undefined ? { hooks: composedHooks } : {}),
-        });
-      } catch {
-        /* swallow — original error already reported */
-      }
-    }
+  // v1.15.0: no mid-session runtime failover — model switches during a
+  // running session cause confusion and inconsistent results. If the
+  // provider returns a transient error the agent loop surfaces it as a
+  // normal error and the caller can retry with a different model on the
+  // next invocation. Construction-time failover (missing API key) is
+  // still active because it never reaches the loop.
+  if (result.stopReason === "error") {
+    process.stderr.write(
+      `\n[failed] ${activeModel} (turn ${result.turnCount})\n`,
+    );
   }
   // Persist every message produced by the turn (assistant turns + tool
   // results). Skip the user + system messages we already appended above.

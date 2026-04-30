@@ -213,7 +213,7 @@ export function App(props: AppProps): React.JSX.Element {
     const t = setInterval(() => {
       if (turnStartRef.current > 0)
         setLiveDurationMs(Date.now() - turnStartRef.current);
-    }, 250);
+    }, 1000);
     return () => clearInterval(t);
   }, [busy]);
 

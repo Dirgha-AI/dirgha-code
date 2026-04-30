@@ -7,8 +7,8 @@
  * output preview. No state is owned here — App is the source of truth
  * so history stays immutable after scroll-off.
  */
-import * as React from 'react';
-export type ToolStatus = 'running' | 'done' | 'error';
+import * as React from "react";
+export type ToolStatus = "pending" | "running" | "done" | "error";
 export interface ToolBoxProps {
     name: string;
     status: ToolStatus;

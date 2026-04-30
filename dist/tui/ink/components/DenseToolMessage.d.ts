@@ -12,14 +12,15 @@
  * Sits flush with surrounding `<ToolGroup>` rows (no own border) so the
  * group's outer bracket reads as one continuous block.
  */
-import * as React from 'react';
-import type { ToolStatus } from './ToolBox.js';
+import * as React from "react";
+import type { ToolStatus } from "./ToolBox.js";
 export interface DenseToolMessageProps {
     name: string;
     status: ToolStatus;
     argSummary?: string;
     outputPreview?: string;
     durationMs?: number;
+    startedAt?: number;
 }
 export declare function DenseToolMessage(props: DenseToolMessageProps): React.JSX.Element;
 export declare function isDenseTool(name: string): boolean;

@@ -17,5 +17,5 @@
  *     --accept "curl -fs -H 'Origin: https://x' http://localhost:3000/api/health" \
  *     --retries 2
  */
-import type { Subcommand } from './index.js';
+import type { Subcommand } from "./index.js";
 export declare const verifySubcommand: Subcommand;

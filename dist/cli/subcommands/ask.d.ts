@@ -13,5 +13,5 @@
  * function. Keeping the one-shot pipeline here keeps the subcommand
  * composable and testable.
  */
-import type { Subcommand } from './index.js';
+import type { Subcommand } from "./index.js";
 export declare const askSubcommand: Subcommand;

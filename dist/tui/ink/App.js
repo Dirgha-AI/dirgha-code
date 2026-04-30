@@ -151,7 +151,7 @@ export function App(props) {
         const t = setInterval(() => {
             if (turnStartRef.current > 0)
                 setLiveDurationMs(Date.now() - turnStartRef.current);
-        }, 250);
+        }, 1000);
         return () => clearInterval(t);
     }, [busy]);
     // Audit writer for the Ink TUI path. Mirrors the one-shot main.ts and

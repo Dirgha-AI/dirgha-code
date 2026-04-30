@@ -2,12 +2,11 @@
  * Thinking block: dim italic render of reasoning tokens.
  *
  * Collapsed by default to a char-count summary (`thinking… (N chars)`)
- * to stop reasoning-heavy models from flooding the screen. Pass
- * `expanded` to dump the full content instead.
+ * to stop reasoning-heavy models from flooding the screen. Press Enter
+ * (Return) on a collapsed block to expand it, Enter again to collapse.
  */
-import * as React from 'react';
+import * as React from "react";
 export interface ThinkingBlockProps {
     content: string;
-    expanded?: boolean;
 }
-export declare function ThinkingBlock({ content, expanded }: ThinkingBlockProps): React.JSX.Element | null;
+export declare function ThinkingBlock({ content, }: ThinkingBlockProps): React.JSX.Element | null;
