@@ -284,6 +284,11 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
     const provider = opts.providers.forModel(currentModel);
 
     const userHooks = buildAgentHooksFromConfig(opts.config);
+    const abortController = new AbortController();
+    const sigintHandler = (): void => {
+      abortController.abort();
+    };
+    process.once("SIGINT", sigintHandler);
     try {
       const result = await runAgentLoop({
         sessionId,
@@ -296,6 +301,7 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
         approvalBus,
         autoApprove: isAutoApprove(currentMode),
         events,
+        signal: abortController.signal,
         errorClassifier: createErrorClassifier(),
         ...(userHooks !== undefined ? { hooks: userHooks } : {}),
         // Per-model compaction trigger: 75 % of the model's actual
@@ -335,6 +341,8 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
           `\n[fatal] ${err instanceof Error ? err.message : String(err)}\n`,
         ),
       );
+    } finally {
+      process.removeListener("SIGINT", sigintHandler);
     }
     rl.prompt();
   };
