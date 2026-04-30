@@ -51,8 +51,11 @@ export const PRICES: PricePoint[] = [
 
   // DeepSeek native API (api.deepseek.com) — own quota, no shared 429s.
   // Cache hits priced at ~10% of base; passed through usage.cached_tokens.
-  { provider: 'deepseek', model: 'deepseek-chat', inputPerM: 0.27, outputPerM: 1.10, cachedInputPerM: 0.07, contextWindow: 128_000, family: 'deepseek' },
-  { provider: 'deepseek', model: 'deepseek-reasoner', inputPerM: 0.55, outputPerM: 2.19, cachedInputPerM: 0.14, contextWindow: 128_000, supportsThinking: true, family: 'deepseek' },
+  { provider: 'deepseek', model: 'deepseek-chat',      inputPerM: 0.27, outputPerM: 1.10, cachedInputPerM: 0.07, contextWindow: 128_000, family: 'deepseek' },
+  { provider: 'deepseek', model: 'deepseek-v4-flash',  inputPerM: 0.07, outputPerM: 0.28, cachedInputPerM: 0.02, contextWindow: 128_000, family: 'deepseek' },
+  { provider: 'deepseek', model: 'deepseek-v4-pro',    inputPerM: 0.43, outputPerM: 0.87, cachedInputPerM: 0.11, contextWindow: 128_000, family: 'deepseek' },
+  { provider: 'deepseek', model: 'deepseek-reasoner',  inputPerM: 0.55, outputPerM: 2.19, cachedInputPerM: 0.14, contextWindow: 128_000, supportsThinking: true, family: 'deepseek' },
+  { provider: 'deepseek', model: 'deepseek-prover-v2', inputPerM: 0.55, outputPerM: 2.19, cachedInputPerM: 0.14, contextWindow: 128_000, supportsThinking: true, family: 'deepseek' },
   { provider: 'nvidia', model: 'moonshotai/kimi-k2-instruct', inputPerM: 0.15, outputPerM: 0.60 },
   { provider: 'nvidia', model: 'qwen/qwen3-next-80b-a3b-instruct', inputPerM: 0.08, outputPerM: 0.30 },
   { provider: 'nvidia', model: 'meta/llama-3.3-70b-instruct', inputPerM: 0.20, outputPerM: 0.80 },
@@ -347,7 +350,7 @@ export function findFailover(modelId: string): string | undefined {
  * permanent rewrites.
  */
 const DEPRECATED_MODELS = new Set<string>([
-  'moonshotai/kimi-k2-instruct',  // NVIDIA NIM dropped 2026-04
+  // intentionally empty — remove entries only when provider confirms permanent removal
 ]);
 
 export function migrateDeprecatedModel(modelId: string): string {

@@ -24,23 +24,20 @@ describe('routeModel', () => {
   // prefix is shared with OpenRouter (e.g. moonshotai/kimi-k2.5 lives
   // only on OR; sending it to NIM would 404).
   describe('NVIDIA NIM whitelist', () => {
-    it('deepseek-ai/deepseek-v4-pro → nvidia', () => {
-      expect(routeModel('deepseek-ai/deepseek-v4-pro')).toBe('nvidia');
+    it('deepseek-ai/deepseek-v4-pro → deepseek (1.12.4: routed to native api.deepseek.com)', () => {
+      expect(routeModel('deepseek-ai/deepseek-v4-pro')).toBe('deepseek');
     });
-    it('deepseek-ai/deepseek-v4-flash → nvidia', () => {
-      expect(routeModel('deepseek-ai/deepseek-v4-flash')).toBe('nvidia');
+    it('deepseek-ai/deepseek-v4-flash → deepseek (1.12.4: routed to native api.deepseek.com)', () => {
+      expect(routeModel('deepseek-ai/deepseek-v4-flash')).toBe('deepseek');
     });
-    it('moonshotai/kimi-k2-instruct → openrouter (deprecated; auto-migrated to kimi-k2.5)', () => {
-      // The legacy NVIDIA NIM ID was deprecated upstream; routeModel
-      // now applies migrateDeprecatedModel, sending the request to
-      // OpenRouter on `moonshotai/kimi-k2.5` instead of 400ing on NIM.
-      expect(routeModel('moonshotai/kimi-k2-instruct')).toBe('openrouter');
+    it('moonshotai/kimi-k2-instruct → nvidia (still active on NIM)', () => {
+      expect(routeModel('moonshotai/kimi-k2-instruct')).toBe('nvidia');
     });
     it('qwen/qwen3-next-80b-a3b-instruct → nvidia', () => {
       expect(routeModel('qwen/qwen3-next-80b-a3b-instruct')).toBe('nvidia');
     });
-    it('meta/llama-3.3-70b-instruct → nvidia', () => {
-      expect(routeModel('meta/llama-3.3-70b-instruct')).toBe('nvidia');
+    it('meta/llama-3.1-70b-instruct → nvidia', () => {
+      expect(routeModel('meta/llama-3.1-70b-instruct')).toBe('nvidia');
     });
   });
 
@@ -66,8 +63,8 @@ describe('routeModel', () => {
       // for slugs that don't start with the registered prefix.
       expect(routeModel('z-ai/glm-5.1')).toBe('zai');
     });
-    it('meta/llama-3.1-70b-instruct → openrouter (3.1, not on NIM whitelist)', () => {
-      expect(routeModel('meta/llama-3.1-70b-instruct')).toBe('openrouter');
+    it('meta/llama-3.3-70b-instruct → openrouter (3.3 not on NIM whitelist)', () => {
+      expect(routeModel('meta/llama-3.3-70b-instruct')).toBe('openrouter');
     });
     it('inclusionai/ling-2.6-1t:free → openrouter', () => {
       expect(routeModel('inclusionai/ling-2.6-1t:free')).toBe('openrouter');
