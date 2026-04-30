@@ -29,7 +29,7 @@ import {
 } from "../../context/primer.js";
 import { probeGitState, renderGitState } from "../../context/git-state.js";
 import { loadSoul } from "../../context/soul.js";
-import { modePreamble } from "../../context/mode.js";
+import { isAutoApprove, modePreamble } from "../../context/mode.js";
 import { runAgentLoop } from "../../kernel/agent-loop.js";
 import { createErrorClassifier } from "../../intelligence/error-classifier.js";
 import type { ProviderRegistry } from "../../providers/index.js";
@@ -119,6 +119,7 @@ export function App(props: AppProps): React.JSX.Element {
   const sessionIdRef = React.useRef<string>(randomUUID());
   const historyRef = React.useRef<Message[]>(initialHistory(props));
   const abortRef = React.useRef<AbortController | null>(null);
+  const pendingModelRef = React.useRef<string | null>(null);
 
   const [transcript, setTranscript] = React.useState<TranscriptItem[]>([]);
   const [input, setInput] = React.useState("");
@@ -463,6 +464,7 @@ export function App(props: AppProps): React.JSX.Element {
         ).messages;
 
       const userHooks = buildAgentHooksFromConfig(props.config);
+      const autoApprove = isAutoApprove(mode);
       const result = await runAgentLoop({
         sessionId: sessionIdRef.current,
         model: currentModel,
@@ -476,6 +478,7 @@ export function App(props: AppProps): React.JSX.Element {
         signal: abort.signal,
         contextTransform: compactionTransform,
         errorClassifier: createErrorClassifier(),
+        autoApprove,
         ...(userHooks !== undefined ? { hooks: userHooks } : {}),
       });
       historyRef.current = result.messages;
@@ -569,6 +572,7 @@ export function App(props: AppProps): React.JSX.Element {
             // Open inline key entry instead of a static hint — the user can
             // paste their key right here without leaving the REPL.
             setPendingKey({ keyName: m[1], retryInput: "" });
+            pendingModelRef.current = id;
             return prev; // Don't switch model until the key is saved
           }
         }
@@ -585,15 +589,29 @@ export function App(props: AppProps): React.JSX.Element {
         try {
           await saveKey(keyName, value);
           const retryText = pendingKey?.retryInput ?? "";
+          const pendingModel = pendingModelRef.current;
+          pendingModelRef.current = null;
           setPendingKey(null);
-          setTranscript((prev) => [
-            ...prev,
-            {
-              kind: "notice",
-              id: randomUUID(),
-              text: `Saved ${keyName}. Model ready.`,
-            },
-          ]);
+          if (pendingModel) {
+            setCurrentModel(pendingModel);
+            setTranscript((prev) => [
+              ...prev,
+              {
+                kind: "notice",
+                id: randomUUID(),
+                text: `Saved ${keyName}. Model set to ${pendingModel}.`,
+              },
+            ]);
+          } else {
+            setTranscript((prev) => [
+              ...prev,
+              {
+                kind: "notice",
+                id: randomUUID(),
+                text: `Saved ${keyName}. Model ready.`,
+              },
+            ]);
+          }
           if (retryText) {
             setInput(retryText);
           }

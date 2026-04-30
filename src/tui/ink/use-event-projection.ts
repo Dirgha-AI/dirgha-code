@@ -48,6 +48,15 @@ export function useEventProjection(events: EventStream): EventProjection {
     cachedTokens: 0,
     costUsd: 0,
   });
+  // Accumulate text deltas in a ref and flush to state on a timer to
+  // avoid re-parsing full markdown on every single delta (O(n²) parse
+  // cost causes visible lag at the end of long streaming responses).
+  const pendingTextRef = React.useRef<{ id: string; content: string } | null>(
+    null,
+  );
+  const flushTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   React.useEffect(() => {
     // Local ids used to attribute in-flight deltas to the right span.
@@ -66,13 +75,25 @@ export function useEventProjection(events: EventStream): EventProjection {
         case "text_delta": {
           const id = currentTextId;
           if (!id) return;
-          setLiveItems((prev) =>
-            prev.map((it) =>
-              it.kind === "text" && it.id === id
-                ? { ...it, content: it.content + event.delta }
-                : it,
-            ),
-          );
+          pendingTextRef.current = {
+            id,
+            content: (pendingTextRef.current?.content ?? "") + event.delta,
+          };
+          if (!flushTimerRef.current) {
+            flushTimerRef.current = setTimeout(() => {
+              const p = pendingTextRef.current;
+              pendingTextRef.current = null;
+              flushTimerRef.current = null;
+              if (!p) return;
+              setLiveItems((prev) =>
+                prev.map((it) =>
+                  it.kind === "text" && it.id === p.id
+                    ? { ...it, content: p.content }
+                    : it,
+                ),
+              );
+            }, 50);
+          }
           return;
         }
         case "text_end":
@@ -94,7 +115,7 @@ export function useEventProjection(events: EventStream): EventProjection {
                 ? { ...it, content: it.content + event.delta }
                 : it,
             ),
-          );
+          ) as any;
           return;
         }
         case "thinking_end":

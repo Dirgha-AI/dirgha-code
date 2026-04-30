@@ -4,11 +4,11 @@
  * (commands starting with /). Streaming output is rendered via the TUI
  * renderer subscribed to the shared event stream.
  */
-import type { Message } from '../kernel/types.js';
-import type { ProviderRegistry } from '../providers/index.js';
-import type { ToolRegistry } from '../tools/registry.js';
-import type { SessionStore } from '../context/session.js';
-import type { DirghaConfig } from './config.js';
+import type { Message } from "../kernel/types.js";
+import type { ProviderRegistry } from "../providers/index.js";
+import type { ToolRegistry } from "../tools/registry.js";
+import type { SessionStore } from "../context/session.js";
+import type { DirghaConfig } from "./config.js";
 export interface InteractiveOptions {
     registry: ToolRegistry;
     providers: ProviderRegistry;

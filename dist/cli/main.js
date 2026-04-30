@@ -531,7 +531,7 @@ async function main() {
     const userHooks = buildAgentHooksFromConfig(config);
     const composedHooks = composeHooks(enforceMode(mode), userHooks);
     const errorClassifier = createErrorClassifier();
-    let result = await runAgentLoop({
+    const result = await runAgentLoop({
         sessionId,
         model: activeModel,
         messages,
