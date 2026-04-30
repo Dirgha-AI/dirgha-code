@@ -17,6 +17,7 @@ const BOOLEAN_FLAGS = new Set([
     'V',
     'force',
     'verbose',
+    'yolo',
 ]);
 export function parseFlags(argv) {
     const flags = {};

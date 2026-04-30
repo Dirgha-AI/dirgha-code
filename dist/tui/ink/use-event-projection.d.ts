@@ -36,7 +36,6 @@ export type TranscriptItem = {
     kind: 'error';
     id: string;
     message: string;
-    failoverModel?: string;
 } | {
     kind: 'notice';
     id: string;

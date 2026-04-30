@@ -97,16 +97,41 @@ export function InputBox(props) {
             setPasteExpanded(false);
         }
     }, [props.value, pasteSegment]);
-    // Wrap onChange so we can detect paste bursts and strip pending `@` updates.
+    // Wrap onChange so we can detect paste bursts, strip raw DEL/BS chars,
+    // and strip pending `@` updates.
     const handleChange = React.useCallback((next) => {
         const prev = prevValueRef.current;
-        prevValueRef.current = next;
-        const seg = detectPaste(prev, next);
+        // Strip raw DEL (0x7f) and BS (0x08) characters that slip through when
+        // Ink doesn't recognise the terminal's backspace keycode. Without this,
+        // terminals that send ^? or ^H for Backspace get literal `` / `` in
+        // the buffer instead of a deletion.
+        let sanitized = next;
+        if (next.includes('\x7f') || next.includes('\x08')) {
+            sanitized = next.replace(/[\x7f\x08]/g, '');
+            // Emulate backspace: the raw char replaced the character before the
+            // cursor. Since we can't know the exact cursor position from here,
+            // we do the common case: strip one raw char and remove the character
+            // immediately before each occurrence.
+            let result = prev;
+            for (const ch of next) {
+                if (ch === '\x7f' || ch === '\x08') {
+                    // Delete the last character (if any) for each backspace.
+                    if (result.length > 0)
+                        result = result.slice(0, -1);
+                }
+                else {
+                    result += ch;
+                }
+            }
+            sanitized = result;
+        }
+        prevValueRef.current = sanitized;
+        const seg = detectPaste(prev, sanitized);
         if (seg !== null) {
             setPasteSegment(seg);
             setPasteExpanded(false);
         }
-        props.onChange(next);
+        props.onChange(sanitized);
     }, [props]);
     useInput((inputCh, key) => {
         // Ctrl+C handling — highest priority.
@@ -131,6 +156,12 @@ export function InputBox(props) {
             if (armTimerRef.current)
                 clearTimeout(armTimerRef.current);
             armTimerRef.current = setTimeout(() => setCtrlCArmed(false), CTRL_C_TIMEOUT_MS);
+            return;
+        }
+        // Ctrl+Y — toggle YOLO mode at any time.
+        if (key.ctrl && inputCh === 'y') {
+            if (props.onRequestYoloToggle)
+                props.onRequestYoloToggle();
             return;
         }
         // Overlay hotkeys bubble up to App.
@@ -182,7 +213,7 @@ export function InputBox(props) {
     const borderColour = props.busy ? palette.brand : palette.accent;
     const promptColour = props.busy ? palette.brand : palette.accent;
     const collapsed = pasteSegment !== null && !pasteExpanded;
-    return (_jsxs(Box, { flexDirection: "column", width: cols, children: [_jsx(Box, { borderStyle: "single", borderColor: borderColour, paddingX: 1, children: _jsxs(Box, { gap: 1, flexGrow: 1, children: [_jsx(Text, { color: promptColour, children: "\u276F" }), collapsed && pasteSegment !== null ? (_jsx(PasteCollapseView, { value: props.value, segment: pasteSegment, expanded: false })) : (_jsx(TextInput, { value: props.value, onChange: handleChange, onSubmit: props.onSubmit, placeholder: props.placeholder ?? 'Ask dirgha anything…', showCursor: !vimActive, focus: focus && !vimActive }))] }) }), _jsxs(Box, { paddingX: 1, justifyContent: "space-between", children: [_jsxs(Box, { gap: 1, children: [props.vimMode === true && (_jsxs(Text, { color: vimActive ? palette.accent : palette.brand, bold: true, children: ["[", vimModeLabel(vimState.mode), "]"] })), pasteSegment !== null && pasteExpanded && (_jsx(Text, { color: palette.textMuted, dimColor: true, children: "pasted block expanded (Ctrl+E collapse)" })), props.busy && (_jsx(BusyHint, { palette: palette }))] }), ctrlCArmed && _jsx(Text, { color: palette.accent, bold: true, children: "Press Ctrl+C again to exit." })] })] }));
+    return (_jsxs(Box, { flexDirection: "column", width: cols, children: [_jsx(Box, { borderStyle: "single", borderColor: borderColour, paddingX: 1, children: _jsxs(Box, { gap: 1, flexGrow: 1, children: [_jsx(Text, { color: promptColour, children: "\u276F" }), collapsed && pasteSegment !== null ? (_jsx(PasteCollapseView, { value: props.value, segment: pasteSegment, expanded: false })) : (_jsx(TextInput, { value: props.value, onChange: handleChange, onSubmit: props.onSubmit, placeholder: props.placeholder ?? 'Ask dirgha anything…', showCursor: !props.busy && !vimActive, focus: focus && !vimActive }))] }) }), _jsxs(Box, { paddingX: 1, justifyContent: "space-between", children: [_jsxs(Box, { gap: 1, children: [props.vimMode === true && (_jsxs(Text, { color: vimActive ? palette.accent : palette.brand, bold: true, children: ["[", vimModeLabel(vimState.mode), "]"] })), pasteSegment !== null && pasteExpanded && (_jsx(Text, { color: palette.textMuted, dimColor: true, children: "pasted block expanded (Ctrl+E collapse)" })), props.busy && _jsx(BusyHint, { palette: palette })] }), ctrlCArmed && _jsx(Text, { color: palette.accent, bold: true, children: "Press Ctrl+C again to exit." })] })] }));
 }
 function vimModeLabel(m) {
     return m === 'NORMAL' ? 'NORMAL' : 'INSERT';

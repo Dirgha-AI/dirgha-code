@@ -40,6 +40,8 @@ export interface InputBoxProps {
   onRequestOverlay?: (kind: 'models' | 'help') => void;
   /** Parent owns the focus so it can be stolen when an overlay is up. */
   inputFocus?: boolean;
+  /** Parent wants to toggle YOLO mode (Ctrl+Y). */
+  onRequestYoloToggle?: () => void;
 }
 
 const CTRL_C_TIMEOUT_MS = 1500;
@@ -119,16 +121,39 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
     }
   }, [props.value, pasteSegment]);
 
-  // Wrap onChange so we can detect paste bursts and strip pending `@` updates.
+  // Wrap onChange so we can detect paste bursts, strip raw DEL/BS chars,
+  // and strip pending `@` updates.
   const handleChange = React.useCallback((next: string): void => {
     const prev = prevValueRef.current;
-    prevValueRef.current = next;
-    const seg = detectPaste(prev, next);
+    // Strip raw DEL (0x7f) and BS (0x08) characters that slip through when
+    // Ink doesn't recognise the terminal's backspace keycode. Without this,
+    // terminals that send ^? or ^H for Backspace get literal `` / `` in
+    // the buffer instead of a deletion.
+    let sanitized = next;
+    if (next.includes('\x7f') || next.includes('\x08')) {
+      sanitized = next.replace(/[\x7f\x08]/g, '');
+      // Emulate backspace: the raw char replaced the character before the
+      // cursor. Since we can't know the exact cursor position from here,
+      // we do the common case: strip one raw char and remove the character
+      // immediately before each occurrence.
+      let result = prev;
+      for (const ch of next) {
+        if (ch === '\x7f' || ch === '\x08') {
+          // Delete the last character (if any) for each backspace.
+          if (result.length > 0) result = result.slice(0, -1);
+        } else {
+          result += ch;
+        }
+      }
+      sanitized = result;
+    }
+    prevValueRef.current = sanitized;
+    const seg = detectPaste(prev, sanitized);
     if (seg !== null) {
       setPasteSegment(seg);
       setPasteExpanded(false);
     }
-    props.onChange(next);
+    props.onChange(sanitized);
   }, [props]);
 
   useInput((inputCh, key) => {
@@ -140,13 +165,22 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
       if (props.value.length > 0) {
         props.onChange('');
         setCtrlCArmed(false);
-        if (armTimerRef.current) { clearTimeout(armTimerRef.current); armTimerRef.current = null; }
+        if (armTimerRef.current) {
+          clearTimeout(armTimerRef.current);
+          armTimerRef.current = null;
+        }
         return;
       }
       if (ctrlCArmed) { exit(); return; }
       setCtrlCArmed(true);
       if (armTimerRef.current) clearTimeout(armTimerRef.current);
       armTimerRef.current = setTimeout(() => setCtrlCArmed(false), CTRL_C_TIMEOUT_MS);
+      return;
+    }
+
+    // Ctrl+Y — toggle YOLO mode at any time.
+    if (key.ctrl && inputCh === 'y') {
+      if (props.onRequestYoloToggle) props.onRequestYoloToggle();
       return;
     }
 
@@ -206,7 +240,7 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
               onChange={handleChange}
               onSubmit={props.onSubmit}
               placeholder={props.placeholder ?? 'Ask dirgha anything…'}
-              showCursor={!vimActive}
+              showCursor={!props.busy && !vimActive}
               focus={focus && !vimActive}
             />
           )}
@@ -224,9 +258,7 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
               pasted block expanded (Ctrl+E collapse)
             </Text>
           )}
-          {props.busy && (
-            <BusyHint palette={palette} />
-          )}
+          {props.busy && <BusyHint palette={palette} />}
         </Box>
         {ctrlCArmed && <Text color={palette.accent} bold>Press Ctrl+C again to exit.</Text>}
       </Box>
@@ -252,13 +284,10 @@ function BusyHint({ palette }: { palette: ReturnType<typeof useTheme> }): React.
     }, 1000);
     return (): void => clearInterval(t);
   }, []);
-  const label =
-    elapsed < 60 ? `${elapsed}s`
+  const label = elapsed < 60 ? `${elapsed}s`
     : elapsed < 3600 ? `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`
     : `${Math.floor(elapsed / 3600)}h ${Math.floor((elapsed % 3600) / 60)}m`;
   return (
-    <Text color={palette.textMuted}>
-      esc cancel · {label} · ctrl+c clear
-    </Text>
+    <Text color={palette.textMuted}>esc cancel · {label} · ctrl+c clear</Text>
   );
 }

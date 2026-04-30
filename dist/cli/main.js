@@ -164,6 +164,14 @@ async function main() {
         }
     }
     const config = await loadConfig(cwd());
+    // CLI-level overrides for flags that affect interactive mode too.
+    // `--yolo` is the most surface-level form of "skip every approval",
+    // more discoverable than `DIRGHA_MODE=yolo`.
+    if (flags.yolo === true)
+        config.mode = 'yolo';
+    if (typeof flags.mode === 'string' && ['plan', 'act', 'yolo', 'verify', 'ask'].includes(flags.mode)) {
+        config.mode = flags.mode;
+    }
     const rawModel = (typeof flags.model === 'string' ? flags.model : (typeof flags.m === 'string' ? flags.m : config.model));
     const model = resolveModelAlias(rawModel);
     const json = flags.json === true;
@@ -548,8 +556,8 @@ Subcommands:
   login / logout / setup              Auth + first-run wizard
   update [--check] [--yes]            Check for + install latest @dirgha/code
   telemetry <status|enable|...>      Anonymous usage opt-in (default: OFF)
-  scaffold "<prompt>" [--serve]      Spin up a new project from a prompt
   submit-paper <doi>                  Fetch Crossref metadata, emit JSON
+  scaffold "<prompt>" [--serve]      Spin up a new project from a prompt
 
 Options:
   -m, --model <id>                    Model id (default from config)

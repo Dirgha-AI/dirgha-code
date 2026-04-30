@@ -33,5 +33,7 @@ export interface InputBoxProps {
     onRequestOverlay?: (kind: 'models' | 'help') => void;
     /** Parent owns the focus so it can be stolen when an overlay is up. */
     inputFocus?: boolean;
+    /** Parent wants to toggle YOLO mode (Ctrl+Y). */
+    onRequestYoloToggle?: () => void;
 }
 export declare function InputBox(props: InputBoxProps): React.JSX.Element;

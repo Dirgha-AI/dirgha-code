@@ -23,6 +23,7 @@ const BOOLEAN_FLAGS = new Set<string>([
   'V',
   'force',
   'verbose',
+  'yolo',
 ]);
 
 export function parseFlags(argv: string[]): ParsedFlags {

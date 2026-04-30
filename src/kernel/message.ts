@@ -2,7 +2,33 @@
  * Message manipulation helpers. Pure functions over Message[].
  */
 
-import type { Message, ContentPart, ToolUsePart, ToolResultPart, AgentEvent } from './types.js';
+import type { AgentMessage, Message, ContentPart, ToolUsePart, ToolResultPart, AgentEvent } from './types.js';
+
+/**
+ * Projection boundary: convert kernel-internal `AgentMessage[]` (which may
+ * carry UI-only metadata) into the clean `Message[]` shape that providers
+ * actually send to the LLM.
+ *
+ * Behaviour:
+ *   - Filters out any entry with `hidden === true`.
+ *   - Strips the `ui` field from the remaining entries.
+ *   - Preserves order.
+ *   - Pure: does not mutate the input array or its elements.
+ *
+ * This is the ONLY seam the agent loop should use when handing messages
+ * off to a `Provider.stream` call. Keeping it a single function makes the
+ * UI/LLM boundary auditable.
+ */
+export function convertToLlm(messages: AgentMessage[]): Message[] {
+  const out: Message[] = [];
+  for (const m of messages) {
+    if (m.hidden === true) continue;
+    // Destructure to strip ui/hidden without mutating the original.
+    const { ui: _ui, hidden: _hidden, ...rest } = m;
+    out.push(rest);
+  }
+  return out;
+}
 
 export function normaliseContent(msg: Message): ContentPart[] {
   if (typeof msg.content === 'string') {

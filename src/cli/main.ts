@@ -34,6 +34,7 @@ import { createCompactionTransform } from '../context/compaction.js';
 import { contextWindowFor, findPrice, findFailover, resolveModelAlias } from '../intelligence/prices.js';
 import { routeModel } from '../providers/dispatch.js';
 import { loadProjectPrimer, composeSystemPrompt } from '../context/primer.js';
+import { probeGitState, renderGitState } from '../context/git-state.js';
 import { loadSoul } from '../context/soul.js';
 import { modePreamble, resolveMode, isAutoApprove, type Mode } from '../context/mode.js';
 import { enforceMode, composeHooks } from '../context/mode-enforcement.js';
@@ -159,6 +160,13 @@ async function main(): Promise<void> {
   }
 
   const config = await loadConfig(cwd());
+  // CLI-level overrides for flags that affect interactive mode too.
+  // `--yolo` is the most surface-level form of "skip every approval",
+  // more discoverable than `DIRGHA_MODE=yolo`.
+  if (flags.yolo === true) config.mode = 'yolo';
+  if (typeof flags.mode === 'string' && (['plan', 'act', 'yolo', 'verify', 'ask'] as const).includes(flags.mode as Mode)) {
+    config.mode = flags.mode as Mode;
+  }
   const rawModel = (typeof flags.model === 'string' ? flags.model : (typeof flags.m === 'string' ? flags.m : config.model));
   const model = resolveModelAlias(rawModel);
   const json = flags.json === true;
@@ -234,16 +242,12 @@ async function main(): Promise<void> {
       && process.env['TERM_PROGRAM'] !== 'vscode';
     const autoFallbackToReadline = onWindowsLegacy && !explicitForceInk;
     const useInk = !explicitNoInk && !autoFallbackToReadline && stdin.isTTY;
-
     if (autoFallbackToReadline && !explicitNoInk) {
       // Surface the swap so the user knows why the UI looks different.
-      stdout.write(
-        '\x1b[33mNote:\x1b[0m Windows legacy console detected — using readline mode.\n'
+      stdout.write('\x1b[33mNote:\x1b[0m Windows legacy console detected — using readline mode.\n'
         + '      For the full Ink TUI, run inside Windows Terminal, the VS Code terminal,\n'
-        + '      or set \x1b[36mDIRGHA_FORCE_INK=1\x1b[0m to override.\n\n',
-      );
+        + '      or set \x1b[36mDIRGHA_FORCE_INK=1\x1b[0m to override.\n\n');
     }
-
     if (useInk) {
       const slashCommands = builtinSlashCommands.map(c => ({
         name: c.name,
@@ -543,8 +547,8 @@ Subcommands:
   login / logout / setup              Auth + first-run wizard
   update [--check] [--yes]            Check for + install latest @dirgha/code
   telemetry <status|enable|...>      Anonymous usage opt-in (default: OFF)
-  scaffold "<prompt>" [--serve]      Spin up a new project from a prompt
   submit-paper <doi>                  Fetch Crossref metadata, emit JSON
+  scaffold "<prompt>" [--serve]      Spin up a new project from a prompt
 
 Options:
   -m, --model <id>                    Model id (default from config)
