@@ -17,7 +17,7 @@
  *     mount the appropriate modal without InputBox knowing about them.
  *   - `?` on an empty buffer also bubbles up, mirroring the README.
  */
-import * as React from 'react';
+import * as React from "react";
 export interface InputBoxProps {
     value: string;
     onChange: (value: string) => void;
@@ -30,8 +30,10 @@ export interface InputBoxProps {
     /** Parent wants to know when the leading `/<token>` changes (null = none active). */
     onSlashQueryChange?: (query: string | null) => void;
     /** Parent wants to know when to surface a modal overlay. */
-    onRequestOverlay?: (kind: 'models' | 'help') => void;
+    onRequestOverlay?: (kind: "models" | "help") => void;
     /** Parent owns the focus so it can be stolen when an overlay is up. */
     inputFocus?: boolean;
+    /** Parent wants to toggle YOLO mode (Ctrl+Y). */
+    onRequestYoloToggle?: () => void;
 }
 export declare function InputBox(props: InputBoxProps): React.JSX.Element;

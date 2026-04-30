@@ -8,39 +8,58 @@
  * read the prompt from stdin and run non-interactively.
  */
 
-import { argv, cwd, exit, stdin, stdout } from 'node:process';
-import { randomUUID } from 'node:crypto';
-import { createEventStream } from '../kernel/event-stream.js';
-import { runAgentLoop } from '../kernel/agent-loop.js';
-import type { Message } from '../kernel/types.js';
-import { ProviderRegistry } from '../providers/index.js';
-import { builtInTools, createToolExecutor, createToolRegistry } from '../tools/index.js';
-import { loadConfig } from './config.js';
-import { parseFlags } from './flags.js';
-import { runInteractive } from './interactive.js';
-import { runInkTUI } from '../tui/ink/index.js';
-import { builtinSlashCommands } from './slash/index.js';
-import { renderStreamingEvents } from '../tui/renderer.js';
-import { createSessionStore } from '../context/session.js';
-import { runSubmitPaper } from './submit-paper.js';
-import { runLogin, runLogout, runSetup, findSubcommand } from './subcommands/index.js';
-import { appendAudit } from '../audit/writer.js';
-import { buildAgentHooksFromConfig } from '../hooks/config-bridge.js';
-import { hydrateEnvFromKeyStore } from '../auth/keystore.js';
-import { hydrateEnvFromPool } from '../auth/keypool.js';
-import { createExtensionAPI, loadExtensions } from '../extensions/api.js';
-import { createErrorClassifier } from '../intelligence/error-classifier.js';
-import { createCompactionTransform } from '../context/compaction.js';
-import { contextWindowFor, findPrice, findFailover, resolveModelAlias } from '../intelligence/prices.js';
-import { routeModel } from '../providers/dispatch.js';
-import { loadProjectPrimer, composeSystemPrompt } from '../context/primer.js';
-import { loadSoul } from '../context/soul.js';
-import { modePreamble, resolveMode, isAutoApprove, type Mode } from '../context/mode.js';
-import { enforceMode, composeHooks } from '../context/mode-enforcement.js';
-import { loadSkills } from '../skills/loader.js';
-import { matchSkills } from '../skills/matcher.js';
-import { injectSkills } from '../skills/runtime.js';
-import { createRequire } from 'node:module';
+import { argv, cwd, exit, stdin, stdout } from "node:process";
+import { randomUUID } from "node:crypto";
+import { createEventStream } from "../kernel/event-stream.js";
+import { runAgentLoop } from "../kernel/agent-loop.js";
+import type { Message } from "../kernel/types.js";
+import { ProviderRegistry } from "../providers/index.js";
+import {
+  builtInTools,
+  createToolExecutor,
+  createToolRegistry,
+} from "../tools/index.js";
+import { loadConfig } from "./config.js";
+import { parseFlags } from "./flags.js";
+import { runInteractive } from "./interactive.js";
+import { runInkTUI } from "../tui/ink/index.js";
+import { builtinSlashCommands } from "./slash/index.js";
+import { renderStreamingEvents } from "../tui/renderer.js";
+import { createSessionStore } from "../context/session.js";
+import { runSubmitPaper } from "./submit-paper.js";
+import {
+  runLogin,
+  runLogout,
+  runSetup,
+  findSubcommand,
+} from "./subcommands/index.js";
+import { appendAudit } from "../audit/writer.js";
+import { buildAgentHooksFromConfig } from "../hooks/config-bridge.js";
+import { hydrateEnvFromKeyStore } from "../auth/keystore.js";
+import { hydrateEnvFromPool } from "../auth/keypool.js";
+import { createExtensionAPI, loadExtensions } from "../extensions/api.js";
+import { createErrorClassifier } from "../intelligence/error-classifier.js";
+import { createCompactionTransform } from "../context/compaction.js";
+import {
+  contextWindowFor,
+  findPrice,
+  findFailover,
+  resolveModelAlias,
+} from "../intelligence/prices.js";
+import { routeModel } from "../providers/dispatch.js";
+import { loadProjectPrimer, composeSystemPrompt } from "../context/primer.js";
+import { loadSoul } from "../context/soul.js";
+import {
+  modePreamble,
+  resolveMode,
+  isAutoApprove,
+  type Mode,
+} from "../context/mode.js";
+import { enforceMode, composeHooks } from "../context/mode-enforcement.js";
+import { loadSkills } from "../skills/loader.js";
+import { matchSkills } from "../skills/matcher.js";
+import { injectSkills } from "../skills/runtime.js";
+import { createRequire } from "node:module";
 
 // `--version` / `-V` prints the package version and exits, matching every
 // other CLI on the planet. Without this, the flag-parser strips `--version`
@@ -48,9 +67,11 @@ import { createRequire } from 'node:module';
 const PKG_VERSION: string = (() => {
   try {
     const req = createRequire(import.meta.url);
-    const pkg = req('../../package.json') as { version?: string };
-    return typeof pkg.version === 'string' ? pkg.version : '0.0.0-dev';
-  } catch { return '0.0.0-dev'; }
+    const pkg = req("../../package.json") as { version?: string };
+    return typeof pkg.version === "string" ? pkg.version : "0.0.0-dev";
+  } catch {
+    return "0.0.0-dev";
+  }
 })();
 
 async function main(): Promise<void> {
@@ -58,8 +79,14 @@ async function main(): Promise<void> {
   // Top-level help/version only fire when there's no verb. With a verb
   // present (e.g. `dirgha fleet --help`), let the subcommand handle its
   // own help so users get scoped docs.
-  if ((flags.help || flags.h) && positionals.length === 0) { printHelp(); exit(0); }
-  if (flags.version || flags.V) { stdout.write(`dirgha ${PKG_VERSION}\n`); exit(0); }
+  if ((flags.help || flags.h) && positionals.length === 0) {
+    printHelp();
+    exit(0);
+  }
+  if (flags.version || flags.V) {
+    stdout.write(`dirgha ${PKG_VERSION}\n`);
+    exit(0);
+  }
 
   // BYOK hydration: pool first (highest-priority non-exhausted entry
   // wins), then the legacy single-slot keystore for backwards compat.
@@ -72,55 +99,81 @@ async function main(): Promise<void> {
   // Loading failures are non-fatal — the failing extension is named on
   // stderr and the rest of the CLI continues.
   const { api: extAPI, registry: extRegistry } = createExtensionAPI();
-  const { join: pathJoin } = await import('node:path');
-  const { homedir: hd } = await import('node:os');
-  const extResult = await loadExtensions({ rootDir: pathJoin(hd(), '.dirgha', 'extensions'), api: extAPI });
+  const { join: pathJoin } = await import("node:path");
+  const { homedir: hd } = await import("node:os");
+  const extResult = await loadExtensions({
+    rootDir: pathJoin(hd(), ".dirgha", "extensions"),
+    api: extAPI,
+  });
   for (const f of extResult.failed) {
-    process.stderr.write(`[extensions] ${f.name} failed to load: ${f.error.message}\n`);
+    process.stderr.write(
+      `[extensions] ${f.name} failed to load: ${f.error.message}\n`,
+    );
   }
   void extRegistry; // surface for downstream wiring (slashes / tools / events)
 
   // Subcommand dispatch (positional 0 as verb).
-  if (positionals[0] === 'submit-paper') {
+  if (positionals[0] === "submit-paper") {
     const doi = positionals[1];
-    if (!doi) { stdout.write('usage: dirgha submit-paper <doi> [--open-pr]\n'); exit(1); }
-    const code = await runSubmitPaper({ doi, openPr: flags['open-pr'] === true });
+    if (!doi) {
+      stdout.write("usage: dirgha submit-paper <doi> [--open-pr]\n");
+      exit(1);
+    }
+    const code = await runSubmitPaper({
+      doi,
+      openPr: flags["open-pr"] === true,
+    });
     exit(code);
   }
   // Pass the RAW argv tail (includes flags like `--provider=...`) so
   // sub-flags survive the top-level parser, the same pattern as fleet.
-  if (positionals[0] === 'login') {
+  if (positionals[0] === "login") {
     const rawArgs = argv.slice(2);
-    const verbIdx = rawArgs.indexOf('login');
-    const tail = verbIdx >= 0 ? rawArgs.slice(verbIdx + 1) : positionals.slice(1);
+    const verbIdx = rawArgs.indexOf("login");
+    const tail =
+      verbIdx >= 0 ? rawArgs.slice(verbIdx + 1) : positionals.slice(1);
     exit(await runLogin(tail));
   }
-  if (positionals[0] === 'logout') {
+  if (positionals[0] === "logout") {
     const rawArgs = argv.slice(2);
-    const verbIdx = rawArgs.indexOf('logout');
-    const tail = verbIdx >= 0 ? rawArgs.slice(verbIdx + 1) : positionals.slice(1);
+    const verbIdx = rawArgs.indexOf("logout");
+    const tail =
+      verbIdx >= 0 ? rawArgs.slice(verbIdx + 1) : positionals.slice(1);
     exit(await runLogout(tail));
   }
-  if (positionals[0] === 'setup') exit(await runSetup(positionals.slice(1)));
-  if (positionals[0] === 'fleet') {
+  if (positionals[0] === "setup") exit(await runSetup(positionals.slice(1)));
+  if (positionals[0] === "fleet") {
     // `dirgha fleet <launch|list|merge|discard|triple|cleanup>` —
     // parallel-agent orchestration in git worktrees. We pass the
     // RAW argv tail (positionals + flags) so the fleet dispatcher
     // can read its own subcommand-specific flags like --single,
     // --branch=<x>, --auto-merge, --strategy that the top-level
     // parser doesn't know about.
-    const { fleetCommand } = await import('../fleet/cli-command.js');
+    const { fleetCommand } = await import("../fleet/cli-command.js");
     const config = await loadConfig(cwd());
     const rawArgs = argv.slice(2);
-    const verbIdx = rawArgs.indexOf('fleet');
-    const tail = verbIdx >= 0 ? rawArgs.slice(verbIdx + 1) : positionals.slice(1);
+    const verbIdx = rawArgs.indexOf("fleet");
+    const tail =
+      verbIdx >= 0 ? rawArgs.slice(verbIdx + 1) : positionals.slice(1);
     const code = await fleetCommand(tail, {
       cwd: cwd(),
-      model: resolveModelAlias(typeof flags.model === 'string' ? flags.model : (typeof flags.m === 'string' ? flags.m : config.model)),
+      model: resolveModelAlias(
+        typeof flags.model === "string"
+          ? flags.model
+          : typeof flags.m === "string"
+            ? flags.m
+            : config.model,
+      ),
       json: flags.json === true,
       verbose: flags.verbose === true,
-      maxTurns: typeof flags['max-turns'] === 'string' ? Number.parseInt(flags['max-turns'], 10) : config.maxTurns,
-      concurrency: typeof flags.concurrency === 'string' ? Number.parseInt(flags.concurrency, 10) : undefined,
+      maxTurns:
+        typeof flags["max-turns"] === "string"
+          ? Number.parseInt(flags["max-turns"], 10)
+          : config.maxTurns,
+      concurrency:
+        typeof flags.concurrency === "string"
+          ? Number.parseInt(flags.concurrency, 10)
+          : undefined,
     });
     exit(code);
   }
@@ -138,7 +191,8 @@ async function main(): Promise<void> {
     if (cmd) {
       const rawArgs = argv.slice(2);
       const verbIdx = rawArgs.indexOf(verb);
-      const tail = verbIdx >= 0 ? rawArgs.slice(verbIdx + 1) : positionals.slice(1);
+      const tail =
+        verbIdx >= 0 ? rawArgs.slice(verbIdx + 1) : positionals.slice(1);
       const code = await cmd.run(tail, { cwd: cwd() });
       // Telemetry — only sends when user opted in via `dirgha telemetry
       // enable`. We cap the wait at 1s so a slow Posthog response (cold
@@ -148,23 +202,50 @@ async function main(): Promise<void> {
       // sender's internal 8s budget keeps the request alive in case
       // Node's event loop survives long enough for it to flush.
       try {
-        const { trackCommand } = await import('../telemetry/sender.js');
+        const { trackCommand } = await import("../telemetry/sender.js");
         await Promise.race([
           trackCommand(verb, PKG_VERSION),
-          new Promise(r => setTimeout(r, 1000)),
+          new Promise((r) => setTimeout(r, 1000)),
         ]);
-      } catch { /* telemetry must never affect the user's command */ }
+      } catch {
+        /* telemetry must never affect the user's command */
+      }
       exit(code);
     }
   }
 
   const config = await loadConfig(cwd());
-  const rawModel = (typeof flags.model === 'string' ? flags.model : (typeof flags.m === 'string' ? flags.m : config.model));
+  // CLI-level overrides for flags that affect interactive mode too.
+  // `--yolo` is the most surface-level form of "skip every approval",
+  // more discoverable than `DIRGHA_MODE=yolo`.
+  if (flags.yolo === true) config.mode = "yolo";
+  if (
+    typeof flags.mode === "string" &&
+    (["plan", "act", "yolo", "verify", "ask"] as const).includes(
+      flags.mode as Mode,
+    )
+  ) {
+    config.mode = flags.mode as Mode;
+  }
+  const rawModel =
+    typeof flags.model === "string"
+      ? flags.model
+      : typeof flags.m === "string"
+        ? flags.m
+        : config.model;
   const model = resolveModelAlias(rawModel);
   const json = flags.json === true;
   const print = flags.print === true;
-  const system = typeof flags.system === 'string' ? flags.system : (typeof flags.s === 'string' ? flags.s : undefined);
-  const maxTurns = typeof flags['max-turns'] === 'string' ? Number.parseInt(flags['max-turns'], 10) : config.maxTurns;
+  const system =
+    typeof flags.system === "string"
+      ? flags.system
+      : typeof flags.s === "string"
+        ? flags.s
+        : undefined;
+  const maxTurns =
+    typeof flags["max-turns"] === "string"
+      ? Number.parseInt(flags["max-turns"], 10)
+      : config.maxTurns;
 
   const providers = new ProviderRegistry();
   const sessions = createSessionStore();
@@ -176,42 +257,56 @@ async function main(): Promise<void> {
   const allTools = [...builtInTools];
   let mcpShutdown: () => Promise<void> = async () => {};
   if (config.mcpServers && Object.keys(config.mcpServers).length > 0) {
-    const { loadMcpServers } = await import('../mcp/loader.js');
+    const { loadMcpServers } = await import("../mcp/loader.js");
     const mcp = await loadMcpServers(config.mcpServers, {
-      onWarn: msg => { process.stderr.write(`warning: ${msg}\n`); },
+      onWarn: (msg) => {
+        process.stderr.write(`warning: ${msg}\n`);
+      },
     });
     allTools.push(...mcp.tools);
     mcpShutdown = mcp.shutdown;
   }
   const registry = createToolRegistry(allTools);
-  process.once('exit', () => { void mcpShutdown(); });
-  process.once('SIGINT', () => { void mcpShutdown().then(() => process.exit(130)); });
+  process.once("exit", () => {
+    void mcpShutdown();
+  });
+  process.once("SIGINT", () => {
+    void mcpShutdown().then(() => process.exit(130));
+  });
 
   // Subagent dispatch: register `task` so the model can spawn a fresh
   // agent for a sub-goal. Built lazily so the
   // delegator can capture the now-finalised registry + provider.
-  const { SubagentDelegator } = await import('../subagents/delegator.js');
-  const { createTaskTool } = await import('../tools/task.js');
+  const { SubagentDelegator } = await import("../subagents/delegator.js");
+  const { createTaskTool } = await import("../tools/task.js");
   // Provider is constructed below; capture via closure so the tool sees
   // the same one. Re-pulled fresh inside execute() so failover swaps work.
-  const taskDelegatorRef: { current: InstanceType<typeof SubagentDelegator> | null } = { current: null };
-  registry.register(createTaskTool({
-    delegate: async (req) => {
-      if (!taskDelegatorRef.current) throw new Error('subagent delegator not yet initialised');
-      return taskDelegatorRef.current.delegate(req);
-    },
-  } as InstanceType<typeof SubagentDelegator>));
+  const taskDelegatorRef: {
+    current: InstanceType<typeof SubagentDelegator> | null;
+  } = { current: null };
+  registry.register(
+    createTaskTool({
+      delegate: async (req) => {
+        if (!taskDelegatorRef.current)
+          throw new Error("subagent delegator not yet initialised");
+        return taskDelegatorRef.current.delegate(req);
+      },
+    } as InstanceType<typeof SubagentDelegator>),
+  );
 
-  let prompt = positionals.join(' ').trim();
+  let prompt = positionals.join(" ").trim();
   if (!prompt && !stdin.isTTY) prompt = (await readAllStdin()).trim();
 
   if (!prompt) {
-    if (print || json) { printHelp(); exit(1); }
+    if (print || json) {
+      printHelp();
+      exit(1);
+    }
     // First-run wizard: if the user has no BYOK keys saved AND no
     // hosted token, auto-launch the three-step setup flow. The wizard
     // itself prints CI-safe help when stdin is non-TTY.
-    if (stdin.isTTY && await isFirstRun()) {
-      const { runWizard } = await import('./flows/wizard.js');
+    if (stdin.isTTY && (await isFirstRun())) {
+      const { runWizard } = await import("./flows/wizard.js");
       const code = await runWizard([]);
       // If they completed setup, fall through into the REPL so they
       // can immediately use what they just configured. Otherwise exit.
@@ -226,26 +321,25 @@ async function main(): Promise<void> {
     //      TERM_PROGRAM=vscode and only use ink when one is present.
     //      Override with DIRGHA_FORCE_INK=1 if the user knows their
     //      console actually works.
-    const explicitNoInk = process.env['DIRGHA_NO_INK'] === '1';
-    const explicitForceInk = process.env['DIRGHA_FORCE_INK'] === '1';
-    const onWindowsLegacy = process.platform === 'win32'
-      && !process.env['WT_SESSION']
-      && process.env['ConEmuANSI'] !== 'ON'
-      && process.env['TERM_PROGRAM'] !== 'vscode';
+    const explicitNoInk = process.env["DIRGHA_NO_INK"] === "1";
+    const explicitForceInk = process.env["DIRGHA_FORCE_INK"] === "1";
+    const onWindowsLegacy =
+      process.platform === "win32" &&
+      !process.env["WT_SESSION"] &&
+      process.env["ConEmuANSI"] !== "ON" &&
+      process.env["TERM_PROGRAM"] !== "vscode";
     const autoFallbackToReadline = onWindowsLegacy && !explicitForceInk;
     const useInk = !explicitNoInk && !autoFallbackToReadline && stdin.isTTY;
-
     if (autoFallbackToReadline && !explicitNoInk) {
       // Surface the swap so the user knows why the UI looks different.
       stdout.write(
-        '\x1b[33mNote:\x1b[0m Windows legacy console detected — using readline mode.\n'
-        + '      For the full Ink TUI, run inside Windows Terminal, the VS Code terminal,\n'
-        + '      or set \x1b[36mDIRGHA_FORCE_INK=1\x1b[0m to override.\n\n',
+        "\x1b[33mNote:\x1b[0m Windows legacy console detected — using readline mode.\n" +
+          "      For the full Ink TUI, run inside Windows Terminal, the VS Code terminal,\n" +
+          "      or set \x1b[36mDIRGHA_FORCE_INK=1\x1b[0m to override.\n\n",
       );
     }
-
     if (useInk) {
-      const slashCommands = builtinSlashCommands.map(c => ({
+      const slashCommands = builtinSlashCommands.map((c) => ({
         name: c.name,
         description: c.description,
         ...(c.aliases !== undefined ? { aliases: c.aliases } : {}),
@@ -254,10 +348,25 @@ async function main(): Promise<void> {
       // takes 1-2s during which nothing renders. Without this the user
       // sees a blank screen and assumes the app froze. The line is
       // overdrawn instantly when ink mounts.
-      stdout.write('\n  Launching dirgha…\n');
-      await runInkTUI({ registry, providers, sessions, config, cwd: cwd(), systemPrompt: system, slashCommands });
+      stdout.write("\n  Launching dirgha…\n");
+      await runInkTUI({
+        registry,
+        providers,
+        sessions,
+        config,
+        cwd: cwd(),
+        systemPrompt: system,
+        slashCommands,
+      });
     } else {
-      await runInteractive({ registry, providers, sessions, config, cwd: cwd(), systemPrompt: system });
+      await runInteractive({
+        registry,
+        providers,
+        sessions,
+        config,
+        cwd: cwd(),
+        systemPrompt: system,
+      });
     }
     return;
   }
@@ -265,9 +374,13 @@ async function main(): Promise<void> {
   const sessionId = randomUUID();
   const events = createEventStream();
   if (json) {
-    events.subscribe(ev => { stdout.write(`${JSON.stringify(ev)}\n`); });
+    events.subscribe((ev) => {
+      stdout.write(`${JSON.stringify(ev)}\n`);
+    });
   } else {
-    events.subscribe(renderStreamingEvents({ showThinking: config.showThinking }));
+    events.subscribe(
+      renderStreamingEvents({ showThinking: config.showThinking }),
+    );
   }
 
   // Persist the session: open the JSONL file up front so subsequent
@@ -282,45 +395,62 @@ async function main(): Promise<void> {
   // uses, so the price lookup matches the actual provider).
   const providerId = routeModel(model);
   const price = findPrice(providerId, model);
-  const computeCost = (input: number, output: number, cached: number): number => price
-    ? (input / 1_000_000) * price.inputPerM + (output / 1_000_000) * price.outputPerM + (cached / 1_000_000) * (price.cachedInputPerM ?? 0)
-    : 0;
-  events.subscribe(async ev => {
+  const computeCost = (
+    input: number,
+    output: number,
+    cached: number,
+  ): number =>
+    price
+      ? (input / 1_000_000) * price.inputPerM +
+        (output / 1_000_000) * price.outputPerM +
+        (cached / 1_000_000) * (price.cachedInputPerM ?? 0)
+      : 0;
+  events.subscribe(async (ev) => {
     try {
-      if (ev.type === 'usage') {
+      if (ev.type === "usage") {
         const cached = ev.cachedTokens ?? 0;
-        await session.append({ type: 'usage', ts: sessionTs(), usage: {
-          inputTokens: ev.inputTokens,
-          outputTokens: ev.outputTokens,
-          cachedTokens: cached,
-          costUsd: computeCost(ev.inputTokens, ev.outputTokens, cached),
-        } });
+        await session.append({
+          type: "usage",
+          ts: sessionTs(),
+          usage: {
+            inputTokens: ev.inputTokens,
+            outputTokens: ev.outputTokens,
+            cachedTokens: cached,
+            costUsd: computeCost(ev.inputTokens, ev.outputTokens, cached),
+          },
+        });
       }
-    } catch { /* never let persistence I/O break the run */ }
+    } catch {
+      /* never let persistence I/O break the run */
+    }
   });
   // Audit writer: produce entries the `dirgha audit` reader can show.
   // Tool executions, errors, and end-of-turn are the high-signal ones.
-  events.subscribe(ev => {
-    if (ev.type === 'tool_exec_end') {
+  events.subscribe((ev) => {
+    if (ev.type === "tool_exec_end") {
       void appendAudit({
-        kind: 'tool',
+        kind: "tool",
         actor: sessionId,
-        summary: `${ev.id} ${ev.isError ? 'error' : 'done'} ${ev.durationMs}ms`,
+        summary: `${ev.id} ${ev.isError ? "error" : "done"} ${ev.durationMs}ms`,
         toolId: ev.id,
         isError: ev.isError,
         durationMs: ev.durationMs,
       });
-    } else if (ev.type === 'agent_end') {
+    } else if (ev.type === "agent_end") {
       void appendAudit({
-        kind: 'turn-end',
+        kind: "turn-end",
         actor: sessionId,
         summary: `model=${model} stop=${ev.stopReason} in=${ev.usage.inputTokens} out=${ev.usage.outputTokens}`,
         model,
         stopReason: ev.stopReason,
         usage: ev.usage,
       });
-    } else if (ev.type === 'error') {
-      void appendAudit({ kind: 'error', actor: sessionId, summary: ev.message });
+    } else if (ev.type === "error") {
+      void appendAudit({
+        kind: "error",
+        actor: sessionId,
+        summary: ev.message,
+      });
     }
   });
 
@@ -335,8 +465,13 @@ async function main(): Promise<void> {
   // CLI-level overrides for one-off mode flips. `--yolo` is the most
   // surface-level form of "skip every approval", more discoverable
   // than `DIRGHA_MODE=yolo`.
-  if (flags.yolo === true) mode = 'yolo' as Mode;
-  if (typeof flags.mode === 'string' && (['plan', 'act', 'yolo', 'verify', 'ask'] as const).includes(flags.mode as Mode)) {
+  if (flags.yolo === true) mode = "yolo" as Mode;
+  if (
+    typeof flags.mode === "string" &&
+    (["plan", "act", "yolo", "verify", "ask"] as const).includes(
+      flags.mode as Mode,
+    )
+  ) {
     mode = flags.mode as Mode;
   }
   const autoApprove = isAutoApprove(mode);
@@ -344,7 +479,7 @@ async function main(): Promise<void> {
   // `audit list` can surface every dirgha invocation, not just turns.
   // Lives after mode-resolve so we can include it in the entry.
   void appendAudit({
-    kind: 'session-start',
+    kind: "session-start",
     actor: sessionId,
     summary: `model=${model} mode=${mode} cwd=${cwd()}`,
     model,
@@ -365,20 +500,31 @@ async function main(): Promise<void> {
   });
 
   const messages: Message[] = [];
-  messages.push({ role: 'system', content: composedSystem });
-  messages.push({ role: 'user', content: prompt });
+  messages.push({ role: "system", content: composedSystem });
+  messages.push({ role: "user", content: prompt });
 
   // Append the user prompt before the turn so a crash mid-stream still
   // leaves a recoverable transcript prefix.
-  await session.append({ type: 'message', ts: sessionTs(), message: { role: 'user', content: prompt } });
-  await session.append({ type: 'message', ts: sessionTs(), message: { role: 'system', content: composedSystem } });
+  await session.append({
+    type: "message",
+    ts: sessionTs(),
+    message: { role: "user", content: prompt },
+  });
+  await session.append({
+    type: "message",
+    ts: sessionTs(),
+    message: { role: "system", content: composedSystem },
+  });
 
   // Skills: load all available; inject the ones whose triggers match
   // this turn's user prompt. Project-local skills override user skills
   // when names collide (loadSkills handles that). Skill bodies are
   // injected as a synthetic user message before the live prompt.
   const allSkills = await loadSkills({ cwd: cwd() });
-  const matched = matchSkills(allSkills, { platform: 'cli', userMessage: prompt });
+  const matched = matchSkills(allSkills, {
+    platform: "cli",
+    userMessage: prompt,
+  });
 
   // Provider construction can fail eagerly (e.g. ANTHROPIC_API_KEY
   // unset). When it does AND the user has a known failover model in
@@ -391,8 +537,17 @@ async function main(): Promise<void> {
   } catch (err) {
     const fallback = findFailover(model);
     if (!fallback) throw err;
-    process.stderr.write(`\n[failover] ${model} → ${fallback} (${err instanceof Error ? err.message : String(err)})\n`);
-    void appendAudit({ kind: 'failover', actor: sessionId, summary: `${model} → ${fallback}`, from: model, to: fallback, reason: err instanceof Error ? err.message : String(err) });
+    process.stderr.write(
+      `\n[failover] ${model} → ${fallback} (${err instanceof Error ? err.message : String(err)})\n`,
+    );
+    void appendAudit({
+      kind: "failover",
+      actor: sessionId,
+      summary: `${model} → ${fallback}`,
+      from: model,
+      to: fallback,
+      reason: err instanceof Error ? err.message : String(err),
+    });
     activeModel = fallback;
     provider = providers.forModel(fallback);
   }
@@ -419,15 +574,25 @@ async function main(): Promise<void> {
       const before = r.tokensBefore.toLocaleString();
       const after = r.tokensAfter.toLocaleString();
       const pct = Math.round((1 - r.tokensAfter / r.tokensBefore) * 100);
-      process.stderr.write(`\n[compacted] ${before} → ${after} tokens (-${pct}%)\n`);
-      void appendAudit({ kind: 'compaction', actor: sessionId, summary: `${before} → ${after} (-${pct}%)`, tokensBefore: r.tokensBefore, tokensAfter: r.tokensAfter });
+      process.stderr.write(
+        `\n[compacted] ${before} → ${after} tokens (-${pct}%)\n`,
+      );
+      void appendAudit({
+        kind: "compaction",
+        actor: sessionId,
+        summary: `${before} → ${after} (-${pct}%)`,
+        tokensBefore: r.tokensBefore,
+        tokensAfter: r.tokensAfter,
+      });
     },
   });
   // Compose: compact first, then inject skills before the live user
   // message. Skill content is per-turn — does not survive compaction.
-  const compactionTransform = matched.length > 0
-    ? async (msgs: Message[]): Promise<Message[]> => injectSkills(await baseCompactionTransform(msgs), matched)
-    : baseCompactionTransform;
+  const compactionTransform =
+    matched.length > 0
+      ? async (msgs: Message[]): Promise<Message[]> =>
+          injectSkills(await baseCompactionTransform(msgs), matched)
+      : baseCompactionTransform;
 
   // Hooks: compose mode enforcement (plan/verify block writes) with
   // user-config hooks. Order matters — mode enforcement runs first so
@@ -454,13 +619,22 @@ async function main(): Promise<void> {
   // continue from the LAST PERSISTED HISTORY (not the original prompt)
   // so multi-turn work doesn't lose progress. Skipped when we already
   // failed over at construction time so we don't double-hop.
-  if (result.stopReason === 'error' && activeModel === model) {
+  if (result.stopReason === "error" && activeModel === model) {
     const fallback = findFailover(activeModel);
     if (fallback) {
       try {
         const fallbackProvider = providers.forModel(fallback);
-        process.stderr.write(`\n[failover] ${activeModel} → ${fallback} (mid-session at turn ${result.turnCount})\n`);
-        void appendAudit({ kind: 'failover', actor: sessionId, summary: `${activeModel} → ${fallback} (turn ${result.turnCount})`, from: activeModel, to: fallback, turn: result.turnCount });
+        process.stderr.write(
+          `\n[failover] ${activeModel} → ${fallback} (mid-session at turn ${result.turnCount})\n`,
+        );
+        void appendAudit({
+          kind: "failover",
+          actor: sessionId,
+          summary: `${activeModel} → ${fallback} (turn ${result.turnCount})`,
+          from: activeModel,
+          to: fallback,
+          turn: result.turnCount,
+        });
         result = await runAgentLoop({
           sessionId,
           model: fallback,
@@ -476,42 +650,52 @@ async function main(): Promise<void> {
           autoApprove,
           ...(composedHooks !== undefined ? { hooks: composedHooks } : {}),
         });
-      } catch { /* swallow — original error already reported */ }
+      } catch {
+        /* swallow — original error already reported */
+      }
     }
   }
   // Persist every message produced by the turn (assistant turns + tool
   // results). Skip the user + system messages we already appended above.
   const initialCount = 2;
   for (const msg of result.messages.slice(initialCount)) {
-    try { await session.append({ type: 'message', ts: sessionTs(), message: msg }); } catch { /* swallow */ }
+    try {
+      await session.append({ type: "message", ts: sessionTs(), message: msg });
+    } catch {
+      /* swallow */
+    }
   }
-  if (!json) stdout.write('\n');
-  if (result.stopReason === 'error') exit(2);
+  if (!json) stdout.write("\n");
+  if (result.stopReason === "error") exit(2);
 }
 
 async function isFirstRun(): Promise<boolean> {
-  const { stat } = await import('node:fs/promises');
-  const { homedir } = await import('node:os');
-  const { join } = await import('node:path');
+  const { stat } = await import("node:fs/promises");
+  const { homedir } = await import("node:os");
+  const { join } = await import("node:path");
   const home = homedir();
   const candidates = [
-    join(home, '.dirgha', 'keys.json'),
-    join(home, '.dirgha', 'credentials.json'),
-    join(home, '.dirgha', 'config.json'),
+    join(home, ".dirgha", "keys.json"),
+    join(home, ".dirgha", "credentials.json"),
+    join(home, ".dirgha", "config.json"),
   ];
   for (const p of candidates) {
-    const exists = await stat(p).then(() => true).catch(() => false);
+    const exists = await stat(p)
+      .then(() => true)
+      .catch(() => false);
     if (exists) return false;
   }
   return true;
 }
 
 function readAllStdin(): Promise<string> {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     const chunks: string[] = [];
-    stdin.setEncoding('utf8');
-    stdin.on('data', c => chunks.push(typeof c === 'string' ? c : (c as Buffer).toString('utf8')));
-    stdin.on('end', () => resolve(chunks.join('')));
+    stdin.setEncoding("utf8");
+    stdin.on("data", (c) =>
+      chunks.push(typeof c === "string" ? c : (c as Buffer).toString("utf8")),
+    );
+    stdin.on("end", () => resolve(chunks.join("")));
   });
 }
 
@@ -543,8 +727,8 @@ Subcommands:
   login / logout / setup              Auth + first-run wizard
   update [--check] [--yes]            Check for + install latest @dirgha/code
   telemetry <status|enable|...>      Anonymous usage opt-in (default: OFF)
-  scaffold "<prompt>" [--serve]      Spin up a new project from a prompt
   submit-paper <doi>                  Fetch Crossref metadata, emit JSON
+  scaffold "<prompt>" [--serve]      Spin up a new project from a prompt
 
 Options:
   -m, --model <id>                    Model id (default from config)
@@ -563,6 +747,8 @@ Environment:
 }
 
 main().catch((err: unknown) => {
-  stdout.write(`\nFatal: ${err instanceof Error ? err.message : String(err)}\n`);
+  stdout.write(
+    `\nFatal: ${err instanceof Error ? err.message : String(err)}\n`,
+  );
   exit(2);
 });

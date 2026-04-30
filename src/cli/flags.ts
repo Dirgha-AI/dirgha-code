@@ -15,14 +15,15 @@ export interface ParsedFlags {
 }
 
 const BOOLEAN_FLAGS = new Set<string>([
-  'json',
-  'print',
-  'help',
-  'h',
-  'version',
-  'V',
-  'force',
-  'verbose',
+  "json",
+  "print",
+  "help",
+  "h",
+  "version",
+  "V",
+  "force",
+  "verbose",
+  "yolo",
 ]);
 
 export function parseFlags(argv: string[]): ParsedFlags {
@@ -31,12 +32,12 @@ export function parseFlags(argv: string[]): ParsedFlags {
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (arg === '--') {
+    if (arg === "--") {
       positionals.push(...argv.slice(i + 1));
       break;
     }
-    if (arg.startsWith('--')) {
-      const eq = arg.indexOf('=');
+    if (arg.startsWith("--")) {
+      const eq = arg.indexOf("=");
       if (eq >= 0) {
         flags[arg.slice(2, eq)] = arg.slice(eq + 1);
       } else {
@@ -46,21 +47,21 @@ export function parseFlags(argv: string[]): ParsedFlags {
           continue;
         }
         const next = argv[i + 1];
-        if (next !== undefined && !next.startsWith('-')) {
+        if (next !== undefined && !next.startsWith("-")) {
           flags[key] = next;
           i++;
         } else {
           flags[key] = true;
         }
       }
-    } else if (arg.startsWith('-') && arg.length > 1) {
+    } else if (arg.startsWith("-") && arg.length > 1) {
       const key = arg.slice(1);
       if (BOOLEAN_FLAGS.has(key)) {
         flags[key] = true;
         continue;
       }
       const next = argv[i + 1];
-      if (next !== undefined && !next.startsWith('-')) {
+      if (next !== undefined && !next.startsWith("-")) {
         flags[key] = next;
         i++;
       } else {

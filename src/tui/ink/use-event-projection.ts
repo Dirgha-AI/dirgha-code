@@ -29,7 +29,7 @@ export type TranscriptItem =
     startedAt: number;
     durationMs?: number;
   }
-  | { kind: 'error'; id: string; message: string; failoverModel?: string }
+  | { kind: 'error'; id: string; message: string }
   | { kind: 'notice'; id: string; text: string };
 
 export interface EventProjection {
@@ -114,12 +114,7 @@ export function useEventProjection(events: EventStream): EventProjection {
           }));
           return;
         case 'error':
-          setLiveItems(prev => [...prev, {
-            kind: 'error',
-            id: randomUUID(),
-            message: event.message,
-            ...(event.failoverModel !== undefined ? { failoverModel: event.failoverModel } : {}),
-          }]);
+          setLiveItems(prev => [...prev, { kind: 'error', id: randomUUID(), message: event.message }]);
           return;
         case 'turn_end':
           currentTextId = null;

@@ -18,12 +18,21 @@
  *   - `?` on an empty buffer also bubbles up, mirroring the README.
  */
 
-import * as React from 'react';
-import { Box, Text, useApp, useInput, useStdout } from 'ink';
-import TextInput from 'ink-text-input';
-import { useTheme } from '../theme-context.js';
-import { applyVimKey, createVimState, type VimMode, type VimState } from './vim-bindings.js';
-import { detectPaste, PasteCollapseView, type PasteSegment } from './PasteCollapse.js';
+import * as React from "react";
+import { Box, Text, useApp, useInput, useStdout } from "ink";
+import TextInput from "ink-text-input";
+import { useTheme } from "../theme-context.js";
+import {
+  applyVimKey,
+  createVimState,
+  type VimMode,
+  type VimState,
+} from "./vim-bindings.js";
+import {
+  detectPaste,
+  PasteCollapseView,
+  type PasteSegment,
+} from "./PasteCollapse.js";
 
 export interface InputBoxProps {
   value: string;
@@ -37,20 +46,22 @@ export interface InputBoxProps {
   /** Parent wants to know when the leading `/<token>` changes (null = none active). */
   onSlashQueryChange?: (query: string | null) => void;
   /** Parent wants to know when to surface a modal overlay. */
-  onRequestOverlay?: (kind: 'models' | 'help') => void;
+  onRequestOverlay?: (kind: "models" | "help") => void;
   /** Parent owns the focus so it can be stolen when an overlay is up. */
   inputFocus?: boolean;
+  /** Parent wants to toggle YOLO mode (Ctrl+Y). */
+  onRequestYoloToggle?: () => void;
 }
 
 const CTRL_C_TIMEOUT_MS = 1500;
 
 function lastAtToken(value: string): string | null {
   // The last `@` must be at column 0 or preceded by whitespace to count.
-  const idx = value.lastIndexOf('@');
+  const idx = value.lastIndexOf("@");
   if (idx === -1) return null;
   if (idx > 0) {
     const prev = value[idx - 1];
-    if (prev !== ' ' && prev !== '\t' && prev !== '\n') return null;
+    if (prev !== " " && prev !== "\t" && prev !== "\n") return null;
   }
   const tail = value.slice(idx + 1);
   if (/\s/.test(tail)) return null;
@@ -60,7 +71,7 @@ function lastAtToken(value: string): string | null {
 function leadingSlashToken(value: string): string | null {
   // Buffer must start with `/` and the first token must contain no whitespace.
   // Returns the substring after `/` up to the first whitespace (or EOL).
-  if (!value.startsWith('/')) return null;
+  if (!value.startsWith("/")) return null;
   const tail = value.slice(1);
   const ws = tail.search(/\s/);
   return ws === -1 ? tail : tail.slice(0, ws);
@@ -74,13 +85,17 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
   const [ctrlCArmed, setCtrlCArmed] = React.useState(false);
   const armTimerRef = React.useRef<NodeJS.Timeout | null>(null);
 
-  const [vimState, setVimState] = React.useState<VimState>(() => createVimState());
-  const [pasteSegment, setPasteSegment] = React.useState<PasteSegment | null>(null);
+  const [vimState, setVimState] = React.useState<VimState>(() =>
+    createVimState(),
+  );
+  const [pasteSegment, setPasteSegment] = React.useState<PasteSegment | null>(
+    null,
+  );
   const [pasteExpanded, setPasteExpanded] = React.useState(false);
   const prevValueRef = React.useRef<string>(props.value);
 
   const focus = props.inputFocus ?? !props.busy;
-  const vimActive = props.vimMode === true && vimState.mode === 'NORMAL';
+  const vimActive = props.vimMode === true && vimState.mode === "NORMAL";
 
   React.useEffect(() => {
     return (): void => {
@@ -119,75 +134,130 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
     }
   }, [props.value, pasteSegment]);
 
-  // Wrap onChange so we can detect paste bursts and strip pending `@` updates.
-  const handleChange = React.useCallback((next: string): void => {
-    const prev = prevValueRef.current;
-    prevValueRef.current = next;
-    const seg = detectPaste(prev, next);
-    if (seg !== null) {
-      setPasteSegment(seg);
-      setPasteExpanded(false);
-    }
-    props.onChange(next);
-  }, [props]);
-
-  useInput((inputCh, key) => {
-    // Ctrl+C handling — highest priority.
-    //   1. If the buffer has text → clear it (don't arm exit).
-    //   2. If the buffer is empty → arm exit; second press within 1.5s exits.
-    // This matches the muscle memory most shells / Claude Code use.
-    if (key.ctrl && inputCh === 'c') {
-      if (props.value.length > 0) {
-        props.onChange('');
-        setCtrlCArmed(false);
-        if (armTimerRef.current) { clearTimeout(armTimerRef.current); armTimerRef.current = null; }
-        return;
+  // Wrap onChange so we can detect paste bursts, strip raw DEL/BS chars,
+  // and strip pending `@` updates.
+  const handleChange = React.useCallback(
+    (next: string): void => {
+      const prev = prevValueRef.current;
+      // Strip raw DEL (0x7f) and BS (0x08) characters that slip through when
+      // Ink doesn't recognise the terminal's backspace keycode. Without this,
+      // terminals that send ^? or ^H for Backspace get literal `` / `` in
+      // the buffer instead of a deletion.
+      const DEL = "\x7f";
+      const BS = "\x08";
+      let sanitized = next;
+      if (next.includes(DEL) || next.includes(BS)) {
+        sanitized = next.replace(new RegExp(`[${DEL}${BS}]`, "g"), "");
+        // Emulate backspace: the raw char replaced the character before the
+        // cursor. Since we can't know the exact cursor position from here,
+        // we do the common case: strip one raw char and remove the character
+        // immediately before each occurrence.
+        let result = prev;
+        for (const ch of next) {
+          if (ch === DEL || ch === BS) {
+            // Delete the last character (if any) for each backspace.
+            if (result.length > 0) result = result.slice(0, -1);
+          } else {
+            result += ch;
+          }
+        }
+        sanitized = result;
       }
-      if (ctrlCArmed) { exit(); return; }
-      setCtrlCArmed(true);
-      if (armTimerRef.current) clearTimeout(armTimerRef.current);
-      armTimerRef.current = setTimeout(() => setCtrlCArmed(false), CTRL_C_TIMEOUT_MS);
-      return;
-    }
-
-    // Overlay hotkeys bubble up to App.
-    if (props.onRequestOverlay) {
-      if (key.ctrl && inputCh === 'm') { props.onRequestOverlay('models'); return; }
-      if (key.ctrl && inputCh === 'h') { props.onRequestOverlay('help'); return; }
-      if (inputCh === '?' && props.value === '' && !key.ctrl && !key.meta) {
-        props.onRequestOverlay('help');
-        return;
+      prevValueRef.current = sanitized;
+      const seg = detectPaste(prev, sanitized);
+      if (seg !== null) {
+        setPasteSegment(seg);
+        setPasteExpanded(false);
       }
-    }
+      props.onChange(sanitized);
+    },
+    [props],
+  );
 
-    // Paste-collapse toggle.
-    if (key.ctrl && inputCh === 'e' && pasteSegment !== null) {
-      setPasteExpanded(v => !v);
-      return;
-    }
-
-    // Vim mode transitions + NORMAL key handling.
-    if (props.vimMode === true) {
-      if (key.escape) {
-        setVimState(s => ({ ...s, mode: 'NORMAL', pending: '' }));
-        return;
-      }
-      if (vimState.mode === 'NORMAL' && !key.ctrl && !key.meta) {
-        if (key.return) {
-          // In NORMAL mode, Enter still submits.
-          props.onSubmit(props.value);
+  useInput(
+    (inputCh, key) => {
+      // Ctrl+C handling — highest priority.
+      //   1. If the buffer has text → clear it (don't arm exit).
+      //   2. If the buffer is empty → arm exit; second press within 1.5s exits.
+      // This matches the muscle memory most shells / Claude Code use.
+      if (key.ctrl && inputCh === "c") {
+        if (props.value.length > 0) {
+          props.onChange("");
+          setCtrlCArmed(false);
+          if (armTimerRef.current) {
+            clearTimeout(armTimerRef.current);
+            armTimerRef.current = null;
+          }
           return;
         }
-        const r = applyVimKey(props.value, vimState, inputCh);
-        if (r.exitRequested === true) { exit(); return; }
-        if (r.handled) {
-          if (r.value !== props.value) props.onChange(r.value);
-          setVimState(r.state);
+        if (ctrlCArmed) {
+          exit();
+          return;
+        }
+        setCtrlCArmed(true);
+        if (armTimerRef.current) clearTimeout(armTimerRef.current);
+        armTimerRef.current = setTimeout(
+          () => setCtrlCArmed(false),
+          CTRL_C_TIMEOUT_MS,
+        );
+        return;
+      }
+
+      // Ctrl+Y — toggle YOLO mode at any time.
+      if (key.ctrl && inputCh === "y") {
+        if (props.onRequestYoloToggle) props.onRequestYoloToggle();
+        return;
+      }
+
+      // Overlay hotkeys bubble up to App.
+      if (props.onRequestOverlay) {
+        if (key.ctrl && inputCh === "m") {
+          props.onRequestOverlay("models");
+          return;
+        }
+        if (key.ctrl && inputCh === "h") {
+          props.onRequestOverlay("help");
+          return;
+        }
+        if (inputCh === "?" && props.value === "" && !key.ctrl && !key.meta) {
+          props.onRequestOverlay("help");
           return;
         }
       }
-    }
-  }, { isActive: focus });
+
+      // Paste-collapse toggle.
+      if (key.ctrl && inputCh === "e" && pasteSegment !== null) {
+        setPasteExpanded((v) => !v);
+        return;
+      }
+
+      // Vim mode transitions + NORMAL key handling.
+      if (props.vimMode === true) {
+        if (key.escape) {
+          setVimState((s) => ({ ...s, mode: "NORMAL", pending: "" }));
+          return;
+        }
+        if (vimState.mode === "NORMAL" && !key.ctrl && !key.meta) {
+          if (key.return) {
+            // In NORMAL mode, Enter still submits.
+            props.onSubmit(props.value);
+            return;
+          }
+          const r = applyVimKey(props.value, vimState, inputCh);
+          if (r.exitRequested === true) {
+            exit();
+            return;
+          }
+          if (r.handled) {
+            if (r.value !== props.value) props.onChange(r.value);
+            setVimState(r.state);
+            return;
+          }
+        }
+      }
+    },
+    { isActive: focus },
+  );
 
   const borderColour = props.busy ? palette.brand : palette.accent;
   const promptColour = props.busy ? palette.brand : palette.accent;
@@ -199,14 +269,18 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
         <Box gap={1} flexGrow={1}>
           <Text color={promptColour}>❯</Text>
           {collapsed && pasteSegment !== null ? (
-            <PasteCollapseView value={props.value} segment={pasteSegment} expanded={false} />
+            <PasteCollapseView
+              value={props.value}
+              segment={pasteSegment}
+              expanded={false}
+            />
           ) : (
             <TextInput
               value={props.value}
               onChange={handleChange}
               onSubmit={props.onSubmit}
-              placeholder={props.placeholder ?? 'Ask dirgha anything…'}
-              showCursor={!vimActive}
+              placeholder={props.placeholder ?? "Ask dirgha anything…"}
+              showCursor={!props.busy && !vimActive}
               focus={focus && !vimActive}
             />
           )}
@@ -224,18 +298,20 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
               pasted block expanded (Ctrl+E collapse)
             </Text>
           )}
-          {props.busy && (
-            <BusyHint palette={palette} />
-          )}
+          {props.busy && <BusyHint palette={palette} />}
         </Box>
-        {ctrlCArmed && <Text color={palette.accent} bold>Press Ctrl+C again to exit.</Text>}
+        {ctrlCArmed && (
+          <Text color={palette.accent} bold>
+            Press Ctrl+C again to exit.
+          </Text>
+        )}
       </Box>
     </Box>
   );
 }
 
 function vimModeLabel(m: VimMode): string {
-  return m === 'NORMAL' ? 'NORMAL' : 'INSERT';
+  return m === "NORMAL" ? "NORMAL" : "INSERT";
 }
 
 /**
@@ -243,7 +319,11 @@ function vimModeLabel(m: VimMode): string {
  * gemini-cli's `(esc to cancel, 12s)` pattern. The timer ticks every
  * 1s while busy; cleans up on unmount.
  */
-function BusyHint({ palette }: { palette: ReturnType<typeof useTheme> }): React.JSX.Element {
+function BusyHint({
+  palette,
+}: {
+  palette: ReturnType<typeof useTheme>;
+}): React.JSX.Element {
   const [elapsed, setElapsed] = React.useState(0);
   React.useEffect(() => {
     const start = Date.now();
@@ -253,12 +333,12 @@ function BusyHint({ palette }: { palette: ReturnType<typeof useTheme> }): React.
     return (): void => clearInterval(t);
   }, []);
   const label =
-    elapsed < 60 ? `${elapsed}s`
-    : elapsed < 3600 ? `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`
-    : `${Math.floor(elapsed / 3600)}h ${Math.floor((elapsed % 3600) / 60)}m`;
+    elapsed < 60
+      ? `${elapsed}s`
+      : elapsed < 3600
+        ? `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`
+        : `${Math.floor(elapsed / 3600)}h ${Math.floor((elapsed % 3600) / 60)}m`;
   return (
-    <Text color={palette.textMuted}>
-      esc cancel · {label} · ctrl+c clear
-    </Text>
+    <Text color={palette.textMuted}>esc cancel · {label} · ctrl+c clear</Text>
   );
 }

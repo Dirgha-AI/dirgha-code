@@ -13,16 +13,16 @@
  * overlay state lives in `use-overlays.ts`. This component stays
  * focused on layout and lifecycle.
  */
-import * as React from 'react';
-import type { Message } from '../../kernel/types.js';
-import type { EventStream } from '../../kernel/event-stream.js';
-import type { ProviderRegistry } from '../../providers/index.js';
-import type { ToolRegistry } from '../../tools/registry.js';
-import type { SessionStore } from '../../context/session.js';
-import type { DirghaConfig } from '../../cli/config.js';
-import type { SlashRegistry } from '../../cli/slash.js';
-import { type ModelEntry } from './components/ModelPicker.js';
-import { type HelpSlashCommand } from './components/HelpOverlay.js';
+import * as React from "react";
+import type { Message } from "../../kernel/types.js";
+import type { EventStream } from "../../kernel/event-stream.js";
+import type { ProviderRegistry } from "../../providers/index.js";
+import type { ToolRegistry } from "../../tools/registry.js";
+import type { SessionStore } from "../../context/session.js";
+import type { DirghaConfig } from "../../cli/config.js";
+import type { SlashRegistry } from "../../cli/slash.js";
+import { type ModelEntry } from "./components/ModelPicker.js";
+import { type HelpSlashCommand } from "./components/HelpOverlay.js";
 export interface AppProps {
     events: EventStream;
     registry: ToolRegistry;

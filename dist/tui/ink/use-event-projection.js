@@ -79,12 +79,7 @@ export function useEventProjection(events) {
                     }));
                     return;
                 case 'error':
-                    setLiveItems(prev => [...prev, {
-                            kind: 'error',
-                            id: randomUUID(),
-                            message: event.message,
-                            ...(event.failoverModel !== undefined ? { failoverModel: event.failoverModel } : {}),
-                        }]);
+                    setLiveItems(prev => [...prev, { kind: 'error', id: randomUUID(), message: event.message }]);
                     return;
                 case 'turn_end':
                     currentTextId = null;

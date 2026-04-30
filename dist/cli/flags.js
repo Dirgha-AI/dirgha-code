@@ -9,26 +9,27 @@
  * the actual prompt would be lost.
  */
 const BOOLEAN_FLAGS = new Set([
-    'json',
-    'print',
-    'help',
-    'h',
-    'version',
-    'V',
-    'force',
-    'verbose',
+    "json",
+    "print",
+    "help",
+    "h",
+    "version",
+    "V",
+    "force",
+    "verbose",
+    "yolo",
 ]);
 export function parseFlags(argv) {
     const flags = {};
     const positionals = [];
     for (let i = 0; i < argv.length; i++) {
         const arg = argv[i];
-        if (arg === '--') {
+        if (arg === "--") {
             positionals.push(...argv.slice(i + 1));
             break;
         }
-        if (arg.startsWith('--')) {
-            const eq = arg.indexOf('=');
+        if (arg.startsWith("--")) {
+            const eq = arg.indexOf("=");
             if (eq >= 0) {
                 flags[arg.slice(2, eq)] = arg.slice(eq + 1);
             }
@@ -39,7 +40,7 @@ export function parseFlags(argv) {
                     continue;
                 }
                 const next = argv[i + 1];
-                if (next !== undefined && !next.startsWith('-')) {
+                if (next !== undefined && !next.startsWith("-")) {
                     flags[key] = next;
                     i++;
                 }
@@ -48,14 +49,14 @@ export function parseFlags(argv) {
                 }
             }
         }
-        else if (arg.startsWith('-') && arg.length > 1) {
+        else if (arg.startsWith("-") && arg.length > 1) {
             const key = arg.slice(1);
             if (BOOLEAN_FLAGS.has(key)) {
                 flags[key] = true;
                 continue;
             }
             const next = argv[i + 1];
-            if (next !== undefined && !next.startsWith('-')) {
+            if (next !== undefined && !next.startsWith("-")) {
                 flags[key] = next;
                 i++;
             }
