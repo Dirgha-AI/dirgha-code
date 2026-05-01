@@ -7,26 +7,26 @@
  * end.
  */
 
-import { migrateDeprecatedModel } from '../intelligence/prices.js';
+import { migrateDeprecatedModel } from "../intelligence/prices.js";
 
 export type ProviderId =
-  | 'anthropic'
-  | 'openai'
-  | 'gemini'
-  | 'openrouter'
-  | 'nvidia'
-  | 'ollama'
-  | 'llamacpp'
-  | 'fireworks'
-  | 'deepseek'
-  | 'mistral'
-  | 'cohere'
-  | 'cerebras'
-  | 'together'
-  | 'perplexity'
-  | 'xai'
-  | 'groq'
-  | 'zai';
+  | "anthropic"
+  | "openai"
+  | "gemini"
+  | "openrouter"
+  | "nvidia"
+  | "ollama"
+  | "llamacpp"
+  | "fireworks"
+  | "deepseek"
+  | "mistral"
+  | "cohere"
+  | "cerebras"
+  | "together"
+  | "perplexity"
+  | "xai"
+  | "groq"
+  | "zai";
 
 interface RoutingRule {
   match: (id: string) => boolean;
@@ -38,46 +38,77 @@ interface RoutingRule {
 // so we route by exact ID rather than prefix to avoid sending OR-only
 // variants like `moonshotai/kimi-k2.5` to NIM (which 404s).
 const NVIDIA_NIM_MODELS = new Set<string>([
-  'moonshotai/kimi-k2-instruct',
-  'qwen/qwen3-next-80b-a3b-instruct',
-  'qwen/qwen3.5-122b-a10b',
-  'meta/llama-3.1-70b-instruct',
-  'minimaxai/minimax-m2.5',
+  "moonshotai/kimi-k2-instruct",
+  "moonshotai/kimi-k2-instruct-0905",
+  "moonshotai/kimi-k2-thinking",
+  "qwen/qwen3-next-80b-a3b-instruct",
+  "qwen/qwen3.5-122b-a10b",
+  "qwen/qwen3-coder-480b-a35b-instruct",
+  "meta/llama-3.1-70b-instruct",
+  "minimaxai/minimax-m2.5",
+  "minimaxai/minimax-m2.7",
+  "deepseek-ai/deepseek-v3.2",
+  "mistralai/mistral-nemotron",
+  "mistralai/devstral-2-123b-instruct-2512",
+  "nvidia/llama-3.1-nemotron-70b-instruct",
+  "nvidia/nemotron-3-nano-30b-a3b",
+  "nvidia/nemotron-3-super-120b-a12b",
 ]);
 
 const RULES: RoutingRule[] = [
   // Specific NVIDIA NIM models (override the prefix-based OR fallback).
-  { match: id => NVIDIA_NIM_MODELS.has(id), provider: 'nvidia' },
+  { match: (id) => NVIDIA_NIM_MODELS.has(id), provider: "nvidia" },
   // Native, no-prefix model IDs go to first-party APIs.
-  { match: id => id.startsWith('claude-'), provider: 'anthropic' },
-  { match: id => id.startsWith('gpt-') || /^o[1-9](?:-.+)?$/i.test(id), provider: 'openai' },
-  { match: id => id.startsWith('gemini-'), provider: 'gemini' },
+  { match: (id) => id.startsWith("claude-"), provider: "anthropic" },
+  {
+    match: (id) => id.startsWith("gpt-") || /^o[1-9](?:-.+)?$/i.test(id),
+    provider: "openai",
+  },
+  { match: (id) => id.startsWith("gemini-"), provider: "gemini" },
   // Local & explicit-prefix providers.
-  { match: id => id.startsWith('ollama/'), provider: 'ollama' },
-  { match: id => id.startsWith('llamacpp/'), provider: 'llamacpp' },
-  { match: id => id.startsWith('fireworks/'), provider: 'fireworks' },
+  { match: (id) => id.startsWith("ollama/"), provider: "ollama" },
+  { match: (id) => id.startsWith("llamacpp/"), provider: "llamacpp" },
+  { match: (id) => id.startsWith("fireworks/"), provider: "fireworks" },
   // Extra OpenAI-compat providers (1.10.1). These are explicit-prefix —
   // the user types `mistral/...`, `cohere/...`, etc. to dispatch here
   // rather than fall through to OpenRouter's catch-all. Lets users pick
   // the native API for lower latency / better quotas vs the OR mirror.
-  { match: id => id.startsWith('mistral/'),    provider: 'mistral' },
-  { match: id => id.startsWith('cohere/'),     provider: 'cohere' },
-  { match: id => id.startsWith('cerebras/'),   provider: 'cerebras' },
-  { match: id => id.startsWith('together/') || id.startsWith('togetherai/'), provider: 'together' },
-  { match: id => id.startsWith('perplexity/'), provider: 'perplexity' },
-  { match: id => id.startsWith('xai/') || id.startsWith('x-ai/') || /^grok-/i.test(id), provider: 'xai' },
-  { match: id => id.startsWith('groq/'),       provider: 'groq' },
-  { match: id => id.startsWith('zai/') || id.startsWith('z-ai/') || id.startsWith('glm/'), provider: 'zai' },
+  { match: (id) => id.startsWith("mistral/"), provider: "mistral" },
+  { match: (id) => id.startsWith("cohere/"), provider: "cohere" },
+  { match: (id) => id.startsWith("cerebras/"), provider: "cerebras" },
+  {
+    match: (id) => id.startsWith("together/") || id.startsWith("togetherai/"),
+    provider: "together",
+  },
+  { match: (id) => id.startsWith("perplexity/"), provider: "perplexity" },
+  {
+    match: (id) =>
+      id.startsWith("xai/") || id.startsWith("x-ai/") || /^grok-/i.test(id),
+    provider: "xai",
+  },
+  { match: (id) => id.startsWith("groq/"), provider: "groq" },
+  {
+    match: (id) =>
+      id.startsWith("zai/") || id.startsWith("z-ai/") || id.startsWith("glm/"),
+    provider: "zai",
+  },
   // DeepSeek native API — bare canonical IDs and the deepseek-ai/ vendor prefix.
   // These go direct to api.deepseek.com (lower latency, own quota, cache discount).
   // Vendor-prefixed deepseek/ slugs (OpenRouter style) still go to OR.
-  { match: id => /^deepseek-(chat|reasoner|coder|v4-flash|v4-pro|r1|prover-v2)$/.test(id), provider: 'deepseek' },
-  { match: id => id.startsWith('deepseek-native/'), provider: 'deepseek' },
-  { match: id => id.startsWith('deepseek-ai/'), provider: 'deepseek' },
+  {
+    match: (id) =>
+      /^deepseek-(chat|reasoner|coder|v4-flash|v4-pro|r1|prover-v2)$/.test(id),
+    provider: "deepseek",
+  },
+  { match: (id) => id.startsWith("deepseek-native/"), provider: "deepseek" },
+  { match: (id) => id.startsWith("deepseek-ai/"), provider: "deepseek" },
   // Catch-all: any vendor-prefixed slug or `:free` variant goes via
   // OpenRouter (anthropic/, openai/, google/, deepseek/, moonshotai/,
   // minimax/, qwen/, tencent/, z-ai/, inclusionai/, etc.).
-  { match: id => id.includes('/') || id.includes(':free'), provider: 'openrouter' },
+  {
+    match: (id) => id.includes("/") || id.includes(":free"),
+    provider: "openrouter",
+  },
 ];
 
 export function routeModel(modelId: string): ProviderId {
@@ -85,7 +116,9 @@ export function routeModel(modelId: string): ProviderId {
   for (const rule of RULES) {
     if (rule.match(migrated)) return rule.provider;
   }
-  throw new Error(`No provider configured for model "${migrated}". Add a routing rule in providers/dispatch.ts.`);
+  throw new Error(
+    `No provider configured for model "${migrated}". Add a routing rule in providers/dispatch.ts.`,
+  );
 }
 
 export function resolveModelForDispatch(modelId: string): string {
@@ -94,11 +127,22 @@ export function resolveModelForDispatch(modelId: string): string {
 
 export function isKnownProvider(id: string): id is ProviderId {
   return (
-    id === 'anthropic' || id === 'openai' || id === 'gemini'
-    || id === 'openrouter' || id === 'nvidia' || id === 'ollama'
-    || id === 'llamacpp' || id === 'fireworks' || id === 'deepseek'
-    || id === 'mistral' || id === 'cohere' || id === 'cerebras'
-    || id === 'together' || id === 'perplexity' || id === 'xai'
-    || id === 'groq' || id === 'zai'
+    id === "anthropic" ||
+    id === "openai" ||
+    id === "gemini" ||
+    id === "openrouter" ||
+    id === "nvidia" ||
+    id === "ollama" ||
+    id === "llamacpp" ||
+    id === "fireworks" ||
+    id === "deepseek" ||
+    id === "mistral" ||
+    id === "cohere" ||
+    id === "cerebras" ||
+    id === "together" ||
+    id === "perplexity" ||
+    id === "xai" ||
+    id === "groq" ||
+    id === "zai"
   );
 }

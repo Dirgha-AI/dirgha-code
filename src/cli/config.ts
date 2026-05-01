@@ -3,10 +3,10 @@
  * environment, and CLI flags. Results are cached on first read.
  */
 
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import { homedir } from 'node:os';
-import { migrateDeprecatedModel } from '../intelligence/prices.js';
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { homedir } from "node:os";
+import { migrateDeprecatedModel } from "../intelligence/prices.js";
 
 export interface DirghaConfig {
   model: string;
@@ -14,7 +14,7 @@ export interface DirghaConfig {
   summaryModel: string;
   maxTurns: number;
   temperature?: number;
-  thinking?: 'off' | 'low' | 'medium' | 'high';
+  thinking?: "off" | "low" | "medium" | "high";
   showThinking: boolean;
   autoApproveTools: string[];
   skills: { enabled: boolean; explicit?: string[] };
@@ -33,15 +33,32 @@ export interface DirghaConfig {
    * Accepts the full 20-theme catalogue from `src/tui/theme.ts` (15 native
    * + 5 ports from gemini-cli).
    */
-  theme?: 'readable' | 'dark' | 'light' | 'none' | 'midnight' | 'ocean'
-    | 'solarized' | 'warm' | 'violet-storm' | 'cosmic' | 'nord' | 'ember'
-    | 'sakura' | 'obsidian-gold' | 'crimson'
-    | 'dracula' | 'github-dark' | 'tokyonight' | 'atom-one-dark' | 'ayu-dark';
+  theme?:
+    | "readable"
+    | "dark"
+    | "light"
+    | "none"
+    | "midnight"
+    | "ocean"
+    | "solarized"
+    | "warm"
+    | "violet-storm"
+    | "cosmic"
+    | "nord"
+    | "ember"
+    | "sakura"
+    | "obsidian-gold"
+    | "crimson"
+    | "dracula"
+    | "github-dark"
+    | "tokyonight"
+    | "atom-one-dark"
+    | "ayu-dark";
   /**
    * Persisted execution mode. Defaults to 'act' (normal execution).
    * Changed live via /mode; also honoured by fresh sessions.
    */
-  mode?: 'plan' | 'act' | 'yolo' | 'verify' | 'ask';
+  mode?: "plan" | "act" | "yolo" | "verify" | "ask";
   /**
    * Optional MCP servers to spawn on startup. Each entry runs as a
    * subprocess; its tools are bridged into the local tool registry
@@ -54,8 +71,18 @@ export interface DirghaConfig {
    */
   mcpServers?: Record<
     string,
-    | { command: string; args?: string[]; env?: Record<string, string>; cwd?: string }
-    | { url: string; bearerToken?: string; headers?: Record<string, string>; timeoutMs?: number }
+    | {
+        command: string;
+        args?: string[];
+        env?: Record<string, string>;
+        cwd?: string;
+      }
+    | {
+        url: string;
+        bearerToken?: string;
+        headers?: Record<string, string>;
+        timeoutMs?: number;
+      }
   >;
   /**
    * Lifecycle hooks fired by the agent loop. Each entry is a shell
@@ -80,21 +107,23 @@ export interface DirghaConfig {
 }
 
 export const DEFAULT_CONFIG: DirghaConfig = {
-  model: 'moonshotai/kimi-k2.5',
-  cheapModel: 'meta/llama-3.1-8b-instruct',
-  summaryModel: 'moonshotai/kimi-k2.5',
+  model: "moonshotai/kimi-k2.6",
+  cheapModel: "meta/llama-3.1-8b-instruct",
+  summaryModel: "moonshotai/kimi-k2.5",
   maxTurns: 16,
   showThinking: false,
-  autoApproveTools: ['fs_read', 'fs_ls', 'search_grep', 'search_glob', 'git'],
+  autoApproveTools: ["fs_read", "fs_ls", "search_grep", "search_glob", "git"],
   skills: { enabled: true },
   smartRoute: { enabled: false },
   compaction: { triggerTokens: 120_000, preserveLastTurns: 6 },
   telemetry: { enabled: false },
 };
 
-export async function loadConfig(cwd: string = process.cwd()): Promise<DirghaConfig> {
-  const userPath = join(homedir(), '.dirgha', 'config.json');
-  const projectPath = join(cwd, '.dirgha', 'config.json');
+export async function loadConfig(
+  cwd: string = process.cwd(),
+): Promise<DirghaConfig> {
+  const userPath = join(homedir(), ".dirgha", "config.json");
+  const projectPath = join(cwd, ".dirgha", "config.json");
 
   const userPartial = await readJson(userPath);
   const projectPartial = await readJson(projectPath);
@@ -110,17 +139,23 @@ export async function loadConfig(cwd: string = process.cwd()): Promise<DirghaCon
 }
 
 async function readJson(path: string): Promise<Partial<DirghaConfig>> {
-  const text = await readFile(path, 'utf8').catch(() => undefined);
+  const text = await readFile(path, "utf8").catch(() => undefined);
   if (!text) return {};
-  try { return JSON.parse(text) as Partial<DirghaConfig>; } catch { return {}; }
+  try {
+    return JSON.parse(text) as Partial<DirghaConfig>;
+  } catch {
+    return {};
+  }
 }
 
 function readEnvOverrides(): Partial<DirghaConfig> {
   const out: Partial<DirghaConfig> = {};
   if (process.env.DIRGHA_MODEL) out.model = process.env.DIRGHA_MODEL;
-  if (process.env.DIRGHA_CHEAP_MODEL) out.cheapModel = process.env.DIRGHA_CHEAP_MODEL;
-  if (process.env.DIRGHA_MAX_TURNS) out.maxTurns = Number.parseInt(process.env.DIRGHA_MAX_TURNS, 10);
-  if (process.env.DIRGHA_SHOW_THINKING === '1') out.showThinking = true;
+  if (process.env.DIRGHA_CHEAP_MODEL)
+    out.cheapModel = process.env.DIRGHA_CHEAP_MODEL;
+  if (process.env.DIRGHA_MAX_TURNS)
+    out.maxTurns = Number.parseInt(process.env.DIRGHA_MAX_TURNS, 10);
+  if (process.env.DIRGHA_SHOW_THINKING === "1") out.showThinking = true;
   return out;
 }
 
@@ -131,8 +166,11 @@ function merge(...partials: Array<Partial<DirghaConfig>>): DirghaConfig {
     for (const key of Object.keys(p) as Array<keyof DirghaConfig>) {
       const value = p[key];
       if (value === undefined) continue;
-      if (typeof value === 'object' && !Array.isArray(value)) {
-        (out[key] as unknown) = { ...(out[key] as object), ...(value as object) };
+      if (typeof value === "object" && !Array.isArray(value)) {
+        (out[key] as unknown) = {
+          ...(out[key] as object),
+          ...(value as object),
+        };
       } else {
         (out[key] as unknown) = value;
       }
