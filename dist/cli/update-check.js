@@ -45,7 +45,7 @@ export async function checkStartupUpdate(currentVersion) {
             return;
         const data = (await res.json());
         const latest = data.version;
-        if (!latest || latest === currentVersion)
+        if (!latest || !isSemverNewer(latest, currentVersion))
             return;
         process.stderr.write(`\n📦 @dirgha/code ${latest} is available (you have ${currentVersion})\n` +
             `   Run: npm i -g @dirgha/code@latest\n` +
@@ -55,5 +55,23 @@ export async function checkStartupUpdate(currentVersion) {
         /* network error — silent */
     }
     markChecked();
+}
+function isSemverNewer(latest, current) {
+    try {
+        const [lm, lmn, lp] = latest.split(".").map(Number);
+        const [cm, cmn, cp] = current.split(".").map(Number);
+        if (isNaN(lm) || isNaN(cm))
+            return latest !== current; // non-semver — show if different
+        if (lm !== cm)
+            return lm > cm;
+        if (lmn !== cmn)
+            return lmn > cmn;
+        if (lp !== cp)
+            return lp > cp;
+        return false; // equal
+    }
+    catch {
+        return latest !== current;
+    }
 }
 //# sourceMappingURL=update-check.js.map
