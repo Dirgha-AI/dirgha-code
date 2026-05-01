@@ -21,24 +21,58 @@
  * The reducer keeps a pending prefix so multi-key motions like `dd`,
  * `dw`, and `yy` work across two keystrokes.
  */
+const graphemeSeg = new Intl.Segmenter("en", { granularity: "grapheme" });
+function graphemePrev(value, cursor) {
+    if (cursor <= 0)
+        return 0;
+    let prev = 0;
+    for (const s of graphemeSeg.segment(value)) {
+        if (s.index >= cursor)
+            break;
+        prev = s.index;
+    }
+    return prev;
+}
+function graphemeNext(value, cursor) {
+    if (cursor >= value.length)
+        return value.length;
+    for (const s of graphemeSeg.segment(value)) {
+        if (s.index > cursor)
+            return s.index;
+    }
+    return value.length;
+}
+function deleteGraphemeAt(value, cursor) {
+    if (cursor >= value.length)
+        return value;
+    for (const s of graphemeSeg.segment(value)) {
+        if (s.index === cursor) {
+            return value.slice(0, cursor) + value.slice(cursor + s.segment.length);
+        }
+        if (s.index > cursor) {
+            return value.slice(0, s.index) + value.slice(s.index + s.segment.length);
+        }
+    }
+    return value;
+}
 export function createVimState() {
-    return { mode: 'INSERT', cursor: 0, pending: '', register: '' };
+    return { mode: "INSERT", cursor: 0, pending: "", register: "" };
 }
 function nextWord(value, from) {
     let i = from;
     // Skip the current word.
-    while (i < value.length && /\S/.test(value[i] ?? ''))
+    while (i < value.length && /\S/.test(value[i] ?? ""))
         i += 1;
     // Skip whitespace to the next word.
-    while (i < value.length && /\s/.test(value[i] ?? ''))
+    while (i < value.length && /\s/.test(value[i] ?? ""))
         i += 1;
     return i;
 }
 function prevWord(value, from) {
     let i = Math.max(0, from - 1);
-    while (i > 0 && /\s/.test(value[i] ?? ''))
+    while (i > 0 && /\s/.test(value[i] ?? ""))
         i -= 1;
-    while (i > 0 && /\S/.test(value[i - 1] ?? ''))
+    while (i > 0 && /\S/.test(value[i - 1] ?? ""))
         i -= 1;
     return i;
 }
@@ -49,17 +83,17 @@ function prevWord(value, from) {
  */
 export function applyVimKey(value, state, ch) {
     const pending = state.pending;
-    const clearPending = { ...state, pending: '' };
+    const clearPending = { ...state, pending: "" };
     // Multi-key prefixes resolve first.
-    if (pending === 'd') {
-        if (ch === 'd') {
+    if (pending === "d") {
+        if (ch === "d") {
             return {
-                value: '',
+                value: "",
                 state: { ...clearPending, cursor: 0, register: value },
                 handled: true,
             };
         }
-        if (ch === 'w') {
+        if (ch === "w") {
             const to = nextWord(value, state.cursor);
             return {
                 value: value.slice(0, state.cursor) + value.slice(to),
@@ -70,62 +104,95 @@ export function applyVimKey(value, state, ch) {
         // Unknown d-prefix → abort.
         return { value, state: clearPending, handled: true };
     }
-    if (pending === 'y') {
-        if (ch === 'y') {
-            return { value, state: { ...clearPending, register: value }, handled: true };
+    if (pending === "y") {
+        if (ch === "y") {
+            return {
+                value,
+                state: { ...clearPending, register: value },
+                handled: true,
+            };
         }
         return { value, state: clearPending, handled: true };
     }
-    if (pending === ':') {
-        if (ch === 'q') {
+    if (pending === ":") {
+        if (ch === "q") {
             return { value, state: clearPending, handled: true, exitRequested: true };
         }
         return { value, state: clearPending, handled: true };
     }
     switch (ch) {
-        case 'h':
-            return { value, state: { ...clearPending, cursor: Math.max(0, state.cursor - 1) }, handled: true };
-        case 'l':
-            return { value, state: { ...clearPending, cursor: Math.min(value.length, state.cursor + 1) }, handled: true };
-        case 'j':
-        case 'k':
+        case "h":
+            return {
+                value,
+                state: { ...clearPending, cursor: graphemePrev(value, state.cursor) },
+                handled: true,
+            };
+        case "l":
+            return {
+                value,
+                state: { ...clearPending, cursor: graphemeNext(value, state.cursor) },
+                handled: true,
+            };
+        case "j":
+        case "k":
             // Single-line buffer: treat as no-op but still consume.
             return { value, state: clearPending, handled: true };
-        case '0':
+        case "0":
             return { value, state: { ...clearPending, cursor: 0 }, handled: true };
-        case '$':
-            return { value, state: { ...clearPending, cursor: value.length }, handled: true };
-        case 'w':
-            return { value, state: { ...clearPending, cursor: nextWord(value, state.cursor) }, handled: true };
-        case 'b':
-            return { value, state: { ...clearPending, cursor: prevWord(value, state.cursor) }, handled: true };
-        case 'x': {
+        case "$":
+            return {
+                value,
+                state: { ...clearPending, cursor: value.length },
+                handled: true,
+            };
+        case "w":
+            return {
+                value,
+                state: { ...clearPending, cursor: nextWord(value, state.cursor) },
+                handled: true,
+            };
+        case "b":
+            return {
+                value,
+                state: { ...clearPending, cursor: prevWord(value, state.cursor) },
+                handled: true,
+            };
+        case "x": {
             if (state.cursor >= value.length)
                 return { value, state: clearPending, handled: true };
-            const nv = value.slice(0, state.cursor) + value.slice(state.cursor + 1);
+            const nv = deleteGraphemeAt(value, state.cursor);
             return {
                 value: nv,
                 state: { ...clearPending, cursor: Math.min(state.cursor, nv.length) },
                 handled: true,
             };
         }
-        case 'p': {
-            if (state.register === '')
+        case "p": {
+            if (state.register === "")
                 return { value, state: clearPending, handled: true };
-            const nv = value.slice(0, state.cursor) + state.register + value.slice(state.cursor);
+            const nv = value.slice(0, state.cursor) +
+                state.register +
+                value.slice(state.cursor);
             return {
                 value: nv,
-                state: { ...clearPending, cursor: state.cursor + state.register.length },
+                state: {
+                    ...clearPending,
+                    cursor: state.cursor + state.register.length,
+                },
                 handled: true,
             };
         }
-        case 'd':
-        case 'y':
-        case ':':
+        case "d":
+        case "y":
+        case ":":
             return { value, state: { ...state, pending: ch }, handled: true };
-        case 'i':
-            return { value, state: { ...clearPending, mode: 'INSERT' }, handled: true };
-        case '/':
+        case "i":
+            return {
+                value,
+                state: { ...clearPending, mode: "INSERT" },
+                handled: true,
+            };
+        case "/":
             // Search stub — consume so it doesn't fall through to text input.
             return { value, state: clearPending, handled: true };
         default:

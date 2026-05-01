@@ -158,8 +158,11 @@ export interface LspConnection {
   sendRequest<T>(method: string, params?: unknown): Promise<T>;
   sendNotification(method: string, params?: unknown): Promise<void>;
   onNotification(method: string, handler: (params: unknown) => void): void;
+  rejectAllPending(reason: string): void;
   dispose(): void;
 }
+
+const LSP_REQUEST_TIMEOUT_MS = 30_000;
 
 export function createLspConnection(proc: ChildProcess): LspConnection {
   const notificationHandlers = new Map<string, (params: unknown) => void>();
@@ -205,14 +208,34 @@ export function createLspConnection(proc: ChildProcess): LspConnection {
     });
   }
 
+  function rejectAllPending(reason: string) {
+    for (const [, handler] of pending) {
+      handler.reject(new Error(reason));
+    }
+    pending.clear();
+  }
+
   return {
     sendRequest<T>(method: string, params?: unknown): Promise<T> {
       const id = nextId++;
       const request = JSON.stringify({ jsonrpc: "2.0", id, method, params });
-      return new Promise<T>((resolve, reject) => {
+      const promise = new Promise<T>((resolve, reject) => {
         pending.set(id, { resolve: resolve as (v: unknown) => void, reject });
         sendRaw(request);
       });
+      const timeout = new Promise<T>((_, reject) =>
+        setTimeout(() => {
+          if (pending.has(id)) {
+            pending.delete(id);
+            reject(
+              new Error(
+                `LSP request ${method} timed out after ${LSP_REQUEST_TIMEOUT_MS}ms`,
+              ),
+            );
+          }
+        }, LSP_REQUEST_TIMEOUT_MS),
+      );
+      return Promise.race([promise, timeout]);
     },
 
     sendNotification(method: string, params?: unknown): Promise<void> {
@@ -224,8 +247,10 @@ export function createLspConnection(proc: ChildProcess): LspConnection {
       notificationHandlers.set(method, handler);
     },
 
+    rejectAllPending,
+
     dispose() {
-      pending.clear();
+      rejectAllPending("LSP connection disposed");
       notificationHandlers.clear();
       if (proc.stdout) proc.stdout.removeAllListeners("data");
     },
@@ -296,11 +321,17 @@ export async function createLspClient(
     proc.stderr.resume();
   }
 
-  if (proc.on) {
-    proc.on("error", () => {
-      /* handled by timeout */
-    });
-  }
+  proc.on("exit", (code, signal) => {
+    const reason =
+      signal != null
+        ? `LSP server ${serverId} killed by signal ${signal}`
+        : `LSP server ${serverId} exited with code ${code}`;
+    connection.rejectAllPending(reason);
+  });
+
+  proc.on("error", (err) => {
+    connection.rejectAllPending(`LSP server ${serverId} error: ${err.message}`);
+  });
 
   const diagnostics = new Map<string, Diagnostic[]>();
 

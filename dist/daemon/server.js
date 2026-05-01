@@ -4,26 +4,31 @@
  * The stream id returned by prompt.submit correlates notifications for
  * the client.
  */
-import { randomUUID } from 'node:crypto';
-import { stdin, stdout } from 'node:process';
-import { createEventStream } from '../kernel/event-stream.js';
-import { runAgentLoop } from '../kernel/agent-loop.js';
-import { createToolExecutor } from '../tools/exec.js';
+import { randomUUID } from "node:crypto";
+import { stdin, stdout } from "node:process";
+import { createEventStream } from "../kernel/event-stream.js";
+import { runAgentLoop } from "../kernel/agent-loop.js";
+import { createToolExecutor } from "../tools/exec.js";
 export class DaemonServer {
     opts;
     active = new Map();
     started = Date.now();
-    totalUsage = { inputTokens: 0, outputTokens: 0, cachedTokens: 0, costUsd: 0 };
+    totalUsage = {
+        inputTokens: 0,
+        outputTokens: 0,
+        cachedTokens: 0,
+        costUsd: 0,
+    };
     constructor(opts) {
         this.opts = opts;
     }
     start() {
-        let buffer = '';
-        stdin.setEncoding('utf8');
-        stdin.on('data', chunk => {
+        let buffer = "";
+        stdin.setEncoding("utf8");
+        stdin.on("data", (chunk) => {
             buffer += chunk;
             let idx;
-            while ((idx = buffer.indexOf('\n')) >= 0) {
+            while ((idx = buffer.indexOf("\n")) >= 0) {
                 const line = buffer.slice(0, idx);
                 buffer = buffer.slice(idx + 1);
                 if (!line.trim())
@@ -41,26 +46,26 @@ export class DaemonServer {
     async handle(req) {
         try {
             switch (req.method) {
-                case 'daemon.health':
+                case "daemon.health":
                     this.writeResult(req.id, this.healthResult());
                     return;
-                case 'daemon.shutdown':
+                case "daemon.shutdown":
                     this.writeResult(req.id, { ok: true });
                     process.exit(0);
                     return;
-                case 'session.start':
+                case "session.start":
                     this.writeResult(req.id, await this.sessionStart(req.params));
                     return;
-                case 'session.resume':
+                case "session.resume":
                     this.writeResult(req.id, await this.sessionResume(req.params));
                     return;
-                case 'session.list':
+                case "session.list":
                     this.writeResult(req.id, await this.sessionList());
                     return;
-                case 'session.messages':
+                case "session.messages":
                     this.writeResult(req.id, await this.sessionMessages(req.params));
                     return;
-                case 'prompt.submit':
+                case "prompt.submit":
                     this.writeResult(req.id, await this.promptSubmit(req.params));
                     return;
                 default:
@@ -84,7 +89,7 @@ export class DaemonServer {
         const model = params?.model ?? this.opts.config.model;
         const history = [];
         if (params?.system)
-            history.push({ role: 'system', content: params.system });
+            history.push({ role: "system", content: params.system });
         this.active.set(sessionId, { session, history, usage: emptyUsage() });
         return { sessionId, model };
     }
@@ -93,8 +98,15 @@ export class DaemonServer {
         if (!session)
             throw new Error(`Unknown session: ${params.sessionId}`);
         const messages = await session.messages();
-        this.active.set(params.sessionId, { session, history: messages, usage: emptyUsage() });
-        return { sessionId: params.sessionId, turns: messages.filter(m => m.role === 'assistant').length };
+        this.active.set(params.sessionId, {
+            session,
+            history: messages,
+            usage: emptyUsage(),
+        });
+        return {
+            sessionId: params.sessionId,
+            turns: messages.filter((m) => m.role === "assistant").length,
+        };
     }
     async sessionList() {
         const ids = await this.opts.sessions.list();
@@ -104,7 +116,11 @@ export class DaemonServer {
             if (!session)
                 continue;
             const messages = await session.messages();
-            out.push({ id, createdAt: '', turns: messages.filter(m => m.role === 'assistant').length });
+            out.push({
+                id,
+                createdAt: "",
+                turns: messages.filter((m) => m.role === "assistant").length,
+            });
         }
         return { sessions: out };
     }
@@ -123,21 +139,21 @@ export class DaemonServer {
             throw new Error(`Unknown session: ${params.sessionId}`);
         const streamId = randomUUID();
         const events = createEventStream();
-        events.subscribe(event => {
+        events.subscribe((event) => {
             const notif = { streamId, event };
-            this.writeNotification('event.stream', notif);
-            if (event.type === 'usage') {
+            this.writeNotification("event.stream", notif);
+            if (event.type === "usage") {
                 active.usage.inputTokens += event.inputTokens;
                 active.usage.outputTokens += event.outputTokens;
                 this.totalUsage.inputTokens += event.inputTokens;
                 this.totalUsage.outputTokens += event.outputTokens;
             }
         });
-        active.history.push({ role: 'user', content: params.prompt });
+        active.history.push({ role: "user", content: params.prompt });
         await active.session.append({
-            type: 'message',
+            type: "message",
             ts: new Date().toISOString(),
-            message: { role: 'user', content: params.prompt },
+            message: { role: "user", content: params.prompt },
         });
         const provider = this.opts.providers.forModel(this.opts.config.model);
         const executor = createToolExecutor({
@@ -155,16 +171,26 @@ export class DaemonServer {
             provider,
             toolExecutor: executor,
             events,
-        }).then(async (result) => {
+        })
+            .then(async (result) => {
+            const savedCount = active.history.length;
             active.history.length = 0;
             active.history.push(...result.messages);
-            for (const msg of result.messages.slice(-4)) {
-                await active.session.append({ type: 'message', ts: new Date().toISOString(), message: msg });
+            for (const msg of result.messages.slice(savedCount)) {
+                await active.session.append({
+                    type: "message",
+                    ts: new Date().toISOString(),
+                    message: msg,
+                });
             }
-        }).catch(err => {
-            this.writeNotification('event.stream', {
+        })
+            .catch((err) => {
+            this.writeNotification("event.stream", {
                 streamId,
-                event: { type: 'error', message: err instanceof Error ? err.message : String(err) },
+                event: {
+                    type: "error",
+                    message: err instanceof Error ? err.message : String(err),
+                },
             });
         });
         return { streamId };
@@ -172,17 +198,21 @@ export class DaemonServer {
     writeResult(id, result) {
         if (id === null)
             return;
-        const out = { jsonrpc: '2.0', id, result };
+        const out = { jsonrpc: "2.0", id, result };
         stdout.write(`${JSON.stringify(out)}\n`);
     }
     writeError(id, code, message) {
         if (id === null)
             return;
-        const out = { jsonrpc: '2.0', id, error: { code, message } };
+        const out = {
+            jsonrpc: "2.0",
+            id,
+            error: { code, message },
+        };
         stdout.write(`${JSON.stringify(out)}\n`);
     }
     writeNotification(method, params) {
-        stdout.write(`${JSON.stringify({ jsonrpc: '2.0', method, params })}\n`);
+        stdout.write(`${JSON.stringify({ jsonrpc: "2.0", method, params })}\n`);
     }
 }
 function emptyUsage() {

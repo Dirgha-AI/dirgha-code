@@ -5,8 +5,8 @@
  * the client.
  */
 
-import { randomUUID } from 'node:crypto';
-import { stdin, stdout } from 'node:process';
+import { randomUUID } from "node:crypto";
+import { stdin, stdout } from "node:process";
 import type {
   DaemonRequest,
   DaemonResponse,
@@ -20,15 +20,15 @@ import type {
   SessionResumeResult,
   SessionStartParams,
   SessionStartResult,
-} from './protocol.js';
-import type { Message, UsageTotal } from '../kernel/types.js';
-import { createEventStream } from '../kernel/event-stream.js';
-import { runAgentLoop } from '../kernel/agent-loop.js';
-import type { ProviderRegistry } from '../providers/index.js';
-import type { ToolRegistry } from '../tools/registry.js';
-import { createToolExecutor } from '../tools/exec.js';
-import type { SessionStore, Session } from '../context/session.js';
-import type { DirghaConfig } from '../cli/config.js';
+} from "./protocol.js";
+import type { Message, UsageTotal } from "../kernel/types.js";
+import { createEventStream } from "../kernel/event-stream.js";
+import { runAgentLoop } from "../kernel/agent-loop.js";
+import type { ProviderRegistry } from "../providers/index.js";
+import type { ToolRegistry } from "../tools/registry.js";
+import { createToolExecutor } from "../tools/exec.js";
+import type { SessionStore, Session } from "../context/session.js";
+import type { DirghaConfig } from "../cli/config.js";
 
 interface ActiveSession {
   session: Session;
@@ -47,17 +47,22 @@ export interface DaemonServerOptions {
 export class DaemonServer {
   private active = new Map<string, ActiveSession>();
   private started = Date.now();
-  private totalUsage: UsageTotal = { inputTokens: 0, outputTokens: 0, cachedTokens: 0, costUsd: 0 };
+  private totalUsage: UsageTotal = {
+    inputTokens: 0,
+    outputTokens: 0,
+    cachedTokens: 0,
+    costUsd: 0,
+  };
 
   constructor(private opts: DaemonServerOptions) {}
 
   start(): void {
-    let buffer = '';
-    stdin.setEncoding('utf8');
-    stdin.on('data', chunk => {
+    let buffer = "";
+    stdin.setEncoding("utf8");
+    stdin.on("data", (chunk) => {
       buffer += chunk;
       let idx: number;
-      while ((idx = buffer.indexOf('\n')) >= 0) {
+      while ((idx = buffer.indexOf("\n")) >= 0) {
         const line = buffer.slice(0, idx);
         buffer = buffer.slice(idx + 1);
         if (!line.trim()) continue;
@@ -74,33 +79,51 @@ export class DaemonServer {
   private async handle(req: DaemonRequest): Promise<void> {
     try {
       switch (req.method) {
-        case 'daemon.health':
+        case "daemon.health":
           this.writeResult(req.id, this.healthResult());
           return;
-        case 'daemon.shutdown':
+        case "daemon.shutdown":
           this.writeResult(req.id, { ok: true });
           process.exit(0);
           return;
-        case 'session.start':
-          this.writeResult(req.id, await this.sessionStart(req.params as SessionStartParams | undefined));
+        case "session.start":
+          this.writeResult(
+            req.id,
+            await this.sessionStart(
+              req.params as SessionStartParams | undefined,
+            ),
+          );
           return;
-        case 'session.resume':
-          this.writeResult(req.id, await this.sessionResume(req.params as SessionResumeParams));
+        case "session.resume":
+          this.writeResult(
+            req.id,
+            await this.sessionResume(req.params as SessionResumeParams),
+          );
           return;
-        case 'session.list':
+        case "session.list":
           this.writeResult(req.id, await this.sessionList());
           return;
-        case 'session.messages':
-          this.writeResult(req.id, await this.sessionMessages(req.params as { sessionId: string }));
+        case "session.messages":
+          this.writeResult(
+            req.id,
+            await this.sessionMessages(req.params as { sessionId: string }),
+          );
           return;
-        case 'prompt.submit':
-          this.writeResult(req.id, await this.promptSubmit(req.params as PromptSubmitParams));
+        case "prompt.submit":
+          this.writeResult(
+            req.id,
+            await this.promptSubmit(req.params as PromptSubmitParams),
+          );
           return;
         default:
           this.writeError(req.id, -32601, `Method not found: ${req.method}`);
       }
     } catch (err) {
-      this.writeError(req.id, -32000, err instanceof Error ? err.message : String(err));
+      this.writeError(
+        req.id,
+        -32000,
+        err instanceof Error ? err.message : String(err),
+      );
     }
   }
 
@@ -112,53 +135,74 @@ export class DaemonServer {
     };
   }
 
-  private async sessionStart(params?: SessionStartParams): Promise<SessionStartResult> {
+  private async sessionStart(
+    params?: SessionStartParams,
+  ): Promise<SessionStartResult> {
     const sessionId = randomUUID();
     const session = await this.opts.sessions.create(sessionId);
     const model = params?.model ?? this.opts.config.model;
     const history: Message[] = [];
-    if (params?.system) history.push({ role: 'system', content: params.system });
+    if (params?.system)
+      history.push({ role: "system", content: params.system });
     this.active.set(sessionId, { session, history, usage: emptyUsage() });
     return { sessionId, model };
   }
 
-  private async sessionResume(params: SessionResumeParams): Promise<SessionResumeResult> {
+  private async sessionResume(
+    params: SessionResumeParams,
+  ): Promise<SessionResumeResult> {
     const session = await this.opts.sessions.open(params.sessionId);
     if (!session) throw new Error(`Unknown session: ${params.sessionId}`);
     const messages = await session.messages();
-    this.active.set(params.sessionId, { session, history: messages, usage: emptyUsage() });
-    return { sessionId: params.sessionId, turns: messages.filter(m => m.role === 'assistant').length };
+    this.active.set(params.sessionId, {
+      session,
+      history: messages,
+      usage: emptyUsage(),
+    });
+    return {
+      sessionId: params.sessionId,
+      turns: messages.filter((m) => m.role === "assistant").length,
+    };
   }
 
   private async sessionList(): Promise<SessionListResult> {
     const ids = await this.opts.sessions.list();
-    const out: SessionListResult['sessions'] = [];
+    const out: SessionListResult["sessions"] = [];
     for (const id of ids) {
       const session = await this.opts.sessions.open(id);
       if (!session) continue;
       const messages = await session.messages();
-      out.push({ id, createdAt: '', turns: messages.filter(m => m.role === 'assistant').length });
+      out.push({
+        id,
+        createdAt: "",
+        turns: messages.filter((m) => m.role === "assistant").length,
+      });
     }
     return { sessions: out };
   }
 
-  private async sessionMessages(params: { sessionId: string }): Promise<SessionMessagesResult> {
+  private async sessionMessages(params: {
+    sessionId: string;
+  }): Promise<SessionMessagesResult> {
     const active = this.active.get(params.sessionId);
-    if (active) return { sessionId: params.sessionId, messages: active.history };
+    if (active)
+      return { sessionId: params.sessionId, messages: active.history };
     const session = await this.opts.sessions.open(params.sessionId);
     if (!session) throw new Error(`Unknown session: ${params.sessionId}`);
     return { sessionId: params.sessionId, messages: await session.messages() };
   }
 
-  private async promptSubmit(params: PromptSubmitParams): Promise<PromptSubmitResult> {
+  private async promptSubmit(
+    params: PromptSubmitParams,
+  ): Promise<PromptSubmitResult> {
     const active = this.active.get(params.sessionId);
     if (!active) throw new Error(`Unknown session: ${params.sessionId}`);
     const streamId = randomUUID();
     const events = createEventStream();
-    events.subscribe(event => {
+    events.subscribe((event) => {
       const notif: EventNotification = { streamId, event };
-      this.writeNotification('event.stream', notif);
-      if (event.type === 'usage') {
+      this.writeNotification("event.stream", notif);
+      if (event.type === "usage") {
         active.usage.inputTokens += event.inputTokens;
         active.usage.outputTokens += event.outputTokens;
         this.totalUsage.inputTokens += event.inputTokens;
@@ -166,11 +210,11 @@ export class DaemonServer {
       }
     });
 
-    active.history.push({ role: 'user', content: params.prompt });
+    active.history.push({ role: "user", content: params.prompt });
     await active.session.append({
-      type: 'message',
+      type: "message",
       ts: new Date().toISOString(),
-      message: { role: 'user', content: params.prompt },
+      message: { role: "user", content: params.prompt },
     });
 
     const provider = this.opts.providers.forModel(this.opts.config.model);
@@ -190,36 +234,54 @@ export class DaemonServer {
       provider,
       toolExecutor: executor,
       events,
-    }).then(async result => {
-      active.history.length = 0;
-      active.history.push(...result.messages);
-      for (const msg of result.messages.slice(-4)) {
-        await active.session.append({ type: 'message', ts: new Date().toISOString(), message: msg });
-      }
-    }).catch(err => {
-      this.writeNotification('event.stream', {
-        streamId,
-        event: { type: 'error', message: err instanceof Error ? err.message : String(err) },
-      } as EventNotification);
-    });
+    })
+      .then(async (result) => {
+        const savedCount = active.history.length;
+        active.history.length = 0;
+        active.history.push(...result.messages);
+        for (const msg of result.messages.slice(savedCount)) {
+          await active.session.append({
+            type: "message",
+            ts: new Date().toISOString(),
+            message: msg,
+          });
+        }
+      })
+      .catch((err) => {
+        this.writeNotification("event.stream", {
+          streamId,
+          event: {
+            type: "error",
+            message: err instanceof Error ? err.message : String(err),
+          },
+        } as EventNotification);
+      });
 
     return { streamId };
   }
 
-  private writeResult<T>(id: DaemonRequest['id'] | null, result: T): void {
+  private writeResult<T>(id: DaemonRequest["id"] | null, result: T): void {
     if (id === null) return;
-    const out: DaemonResponse<T> = { jsonrpc: '2.0', id, result };
+    const out: DaemonResponse<T> = { jsonrpc: "2.0", id, result };
     stdout.write(`${JSON.stringify(out)}\n`);
   }
 
-  private writeError(id: DaemonRequest['id'] | null, code: number, message: string): void {
+  private writeError(
+    id: DaemonRequest["id"] | null,
+    code: number,
+    message: string,
+  ): void {
     if (id === null) return;
-    const out: DaemonResponse = { jsonrpc: '2.0', id, error: { code, message } };
+    const out: DaemonResponse = {
+      jsonrpc: "2.0",
+      id,
+      error: { code, message },
+    };
     stdout.write(`${JSON.stringify(out)}\n`);
   }
 
   private writeNotification(method: string, params: unknown): void {
-    stdout.write(`${JSON.stringify({ jsonrpc: '2.0', method, params })}\n`);
+    stdout.write(`${JSON.stringify({ jsonrpc: "2.0", method, params })}\n`);
   }
 }
 

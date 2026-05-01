@@ -25,6 +25,7 @@ export async function loadConfig(cwd = process.cwd()) {
     const projectPartial = await readJson(projectPath);
     const envPartial = readEnvOverrides();
     const merged = merge(DEFAULT_CONFIG, userPartial, projectPartial, envPartial);
+    validate(merged);
     // Migrate any model IDs the upstream provider has dropped, so users
     // with stale `~/.dirgha/config.json` don't 400 on every call.
     merged.model = migrateDeprecatedModel(merged.model);
@@ -76,5 +77,19 @@ function merge(...partials) {
         }
     }
     return out;
+}
+function validate(cfg) {
+    if (cfg.maxTurns < 1) {
+        cfg.maxTurns = 1;
+    }
+    if (cfg.compaction.triggerTokens < 1000) {
+        cfg.compaction.triggerTokens = 1000;
+    }
+    if (cfg.compaction.preserveLastTurns < 1) {
+        cfg.compaction.preserveLastTurns = 1;
+    }
+    if (!cfg.model || cfg.model.trim() === "") {
+        process.stderr.write("[dirgha] warn: model is empty; LLM calls will fail\n");
+    }
 }
 //# sourceMappingURL=config.js.map

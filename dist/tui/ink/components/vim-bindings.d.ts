@@ -21,7 +21,7 @@
  * The reducer keeps a pending prefix so multi-key motions like `dd`,
  * `dw`, and `yy` work across two keystrokes.
  */
-export type VimMode = 'INSERT' | 'NORMAL';
+export type VimMode = "INSERT" | "NORMAL";
 export interface VimState {
     mode: VimMode;
     cursor: number;

@@ -57,6 +57,7 @@ export interface LspConnection {
     sendRequest<T>(method: string, params?: unknown): Promise<T>;
     sendNotification(method: string, params?: unknown): Promise<void>;
     onNotification(method: string, handler: (params: unknown) => void): void;
+    rejectAllPending(reason: string): void;
     dispose(): void;
 }
 export declare function createLspConnection(proc: ChildProcess): LspConnection;

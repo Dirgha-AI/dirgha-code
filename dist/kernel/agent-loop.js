@@ -26,6 +26,8 @@ export async function runAgentLoop(cfg) {
     };
     let stopReason = "end_turn";
     let turnCount = 0;
+    let retriesForTurn = 0;
+    const MAX_RETRIES = 3;
     events.emit({
         type: "agent_start",
         sessionId: cfg.sessionId,
@@ -108,6 +110,13 @@ export async function runAgentLoop(cfg) {
                     retryable: classified?.retryable ?? false,
                     ...(failover !== undefined ? { failoverModel: failover } : {}),
                 });
+                if (classified?.retryable && retriesForTurn < MAX_RETRIES) {
+                    retriesForTurn++;
+                    const backoff = classified.backoffMs ?? 1000;
+                    await new Promise((r) => setTimeout(r, backoff));
+                    turnIndex--;
+                    continue;
+                }
                 stopReason = "error";
                 events.emit({ type: "turn_end", turnId, stopReason });
                 break;
@@ -117,6 +126,7 @@ export async function runAgentLoop(cfg) {
             totals.outputTokens += assembled.outputTokens;
             totals.cachedTokens += assembled.cachedTokens;
             recordRequest(cfg.provider.id, true, 0);
+            retriesForTurn = 0;
             if (cfg.costCalculator) {
                 totals.costUsd += cfg.costCalculator(assembled.inputTokens, assembled.outputTokens, assembled.cachedTokens);
             }

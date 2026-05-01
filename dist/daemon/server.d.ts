@@ -4,10 +4,10 @@
  * The stream id returned by prompt.submit correlates notifications for
  * the client.
  */
-import type { ProviderRegistry } from '../providers/index.js';
-import type { ToolRegistry } from '../tools/registry.js';
-import type { SessionStore } from '../context/session.js';
-import type { DirghaConfig } from '../cli/config.js';
+import type { ProviderRegistry } from "../providers/index.js";
+import type { ToolRegistry } from "../tools/registry.js";
+import type { SessionStore } from "../context/session.js";
+import type { DirghaConfig } from "../cli/config.js";
 export interface DaemonServerOptions {
     registry: ToolRegistry;
     providers: ProviderRegistry;

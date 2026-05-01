@@ -68,6 +68,7 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
   events.subscribe(render);
 
   let currentModel = opts.config.model;
+  let isProcessing = false;
 
   // Audit writer: produces entries the `dirgha audit` reader can show.
   // Same shape as the one-shot path in cli/main.ts — kept inline so the
@@ -168,6 +169,7 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
   rl.prompt();
 
   rl.on("line", (line) => {
+    if (isProcessing) return;
     void handleLine(line);
   });
   rl.on("close", () => process.exit(0));
@@ -205,149 +207,156 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
   };
 
   const handleLine = async (raw: string): Promise<void> => {
-    const line = raw.trim();
-    if (line.length === 0) {
-      rl.prompt();
-      return;
-    }
-
-    if (line.startsWith("/")) {
-      const ctx = buildSlashCtx({
-        session,
-        opts,
-        modelRef: {
-          get model() {
-            return currentModel;
-          },
-          set model(v) {
-            currentModel = v;
-          },
-        },
-        totals,
-        clearHistory: () => {
-          history.length = 0;
-          history.push(...initial);
-        },
-        exit: () => rl.close(),
-        tokenRef: {
-          get token() {
-            return currentToken;
-          },
-          set token(v) {
-            currentToken = v;
-          },
-        },
-        status: emitStatus,
-        modeRef: {
-          get mode() {
-            return currentMode;
-          },
-          set mode(v) {
-            currentMode = v;
-          },
-        },
-        themeRef: {
-          get name() {
-            return currentThemeName;
-          },
-          set name(v) {
-            currentThemeName = v;
-            currentTheme = getTheme(v);
-            rl.setPrompt(style(currentTheme.userPrompt, "❯ "));
-          },
-        },
-        providerForCurrent: () => opts.providers.forModel(currentModel),
-        summaryModel: opts.config.summaryModel,
-      });
-      const result = await slash.dispatch(line, ctx);
-      if (result.output) process.stdout.write(`${result.output}\n`);
-      rl.prompt();
-      return;
-    }
-
-    // Rebuild system prompt per turn so /mode changes apply immediately.
-    const system = await buildSystem();
-    const turnHistory: Message[] = system
-      ? [{ role: "system", content: system }, ...history]
-      : [...history];
-    turnHistory.push({ role: "user", content: line });
-    history.push({ role: "user", content: line });
-    await session.append({
-      type: "message",
-      ts: new Date().toISOString(),
-      message: { role: "user", content: line },
-    });
-
-    const executor = createToolExecutor({
-      registry: opts.registry,
-      cwd: opts.cwd,
-      sessionId,
-    });
-    const sanitized = opts.registry.sanitize({ descriptionLimit: 200 });
-    const provider = opts.providers.forModel(currentModel);
-
-    const userHooks = buildAgentHooksFromConfig(opts.config);
-    const abortController = new AbortController();
-    const sigintHandler = (): void => {
-      abortController.abort();
-    };
-    process.once("SIGINT", sigintHandler);
+    isProcessing = true;
     try {
-      const result = await runAgentLoop({
-        sessionId,
-        model: currentModel,
-        messages: turnHistory,
-        tools: sanitized.definitions,
-        maxTurns: opts.config.maxTurns,
-        provider,
-        toolExecutor: executor,
-        approvalBus,
-        autoApprove: isAutoApprove(currentMode),
-        events,
-        signal: abortController.signal,
-        errorClassifier: createErrorClassifier(),
-        ...(userHooks !== undefined ? { hooks: userHooks } : {}),
-        // Per-model compaction trigger: 75 % of the model's actual
-        // context window beats a static 120k cap (which over-compacts
-        // big-window models and under-compacts 32k ones).
-        contextTransform: async (msgs) =>
-          (
-            await maybeCompact(
-              msgs,
-              {
-                triggerTokens: Math.floor(
-                  contextWindowFor(currentModel) * 0.75,
-                ),
-                preserveLastTurns: opts.config.compaction.preserveLastTurns,
-                summarizer: provider,
-                summaryModel: opts.config.summaryModel,
-              },
-              session,
-            )
-          ).messages,
-      });
-      // Persist only the non-system portion so /mode changes don't
-      // calcify a stale preamble into the history.
-      history.length = 0;
-      history.push(...result.messages.filter((m) => m.role !== "system"));
-      for (const msg of result.messages.slice(-4)) {
-        await session.append({
-          type: "message",
-          ts: new Date().toISOString(),
-          message: msg,
-        });
+      const line = raw.trim();
+      if (line.length === 0) {
+        rl.prompt();
+        return;
       }
-    } catch (err) {
-      process.stdout.write(
-        style(
-          currentTheme.danger,
-          `\n[fatal] ${err instanceof Error ? err.message : String(err)}\n`,
-        ),
-      );
+
+      if (line.startsWith("/")) {
+        const ctx = buildSlashCtx({
+          session,
+          opts,
+          modelRef: {
+            get model() {
+              return currentModel;
+            },
+            set model(v) {
+              currentModel = v;
+            },
+          },
+          totals,
+          clearHistory: () => {
+            history.length = 0;
+            history.push(...initial);
+          },
+          exit: () => rl.close(),
+          tokenRef: {
+            get token() {
+              return currentToken;
+            },
+            set token(v) {
+              currentToken = v;
+            },
+          },
+          status: emitStatus,
+          modeRef: {
+            get mode() {
+              return currentMode;
+            },
+            set mode(v) {
+              currentMode = v;
+            },
+          },
+          themeRef: {
+            get name() {
+              return currentThemeName;
+            },
+            set name(v) {
+              currentThemeName = v;
+              currentTheme = getTheme(v);
+              rl.setPrompt(style(currentTheme.userPrompt, "❯ "));
+            },
+          },
+          providerForCurrent: () => opts.providers.forModel(currentModel),
+          summaryModel: opts.config.summaryModel,
+        });
+        const result = await slash.dispatch(line, ctx);
+        if (result.output) process.stdout.write(`${result.output}\n`);
+        rl.prompt();
+        return;
+      }
+
+      // Rebuild system prompt per turn so /mode changes apply immediately.
+      const system = await buildSystem();
+      const turnHistory: Message[] = system
+        ? [{ role: "system", content: system }, ...history]
+        : [...history];
+      turnHistory.push({ role: "user", content: line });
+      history.push({ role: "user", content: line });
+      await session.append({
+        type: "message",
+        ts: new Date().toISOString(),
+        message: { role: "user", content: line },
+      });
+
+      const initialCount = history.length;
+
+      const executor = createToolExecutor({
+        registry: opts.registry,
+        cwd: opts.cwd,
+        sessionId,
+      });
+      const sanitized = opts.registry.sanitize({ descriptionLimit: 200 });
+      const provider = opts.providers.forModel(currentModel);
+
+      const userHooks = buildAgentHooksFromConfig(opts.config);
+      const abortController = new AbortController();
+      const sigintHandler = (): void => {
+        abortController.abort();
+      };
+      process.once("SIGINT", sigintHandler);
+      try {
+        const result = await runAgentLoop({
+          sessionId,
+          model: currentModel,
+          messages: turnHistory,
+          tools: sanitized.definitions,
+          maxTurns: opts.config.maxTurns,
+          provider,
+          toolExecutor: executor,
+          approvalBus,
+          autoApprove: isAutoApprove(currentMode),
+          events,
+          signal: abortController.signal,
+          errorClassifier: createErrorClassifier(),
+          ...(userHooks !== undefined ? { hooks: userHooks } : {}),
+          // Per-model compaction trigger: 75 % of the model's actual
+          // context window beats a static 120k cap (which over-compacts
+          // big-window models and under-compacts 32k ones).
+          contextTransform: async (msgs) =>
+            (
+              await maybeCompact(
+                msgs,
+                {
+                  triggerTokens: Math.floor(
+                    contextWindowFor(currentModel) * 0.75,
+                  ),
+                  preserveLastTurns: opts.config.compaction.preserveLastTurns,
+                  summarizer: provider,
+                  summaryModel: opts.config.summaryModel,
+                },
+                session,
+              )
+            ).messages,
+        });
+        // Persist only the non-system portion so /mode changes don't
+        // calcify a stale preamble into the history.
+        history.length = 0;
+        history.push(...result.messages.filter((m) => m.role !== "system"));
+        for (const msg of result.messages.slice(initialCount)) {
+          await session.append({
+            type: "message",
+            ts: new Date().toISOString(),
+            message: msg,
+          });
+        }
+      } catch (err) {
+        process.stdout.write(
+          style(
+            currentTheme.danger,
+            `\n[fatal] ${err instanceof Error ? err.message : String(err)}\n`,
+          ),
+        );
+      } finally {
+        process.removeListener("SIGINT", sigintHandler);
+      }
+      rl.prompt();
     } finally {
-      process.removeListener("SIGINT", sigintHandler);
+      isProcessing = false;
     }
-    rl.prompt();
   };
 }
 
