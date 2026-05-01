@@ -154,14 +154,12 @@ async function main(): Promise<void> {
   // Pass the RAW argv tail (includes flags like `--provider=...`) so
   // sub-flags survive the top-level parser, the same pattern as fleet.
   if (positionals[0] === "login") {
-    const rawArgs = argv.slice(2);
     const verbIdx = rawArgs.indexOf("login");
     const tail =
       verbIdx >= 0 ? rawArgs.slice(verbIdx + 1) : positionals.slice(1);
     exit(await runLogin(tail));
   }
   if (positionals[0] === "logout") {
-    const rawArgs = argv.slice(2);
     const verbIdx = rawArgs.indexOf("logout");
     const tail =
       verbIdx >= 0 ? rawArgs.slice(verbIdx + 1) : positionals.slice(1);
@@ -177,7 +175,6 @@ async function main(): Promise<void> {
     // parser doesn't know about.
     const { fleetCommand } = await import("../fleet/cli-command.js");
     const config = await loadConfig(cwd());
-    const rawArgs = argv.slice(2);
     const verbIdx = rawArgs.indexOf("fleet");
     const tail =
       verbIdx >= 0 ? rawArgs.slice(verbIdx + 1) : positionals.slice(1);
@@ -215,7 +212,6 @@ async function main(): Promise<void> {
     const verb = positionals[0];
     const cmd = verb ? findSubcommand(verb) : undefined;
     if (cmd) {
-      const rawArgs = argv.slice(2);
       const verbIdx = rawArgs.indexOf(verb);
       const tail =
         verbIdx >= 0 ? rawArgs.slice(verbIdx + 1) : positionals.slice(1);

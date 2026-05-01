@@ -53,7 +53,6 @@ function composeUserMessage(
   model: string,
 ): string | undefined {
   const label = PROVIDER_ENV[provider];
-  const name = label ?? provider;
   switch (reason) {
     case "auth":
       if (label) {
