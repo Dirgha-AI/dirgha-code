@@ -2,25 +2,25 @@
  * Configuration loader. Merges defaults, user config, project config,
  * environment, and CLI flags. Results are cached on first read.
  */
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import { homedir } from 'node:os';
-import { migrateDeprecatedModel } from '../intelligence/prices.js';
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { homedir } from "node:os";
+import { migrateDeprecatedModel } from "../intelligence/prices.js";
 export const DEFAULT_CONFIG = {
-    model: 'moonshotai/kimi-k2.5',
-    cheapModel: 'meta/llama-3.1-8b-instruct',
-    summaryModel: 'moonshotai/kimi-k2.5',
+    model: "moonshotai/kimi-k2.6",
+    cheapModel: "meta/llama-3.1-8b-instruct",
+    summaryModel: "moonshotai/kimi-k2.5",
     maxTurns: 16,
     showThinking: false,
-    autoApproveTools: ['fs_read', 'fs_ls', 'search_grep', 'search_glob', 'git'],
+    autoApproveTools: ["fs_read", "fs_ls", "search_grep", "search_glob", "git"],
     skills: { enabled: true },
     smartRoute: { enabled: false },
     compaction: { triggerTokens: 120_000, preserveLastTurns: 6 },
     telemetry: { enabled: false },
 };
 export async function loadConfig(cwd = process.cwd()) {
-    const userPath = join(homedir(), '.dirgha', 'config.json');
-    const projectPath = join(cwd, '.dirgha', 'config.json');
+    const userPath = join(homedir(), ".dirgha", "config.json");
+    const projectPath = join(cwd, ".dirgha", "config.json");
     const userPartial = await readJson(userPath);
     const projectPartial = await readJson(projectPath);
     const envPartial = readEnvOverrides();
@@ -33,7 +33,7 @@ export async function loadConfig(cwd = process.cwd()) {
     return merged;
 }
 async function readJson(path) {
-    const text = await readFile(path, 'utf8').catch(() => undefined);
+    const text = await readFile(path, "utf8").catch(() => undefined);
     if (!text)
         return {};
     try {
@@ -51,7 +51,7 @@ function readEnvOverrides() {
         out.cheapModel = process.env.DIRGHA_CHEAP_MODEL;
     if (process.env.DIRGHA_MAX_TURNS)
         out.maxTurns = Number.parseInt(process.env.DIRGHA_MAX_TURNS, 10);
-    if (process.env.DIRGHA_SHOW_THINKING === '1')
+    if (process.env.DIRGHA_SHOW_THINKING === "1")
         out.showThinking = true;
     return out;
 }
@@ -64,8 +64,11 @@ function merge(...partials) {
             const value = p[key];
             if (value === undefined)
                 continue;
-            if (typeof value === 'object' && !Array.isArray(value)) {
-                out[key] = { ...out[key], ...value };
+            if (typeof value === "object" && !Array.isArray(value)) {
+                out[key] = {
+                    ...out[key],
+                    ...value,
+                };
             }
             else {
                 out[key] = value;

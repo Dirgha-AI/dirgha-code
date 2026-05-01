@@ -31,6 +31,7 @@ import type { EventStream } from "./event-stream.js";
 import { assembleTurn, extractToolUses, appendToolResults } from "./message.js";
 import { resolveModelForDispatch } from "../providers/dispatch.js";
 import { findFailover } from "../intelligence/prices.js";
+import { recordRequest, recordRateLimit } from "../providers/health.js";
 
 export interface AgentLoopConfig {
   sessionId: string;
@@ -131,6 +132,9 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
           cfg.provider.id,
           cfg.model,
         );
+        recordRequest(cfg.provider.id, false, 0);
+        if (classified?.reason === "rate_limit")
+          recordRateLimit(cfg.provider.id);
         // Suggest a known-good fallback model so the TUI can prompt the
         // user to switch instead of just dead-ending the turn. Only
         // fires for errors that look fixable by swapping models —
@@ -158,6 +162,7 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
       totals.inputTokens += assembled.inputTokens;
       totals.outputTokens += assembled.outputTokens;
       totals.cachedTokens += assembled.cachedTokens;
+      recordRequest(cfg.provider.id, true, 0);
       if (cfg.costCalculator) {
         totals.costUsd += cfg.costCalculator(
           assembled.inputTokens,

@@ -8,7 +8,7 @@ export interface DirghaConfig {
     summaryModel: string;
     maxTurns: number;
     temperature?: number;
-    thinking?: 'off' | 'low' | 'medium' | 'high';
+    thinking?: "off" | "low" | "medium" | "high";
     showThinking: boolean;
     autoApproveTools: string[];
     skills: {
@@ -37,12 +37,12 @@ export interface DirghaConfig {
      * Accepts the full 20-theme catalogue from `src/tui/theme.ts` (15 native
      * + 5 ports from gemini-cli).
      */
-    theme?: 'readable' | 'dark' | 'light' | 'none' | 'midnight' | 'ocean' | 'solarized' | 'warm' | 'violet-storm' | 'cosmic' | 'nord' | 'ember' | 'sakura' | 'obsidian-gold' | 'crimson' | 'dracula' | 'github-dark' | 'tokyonight' | 'atom-one-dark' | 'ayu-dark';
+    theme?: "readable" | "dark" | "light" | "none" | "midnight" | "ocean" | "solarized" | "warm" | "violet-storm" | "cosmic" | "nord" | "ember" | "sakura" | "obsidian-gold" | "crimson" | "dracula" | "github-dark" | "tokyonight" | "atom-one-dark" | "ayu-dark";
     /**
      * Persisted execution mode. Defaults to 'act' (normal execution).
      * Changed live via /mode; also honoured by fresh sessions.
      */
-    mode?: 'plan' | 'act' | 'yolo' | 'verify' | 'ask';
+    mode?: "plan" | "act" | "yolo" | "verify" | "ask";
     /**
      * Optional MCP servers to spawn on startup. Each entry runs as a
      * subprocess; its tools are bridged into the local tool registry
