@@ -10,6 +10,6 @@
  *
  * Non-REPL variant of the `/login` slash command. Returns POSIX exit codes.
  */
-import type { Subcommand } from './index.js';
+import type { Subcommand } from "./index.js";
 export declare function runLogin(argv: string[]): Promise<number>;
 export declare const loginSubcommand: Subcommand;

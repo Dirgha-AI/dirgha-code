@@ -12,46 +12,49 @@
  *   - CLI subcommands (`dirgha login`, `dirgha logout`).
  *   - Billing preflight (`preRequestCheck` reads the bearer).
  */
-import { chmod, mkdir, readFile, rename, stat, unlink, writeFile, open } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
-const DEFAULT_API_BASE = 'https://api.dirgha.ai';
+import { chmod, mkdir, readFile, rename, stat, unlink, writeFile, open, } from "node:fs/promises";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
+const DEFAULT_API_BASE = "https://api.dirgha.ai";
 const POLL_INTERVAL_MS = 2_000;
 const POLL_TIMEOUT_MS = 15 * 60 * 1_000;
 const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1_000;
 function resolveApiBase(apiBase) {
     const raw = apiBase ?? process.env.DIRGHA_API_BASE ?? DEFAULT_API_BASE;
-    return raw.replace(/\/+$/, '');
+    return raw.replace(/\/+$/, "");
 }
 function credentialsPath() {
-    return join(homedir(), '.dirgha', 'credentials.json');
+    return join(homedir(), ".dirgha", "credentials.json");
 }
 function redact(err) {
     const message = err instanceof Error ? err.message : String(err);
-    return message.replace(/Bearer\s+[\w.-]+/gi, 'Bearer [REDACTED]');
+    return message.replace(/Bearer\s+[\w.-]+/gi, "Bearer [REDACTED]");
 }
 export async function startDeviceAuth(apiBase) {
     const base = resolveApiBase(apiBase);
     let response;
     try {
-        response = await fetch(`${base}/api/auth/device/start`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-            body: JSON.stringify({ client_id: 'dirgha-cli' }),
+        response = await fetch(`${base}/api/auth/device/request`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+            },
+            body: JSON.stringify({ client_id: "dirgha-cli" }),
         });
     }
     catch (err) {
-        throw new Error(`device/start request failed: ${redact(err)}`);
+        throw new Error(`device/request request failed: ${redact(err)}`);
     }
     if (!response.ok) {
-        throw new Error(`device/start failed: HTTP ${response.status}`);
+        throw new Error(`device/request failed: HTTP ${response.status}`);
     }
     const data = (await response.json());
     const deviceCode = data.device_code;
     const userCode = data.user_code;
     const verifyUri = data.verification_uri ?? data.verification_url;
     if (!deviceCode || !userCode || !verifyUri) {
-        throw new Error('device/start returned malformed payload');
+        throw new Error("device/request returned malformed payload");
     }
     return {
         deviceCode,
@@ -68,10 +71,12 @@ export async function pollDeviceAuth(deviceCode, apiBase, opts = {}) {
     while (Date.now() < deadline) {
         let response;
         try {
-            response = await fetch(`${base}/api/auth/device/poll`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-                body: JSON.stringify({ device_code: deviceCode }),
+            response = await fetch(`${base}/api/auth/device/poll?device_code=${encodeURIComponent(deviceCode)}`, {
+                method: "GET",
+                headers: {
+                    Accept: "application/json",
+                    "Content-Type": "application/json",
+                },
             });
         }
         catch (err) {
@@ -82,29 +87,31 @@ export async function pollDeviceAuth(deviceCode, apiBase, opts = {}) {
             continue;
         }
         if (response.status === 410)
-            throw new Error('device code expired');
+            throw new Error("device code expired");
         if (response.status === 403)
-            throw new Error('device code denied');
+            throw new Error("device code denied");
         if (response.ok) {
             const data = (await response.json());
-            if (data.status === 'authorized' && data.token) {
+            if (data.status === "authorized" && data.token) {
                 return {
                     token: data.token,
-                    userId: data.user?.id ?? 'unknown',
-                    email: data.user?.email ?? 'unknown',
+                    userId: data.user?.id ?? "unknown",
+                    email: data.user?.email ?? "unknown",
                 };
             }
-            if (data.status === 'denied')
-                throw new Error('device code denied');
-            if (data.status === 'expired')
-                throw new Error('device code expired');
+            if (data.status === "denied")
+                throw new Error("device code denied");
+            if (data.status === "expired")
+                throw new Error("device code expired");
         }
-        else if (response.status !== 202 && response.status !== 425 && response.status !== 428) {
+        else if (response.status !== 202 &&
+            response.status !== 425 &&
+            response.status !== 428) {
             throw new Error(`device/poll failed: HTTP ${response.status}`);
         }
         await sleep(intervalMs);
     }
-    throw new Error('device/poll timed out');
+    throw new Error("device/poll timed out");
 }
 export async function saveToken(token, userId, email) {
     const path = credentialsPath();
@@ -120,9 +127,9 @@ export async function saveToken(token, userId, email) {
     // then rename into place — avoids a world-readable window where any local
     // process could read the JWT between writeFile and chmod.
     try {
-        const fh = await open(tmp, 'w', 0o600);
+        const fh = await open(tmp, "w", 0o600);
         try {
-            await fh.writeFile(JSON.stringify(payload, null, 2), 'utf8');
+            await fh.writeFile(JSON.stringify(payload, null, 2), "utf8");
         }
         finally {
             await fh.close();
@@ -132,17 +139,19 @@ export async function saveToken(token, userId, email) {
     catch {
         // Fallback path for platforms where open+mode isn't supported (e.g. Windows):
         // write first, then chmod. The window is unavoidable there.
-        await writeFile(path, JSON.stringify(payload, null, 2), 'utf8');
+        await writeFile(path, JSON.stringify(payload, null, 2), "utf8");
         try {
             await chmod(path, 0o600);
         }
-        catch { /* non-POSIX */ }
+        catch {
+            /* non-POSIX */
+        }
         await unlink(tmp).catch(() => undefined);
     }
 }
 export async function loadToken() {
     const path = credentialsPath();
-    const text = await readFile(path, 'utf8').catch(() => undefined);
+    const text = await readFile(path, "utf8").catch(() => undefined);
     if (!text)
         return null;
     try {
@@ -169,7 +178,7 @@ export async function clearToken() {
  * Logs a single line to stderr on a successful move. Silent on no-op.
  */
 export async function migrateLegacyAuth() {
-    const legacyPath = join(homedir(), '.dirgha', 'auth.json');
+    const legacyPath = join(homedir(), ".dirgha", "auth.json");
     const targetPath = credentialsPath();
     const legacyInfo = await stat(legacyPath).catch(() => undefined);
     if (!legacyInfo || !legacyInfo.isFile() || legacyInfo.size === 0)
@@ -177,7 +186,7 @@ export async function migrateLegacyAuth() {
     const targetInfo = await stat(targetPath).catch(() => undefined);
     if (targetInfo && targetInfo.size > 0)
         return false;
-    const text = await readFile(legacyPath, 'utf8').catch(() => undefined);
+    const text = await readFile(legacyPath, "utf8").catch(() => undefined);
     if (!text)
         return false;
     let parsed;
@@ -192,20 +201,22 @@ export async function migrateLegacyAuth() {
     await mkdir(dirname(targetPath), { recursive: true });
     const payload = {
         token: parsed.jwt,
-        userId: parsed.userId ?? 'unknown',
-        email: 'unknown',
+        userId: parsed.userId ?? "unknown",
+        email: "unknown",
         expiresAt: parsed.expiresAt ?? new Date(Date.now() + TOKEN_TTL_MS).toISOString(),
     };
-    await writeFile(targetPath, JSON.stringify(payload, null, 2), 'utf8');
+    await writeFile(targetPath, JSON.stringify(payload, null, 2), "utf8");
     try {
         await chmod(targetPath, 0o600);
     }
-    catch { /* non-POSIX */ }
+    catch {
+        /* non-POSIX */
+    }
     await rename(legacyPath, `${legacyPath}.migrated`).catch(() => undefined);
-    process.stderr.write('[auth] migrated legacy credentials\n');
+    process.stderr.write("[auth] migrated legacy credentials\n");
     return true;
 }
 function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
 }
 //# sourceMappingURL=device-auth.js.map

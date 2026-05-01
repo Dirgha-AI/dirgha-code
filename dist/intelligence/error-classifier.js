@@ -29,7 +29,6 @@ const PROVIDER_ENV = {
 };
 function composeUserMessage(reason, err, provider, model) {
     const label = PROVIDER_ENV[provider];
-    const name = label ?? provider;
     switch (reason) {
         case "auth":
             if (label) {

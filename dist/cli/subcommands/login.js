@@ -10,20 +10,20 @@
  *
  * Non-REPL variant of the `/login` slash command. Returns POSIX exit codes.
  */
-import { stdin, stdout } from 'node:process';
-import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
-import { createInterface } from 'node:readline/promises';
-import { pollDeviceAuth, saveToken, startDeviceAuth, } from '../../integrations/device-auth.js';
-import { defaultTheme, style } from '../../tui/theme.js';
+import { stdin, stdout } from "node:process";
+import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { createInterface } from "node:readline/promises";
+import { pollDeviceAuth, saveToken, startDeviceAuth, } from "../../integrations/device-auth.js";
+import { defaultTheme, style } from "../../tui/theme.js";
 const PROVIDER_ENV = {
-    nvidia: 'NVIDIA_API_KEY',
-    openrouter: 'OPENROUTER_API_KEY',
-    anthropic: 'ANTHROPIC_API_KEY',
-    openai: 'OPENAI_API_KEY',
-    gemini: 'GEMINI_API_KEY',
-    fireworks: 'FIREWORKS_API_KEY',
+    nvidia: "NVIDIA_API_KEY",
+    openrouter: "OPENROUTER_API_KEY",
+    anthropic: "ANTHROPIC_API_KEY",
+    openai: "OPENAI_API_KEY",
+    gemini: "GEMINI_API_KEY",
+    fireworks: "FIREWORKS_API_KEY",
 };
 function print(line) {
     stdout.write(`${line}\n`);
@@ -40,10 +40,10 @@ function parseFlag(argv, name) {
     return undefined;
 }
 function keyStorePath() {
-    return join(homedir(), '.dirgha', 'keys.json');
+    return join(homedir(), ".dirgha", "keys.json");
 }
 async function readKeys() {
-    const text = await readFile(keyStorePath(), 'utf8').catch(() => '');
+    const text = await readFile(keyStorePath(), "utf8").catch(() => "");
     if (!text)
         return {};
     try {
@@ -54,19 +54,22 @@ async function readKeys() {
     }
 }
 async function writeKeys(store) {
-    await mkdir(join(homedir(), '.dirgha'), { recursive: true });
-    await writeFile(keyStorePath(), JSON.stringify(store, null, 2) + '\n', 'utf8');
+    await mkdir(join(homedir(), ".dirgha"), { recursive: true });
+    await writeFile(keyStorePath(), JSON.stringify(store, null, 2) + "\n", "utf8");
     try {
         await chmod(keyStorePath(), 0o600);
     }
-    catch { /* non-POSIX */ }
+    catch {
+        /* non-POSIX */
+    }
 }
 async function promptHidden(prompt) {
     const rl = createInterface({ input: stdin, output: stdout, terminal: true });
     const wasRaw = stdin.isTTY ? stdin.isRaw : false;
     // Simple hidden read: replace the readline echo with nothing.
     // Works for typed input; pasted input is fine too.
-    const orig = rl._writeToOutput;
+    const orig = rl
+        ._writeToOutput;
     rl._writeToOutput = (s) => {
         if (s.startsWith(prompt))
             stdout.write(prompt);
@@ -77,7 +80,8 @@ async function promptHidden(prompt) {
         return value.trim();
     }
     finally {
-        rl._writeToOutput = orig;
+        rl._writeToOutput =
+            orig;
         rl.close();
         if (wasRaw && stdin.setRawMode)
             stdin.setRawMode(true);
@@ -86,44 +90,46 @@ async function promptHidden(prompt) {
 async function runProviderLogin(provider, argv) {
     const env = PROVIDER_ENV[provider.toLowerCase()];
     if (!env) {
-        print(style(defaultTheme.danger, `\n✗ Unknown provider "${provider}". Known: ${Object.keys(PROVIDER_ENV).join(', ')}`));
+        print(style(defaultTheme.danger, `\n✗ Unknown provider "${provider}". Known: ${Object.keys(PROVIDER_ENV).join(", ")}`));
         return 1;
     }
-    let key = parseFlag(argv, 'key');
+    let key = parseFlag(argv, "key");
     if (!key) {
         print(style(defaultTheme.accent, `\nBYOK login for ${provider}`));
         print(style(defaultTheme.muted, `  paste your ${env} value (input hidden):`));
-        key = await promptHidden('> ');
+        key = await promptHidden("> ");
     }
     if (!key || key.length < 6) {
-        print(style(defaultTheme.danger, '\n✗ Empty or implausibly short key — aborted.'));
+        print(style(defaultTheme.danger, "\n✗ Empty or implausibly short key — aborted."));
         return 1;
     }
     const store = await readKeys();
     store[env] = key;
     await writeKeys(store);
     print(style(defaultTheme.success, `\n✓ Stored ${env} (${key.length} chars) at ~/.dirgha/keys.json (mode 0600).`));
-    print(style(defaultTheme.muted, '  Run `dirgha keys list` to verify, or `dirgha logout --provider=' + provider + '` to remove.'));
+    print(style(defaultTheme.muted, "  Run `dirgha keys list` to verify, or `dirgha logout --provider=" +
+        provider +
+        "` to remove."));
     return 0;
 }
 export async function runLogin(argv) {
-    const provider = parseFlag(argv, 'provider');
+    const provider = parseFlag(argv, "provider");
     if (provider)
         return runProviderLogin(provider, argv);
-    const apiBase = parseFlag(argv, 'api-base') ?? process.env.DIRGHA_API_BASE;
-    print(style(defaultTheme.accent, '\ndirgha — device-code sign-in'));
+    const apiBase = parseFlag(argv, "api-base") ?? process.env.DIRGHA_API_BASE;
+    print(style(defaultTheme.accent, "\ndirgha — device-code sign-in"));
     let start;
     try {
         start = await startDeviceAuth(apiBase);
     }
     catch (err) {
-        print(style(defaultTheme.danger, `\n✗ device/start failed: ${err instanceof Error ? err.message : String(err)}`));
+        print(style(defaultTheme.danger, `\n✗ device/request failed: ${err instanceof Error ? err.message : String(err)}`));
         return 2;
     }
-    print('');
+    print("");
     print(`  1. Open: ${start.verifyUri}`);
     print(`  2. Enter code: ${style(defaultTheme.accent, start.userCode)}`);
-    print('');
+    print("");
     print(`Waiting for authorization (expires in ~${Math.round(start.expiresIn / 60_000)} min)...`);
     try {
         const result = await pollDeviceAuth(start.deviceCode, apiBase, {
@@ -140,8 +146,10 @@ export async function runLogin(argv) {
     }
 }
 export const loginSubcommand = {
-    name: 'login',
-    description: 'Sign in via device-code flow',
-    async run(argv) { return runLogin(argv); },
+    name: "login",
+    description: "Sign in via device-code flow",
+    async run(argv) {
+        return runLogin(argv);
+    },
 };
 //# sourceMappingURL=login.js.map
