@@ -766,7 +766,7 @@ function TranscriptRow({ item, }) {
             // renders something rather than nothing.
             return (_jsx(ToolBox, { name: item.name, status: item.status, argSummary: item.argSummary, outputPreview: item.outputPreview, outputKind: item.outputKind, startedAt: item.startedAt, durationMs: item.durationMs }));
         case "error":
-            return (_jsxs(Box, { gap: 1, marginBottom: 1, children: [_jsx(Text, { color: "red", bold: true, children: "\u2717" }), _jsx(Text, { color: "red", children: item.message })] }));
+            return (_jsx(Box, { flexDirection: "column", marginBottom: 1, children: _jsxs(Box, { gap: 1, children: [_jsx(Text, { color: "red", bold: true, children: "\u2717" }), _jsx(Text, { color: "red", children: item.userMessage ?? item.message })] }) }));
         case "notice":
             return (_jsx(Box, { marginBottom: 1, children: _jsx(Text, { color: "yellow", children: item.text }) }));
     }

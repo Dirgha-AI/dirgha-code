@@ -107,6 +107,9 @@ export async function runAgentLoop(cfg) {
                     message: errMsg,
                     reason: classified?.reason,
                     retryable: classified?.retryable ?? false,
+                    ...(classified?.userMessage !== undefined
+                        ? { userMessage: classified.userMessage }
+                        : {}),
                     ...(failover !== undefined ? { failoverModel: failover } : {}),
                 });
                 if (classified?.retryable && retriesForTurn < MAX_RETRIES) {

@@ -174,6 +174,9 @@ export function useEventProjection(events) {
                             ...(event.failoverModel !== undefined
                                 ? { failoverModel: event.failoverModel }
                                 : {}),
+                            ...(event.userMessage !== undefined
+                                ? { userMessage: event.userMessage }
+                                : {}),
                         },
                     ]);
                     return;

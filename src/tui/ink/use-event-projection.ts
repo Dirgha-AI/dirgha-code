@@ -31,7 +31,13 @@ export type TranscriptItem =
       startedAt: number;
       durationMs?: number;
     }
-  | { kind: "error"; id: string; message: string; failoverModel?: string }
+  | {
+      kind: "error";
+      id: string;
+      message: string;
+      failoverModel?: string;
+      userMessage?: string;
+    }
   | { kind: "notice"; id: string; text: string };
 
 export interface EventProjection {
@@ -237,6 +243,9 @@ export function useEventProjection(events: EventStream): EventProjection {
               message: event.message,
               ...(event.failoverModel !== undefined
                 ? { failoverModel: event.failoverModel }
+                : {}),
+              ...(event.userMessage !== undefined
+                ? { userMessage: event.userMessage }
                 : {}),
             },
           ]);

@@ -170,6 +170,9 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
           message: errMsg,
           reason: classified?.reason,
           retryable: classified?.retryable ?? false,
+          ...(classified?.userMessage !== undefined
+            ? { userMessage: classified.userMessage }
+            : {}),
           ...(failover !== undefined ? { failoverModel: failover } : {}),
         });
 

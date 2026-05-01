@@ -110,6 +110,7 @@ export type AgentEvent = {
     reason?: string;
     retryable?: boolean;
     failoverModel?: string;
+    userMessage?: string;
 };
 export interface ToolCall {
     id: string;
@@ -177,6 +178,7 @@ export interface ClassifiedError {
     backoffMs?: number;
     shouldFallback: boolean;
     reason: string;
+    userMessage?: string;
 }
 export interface AgentHooks {
     beforeTurn?: (turnIndex: number, messages: Message[]) => Promise<"continue" | "abort">;

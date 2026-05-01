@@ -995,11 +995,15 @@ function TranscriptRow({
       );
     case "error":
       return (
-        <Box gap={1} marginBottom={1}>
-          <Text color="red" bold>
-            ✗
-          </Text>
-          <Text color="red">{item.message}</Text>
+        <Box flexDirection="column" marginBottom={1}>
+          <Box gap={1}>
+            <Text color="red" bold>
+              ✗
+            </Text>
+            <Text color="red">
+              {(item as { userMessage?: string }).userMessage ?? item.message}
+            </Text>
+          </Box>
         </Box>
       );
     case "notice":

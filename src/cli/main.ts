@@ -62,6 +62,7 @@ import { loadSkills } from "../skills/loader.js";
 import { matchSkills } from "../skills/matcher.js";
 import { injectSkills } from "../skills/runtime.js";
 import { createRequire } from "node:module";
+import { checkFirstRun, showWelcomeWizard } from "./first-run.js";
 
 // `--version` / `-V` prints the package version and exits, matching every
 // other CLI on the planet. Without this, the flag-parser strips `--version`
@@ -77,6 +78,26 @@ const PKG_VERSION: string = (() => {
 })();
 
 async function main(): Promise<void> {
+  // First-run wizard: when the user runs `dirgha` with no arguments and
+  // no provider API keys are configured at all, show the welcome wizard
+  // and exit. Subcommands like `setup`, `keys set`, `login` still work
+  // so users can configure things without the wizard blocking them.
+  const rawArgs = argv.slice(2);
+  const isBareInvocation =
+    rawArgs.length === 0 ||
+    rawArgs.every(
+      (a) =>
+        a.startsWith("-") &&
+        a !== "--help" &&
+        a !== "-h" &&
+        a !== "--version" &&
+        a !== "-V",
+    );
+  if (isBareInvocation && checkFirstRun()) {
+    await showWelcomeWizard();
+    exit(0);
+  }
+
   const { flags, positionals } = parseFlags(argv.slice(2));
   // Top-level help/version only fire when there's no verb. With a verb
   // present (e.g. `dirgha fleet --help`), let the subcommand handle its
