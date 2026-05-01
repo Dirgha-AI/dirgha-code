@@ -37,5 +37,16 @@ export interface AgentLoopConfig {
      */
     autoApprove?: boolean;
     costCalculator?: (input: number, output: number, cached: number) => number;
+    /** Optional loop detector — checked before each turn; abort if looping. */
+    loopDetector?: {
+        track(turn: {
+            toolCalls?: Array<{
+                name: string;
+                args?: unknown;
+            }>;
+        }): void;
+        isLoopDetected(): boolean;
+        reason(): string | null;
+    };
 }
 export declare function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult>;

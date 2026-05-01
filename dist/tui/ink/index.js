@@ -5,23 +5,23 @@
  * resolves when the user exits. Shape mirrors `runInteractive()` in
  * ../../cli/interactive.ts so the CLI can swap renderers by flag.
  */
-import * as React from 'react';
-import { render } from 'ink';
-import { createEventStream } from '../../kernel/event-stream.js';
-import { App } from './App.js';
-import { createDefaultSlashRegistry, registerBuiltinSlashCommands } from '../../cli/slash.js';
-export { App } from './App.js';
-export { Logo } from './components/Logo.js';
-export { StatusBar } from './components/StatusBar.js';
-export { StreamingText } from './components/StreamingText.js';
-export { ToolBox } from './components/ToolBox.js';
-export { ThinkingBlock } from './components/ThinkingBlock.js';
-export { InputBox } from './components/InputBox.js';
-export { ModelPicker } from './components/ModelPicker.js';
-export { HelpOverlay } from './components/HelpOverlay.js';
-export { AtFileComplete } from './components/AtFileComplete.js';
-export { PasteCollapseView, detectPaste } from './components/PasteCollapse.js';
-export { applyVimKey, createVimState } from './components/vim-bindings.js';
+import * as React from "react";
+import { render } from "ink";
+import { createEventStream } from "../../kernel/event-stream.js";
+import { App } from "./App.js";
+import { createDefaultSlashRegistry, registerBuiltinSlashCommands, } from "../../cli/slash.js";
+export { App } from "./App.js";
+export { Logo } from "./components/Logo.js";
+export { StatusBar } from "./components/StatusBar.js";
+export { StreamingText } from "./components/StreamingText.js";
+export { ToolBox } from "./components/ToolBox.js";
+export { ThinkingBlock } from "./components/ThinkingBlock.js";
+export { InputBox } from "./components/InputBox.js";
+export { ModelPicker } from "./components/ModelPicker.js";
+export { HelpOverlay, } from "./components/HelpOverlay.js";
+export { AtFileComplete } from "./components/AtFileComplete.js";
+export { PasteCollapseView, detectPaste } from "./components/PasteCollapse.js";
+export { applyVimKey, createVimState, } from "./components/vim-bindings.js";
 export async function runInkTUI(opts) {
     const events = createEventStream();
     const slashRegistry = createDefaultSlashRegistry();
@@ -34,9 +34,16 @@ export async function runInkTUI(opts) {
         config: opts.config,
         cwd: opts.cwd,
         slashRegistry,
-        ...(opts.systemPrompt !== undefined ? { systemPrompt: opts.systemPrompt } : {}),
-        ...(opts.slashCommands !== undefined ? { slashCommands: opts.slashCommands } : {}),
+        ...(opts.systemPrompt !== undefined
+            ? { systemPrompt: opts.systemPrompt }
+            : {}),
+        ...(opts.slashCommands !== undefined
+            ? { slashCommands: opts.slashCommands }
+            : {}),
         ...(opts.models !== undefined ? { models: opts.models } : {}),
+        ...(opts.ledgerContext !== undefined
+            ? { ledgerContext: opts.ledgerContext }
+            : {}),
     });
     const instance = render(element, {
         exitOnCtrlC: false,

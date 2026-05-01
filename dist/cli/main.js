@@ -34,6 +34,7 @@ import { contextWindowFor, findPrice, findFailover, resolveModelAlias, } from ".
 import { routeModel } from "../providers/dispatch.js";
 import { loadProjectPrimer, composeSystemPrompt } from "../context/primer.js";
 import { loadSoul } from "../context/soul.js";
+import { ledgerScope, renderLedgerContext } from "../context/ledger.js";
 import { modePreamble, resolveMode, isAutoApprove, } from "../context/mode.js";
 import { enforceMode, composeHooks } from "../context/mode-enforcement.js";
 import { loadSkills } from "../skills/loader.js";
@@ -301,6 +302,7 @@ async function main() {
             // sees a blank screen and assumes the app froze. The line is
             // overdrawn instantly when ink mounts.
             stdout.write("\n  Launching dirgha…\n");
+            const inkLedgerCtx = await renderLedgerContext(ledgerScope("default"));
             await runInkTUI({
                 registry,
                 providers,
@@ -309,6 +311,7 @@ async function main() {
                 cwd: cwd(),
                 systemPrompt: system,
                 slashCommands,
+                ledgerContext: inkLedgerCtx || undefined,
             });
         }
         else {
@@ -435,10 +438,12 @@ async function main() {
     // can fixate on the workspace state and answer about it instead of
     // the user's prompt. Interactive sessions still inject it because
     // the conversation context anchors the model on the actual goal.
+    const ledgerCtx = await renderLedgerContext(ledgerScope("default"));
     const composedSystem = composeSystemPrompt({
         soul: soul.text,
         modePreamble: modePreamble(mode),
         primer: primer.primer,
+        ledgerContext: ledgerCtx,
         userSystem: system,
     });
     const messages = [];

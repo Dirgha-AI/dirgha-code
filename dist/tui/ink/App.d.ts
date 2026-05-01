@@ -38,5 +38,7 @@ export interface AppProps {
     models?: ModelEntry[];
     /** Slash registry — built by runInkTUI, dispatched on submit. */
     slashRegistry: SlashRegistry;
+    /** Cross-session memory/ledger context injected into system prompt. */
+    ledgerContext?: string;
 }
 export declare function App(props: AppProps): React.JSX.Element;

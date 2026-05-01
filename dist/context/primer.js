@@ -14,9 +14,9 @@
  *   ├─ project primer (DIRGHA.md, capped)
  *   └─ caller-supplied --system text (rare)
  */
-import { readFileSync, statSync } from 'node:fs';
-import { join, parse, resolve } from 'node:path';
-const PRIMER_FILES = ['DIRGHA.md', 'CLAUDE.md'];
+import { readFileSync, statSync } from "node:fs";
+import { join, parse, resolve } from "node:path";
+const PRIMER_FILES = ["DIRGHA.md", "CLAUDE.md"];
 const PRIMER_CAP_BYTES = 8_000;
 const MAX_PARENT_WALK = 6;
 /**
@@ -32,23 +32,27 @@ export function loadProjectPrimer(startDir) {
             try {
                 const info = statSync(path);
                 if (info.isFile()) {
-                    let content = readFileSync(path, 'utf8');
+                    let content = readFileSync(path, "utf8");
                     let truncated = false;
                     if (content.length > PRIMER_CAP_BYTES) {
-                        content = content.slice(0, PRIMER_CAP_BYTES) + '\n\n[...primer truncated to 8 KB...]';
+                        content =
+                            content.slice(0, PRIMER_CAP_BYTES) +
+                                "\n\n[...primer truncated to 8 KB...]";
                         truncated = true;
                     }
                     return { primer: content, source: path, truncated };
                 }
             }
-            catch { /* not present, keep walking */ }
+            catch {
+                /* not present, keep walking */
+            }
         }
         const next = parse(dir).dir;
         if (!next || next === dir)
             break;
         dir = next;
     }
-    return { primer: '', source: null, truncated: false };
+    return { primer: "", source: null, truncated: false };
 }
 /**
  * Compose the full boot system prompt. Order:
@@ -56,8 +60,9 @@ export function loadProjectPrimer(startDir) {
  *   1. soul          — who dirgha is and how it should behave
  *   2. modePreamble  — act/plan/verify/ask gates
  *   3. project primer — DIRGHA.md / CLAUDE.md
- *   4. gitState      — workspace snapshot (interactive only)
- *   5. userSystem    — caller-supplied --system flag (escape hatch)
+ *   4. ledgerContext — cross-session memory (digest + recent entries)
+ *   5. gitState      — workspace snapshot (interactive only)
+ *   6. userSystem    — caller-supplied --system flag (escape hatch)
  *
  * Empty sections drop out — no leading/trailing blank lines.
  */
@@ -70,12 +75,15 @@ export function composeSystemPrompt(parts) {
     if (parts.primer && parts.primer.trim()) {
         sections.push(`<project_primer>\n${parts.primer.trim()}\n</project_primer>`);
     }
+    if (parts.ledgerContext && parts.ledgerContext.trim()) {
+        sections.push(parts.ledgerContext.trim());
+    }
     if (parts.gitState && parts.gitState.trim()) {
         sections.push(parts.gitState.trim());
     }
     if (parts.userSystem && parts.userSystem.trim()) {
         sections.push(parts.userSystem.trim());
     }
-    return sections.filter(s => s.length > 0).join('\n\n');
+    return sections.filter((s) => s.length > 0).join("\n\n");
 }
 //# sourceMappingURL=primer.js.map

@@ -44,6 +44,17 @@ export async function runAgentLoop(cfg) {
                     break;
                 }
             }
+            if (cfg.loopDetector?.isLoopDetected()) {
+                const loopReason = cfg.loopDetector.reason() ?? "loop detected";
+                events.emit({
+                    type: "error",
+                    message: `Sub-agent aborted: ${loopReason}`,
+                    reason: "loop",
+                    retryable: false,
+                });
+                stopReason = "loop";
+                break;
+            }
             turnCount = turnIndex + 1;
             const turnId = `t${turnIndex}-${Date.now().toString(36)}`;
             events.emit({ type: "turn_start", turnId, turnIndex });
@@ -111,6 +122,9 @@ export async function runAgentLoop(cfg) {
             }
             history.push(assembled.message);
             const toolUses = extractToolUses(assembled.message);
+            cfg.loopDetector?.track({
+                toolCalls: toolUses.map((t) => ({ name: t.name, args: t.input })),
+            });
             if (toolUses.length === 0) {
                 events.emit({ type: "turn_end", turnId, stopReason: "end_turn" });
                 await cfg.hooks?.afterTurn?.(turnIndex, totals);

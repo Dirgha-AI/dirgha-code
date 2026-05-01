@@ -7,18 +7,19 @@
  * transcript is preserved in the child session for audit.
  */
 
-import { randomUUID } from 'node:crypto';
+import { randomUUID } from "node:crypto";
 import type {
   Provider,
   ToolDefinition,
   UsageTotal,
   Message,
-} from '../kernel/types.js';
-import { createEventStream } from '../kernel/event-stream.js';
-import { runAgentLoop } from '../kernel/agent-loop.js';
-import { extractText } from '../kernel/message.js';
-import type { Tool, ToolRegistry } from '../tools/registry.js';
-import { createToolExecutor } from '../tools/exec.js';
+} from "../kernel/types.js";
+import { createEventStream } from "../kernel/event-stream.js";
+import { runAgentLoop } from "../kernel/agent-loop.js";
+import { extractText } from "../kernel/message.js";
+import type { Tool, ToolRegistry } from "../tools/registry.js";
+import { createToolExecutor } from "../tools/exec.js";
+import { LoopDetector } from "../subagents/loop-detector.js";
 
 export interface SubagentRequest {
   prompt: string;
@@ -50,9 +51,11 @@ export class SubagentDelegator {
   async delegate(req: SubagentRequest): Promise<SubagentResult> {
     const sessionId = `${this.opts.parentSessionId}-sub-${randomUUID().slice(0, 8)}`;
     const events = createEventStream();
-    const allowlist = req.toolAllowlist ? new Set(req.toolAllowlist) : undefined;
+    const allowlist = req.toolAllowlist
+      ? new Set(req.toolAllowlist)
+      : undefined;
     const filteredTools: Tool[] = allowlist
-      ? this.opts.registry.list().filter(t => allowlist.has(t.name))
+      ? this.opts.registry.list().filter((t) => allowlist.has(t.name))
       : this.opts.registry.list();
 
     const scoped = new Map<string, Tool>();
@@ -67,8 +70,10 @@ export class SubagentDelegator {
     });
 
     const messages: Message[] = [];
-    if (req.system) messages.push({ role: 'system', content: req.system });
-    messages.push({ role: 'user', content: req.prompt });
+    if (req.system) messages.push({ role: "system", content: req.system });
+    messages.push({ role: "user", content: req.prompt });
+
+    const loopDetector = new LoopDetector();
 
     const result = await runAgentLoop({
       sessionId,
@@ -79,11 +84,14 @@ export class SubagentDelegator {
       provider: this.opts.provider,
       toolExecutor: executor,
       events,
+      loopDetector,
     });
 
-    const lastAssistant = [...result.messages].reverse().find(m => m.role === 'assistant');
+    const lastAssistant = [...result.messages]
+      .reverse()
+      .find((m) => m.role === "assistant");
     return {
-      output: lastAssistant ? extractText(lastAssistant) : '',
+      output: lastAssistant ? extractText(lastAssistant) : "",
       usage: result.usage,
       transcript: result.messages,
       stopReason: result.stopReason,
@@ -94,8 +102,12 @@ export class SubagentDelegator {
 
 function createScopedRegistry(tools: Map<string, Tool>): ToolRegistry {
   return {
-    register() { throw new Error('scoped registry is read-only'); },
-    unregister() { return false; },
+    register() {
+      throw new Error("scoped registry is read-only");
+    },
+    unregister() {
+      return false;
+    },
     has: (name: string) => tools.has(name),
     get: (name: string) => tools.get(name),
     list: () => [...tools.values()],
@@ -104,10 +116,15 @@ function createScopedRegistry(tools: Map<string, Tool>): ToolRegistry {
       const definitions: ToolDefinition[] = [];
       const nameSet = new Set<string>();
       for (const tool of tools.values()) {
-        const description = tool.description.length > limit
-          ? `${tool.description.slice(0, limit - 3)}...`
-          : tool.description;
-        definitions.push({ name: tool.name, description, inputSchema: tool.inputSchema });
+        const description =
+          tool.description.length > limit
+            ? `${tool.description.slice(0, limit - 3)}...`
+            : tool.description;
+        definitions.push({
+          name: tool.name,
+          description,
+          inputSchema: tool.inputSchema,
+        });
         nameSet.add(tool.name);
       }
       return { definitions, nameSet };

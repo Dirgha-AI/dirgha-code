@@ -241,9 +241,10 @@ export async function createLspClient(serverId, command, args, root, cwd) {
             if (!result)
                 return [];
             const arr = Array.isArray(result) ? result : [result];
-            return arr
-                .filter(Boolean)
-                .map((loc) => ({ ...loc, uri: uriToPath(loc.uri) }));
+            return arr.filter(Boolean).map((loc) => ({
+                uri: uriToPath(loc.targetUri ?? loc.uri),
+                range: (loc.targetRange ?? loc.range),
+            }));
         },
         async findReferences(pos, filePath) {
             await openFile(filePath);
@@ -256,9 +257,10 @@ export async function createLspClient(serverId, command, args, root, cwd) {
                 .catch(() => []);
             if (!result)
                 return [];
-            return result
-                .filter(Boolean)
-                .map((loc) => ({ ...loc, uri: uriToPath(loc.uri) }));
+            return result.filter(Boolean).map((loc) => ({
+                uri: uriToPath(loc.targetUri ?? loc.uri),
+                range: (loc.targetRange ?? loc.range),
+            }));
         },
         async hover(pos, filePath) {
             await openFile(filePath);

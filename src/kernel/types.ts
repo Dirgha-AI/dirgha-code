@@ -51,7 +51,8 @@ export type StopReason =
   | "max_tokens"
   | "stop_sequence"
   | "error"
-  | "aborted";
+  | "aborted"
+  | "loop";
 
 export interface UsageTotal {
   inputTokens: number;

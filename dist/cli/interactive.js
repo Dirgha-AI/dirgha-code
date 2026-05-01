@@ -21,6 +21,7 @@ import { createDefaultSlashRegistry, registerBuiltinSlashCommands, } from "./sla
 import { loadToken, migrateLegacyAuth, } from "../integrations/device-auth.js";
 import { resolveMode } from "../context/mode.js";
 import { loadProjectPrimer, composeSystemPrompt } from "../context/primer.js";
+import { ledgerScope, renderLedgerContext } from "../context/ledger.js";
 import { probeGitState, renderGitState } from "../context/git-state.js";
 import { loadSoul } from "../context/soul.js";
 import { modePreamble } from "../context/mode.js";
@@ -145,11 +146,13 @@ export async function runInteractive(opts) {
     }
     const soulLoaded = loadSoul();
     /** Build the per-turn system prompt: soul + mode + primer + git_state + --system. */
-    const buildSystem = () => {
+    const buildSystem = async () => {
+        const ledgerCtx = await renderLedgerContext(ledgerScope("default"));
         return composeSystemPrompt({
             soul: soulLoaded.text,
             modePreamble: modePreamble(currentMode),
             primer: primerLoaded.primer,
+            ledgerContext: ledgerCtx,
             gitState: renderGitState(probeGitState(opts.cwd)),
             userSystem: opts.systemPrompt,
         });
@@ -215,7 +218,7 @@ export async function runInteractive(opts) {
             return;
         }
         // Rebuild system prompt per turn so /mode changes apply immediately.
-        const system = buildSystem();
+        const system = await buildSystem();
         const turnHistory = system
             ? [{ role: "system", content: system }, ...history]
             : [...history];

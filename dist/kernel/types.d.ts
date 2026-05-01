@@ -33,7 +33,7 @@ export interface Message {
     content: string | ContentPart[];
     name?: string;
 }
-export type StopReason = "end_turn" | "tool_use" | "max_tokens" | "stop_sequence" | "error" | "aborted";
+export type StopReason = "end_turn" | "tool_use" | "max_tokens" | "stop_sequence" | "error" | "aborted" | "loop";
 export interface UsageTotal {
     inputTokens: number;
     outputTokens: number;

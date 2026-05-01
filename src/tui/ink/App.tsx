@@ -29,6 +29,7 @@ import {
 } from "../../context/primer.js";
 import { probeGitState, renderGitState } from "../../context/git-state.js";
 import { loadSoul } from "../../context/soul.js";
+import { ledgerScope, renderLedgerContext } from "../../context/ledger.js";
 import { isAutoApprove, modePreamble } from "../../context/mode.js";
 import { runAgentLoop } from "../../kernel/agent-loop.js";
 import { createErrorClassifier } from "../../intelligence/error-classifier.js";
@@ -112,6 +113,8 @@ export interface AppProps {
   models?: ModelEntry[];
   /** Slash registry — built by runInkTUI, dispatched on submit. */
   slashRegistry: SlashRegistry;
+  /** Cross-session memory/ledger context injected into system prompt. */
+  ledgerContext?: string;
 }
 
 export function App(props: AppProps): React.JSX.Element {
@@ -1011,6 +1014,7 @@ function initialHistory(props: AppProps): Message[] {
     soul: soul.text,
     modePreamble: modePreamble(props.config.mode ?? "act"),
     primer: primer.primer,
+    ledgerContext: props.ledgerContext,
     gitState: renderGitState(probeGitState(props.cwd)),
     userSystem: props.systemPrompt,
   });

@@ -31,8 +31,9 @@ export declare function loadProjectPrimer(startDir: string): PrimerResult;
  *   1. soul          — who dirgha is and how it should behave
  *   2. modePreamble  — act/plan/verify/ask gates
  *   3. project primer — DIRGHA.md / CLAUDE.md
- *   4. gitState      — workspace snapshot (interactive only)
- *   5. userSystem    — caller-supplied --system flag (escape hatch)
+ *   4. ledgerContext — cross-session memory (digest + recent entries)
+ *   5. gitState      — workspace snapshot (interactive only)
+ *   6. userSystem    — caller-supplied --system flag (escape hatch)
  *
  * Empty sections drop out — no leading/trailing blank lines.
  */
@@ -40,6 +41,7 @@ export declare function composeSystemPrompt(parts: {
     soul?: string;
     modePreamble: string;
     primer?: string;
+    ledgerContext?: string;
     gitState?: string;
     userSystem?: string | undefined;
 }): string;

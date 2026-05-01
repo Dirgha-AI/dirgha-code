@@ -772,6 +772,7 @@ function initialHistory(props) {
         soul: soul.text,
         modePreamble: modePreamble(props.config.mode ?? "act"),
         primer: primer.primer,
+        ledgerContext: props.ledgerContext,
         gitState: renderGitState(probeGitState(props.cwd)),
         userSystem: props.systemPrompt,
     });

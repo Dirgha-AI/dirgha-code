@@ -6,8 +6,8 @@
  * tool subset. The parent receives only the final text output; the full
  * transcript is preserved in the child session for audit.
  */
-import type { Provider, UsageTotal, Message } from '../kernel/types.js';
-import type { ToolRegistry } from '../tools/registry.js';
+import type { Provider, UsageTotal, Message } from "../kernel/types.js";
+import type { ToolRegistry } from "../tools/registry.js";
 export interface SubagentRequest {
     prompt: string;
     system?: string;

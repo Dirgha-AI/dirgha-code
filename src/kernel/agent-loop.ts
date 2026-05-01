@@ -57,6 +57,12 @@ export interface AgentLoopConfig {
    */
   autoApprove?: boolean;
   costCalculator?: (input: number, output: number, cached: number) => number;
+  /** Optional loop detector — checked before each turn; abort if looping. */
+  loopDetector?: {
+    track(turn: { toolCalls?: Array<{ name: string; args?: unknown }> }): void;
+    isLoopDetected(): boolean;
+    reason(): string | null;
+  };
 }
 
 export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
@@ -90,6 +96,18 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
           stopReason = "aborted";
           break;
         }
+      }
+
+      if (cfg.loopDetector?.isLoopDetected()) {
+        const loopReason = cfg.loopDetector.reason() ?? "loop detected";
+        events.emit({
+          type: "error",
+          message: `Sub-agent aborted: ${loopReason}`,
+          reason: "loop",
+          retryable: false,
+        });
+        stopReason = "loop";
+        break;
       }
 
       turnCount = turnIndex + 1;
@@ -173,6 +191,9 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
       history.push(assembled.message);
 
       const toolUses = extractToolUses(assembled.message);
+      cfg.loopDetector?.track({
+        toolCalls: toolUses.map((t) => ({ name: t.name, args: t.input })),
+      });
       if (toolUses.length === 0) {
         events.emit({ type: "turn_end", turnId, stopReason: "end_turn" });
         await cfg.hooks?.afterTurn?.(turnIndex, totals);
