@@ -81,7 +81,7 @@ export const mcpCommand = {
                 return `Disconnected MCP server: ${name}`;
             }
             const count = connections.size;
-            for (const [n, c] of connections) {
+            for (const [, c] of connections) {
                 await c.client.close();
             }
             connections.clear();

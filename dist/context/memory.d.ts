@@ -17,7 +17,7 @@
  * `~/.dirgha/memory/index.db` accelerates `search` when better-sqlite3
  * is available; if not, we fall back to a substring scan.
  */
-export type MemoryType = 'user' | 'feedback' | 'project' | 'reference';
+export type MemoryType = "user" | "feedback" | "project" | "reference";
 export interface MemoryEntry {
     id: string;
     type: MemoryType;
@@ -40,8 +40,13 @@ export interface MemoryHit {
     snippet: string;
     score: number;
 }
+export type MemoryValue = string | {
+    title?: string;
+    content: string;
+    tags?: string[];
+};
 export interface KeyedMemoryStore {
-    save(key: string, value: string, tags?: string[]): Promise<void>;
+    save(key: string, value: MemoryValue, tags?: string[]): Promise<void>;
     load(key: string): Promise<string | null>;
     search(query: string, limit?: number): Promise<MemoryHit[]>;
     list(): Promise<string[]>;

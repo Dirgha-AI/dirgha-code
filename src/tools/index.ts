@@ -21,8 +21,9 @@ import { lspFindReferencesTool } from "./lsp-references.js";
 import { lspHoverTool } from "./lsp-hover.js";
 import { lspDocumentSymbolsTool } from "./lsp-symbols.js";
 // multimodal is a factory (needs runtime Provider) — wired in main.ts, not baked into builtInTools
-export { createMultimodalTool } from "./multimodal.js";
+// export { createMultimodalTool } from "./multimodal.js";
 export { createCronTool } from "./cron.js";
+export { createTaskTool } from "./task.js";
 
 const cronTool = createCronTool();
 

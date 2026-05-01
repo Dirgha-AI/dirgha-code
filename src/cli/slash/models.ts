@@ -5,20 +5,20 @@
  * a numeric index or a full `provider/model` id.
  */
 
-import { PRICES } from '../../intelligence/prices.js';
-import type { SlashCommand } from './types.js';
+import { PRICES } from "../../intelligence/prices.js";
+import type { SlashCommand } from "./types.js";
 
 const ENV_FOR_PROVIDER: Record<string, string> = {
-  anthropic: 'ANTHROPIC_API_KEY',
-  openai: 'OPENAI_API_KEY',
-  gemini: 'GEMINI_API_KEY',
-  nvidia: 'NVIDIA_API_KEY',
-  openrouter: 'OPENROUTER_API_KEY',
-  ollama: '',
+  anthropic: "ANTHROPIC_API_KEY",
+  openai: "OPENAI_API_KEY",
+  gemini: "GEMINI_API_KEY",
+  nvidia: "NVIDIA_API_KEY",
+  openrouter: "OPENROUTER_API_KEY",
+  ollama: "",
 };
 
 function priceText(value: number): string {
-  return value === 0 ? 'free' : `$${value.toFixed(2)}/M`;
+  return value === 0 ? "free" : `$${value.toFixed(2)}/M`;
 }
 
 function configured(provider: string): boolean {
@@ -28,8 +28,8 @@ function configured(provider: string): boolean {
 }
 
 export const modelsCommand: SlashCommand = {
-  name: 'models',
-  description: 'List models and optionally switch the current one',
+  name: "models",
+  description: "List models and optionally switch the current one",
   async execute(args, ctx) {
     const ordered = [...PRICES];
 
@@ -44,16 +44,15 @@ export const modelsCommand: SlashCommand = {
         }
         return `Index out of range. There are ${ordered.length} models.`;
       }
-      const match = ordered.find(p => p.model === first);
+      const match = ordered.find((p) => p.model === first);
       if (match) {
         ctx.setModel(match.model);
         return `Model set to ${match.model} (${match.provider}).`;
       }
-      ctx.setModel(first);
-      return `Model set to ${first} (not in catalogue — will only work if the provider accepts it).`;
+      return `Invalid model: ${first}. Not found in the price catalogue. Use /models without arguments to browse.`;
     }
 
-    const lines: string[] = ['Model catalogue (current: ' + ctx.model + '):'];
+    const lines: string[] = ["Model catalogue (current: " + ctx.model + "):"];
     let i = 1;
     const byProvider = new Map<string, typeof ordered>();
     for (const row of ordered) {
@@ -62,18 +61,22 @@ export const modelsCommand: SlashCommand = {
       byProvider.set(row.provider, bucket);
     }
     for (const [provider, rows] of byProvider) {
-      const env = ENV_FOR_PROVIDER[provider] ?? '';
+      const env = ENV_FOR_PROVIDER[provider] ?? "";
       const marker = configured(provider)
-        ? 'configured'
-        : env ? `set ${env} to enable` : 'no key required';
+        ? "configured"
+        : env
+          ? `set ${env} to enable`
+          : "no key required";
       lines.push(`\n${provider} (${marker})`);
       for (const row of rows) {
-        const mark = row.model === ctx.model ? '*' : ' ';
-        lines.push(`  ${mark} ${String(i).padStart(2)}. ${row.model.padEnd(42)}  in ${priceText(row.inputPerM).padEnd(10)} out ${priceText(row.outputPerM)}`);
+        const mark = row.model === ctx.model ? "*" : " ";
+        lines.push(
+          `  ${mark} ${String(i).padStart(2)}. ${row.model.padEnd(42)}  in ${priceText(row.inputPerM).padEnd(10)} out ${priceText(row.outputPerM)}`,
+        );
         i++;
       }
     }
-    lines.push('\nPick with `/models <number>` or `/models <model-id>`.');
-    return lines.join('\n');
+    lines.push("\nPick with `/models <number>` or `/models <model-id>`.");
+    return lines.join("\n");
   },
 };

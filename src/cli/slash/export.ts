@@ -44,7 +44,7 @@ export const exportCommand: SlashCommand = {
   name: "export",
   description: "Export session as markdown, JSON, or HTML",
   async execute(args, ctx) {
-    let fmtRaw = args[0]?.toLowerCase();
+    const fmtRaw = args[0]?.toLowerCase();
     const format: ExportFormat =
       fmtRaw && VALID_FORMATS.includes(fmtRaw as ExportFormat)
         ? (fmtRaw as ExportFormat)

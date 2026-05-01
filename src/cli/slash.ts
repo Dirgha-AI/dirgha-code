@@ -5,11 +5,12 @@
  * output directly.
  */
 
-import type { Token } from '../integrations/device-auth.js';
-import type { Mode } from '../context/mode.js';
-import type { ThemeName } from '../tui/theme.js';
-import type { Session, SessionStore } from '../context/session.js';
-import type { Provider } from '../kernel/types.js';
+import type { Token } from "../integrations/device-auth.js";
+import type { Mode } from "../context/mode.js";
+import type { ThemeName } from "../tui/theme.js";
+import type { Session, SessionStore } from "../context/session.js";
+import type { Provider } from "../kernel/types.js";
+import { PRICES } from "../intelligence/prices.js";
 
 export interface SlashContext {
   model: string;
@@ -55,7 +56,10 @@ export interface SlashContext {
   getSummaryModel(): string;
 }
 
-export type SlashHandler = (args: string[], ctx: SlashContext) => Promise<string | undefined> | string | undefined;
+export type SlashHandler = (
+  args: string[],
+  ctx: SlashContext,
+) => Promise<string | undefined> | string | undefined;
 
 export class SlashRegistry {
   private readonly handlers = new Map<string, SlashHandler>();
@@ -72,45 +76,84 @@ export class SlashRegistry {
     return [...this.handlers.keys()].sort();
   }
 
-  async dispatch(line: string, ctx: SlashContext): Promise<{ handled: boolean; output?: string }> {
-    if (!line.startsWith('/')) return { handled: false };
+  async dispatch(
+    line: string,
+    ctx: SlashContext,
+  ): Promise<{ handled: boolean; output?: string }> {
+    if (!line.startsWith("/")) return { handled: false };
     // Strip leading slash + ALL control chars (\x00-\x1F + DEL \x7F).
     // Windows terminals on some setups inject stray bytes into ink's
     // input stream — without sanitising, /mode comes through as
     // /mode and fails the registry lookup. We trim whitespace
     // afterwards so a buffer of just the slash + ws still no-ops.
-    // eslint-disable-next-line no-control-regex
-    const stripped = line.slice(1).replace(/[\x00-\x1F\x7F]+/g, '').trim();
+    const stripped = line
+      .slice(1)
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\x00-\x1F\x7F]+/g, "")
+      .trim();
     if (stripped.length === 0) return { handled: false };
     const [rawName, ...args] = stripped.split(/\s+/);
     const name = rawName.toLowerCase();
     const handler = this.handlers.get(name);
-    if (!handler) return { handled: true, output: `Unknown slash command: /${name}. Try /help.` };
-    const output = await handler(args, ctx);
-    return { handled: true, output };
+    if (!handler) {
+      console.error(
+        `[slash dispatch] no handler for "${name}" (raw="${rawName}", stripped="${stripped}"). Registered:`,
+        [...this.handlers.keys()].sort().join(", "),
+      );
+      return {
+        handled: true,
+        output: `Unknown slash command: /${name}. Try /help.`,
+      };
+    }
+    try {
+      const output = await handler(args, ctx);
+      return { handled: true, output };
+    } catch (err) {
+      console.error(
+        `[slash dispatch] /${name} handler threw:`,
+        err instanceof Error ? (err.stack ?? err.message) : String(err),
+      );
+      return {
+        handled: true,
+        output: `[slash error] ${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
   }
 }
 
 export function createDefaultSlashRegistry(): SlashRegistry {
   const registry = new SlashRegistry();
   // Core readline-REPL primitives
-  registry.register('help', (_, ctx) => ctx.showHelp());
-  registry.register('exit', (_, ctx) => { ctx.exit(0); return undefined; });
-  registry.register('quit', (_, ctx) => { ctx.exit(0); return undefined; });
-  registry.register('clear', (_, ctx) => { ctx.clear(); return undefined; });
-  registry.register('model', (args, ctx) => {
+  registry.register("help", (_, ctx) => ctx.showHelp());
+  registry.register("exit", (_, ctx) => {
+    ctx.exit(0);
+    return undefined;
+  });
+  registry.register("quit", (_, ctx) => {
+    ctx.exit(0);
+    return undefined;
+  });
+  registry.register("clear", (_, ctx) => {
+    ctx.clear();
+    return undefined;
+  });
+  registry.register("model", (args, ctx) => {
     if (args.length === 0) return `Current model: ${ctx.model}`;
-    ctx.setModel(args[0]);
-    return `Model set to ${args[0]}`;
+    const id = args[0];
+    const valid = PRICES.some((p) => p.model === id);
+    if (!valid)
+      return `Invalid model: ${id}. Use /models to see the catalogue.`;
+    ctx.setModel(id);
+    return `Model set to ${id}`;
   });
-  registry.register('compact', (_, ctx) => ctx.compact());
-  registry.register('session', async (args, ctx) => {
-    if (args[0] === 'list') return ctx.listSessions();
-    if (args[0] === 'load' && args[1]) return ctx.loadSession(args[1]);
-    return 'Usage: /session list | /session load <id>';
+  registry.register("compact", (_, ctx) => ctx.compact());
+  registry.register("session", async (args, ctx) => {
+    if (args[0] === "list") return ctx.listSessions();
+    if (args[0] === "load" && args[1]) return ctx.loadSession(args[1]);
+    return "Usage: /session list | /session load <id>";
   });
-  registry.register('skills', (_, ctx) => ctx.listSkills());
-  registry.register('cost', (_, ctx) => ctx.showCost());
+  registry.register("skills", (_, ctx) => ctx.listSkills());
+  registry.register("cost", (_, ctx) => ctx.showCost());
 
   return registry;
 }
@@ -124,8 +167,10 @@ export function createDefaultSlashRegistry(): SlashRegistry {
  * Kept separate from `createDefaultSlashRegistry` so the core primitives
  * stay importable without dragging in the full command set.
  */
-export async function registerBuiltinSlashCommands(registry: SlashRegistry): Promise<void> {
-  const { builtinSlashCommands } = await import('./slash/index.js');
+export async function registerBuiltinSlashCommands(
+  registry: SlashRegistry,
+): Promise<void> {
+  const { builtinSlashCommands } = await import("./slash/index.js");
   for (const cmd of builtinSlashCommands) {
     if (!registry.has(cmd.name)) registry.register(cmd.name, cmd.execute);
     for (const alias of cmd.aliases ?? []) {

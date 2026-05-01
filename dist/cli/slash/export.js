@@ -36,7 +36,7 @@ export const exportCommand = {
     name: "export",
     description: "Export session as markdown, JSON, or HTML",
     async execute(args, ctx) {
-        let fmtRaw = args[0]?.toLowerCase();
+        const fmtRaw = args[0]?.toLowerCase();
         const format = fmtRaw && VALID_FORMATS.includes(fmtRaw)
             ? fmtRaw
             : "markdown";

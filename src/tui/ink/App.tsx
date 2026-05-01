@@ -29,7 +29,6 @@ import {
 } from "../../context/primer.js";
 import { probeGitState, renderGitState } from "../../context/git-state.js";
 import { loadSoul } from "../../context/soul.js";
-import { ledgerScope, renderLedgerContext } from "../../context/ledger.js";
 import { isAutoApprove, modePreamble } from "../../context/mode.js";
 import { runAgentLoop } from "../../kernel/agent-loop.js";
 import { createErrorClassifier } from "../../intelligence/error-classifier.js";
@@ -307,13 +306,23 @@ export function App(props: AppProps): React.JSX.Element {
       if (value.startsWith("/model ")) {
         const id = value.slice("/model ".length).trim();
         if (id !== "") {
-          setCurrentModel(id);
-          const note: TranscriptItem = {
-            kind: "notice",
-            id: randomUUID(),
-            text: `Model set to ${id}`,
-          };
-          setTranscript((prev) => [...prev, note]);
+          const valid = PRICES.some((p) => p.model === id);
+          if (!valid) {
+            const note: TranscriptItem = {
+              kind: "notice",
+              id: randomUUID(),
+              text: `Invalid model: ${id}. Use /models to see the catalogue.`,
+            };
+            setTranscript((prev) => [...prev, note]);
+          } else {
+            setCurrentModel(id);
+            const note: TranscriptItem = {
+              kind: "notice",
+              id: randomUUID(),
+              text: `Model set to ${id}`,
+            };
+            setTranscript((prev) => [...prev, note]);
+          }
         }
         return;
       }

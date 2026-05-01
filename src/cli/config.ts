@@ -181,13 +181,19 @@ function merge(...partials: Array<Partial<DirghaConfig>>): DirghaConfig {
 }
 
 function validate(cfg: DirghaConfig): void {
-  if (cfg.maxTurns < 1) {
+  if (!Number.isFinite(cfg.maxTurns) || cfg.maxTurns < 1) {
     cfg.maxTurns = 1;
   }
-  if (cfg.compaction.triggerTokens < 1000) {
+  if (
+    !Number.isFinite(cfg.compaction.triggerTokens) ||
+    cfg.compaction.triggerTokens < 1000
+  ) {
     cfg.compaction.triggerTokens = 1000;
   }
-  if (cfg.compaction.preserveLastTurns < 1) {
+  if (
+    !Number.isFinite(cfg.compaction.preserveLastTurns) ||
+    cfg.compaction.preserveLastTurns < 1
+  ) {
     cfg.compaction.preserveLastTurns = 1;
   }
   if (!cfg.model || cfg.model.trim() === "") {

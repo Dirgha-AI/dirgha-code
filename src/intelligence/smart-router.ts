@@ -4,7 +4,9 @@
  * cheap enough to run per turn.
  */
 
-import type { Message, ContentPart } from '../kernel/types.js';
+import type { Message, ContentPart } from "../kernel/types.js";
+import type { ProviderId } from "../providers/dispatch.js";
+import { bestProvider, healthScore } from "../providers/health.js";
 
 export interface SmartRouterConfig {
   enabled: boolean;
@@ -12,6 +14,7 @@ export interface SmartRouterConfig {
   defaultModel: string;
   maxCheapChars?: number;
   maxCheapWords?: number;
+  candidateProviders?: ProviderId[];
 }
 
 export interface RouteDecision {
@@ -24,42 +27,65 @@ export interface SmartRouter {
 }
 
 const TOOL_INTENT_KEYWORDS = [
-  'edit', 'create', 'delete', 'run', 'install', 'refactor', 'fix',
-  'open', 'write', 'test', 'deploy', 'commit', 'push', 'merge',
+  "edit",
+  "create",
+  "delete",
+  "run",
+  "install",
+  "refactor",
+  "fix",
+  "open",
+  "write",
+  "test",
+  "deploy",
+  "commit",
+  "push",
+  "merge",
 ];
 
 export function createSmartRouter(cfg: SmartRouterConfig): SmartRouter {
   return {
     route(messages) {
       if (!cfg.enabled) {
-        return { model: cfg.defaultModel, reason: 'router disabled' };
+        return { model: cfg.defaultModel, reason: "router disabled" };
       }
       const latestUser = latestUserMessage(messages);
       if (!latestUser) {
-        return { model: cfg.defaultModel, reason: 'no user message' };
+        return { model: cfg.defaultModel, reason: "no user message" };
       }
       const text = extractText(latestUser);
       if (looksComplex(text, cfg)) {
-        return { model: cfg.defaultModel, reason: 'message looks complex' };
+        return { model: cfg.defaultModel, reason: "message looks complex" };
       }
-      return { model: cfg.cheapModel, reason: 'short + no code/tool signals' };
+      if (cfg.candidateProviders?.length) {
+        const best = bestProvider(cfg.candidateProviders);
+        if (healthScore(best) < 0.25) {
+          return {
+            model: cfg.defaultModel,
+            reason: "providers unhealthy for cheap routing",
+          };
+        }
+      }
+      return { model: cfg.cheapModel, reason: "short + no code/tool signals" };
     },
   };
 }
 
 function latestUserMessage(messages: Message[]): Message | undefined {
   for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].role === 'user') return messages[i];
+    if (messages[i].role === "user") return messages[i];
   }
   return undefined;
 }
 
 function extractText(msg: Message): string {
-  if (typeof msg.content === 'string') return msg.content;
+  if (typeof msg.content === "string") return msg.content;
   return (msg.content as ContentPart[])
-    .filter((p): p is Extract<ContentPart, { type: 'text' }> => p.type === 'text')
-    .map(p => p.text)
-    .join('');
+    .filter(
+      (p): p is Extract<ContentPart, { type: "text" }> => p.type === "text",
+    )
+    .map((p) => p.text)
+    .join("");
 }
 
 function looksComplex(text: string, cfg: SmartRouterConfig): boolean {
@@ -71,5 +97,5 @@ function looksComplex(text: string, cfg: SmartRouterConfig): boolean {
   if (/\bhttps?:\/\//.test(text)) return true;
   if (/[{};]\s*$/m.test(text)) return true;
   const lower = text.toLowerCase();
-  return TOOL_INTENT_KEYWORDS.some(k => lower.includes(k));
+  return TOOL_INTENT_KEYWORDS.some((k) => lower.includes(k));
 }

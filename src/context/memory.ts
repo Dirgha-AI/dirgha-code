@@ -18,13 +18,20 @@
  * is available; if not, we fall back to a substring scan.
  */
 
-import { readFile, readdir, stat, writeFile, mkdir, unlink } from 'node:fs/promises';
-import { join } from 'node:path';
-import { homedir } from 'node:os';
-import { openFtsIndex, fallbackSearch } from './_fts.js';
-import type { FtsIndex } from './_fts.js';
+import {
+  readFile,
+  readdir,
+  stat,
+  writeFile,
+  mkdir,
+  unlink,
+} from "node:fs/promises";
+import { join } from "node:path";
+import { homedir } from "node:os";
+import { openFtsIndex, fallbackSearch } from "./_fts.js";
+import type { FtsIndex } from "./_fts.js";
 
-export type MemoryType = 'user' | 'feedback' | 'project' | 'reference';
+export type MemoryType = "user" | "feedback" | "project" | "reference";
 
 export interface MemoryEntry {
   id: string;
@@ -59,8 +66,12 @@ export interface MemoryHit {
   score: number;
 }
 
+export type MemoryValue =
+  | string
+  | { title?: string; content: string; tags?: string[] };
+
 export interface KeyedMemoryStore {
-  save(key: string, value: string, tags?: string[]): Promise<void>;
+  save(key: string, value: MemoryValue, tags?: string[]): Promise<void>;
   load(key: string): Promise<string | null>;
   search(query: string, limit?: number): Promise<MemoryHit[]>;
   list(): Promise<string[]>;
@@ -74,7 +85,9 @@ export interface FileMemoryStoreOptions {
 }
 
 /** Legacy factory — returns the structured-record API used by existing callers. */
-export function createMemoryStore(opts: FileMemoryStoreOptions = {}): MemoryStore {
+export function createMemoryStore(
+  opts: FileMemoryStoreOptions = {},
+): MemoryStore {
   return buildStore(opts);
 }
 
@@ -83,12 +96,14 @@ export function createMemoryStore(opts: FileMemoryStoreOptions = {}): MemoryStor
  * experience spec. Both factories wrap the same on-disk store, so
  * callers may create either view safely.
  */
-export function createKeyedMemoryStore(opts: FileMemoryStoreOptions = {}): KeyedMemoryStore {
+export function createKeyedMemoryStore(
+  opts: FileMemoryStoreOptions = {},
+): KeyedMemoryStore {
   return new KeyedAdapter(buildStore(opts));
 }
 
 function buildStore(opts: FileMemoryStoreOptions): FileMemoryStore {
-  const dir = opts.directory ?? join(homedir(), '.dirgha', 'memory');
+  const dir = opts.directory ?? join(homedir(), ".dirgha", "memory");
   return new FileMemoryStore(dir, opts.useFtsIndex !== false);
 }
 
@@ -105,8 +120,8 @@ export class FileMemoryStore implements MemoryStore {
     const names = await readdir(this.dir).catch(() => [] as string[]);
     const entries: MemoryEntry[] = [];
     for (const name of names) {
-      if (!name.endsWith('.md') || name === 'MEMORY.md') continue;
-      const id = name.replace(/\.md$/, '');
+      if (!name.endsWith(".md") || name === "MEMORY.md") continue;
+      const id = name.replace(/\.md$/, "");
       const entry = await this.get(id);
       if (entry) entries.push(entry);
     }
@@ -116,7 +131,7 @@ export class FileMemoryStore implements MemoryStore {
 
   async get(id: string): Promise<MemoryEntry | undefined> {
     const abs = this.pathFor(id);
-    const text = await readFile(abs, 'utf8').catch(() => undefined);
+    const text = await readFile(abs, "utf8").catch(() => undefined);
     if (!text) return undefined;
     return parseEntry(id, text);
   }
@@ -129,7 +144,7 @@ export class FileMemoryStore implements MemoryStore {
       createdAt: entry.createdAt || now,
       updatedAt: now,
     };
-    await writeFile(this.pathFor(complete.id), renderEntry(complete), 'utf8');
+    await writeFile(this.pathFor(complete.id), renderEntry(complete), "utf8");
     await this.writeIndex();
     await this.reindex(complete);
   }
@@ -144,10 +159,11 @@ export class FileMemoryStore implements MemoryStore {
   async search(query: string): Promise<MemoryEntry[]> {
     const needle = query.toLowerCase();
     const all = await this.list();
-    return all.filter(e =>
-      e.name.toLowerCase().includes(needle)
-      || e.description.toLowerCase().includes(needle)
-      || e.body.toLowerCase().includes(needle),
+    return all.filter(
+      (e) =>
+        e.name.toLowerCase().includes(needle) ||
+        e.description.toLowerCase().includes(needle) ||
+        e.body.toLowerCase().includes(needle),
     );
   }
 
@@ -157,13 +173,26 @@ export class FileMemoryStore implements MemoryStore {
     if (fts) {
       const hits = fts.search(query, limit);
       if (hits.length > 0) {
-        return hits.map(h => ({ key: h.id, title: h.title, snippet: h.snippet, score: h.score }));
+        return hits.map((h) => ({
+          key: h.id,
+          title: h.title,
+          snippet: h.snippet,
+          score: h.score,
+        }));
       }
     }
     const entries = await this.list();
-    const docs = entries.map(e => ({ id: e.id, title: e.name, body: e.body, tags: '' }));
-    return fallbackSearch(docs, query, limit).map(h => ({
-      key: h.id, title: h.title, snippet: h.snippet, score: h.score,
+    const docs = entries.map((e) => ({
+      id: e.id,
+      title: e.name,
+      body: e.body,
+      tags: "",
+    }));
+    return fallbackSearch(docs, query, limit).map((h) => ({
+      key: h.id,
+      title: h.title,
+      snippet: h.snippet,
+      score: h.score,
     }));
   }
 
@@ -178,19 +207,23 @@ export class FileMemoryStore implements MemoryStore {
 
   private async writeIndex(): Promise<void> {
     const entries = await this.list();
-    const lines = ['# Memory Index', ''];
+    const lines = ["# Memory Index", ""];
     for (const e of entries) {
       lines.push(`- [${e.name}](${e.id}.md) — ${e.description}`);
     }
-    await writeFile(join(this.dir, 'MEMORY.md'), `${lines.join('\n')}\n`, 'utf8');
+    await writeFile(
+      join(this.dir, "MEMORY.md"),
+      `${lines.join("\n")}\n`,
+      "utf8",
+    );
   }
 
   private fts(): Promise<FtsIndex | null> {
     if (!this.ftsEnabled) return Promise.resolve(null);
     if (!this.ftsPromise) {
       this.ftsPromise = openFtsIndex({
-        dbPath: join(this.dir, 'index.db'),
-        namespace: 'memory',
+        dbPath: join(this.dir, "index.db"),
+        namespace: "memory",
       });
     }
     return this.ftsPromise;
@@ -198,7 +231,12 @@ export class FileMemoryStore implements MemoryStore {
 
   private async reindex(entry: MemoryEntry): Promise<void> {
     const fts = await this.fts();
-    fts?.upsert({ id: entry.id, title: entry.name, body: entry.body, tags: '' });
+    fts?.upsert({
+      id: entry.id,
+      title: entry.name,
+      body: entry.body,
+      tags: "",
+    });
   }
 }
 
@@ -211,18 +249,26 @@ export class FileMemoryStore implements MemoryStore {
 class KeyedAdapter implements KeyedMemoryStore {
   constructor(private readonly inner: FileMemoryStore) {}
 
-  async save(key: string, value: string, tags: string[] = []): Promise<void> {
+  async save(
+    key: string,
+    value: MemoryValue,
+    tags: string[] = [],
+  ): Promise<void> {
     assertValidKey(key);
+    const resolvedValue = typeof value === "string" ? value : value.content;
+    const resolvedTags =
+      typeof value === "string" ? tags : (value.tags ?? tags);
+    const resolvedTitle = typeof value === "string" ? undefined : value.title;
     const existing = await this.inner.get(key);
-    const title = firstHeading(value) ?? key;
+    const title = resolvedTitle ?? firstHeading(resolvedValue) ?? key;
     await this.inner.upsert({
       id: key,
       type: inferType(key, existing?.type),
       name: title,
-      description: firstParagraph(value) ?? '',
-      body: ensureTagsBlock(value, tags),
-      createdAt: existing?.createdAt ?? '',
-      updatedAt: '',
+      description: firstParagraph(resolvedValue) ?? "",
+      body: ensureTagsBlock(resolvedValue, resolvedTags),
+      createdAt: existing?.createdAt ?? "",
+      updatedAt: "",
     });
   }
 
@@ -237,7 +283,7 @@ class KeyedAdapter implements KeyedMemoryStore {
 
   async list(): Promise<string[]> {
     const entries = await this.inner.list();
-    return entries.map(e => e.id);
+    return entries.map((e) => e.id);
   }
 
   async delete(key: string): Promise<void> {
@@ -251,16 +297,16 @@ class KeyedAdapter implements KeyedMemoryStore {
 
 function renderEntry(entry: MemoryEntry): string {
   const frontmatter = [
-    '---',
+    "---",
     `id: ${entry.id}`,
     `type: ${entry.type}`,
     `name: ${escapeValue(entry.name)}`,
     `description: ${escapeValue(entry.description)}`,
     `createdAt: ${entry.createdAt}`,
     `updatedAt: ${entry.updatedAt}`,
-    '---',
-    '',
-  ].join('\n');
+    "---",
+    "",
+  ].join("\n");
   return `${frontmatter}${entry.body}`;
 }
 
@@ -268,40 +314,46 @@ function parseEntry(id: string, text: string): MemoryEntry | undefined {
   const match = text.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
   if (!match) return undefined;
   const meta: Record<string, string> = {};
-  for (const line of match[1].split('\n')) {
-    const idx = line.indexOf(':');
+  for (const line of match[1].split("\n")) {
+    const idx = line.indexOf(":");
     if (idx < 0) continue;
     const key = line.slice(0, idx).trim();
     const value = line.slice(idx + 1).trim();
     meta[key] = unescapeValue(value);
   }
-  const type = (meta.type as MemoryType) ?? 'user';
+  const type = (meta.type as MemoryType) ?? "user";
   return {
     id: meta.id ?? id,
     type,
     name: meta.name ?? id,
-    description: meta.description ?? '',
+    description: meta.description ?? "",
     body: match[2],
-    createdAt: meta.createdAt ?? '',
-    updatedAt: meta.updatedAt ?? '',
+    createdAt: meta.createdAt ?? "",
+    updatedAt: meta.updatedAt ?? "",
   };
 }
 
 function escapeValue(s: string): string {
-  if (s.includes(':') || s.includes('\n')) return JSON.stringify(s);
+  if (s.includes(":") || s.includes("\n")) return JSON.stringify(s);
   return s;
 }
 
 function unescapeValue(s: string): string {
   if (s.startsWith('"') && s.endsWith('"')) {
-    try { return JSON.parse(s); } catch { return s; }
+    try {
+      return JSON.parse(s);
+    } catch {
+      return s;
+    }
   }
   return s;
 }
 
 function assertValidKey(key: string): void {
   if (!key || !/^[a-zA-Z0-9][a-zA-Z0-9_\-.]*$/.test(key)) {
-    throw new Error(`Invalid memory key "${key}". Use alphanumeric, dash, dot, underscore.`);
+    throw new Error(
+      `Invalid memory key "${key}". Use alphanumeric, dash, dot, underscore.`,
+    );
   }
 }
 
@@ -311,16 +363,16 @@ function firstHeading(text: string): string | null {
 }
 
 function firstParagraph(text: string): string | null {
-  const stripped = text.replace(/^\s*#+.*$/m, '').trim();
-  const first = stripped.split(/\n\s*\n/)[0]?.trim() ?? '';
+  const stripped = text.replace(/^\s*#+.*$/m, "").trim();
+  const first = stripped.split(/\n\s*\n/)[0]?.trim() ?? "";
   return first || null;
 }
 
 function inferType(key: string, fallback: MemoryType | undefined): MemoryType {
-  if (key.startsWith('project_')) return 'project';
-  if (key.startsWith('feedback_')) return 'feedback';
-  if (key.startsWith('reference_')) return 'reference';
-  return fallback ?? 'user';
+  if (key.startsWith("project_")) return "project";
+  if (key.startsWith("feedback_")) return "feedback";
+  if (key.startsWith("reference_")) return "reference";
+  return fallback ?? "user";
 }
 
 /**
@@ -329,9 +381,9 @@ function inferType(key: string, fallback: MemoryType | undefined): MemoryType {
  * any prior marker so tags don't stack.
  */
 function ensureTagsBlock(body: string, tags: string[]): string {
-  const stripped = body.replace(/\n?<!-- tags:[^>]*-->\s*$/s, '');
+  const stripped = body.replace(/\n?<!-- tags:[^>]*-->\s*$/s, "");
   if (tags.length === 0) return stripped;
-  const clean = tags.map(t => t.trim()).filter(Boolean);
+  const clean = tags.map((t) => t.trim()).filter(Boolean);
   if (clean.length === 0) return stripped;
-  return `${stripped.trimEnd()}\n<!-- tags: ${clean.join(', ')} -->\n`;
+  return `${stripped.trimEnd()}\n<!-- tags: ${clean.join(", ")} -->\n`;
 }

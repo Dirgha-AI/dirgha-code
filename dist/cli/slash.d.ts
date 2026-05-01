@@ -4,11 +4,11 @@
  * string that the REPL prints, or nothing when the handler produced
  * output directly.
  */
-import type { Token } from '../integrations/device-auth.js';
-import type { Mode } from '../context/mode.js';
-import type { ThemeName } from '../tui/theme.js';
-import type { Session, SessionStore } from '../context/session.js';
-import type { Provider } from '../kernel/types.js';
+import type { Token } from "../integrations/device-auth.js";
+import type { Mode } from "../context/mode.js";
+import type { ThemeName } from "../tui/theme.js";
+import type { Session, SessionStore } from "../context/session.js";
+import type { Provider } from "../kernel/types.js";
 export interface SlashContext {
     model: string;
     sessionId: string;

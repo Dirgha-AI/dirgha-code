@@ -56,7 +56,11 @@ function priceText(value: number): string {
   return value === 0 ? 'free' : `$${value.toFixed(2)}/M`;
 }
 
-function runList(): number {
+function runList(json: boolean): number {
+  if (json) {
+    stdout.write(JSON.stringify(PRICES, null, 2) + "\n");
+    return 0;
+  }
   stdout.write(`\n${style(defaultTheme.accent, 'Model catalogue')}\n`);
   const byProvider = new Map<string, typeof PRICES>();
   for (const row of PRICES) {
@@ -192,7 +196,7 @@ export const modelsSubcommand: Subcommand = {
     const json = argv.includes('--json');
     const args = argv.filter(a => a !== '--json');
     const [op, arg] = args;
-    if (!op || op === 'list') return runList();
+    if (!op || op === 'list') return runList(json);
     if (op === 'default') return runDefault(arg);
     if (op === 'info') {
       if (!arg) { stderr.write(`${usage()}\n`); return 1; }

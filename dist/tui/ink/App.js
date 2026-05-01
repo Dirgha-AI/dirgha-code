@@ -237,13 +237,24 @@ export function App(props) {
         if (value.startsWith("/model ")) {
             const id = value.slice("/model ".length).trim();
             if (id !== "") {
-                setCurrentModel(id);
-                const note = {
-                    kind: "notice",
-                    id: randomUUID(),
-                    text: `Model set to ${id}`,
-                };
-                setTranscript((prev) => [...prev, note]);
+                const valid = PRICES.some((p) => p.model === id);
+                if (!valid) {
+                    const note = {
+                        kind: "notice",
+                        id: randomUUID(),
+                        text: `Invalid model: ${id}. Use /models to see the catalogue.`,
+                    };
+                    setTranscript((prev) => [...prev, note]);
+                }
+                else {
+                    setCurrentModel(id);
+                    const note = {
+                        kind: "notice",
+                        id: randomUUID(),
+                        text: `Model set to ${id}`,
+                    };
+                    setTranscript((prev) => [...prev, note]);
+                }
             }
             return;
         }

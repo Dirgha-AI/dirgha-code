@@ -14,7 +14,7 @@ interface WindowEntry {
 }
 
 const WINDOW_MS = 5 * 60 * 1000; // 5 min sliding window
-const HALF_LIFE_MS = 5 * 60 * 1000; // 5 min decay half-life
+// const HALF_LIFE_MS = 5 * 60 * 1000; // 5 min decay half-life
 
 const windows = new Map<string, WindowEntry[]>();
 const rateLimitHits = new Map<string, number>();

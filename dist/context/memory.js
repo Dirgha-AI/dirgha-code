@@ -17,10 +17,10 @@
  * `~/.dirgha/memory/index.db` accelerates `search` when better-sqlite3
  * is available; if not, we fall back to a substring scan.
  */
-import { readFile, readdir, stat, writeFile, mkdir, unlink } from 'node:fs/promises';
-import { join } from 'node:path';
-import { homedir } from 'node:os';
-import { openFtsIndex, fallbackSearch } from './_fts.js';
+import { readFile, readdir, stat, writeFile, mkdir, unlink, } from "node:fs/promises";
+import { join } from "node:path";
+import { homedir } from "node:os";
+import { openFtsIndex, fallbackSearch } from "./_fts.js";
 /** Legacy factory — returns the structured-record API used by existing callers. */
 export function createMemoryStore(opts = {}) {
     return buildStore(opts);
@@ -34,7 +34,7 @@ export function createKeyedMemoryStore(opts = {}) {
     return new KeyedAdapter(buildStore(opts));
 }
 function buildStore(opts) {
-    const dir = opts.directory ?? join(homedir(), '.dirgha', 'memory');
+    const dir = opts.directory ?? join(homedir(), ".dirgha", "memory");
     return new FileMemoryStore(dir, opts.useFtsIndex !== false);
 }
 export class FileMemoryStore {
@@ -50,9 +50,9 @@ export class FileMemoryStore {
         const names = await readdir(this.dir).catch(() => []);
         const entries = [];
         for (const name of names) {
-            if (!name.endsWith('.md') || name === 'MEMORY.md')
+            if (!name.endsWith(".md") || name === "MEMORY.md")
                 continue;
-            const id = name.replace(/\.md$/, '');
+            const id = name.replace(/\.md$/, "");
             const entry = await this.get(id);
             if (entry)
                 entries.push(entry);
@@ -62,7 +62,7 @@ export class FileMemoryStore {
     }
     async get(id) {
         const abs = this.pathFor(id);
-        const text = await readFile(abs, 'utf8').catch(() => undefined);
+        const text = await readFile(abs, "utf8").catch(() => undefined);
         if (!text)
             return undefined;
         return parseEntry(id, text);
@@ -75,7 +75,7 @@ export class FileMemoryStore {
             createdAt: entry.createdAt || now,
             updatedAt: now,
         };
-        await writeFile(this.pathFor(complete.id), renderEntry(complete), 'utf8');
+        await writeFile(this.pathFor(complete.id), renderEntry(complete), "utf8");
         await this.writeIndex();
         await this.reindex(complete);
     }
@@ -88,9 +88,9 @@ export class FileMemoryStore {
     async search(query) {
         const needle = query.toLowerCase();
         const all = await this.list();
-        return all.filter(e => e.name.toLowerCase().includes(needle)
-            || e.description.toLowerCase().includes(needle)
-            || e.body.toLowerCase().includes(needle));
+        return all.filter((e) => e.name.toLowerCase().includes(needle) ||
+            e.description.toLowerCase().includes(needle) ||
+            e.body.toLowerCase().includes(needle));
     }
     /** Ranked hit search used by `KeyedMemoryStore.search`. */
     async searchHits(query, limit) {
@@ -98,13 +98,26 @@ export class FileMemoryStore {
         if (fts) {
             const hits = fts.search(query, limit);
             if (hits.length > 0) {
-                return hits.map(h => ({ key: h.id, title: h.title, snippet: h.snippet, score: h.score }));
+                return hits.map((h) => ({
+                    key: h.id,
+                    title: h.title,
+                    snippet: h.snippet,
+                    score: h.score,
+                }));
             }
         }
         const entries = await this.list();
-        const docs = entries.map(e => ({ id: e.id, title: e.name, body: e.body, tags: '' }));
-        return fallbackSearch(docs, query, limit).map(h => ({
-            key: h.id, title: h.title, snippet: h.snippet, score: h.score,
+        const docs = entries.map((e) => ({
+            id: e.id,
+            title: e.name,
+            body: e.body,
+            tags: "",
+        }));
+        return fallbackSearch(docs, query, limit).map((h) => ({
+            key: h.id,
+            title: h.title,
+            snippet: h.snippet,
+            score: h.score,
         }));
     }
     pathFor(id) {
@@ -117,26 +130,31 @@ export class FileMemoryStore {
     }
     async writeIndex() {
         const entries = await this.list();
-        const lines = ['# Memory Index', ''];
+        const lines = ["# Memory Index", ""];
         for (const e of entries) {
             lines.push(`- [${e.name}](${e.id}.md) — ${e.description}`);
         }
-        await writeFile(join(this.dir, 'MEMORY.md'), `${lines.join('\n')}\n`, 'utf8');
+        await writeFile(join(this.dir, "MEMORY.md"), `${lines.join("\n")}\n`, "utf8");
     }
     fts() {
         if (!this.ftsEnabled)
             return Promise.resolve(null);
         if (!this.ftsPromise) {
             this.ftsPromise = openFtsIndex({
-                dbPath: join(this.dir, 'index.db'),
-                namespace: 'memory',
+                dbPath: join(this.dir, "index.db"),
+                namespace: "memory",
             });
         }
         return this.ftsPromise;
     }
     async reindex(entry) {
         const fts = await this.fts();
-        fts?.upsert({ id: entry.id, title: entry.name, body: entry.body, tags: '' });
+        fts?.upsert({
+            id: entry.id,
+            title: entry.name,
+            body: entry.body,
+            tags: "",
+        });
     }
 }
 /**
@@ -152,16 +170,19 @@ class KeyedAdapter {
     }
     async save(key, value, tags = []) {
         assertValidKey(key);
+        const resolvedValue = typeof value === "string" ? value : value.content;
+        const resolvedTags = typeof value === "string" ? tags : (value.tags ?? tags);
+        const resolvedTitle = typeof value === "string" ? undefined : value.title;
         const existing = await this.inner.get(key);
-        const title = firstHeading(value) ?? key;
+        const title = resolvedTitle ?? firstHeading(resolvedValue) ?? key;
         await this.inner.upsert({
             id: key,
             type: inferType(key, existing?.type),
             name: title,
-            description: firstParagraph(value) ?? '',
-            body: ensureTagsBlock(value, tags),
-            createdAt: existing?.createdAt ?? '',
-            updatedAt: '',
+            description: firstParagraph(resolvedValue) ?? "",
+            body: ensureTagsBlock(resolvedValue, resolvedTags),
+            createdAt: existing?.createdAt ?? "",
+            updatedAt: "",
         });
     }
     async load(key) {
@@ -173,7 +194,7 @@ class KeyedAdapter {
     }
     async list() {
         const entries = await this.inner.list();
-        return entries.map(e => e.id);
+        return entries.map((e) => e.id);
     }
     async delete(key) {
         await this.inner.remove(key);
@@ -184,16 +205,16 @@ class KeyedAdapter {
 // ---------------------------------------------------------------------------
 function renderEntry(entry) {
     const frontmatter = [
-        '---',
+        "---",
         `id: ${entry.id}`,
         `type: ${entry.type}`,
         `name: ${escapeValue(entry.name)}`,
         `description: ${escapeValue(entry.description)}`,
         `createdAt: ${entry.createdAt}`,
         `updatedAt: ${entry.updatedAt}`,
-        '---',
-        '',
-    ].join('\n');
+        "---",
+        "",
+    ].join("\n");
     return `${frontmatter}${entry.body}`;
 }
 function parseEntry(id, text) {
@@ -201,27 +222,27 @@ function parseEntry(id, text) {
     if (!match)
         return undefined;
     const meta = {};
-    for (const line of match[1].split('\n')) {
-        const idx = line.indexOf(':');
+    for (const line of match[1].split("\n")) {
+        const idx = line.indexOf(":");
         if (idx < 0)
             continue;
         const key = line.slice(0, idx).trim();
         const value = line.slice(idx + 1).trim();
         meta[key] = unescapeValue(value);
     }
-    const type = meta.type ?? 'user';
+    const type = meta.type ?? "user";
     return {
         id: meta.id ?? id,
         type,
         name: meta.name ?? id,
-        description: meta.description ?? '',
+        description: meta.description ?? "",
         body: match[2],
-        createdAt: meta.createdAt ?? '',
-        updatedAt: meta.updatedAt ?? '',
+        createdAt: meta.createdAt ?? "",
+        updatedAt: meta.updatedAt ?? "",
     };
 }
 function escapeValue(s) {
-    if (s.includes(':') || s.includes('\n'))
+    if (s.includes(":") || s.includes("\n"))
         return JSON.stringify(s);
     return s;
 }
@@ -246,18 +267,18 @@ function firstHeading(text) {
     return m ? m[1] : null;
 }
 function firstParagraph(text) {
-    const stripped = text.replace(/^\s*#+.*$/m, '').trim();
-    const first = stripped.split(/\n\s*\n/)[0]?.trim() ?? '';
+    const stripped = text.replace(/^\s*#+.*$/m, "").trim();
+    const first = stripped.split(/\n\s*\n/)[0]?.trim() ?? "";
     return first || null;
 }
 function inferType(key, fallback) {
-    if (key.startsWith('project_'))
-        return 'project';
-    if (key.startsWith('feedback_'))
-        return 'feedback';
-    if (key.startsWith('reference_'))
-        return 'reference';
-    return fallback ?? 'user';
+    if (key.startsWith("project_"))
+        return "project";
+    if (key.startsWith("feedback_"))
+        return "feedback";
+    if (key.startsWith("reference_"))
+        return "reference";
+    return fallback ?? "user";
 }
 /**
  * Append a hidden `<!-- tags: a, b, c -->` marker so tags survive on
@@ -265,12 +286,12 @@ function inferType(key, fallback) {
  * any prior marker so tags don't stack.
  */
 function ensureTagsBlock(body, tags) {
-    const stripped = body.replace(/\n?<!-- tags:[^>]*-->\s*$/s, '');
+    const stripped = body.replace(/\n?<!-- tags:[^>]*-->\s*$/s, "");
     if (tags.length === 0)
         return stripped;
-    const clean = tags.map(t => t.trim()).filter(Boolean);
+    const clean = tags.map((t) => t.trim()).filter(Boolean);
     if (clean.length === 0)
         return stripped;
-    return `${stripped.trimEnd()}\n<!-- tags: ${clean.join(', ')} -->\n`;
+    return `${stripped.trimEnd()}\n<!-- tags: ${clean.join(", ")} -->\n`;
 }
 //# sourceMappingURL=memory.js.map

@@ -114,7 +114,6 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
 
       turnCount = turnIndex + 1;
       const turnId = `t${turnIndex}-${Date.now().toString(36)}`;
-      events.emit({ type: "turn_start", turnId, turnIndex });
 
       const messagesForCall = cfg.contextTransform
         ? await cfg.contextTransform(history)
@@ -318,7 +317,18 @@ async function executeToolCalls(
   };
 
   if (cfg.toolConcurrency === "parallel" && toolUses.length > 1) {
-    return Promise.all(toolUses.map(run));
+    const results = await Promise.allSettled(toolUses.map(run));
+    return results.map((r) =>
+      r.status === "fulfilled"
+        ? r.value
+        : {
+            call: { id: "", name: "error", input: {} } as ToolCall,
+            result: {
+              content: `Tool execution failed: ${String(r.reason)}`,
+              isError: true,
+            },
+          },
+    );
   }
   const out: Array<{ call: ToolCall; result: ToolResult }> = [];
   for (const u of toolUses) out.push(await run(u));

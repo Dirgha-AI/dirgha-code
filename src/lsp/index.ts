@@ -1,4 +1,3 @@
-import type { LanguageServerInfo } from "./detector.js";
 import { getServerForFile, getLspRoot } from "./detector.js";
 import {
   createLspClient,

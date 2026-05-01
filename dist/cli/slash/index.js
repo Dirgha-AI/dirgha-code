@@ -8,6 +8,7 @@ import { accountCommand } from "./account.js";
 import { clearCommand } from "./clear.js";
 import { compactCommand } from "./compact.js";
 import { configCommand } from "./config.js";
+import { costCommand } from "./cost.js";
 import { exitCommand } from "./exit.js";
 import { exportCommand } from "./export.js";
 import { fleetCommand } from "./fleet.js";
@@ -41,6 +42,7 @@ export const builtinSlashCommands = [
     statusCommand,
     memoryCommand,
     compactCommand,
+    costCommand,
     modeCommand,
     exitCommand,
     historyCommand,
@@ -60,5 +62,5 @@ export const builtinSlashCommands = [
 ];
 // Wire /help so it can introspect the full list without a circular import.
 registerHelpSource(builtinSlashCommands);
-export { accountCommand, clearCommand, compactCommand, configCommand, exitCommand, exportCommand, fleetCommand, fsCommand, helpCommand, historyCommand, initCommand, keysCommand, loginCommand, mcpCommand, memoryCommand, modeCommand, modelsCommand, providerCommand, resumeCommand, sessionCommand, setupCommand, statusCommand, themeCommand, updateCommand, upgradeCommand, };
+export { accountCommand, clearCommand, compactCommand, configCommand, costCommand, exitCommand, exportCommand, fleetCommand, fsCommand, helpCommand, historyCommand, initCommand, keysCommand, loginCommand, mcpCommand, memoryCommand, modeCommand, modelsCommand, providerCommand, resumeCommand, sessionCommand, setupCommand, statusCommand, themeCommand, updateCommand, upgradeCommand, };
 //# sourceMappingURL=index.js.map

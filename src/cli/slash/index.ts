@@ -11,6 +11,7 @@ import { accountCommand } from "./account.js";
 import { clearCommand } from "./clear.js";
 import { compactCommand } from "./compact.js";
 import { configCommand } from "./config.js";
+import { costCommand } from "./cost.js";
 import { exitCommand } from "./exit.js";
 import { exportCommand } from "./export.js";
 import { fleetCommand } from "./fleet.js";
@@ -45,6 +46,7 @@ export const builtinSlashCommands: SlashCommand[] = [
   statusCommand,
   memoryCommand,
   compactCommand,
+  costCommand,
   modeCommand,
   exitCommand,
   historyCommand,
@@ -72,6 +74,7 @@ export {
   clearCommand,
   compactCommand,
   configCommand,
+  costCommand,
   exitCommand,
   exportCommand,
   fleetCommand,

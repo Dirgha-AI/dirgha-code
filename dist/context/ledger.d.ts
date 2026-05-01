@@ -17,7 +17,7 @@
  *   - "<repo-name>"     — per-repo project context
  *   - "<task-id>"       — a specific long-running goal
  */
-export type LedgerEntryKind = 'goal' | 'decision' | 'observation' | 'experiment' | 'metric' | 'note' | 'compaction';
+export type LedgerEntryKind = "goal" | "decision" | "observation" | "experiment" | "metric" | "note" | "compaction";
 export interface LedgerEntry {
     ts: string;
     kind: LedgerEntryKind;
@@ -30,7 +30,7 @@ export interface LedgerScope {
     digestPath: string;
 }
 export declare function ledgerScope(name: string, home?: string): LedgerScope;
-export declare function appendLedger(scope: LedgerScope, entry: Omit<LedgerEntry, 'ts'>): Promise<void>;
+export declare function appendLedger(scope: LedgerScope, entry: Omit<LedgerEntry, "ts">): Promise<void>;
 export declare function readLedger(scope: LedgerScope, limit?: number): Promise<LedgerEntry[]>;
 export declare function searchLedger(scope: LedgerScope, query: string): Promise<LedgerEntry[]>;
 /**
@@ -53,6 +53,16 @@ export declare function readDigest(scope: LedgerScope): Promise<string>;
  * (recent decisions / observations). Returns empty string when the
  * scope has no content.
  */
+export interface LedgerStore {
+    scope: LedgerScope;
+    append(entry: Omit<LedgerEntry, "ts">): Promise<void>;
+    read(limit?: number): Promise<LedgerEntry[]>;
+    search(query: string): Promise<LedgerEntry[]>;
+    render(opts?: {
+        tailEntries?: number;
+    }): Promise<string>;
+}
+export declare function createLedgerStore(name: string, home?: string): LedgerStore;
 export declare function renderLedgerContext(scope: LedgerScope, opts?: {
     tailEntries?: number;
 }): Promise<string>;

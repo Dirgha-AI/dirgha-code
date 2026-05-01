@@ -4,32 +4,32 @@
  * ignored silently. A session is identified by its id; the canonical
  * file path derives from the id plus the store's base directory.
  */
-import type { Message, UsageTotal } from '../kernel/types.js';
+import type { Message, UsageTotal } from "../kernel/types.js";
 export type SessionEntry = {
-    type: 'message';
+    type: "message";
     ts: string;
     message: Message;
 } | {
-    type: 'usage';
+    type: "usage";
     ts: string;
     usage: UsageTotal;
 } | {
-    type: 'model_change';
+    type: "model_change";
     ts: string;
     from: string;
     to: string;
 } | {
-    type: 'compaction';
+    type: "compaction";
     ts: string;
     keptFrom: string;
     summary: string;
 } | {
-    type: 'branch';
+    type: "branch";
     ts: string;
     parentId: string;
     name: string;
 } | {
-    type: 'system';
+    type: "system";
     ts: string;
     event: string;
     data?: Record<string, unknown>;
@@ -39,6 +39,7 @@ export interface Session {
     readonly path: string;
     append(entry: SessionEntry): Promise<void>;
     replay(): AsyncIterable<SessionEntry>;
+    replayAll(): Promise<SessionEntry[]>;
     messages(): Promise<Message[]>;
 }
 export interface SessionStoreOptions {

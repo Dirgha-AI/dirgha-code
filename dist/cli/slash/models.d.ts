@@ -4,5 +4,5 @@
  * allow picking one as the current model for the REPL. Accepts either
  * a numeric index or a full `provider/model` id.
  */
-import type { SlashCommand } from './types.js';
+import type { SlashCommand } from "./types.js";
 export declare const modelsCommand: SlashCommand;
