@@ -37,6 +37,7 @@ import { appendAudit } from "../audit/writer.js";
 import { buildAgentHooksFromConfig } from "../hooks/config-bridge.js";
 import { hydrateEnvFromKeyStore } from "../auth/keystore.js";
 import { hydrateEnvFromPool } from "../auth/keypool.js";
+import { checkStartupUpdate } from "./update-check.js";
 import { createExtensionAPI, loadExtensions } from "../extensions/api.js";
 import { createErrorClassifier } from "../intelligence/error-classifier.js";
 import { createCompactionTransform } from "../context/compaction.js";
@@ -93,6 +94,9 @@ async function main(): Promise<void> {
   // Real env vars beat both, so a shell-exported override still wins.
   await hydrateEnvFromPool();
   await hydrateEnvFromKeyStore();
+
+  // Fire-and-forget startup update check — doesn't block launch.
+  checkStartupUpdate(PKG_VERSION).catch(() => {});
 
   // Load user extensions from ~/.dirgha/extensions/<name>/index.mjs.
   // Extensions register tools, slashes, subcommands, and event handlers.

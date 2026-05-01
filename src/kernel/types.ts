@@ -6,34 +6,38 @@
  * events, the daemon streams events over RPC. One shape, everywhere.
  */
 
-export type Role = 'system' | 'user' | 'assistant' | 'tool';
+export type Role = "system" | "user" | "assistant" | "tool";
 
 export interface TextPart {
-  type: 'text';
+  type: "text";
   text: string;
 }
 
 export interface ThinkingPart {
-  type: 'thinking';
+  type: "thinking";
   text: string;
   signature?: string;
 }
 
 export interface ToolUsePart {
-  type: 'tool_use';
+  type: "tool_use";
   id: string;
   name: string;
   input: unknown;
 }
 
 export interface ToolResultPart {
-  type: 'tool_result';
+  type: "tool_result";
   toolUseId: string;
   content: string;
   isError?: boolean;
 }
 
-export type ContentPart = TextPart | ThinkingPart | ToolUsePart | ToolResultPart;
+export type ContentPart =
+  | TextPart
+  | ThinkingPart
+  | ToolUsePart
+  | ToolResultPart;
 
 export interface Message {
   role: Role;
@@ -42,12 +46,12 @@ export interface Message {
 }
 
 export type StopReason =
-  | 'end_turn'
-  | 'tool_use'
-  | 'max_tokens'
-  | 'stop_sequence'
-  | 'error'
-  | 'aborted';
+  | "end_turn"
+  | "tool_use"
+  | "max_tokens"
+  | "stop_sequence"
+  | "error"
+  | "aborted";
 
 export interface UsageTotal {
   inputTokens: number;
@@ -57,24 +61,47 @@ export interface UsageTotal {
 }
 
 export type AgentEvent =
-  | { type: 'agent_start'; sessionId: string; model: string }
-  | { type: 'turn_start'; turnId: string; turnIndex: number }
-  | { type: 'text_start' }
-  | { type: 'text_delta'; delta: string }
-  | { type: 'text_end' }
-  | { type: 'thinking_start' }
-  | { type: 'thinking_delta'; delta: string }
-  | { type: 'thinking_end' }
-  | { type: 'toolcall_start'; id: string; name: string }
-  | { type: 'toolcall_delta'; id: string; deltaJson: string }
-  | { type: 'toolcall_end'; id: string; input: unknown }
-  | { type: 'tool_exec_start'; id: string; name: string; input: unknown }
-  | { type: 'tool_exec_progress'; id: string; message: string }
-  | { type: 'tool_exec_end'; id: string; output: string; isError: boolean; durationMs: number }
-  | { type: 'usage'; inputTokens: number; outputTokens: number; cachedTokens?: number }
-  | { type: 'turn_end'; turnId: string; stopReason: StopReason }
-  | { type: 'agent_end'; sessionId: string; stopReason: StopReason; usage: UsageTotal }
-  | { type: 'error'; message: string; reason?: string; retryable?: boolean; failoverModel?: string };
+  | { type: "agent_start"; sessionId: string; model: string }
+  | { type: "turn_start"; turnId: string; turnIndex: number }
+  | { type: "text_start" }
+  | { type: "text_delta"; delta: string }
+  | { type: "text_end" }
+  | { type: "thinking_start" }
+  | { type: "thinking_delta"; delta: string }
+  | { type: "thinking_end" }
+  | { type: "toolcall_start"; id: string; name: string }
+  | { type: "toolcall_delta"; id: string; deltaJson: string }
+  | { type: "toolcall_end"; id: string; input: unknown }
+  | { type: "tool_exec_start"; id: string; name: string; input: unknown }
+  | { type: "tool_exec_progress"; id: string; message: string }
+  | {
+      type: "tool_exec_end";
+      id: string;
+      output: string;
+      isError: boolean;
+      durationMs: number;
+      metadata?: Record<string, unknown>;
+    }
+  | {
+      type: "usage";
+      inputTokens: number;
+      outputTokens: number;
+      cachedTokens?: number;
+    }
+  | { type: "turn_end"; turnId: string; stopReason: StopReason }
+  | {
+      type: "agent_end";
+      sessionId: string;
+      stopReason: StopReason;
+      usage: UsageTotal;
+    }
+  | {
+      type: "error";
+      message: string;
+      reason?: string;
+      retryable?: boolean;
+      failoverModel?: string;
+    };
 
 export interface ToolCall {
   id: string;
@@ -102,7 +129,7 @@ export interface StreamRequest {
   tools?: ToolDefinition[];
   temperature?: number;
   maxTokens?: number;
-  thinking?: 'off' | 'low' | 'medium' | 'high';
+  thinking?: "off" | "low" | "medium" | "high";
   signal?: AbortSignal;
 }
 
@@ -126,7 +153,10 @@ export interface Provider {
   supportsTools(modelId: string): boolean;
   supportsThinking(modelId: string): boolean;
   stream(req: StreamRequest): AsyncIterable<AgentEvent>;
-  generateImage?(req: ImageGenRequest, signal?: AbortSignal): Promise<ImageGenResult>;
+  generateImage?(
+    req: ImageGenRequest,
+    signal?: AbortSignal,
+  ): Promise<ImageGenResult>;
 }
 
 export interface ToolExecutor {
@@ -134,7 +164,12 @@ export interface ToolExecutor {
 }
 
 export interface ApprovalBus {
-  request(req: { id: string; tool: string; summary: string; diff?: string }): Promise<'approve' | 'deny' | 'approve_once' | 'deny_always'>;
+  request(req: {
+    id: string;
+    tool: string;
+    summary: string;
+    diff?: string;
+  }): Promise<"approve" | "deny" | "approve_once" | "deny_always">;
   requiresApproval(toolName: string, input: unknown): boolean;
 }
 
@@ -150,8 +185,17 @@ export interface ClassifiedError {
 }
 
 export interface AgentHooks {
-  beforeTurn?: (turnIndex: number, messages: Message[]) => Promise<'continue' | 'abort'>;
-  beforeToolCall?: (call: ToolCall) => Promise<{ block: true; reason: string } | { block: false; replaceInput?: unknown } | undefined>;
+  beforeTurn?: (
+    turnIndex: number,
+    messages: Message[],
+  ) => Promise<"continue" | "abort">;
+  beforeToolCall?: (
+    call: ToolCall,
+  ) => Promise<
+    | { block: true; reason: string }
+    | { block: false; replaceInput?: unknown }
+    | undefined
+  >;
   afterToolCall?: (call: ToolCall, result: ToolResult) => Promise<ToolResult>;
   afterTurn?: (turnIndex: number, usage: UsageTotal) => Promise<void>;
 }

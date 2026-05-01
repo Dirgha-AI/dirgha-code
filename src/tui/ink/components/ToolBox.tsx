@@ -6,6 +6,10 @@
  * on completion we show ✓ or ✗ plus the elapsed time and a short
  * output preview. No state is owned here — App is the source of truth
  * so history stays immutable after scroll-off.
+ *
+ * Diff-aware rendering: when outputKind is "diff" or the output
+ * contains unified-diff markers, lines are coloured green (+) /
+ * red (-) / cyan (@@) to match monorepo patterns.
  */
 
 import * as React from "react";
@@ -20,6 +24,7 @@ export interface ToolBoxProps {
   status: ToolStatus;
   argSummary?: string;
   outputPreview?: string;
+  outputKind?: "text" | "diff";
   durationMs?: number;
   startedAt: number;
 }
@@ -48,6 +53,10 @@ const TOOL_LABEL: Record<string, string> = {
   task: "Task",
 };
 
+const DIFF_ADD_COLOUR = "#50fa7b";
+const DIFF_DEL_COLOUR = "#ff5555";
+const DIFF_HUNK_COLOUR = "#00ffff";
+
 function prettyName(name: string): string {
   return TOOL_LABEL[name] ?? name.replace(/_/g, " ");
 }
@@ -57,6 +66,44 @@ function formatElapsed(ms: number): string {
   const s = Math.floor(ms / 1000);
   if (s < 60) return `${s}s`;
   return `${Math.floor(s / 60)}m ${s % 60}s`;
+}
+
+function hasDiffMarkers(text: string): boolean {
+  return /^[+-]|^@@\s/m.test(text);
+}
+
+function isDiffOutput(props: ToolBoxProps): boolean {
+  if (props.outputKind === "diff") return true;
+  if (props.outputPreview && hasDiffMarkers(props.outputPreview)) return true;
+  return false;
+}
+
+function renderDiffLines(text: string, limit: number): React.ReactNode[] {
+  const lines = text.split("\n").slice(0, limit);
+  return lines.map((line, i) => {
+    let colour: string | undefined;
+    if (line.startsWith("+") && !line.startsWith("+++"))
+      colour = DIFF_ADD_COLOUR;
+    else if (line.startsWith("-") && !line.startsWith("---"))
+      colour = DIFF_DEL_COLOUR;
+    else if (/^@@\s/.test(line)) colour = DIFF_HUNK_COLOUR;
+    return (
+      <Box key={i} flexDirection="row">
+        <Text color={colour} dimColor={!colour}>
+          {line || " "}
+        </Text>
+      </Box>
+    );
+  });
+}
+
+/** Short single-line preview for collapsed diff output. */
+function diffShortPreview(text: string, maxLen = 80): string {
+  const first = text
+    .split("\n")
+    .find((l) => l.startsWith("+") || l.startsWith("-"));
+  if (!first) return text.replace(/\s+/g, " ").slice(0, maxLen);
+  return first.replace(/\s+/g, " ").slice(0, maxLen) + "\u2026";
 }
 
 export function ToolBox(props: ToolBoxProps): React.JSX.Element {
@@ -98,12 +145,16 @@ export function ToolBox(props: ToolBoxProps): React.JSX.Element {
       : props.durationMs !== undefined
         ? formatElapsed(props.durationMs)
         : "";
-  // tick is read so React treats it as a live dep; silences unused var lints.
   void tick;
 
-  const preview = props.outputPreview
-    ? props.outputPreview.replace(/\s+/g, " ").slice(0, 80)
-    : "";
+  const diffMode = isDiffOutput(props);
+
+  const preview =
+    !diffMode && props.outputPreview
+      ? props.outputPreview.replace(/\s+/g, " ").slice(0, 80)
+      : diffMode && props.outputPreview
+        ? diffShortPreview(props.outputPreview, 80)
+        : "";
 
   return (
     <Box
@@ -137,11 +188,16 @@ export function ToolBox(props: ToolBoxProps): React.JSX.Element {
           </Text>
         )}
       </Box>
-      {preview !== "" && (
+      {preview !== "" && !diffMode && (
         <Box>
           <Text color={palette.textMuted} dimColor>
             {preview}
           </Text>
+        </Box>
+      )}
+      {diffMode && props.outputPreview && (
+        <Box flexDirection="column">
+          {renderDiffLines(props.outputPreview, 30)}
         </Box>
       )}
     </Box>

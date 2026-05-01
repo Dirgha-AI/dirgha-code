@@ -8,13 +8,14 @@
  *       reject very long descriptions or lack tool-use capability
  *       entirely.
  */
-import type { JsonSchema, ToolDefinition, ToolResult } from '../kernel/types.js';
+import type { JsonSchema, ToolDefinition, ToolResult } from "../kernel/types.js";
 export interface ToolContext {
     cwd: string;
     env: Record<string, string>;
     sessionId: string;
     signal: AbortSignal;
-    log?: (level: 'debug' | 'info' | 'warn' | 'error', msg: string, meta?: Record<string, unknown>) => void;
+    log?: (level: "debug" | "info" | "warn" | "error", msg: string, meta?: Record<string, unknown>) => void;
+    onProgress?: (message: string) => void;
 }
 export interface Tool {
     name: string;

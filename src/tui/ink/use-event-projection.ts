@@ -27,6 +27,7 @@ export type TranscriptItem =
       argSummary: string;
       argJson?: string;
       outputPreview: string;
+      outputKind?: "text" | "diff";
       startedAt: number;
       durationMs?: number;
     }
@@ -175,15 +176,43 @@ export function useEventProjection(events: EventStream): EventProjection {
           setLiveItems((prev) => [...prev, item]);
           return;
         }
+        case "tool_exec_progress": {
+          setLiveItems((prev) =>
+            prev.map((it) =>
+              it.kind === "tool" &&
+              it.id === event.id &&
+              it.status === "running"
+                ? {
+                    ...it,
+                    outputPreview: it.outputPreview + event.message + "\n",
+                  }
+                : it,
+            ),
+          );
+          return;
+        }
         case "tool_exec_end": {
           const status: ToolStatus = event.isError ? "error" : "done";
+          const diff =
+            typeof event.metadata?.diff === "string"
+              ? event.metadata.diff
+              : undefined;
+          const outputKind: "text" | "diff" | undefined =
+            diff !== undefined
+              ? "diff"
+              : hasDiffMarkers(event.output)
+                ? "diff"
+                : "text";
+          const outputText =
+            outputKind === "diff" && diff !== undefined ? diff : event.output;
           setLiveItems((prev) =>
             prev.map((it) =>
               it.kind === "tool" && it.id === event.id
                 ? {
                     ...it,
                     status,
-                    outputPreview: event.output.slice(0, 200),
+                    outputPreview: outputText.slice(0, 2000),
+                    outputKind,
                     durationMs: event.durationMs,
                   }
                 : it,
@@ -260,4 +289,8 @@ function safeStringify(value: unknown): string {
   } catch {
     return String(value);
   }
+}
+
+function hasDiffMarkers(result: string): boolean {
+  return /^[+-]|^@@\s/m.test(result);
 }

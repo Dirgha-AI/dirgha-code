@@ -8,11 +8,11 @@
  * auditable — no "nearest fuzzy match" guessing.
  */
 
-import { readFile, stat, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
-import type { Tool } from './registry.js';
-import type { ToolResult } from '../kernel/types.js';
-import { summariseDiff, unifiedDiff } from './diff.js';
+import { readFile, stat, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import type { Tool } from "./registry.js";
+import type { ToolResult } from "../kernel/types.js";
+import { summariseDiff, unifiedDiff } from "./diff.js";
 
 interface Input {
   path: string;
@@ -22,28 +22,38 @@ interface Input {
 }
 
 export const fsEditTool: Tool = {
-  name: 'fs_edit',
-  description: 'Replace an exact substring in a file. Fails on ambiguity (multiple matches) unless replaceAll is set. Use larger context around oldString to disambiguate.',
+  name: "fs_edit",
+  description:
+    "Replace an exact substring in a file. Fails on ambiguity (multiple matches) unless replaceAll is set. Use larger context around oldString to disambiguate.",
   inputSchema: {
-    type: 'object',
+    type: "object",
     properties: {
-      path: { type: 'string' },
-      oldString: { type: 'string' },
-      newString: { type: 'string' },
-      replaceAll: { type: 'boolean' },
+      path: { type: "string" },
+      oldString: { type: "string" },
+      newString: { type: "string" },
+      replaceAll: { type: "boolean" },
     },
-    required: ['path', 'oldString', 'newString'],
+    required: ["path", "oldString", "newString"],
   },
   requiresApproval: () => true,
-  async execute(rawInput: unknown, ctx): Promise<ToolResult<{ replacements: number; added: number; removed: number }>> {
+  async execute(
+    rawInput: unknown,
+    ctx,
+  ): Promise<
+    ToolResult<{ replacements: number; added: number; removed: number }>
+  > {
     const input = rawInput as Input;
     const abs = resolve(ctx.cwd, input.path);
     const info = await stat(abs).catch(() => undefined);
-    if (!info || !info.isFile()) return { content: `No such file: ${input.path}`, isError: true };
-    const before = await readFile(abs, 'utf8');
+    if (!info || !info.isFile())
+      return { content: `No such file: ${input.path}`, isError: true };
+    const before = await readFile(abs, "utf8");
 
     if (input.oldString === input.newString) {
-      return { content: 'oldString and newString are identical; nothing to do.', isError: true };
+      return {
+        content: "oldString and newString are identical; nothing to do.",
+        isError: true,
+      };
     }
 
     const exactCount = countOccurrences(before, input.oldString);
@@ -64,16 +74,27 @@ export const fsEditTool: Tool = {
       ? splitJoin(before, input.oldString, input.newString)
       : before.replace(input.oldString, input.newString);
 
-    const diff = unifiedDiff(before, after, { fromLabel: input.path, toLabel: input.path });
+    const diff = unifiedDiff(before, after, {
+      fromLabel: input.path,
+      toLabel: input.path,
+    });
     const { added, removed } = summariseDiff(diff);
 
-    await writeFile(abs, after, 'utf8');
+    await writeFile(abs, after, "utf8");
+
+    const summary = `Edited ${input.path}: ${input.replaceAll ? exactCount : 1} replacement(s) (+${added} / -${removed})`;
+    const content = diff ? `${summary}\n\n${diff}` : summary;
 
     return {
-      content: `Edited ${input.path}: ${input.replaceAll ? exactCount : 1} replacement(s) (+${added} / -${removed})`,
+      content,
       data: { replacements: input.replaceAll ? exactCount : 1, added, removed },
       isError: false,
-      metadata: { diff },
+      metadata: {
+        diff,
+        added,
+        removed,
+        replacements: input.replaceAll ? exactCount : 1,
+      },
     };
   },
 };
@@ -91,6 +112,10 @@ function countOccurrences(haystack: string, needle: string): number {
   return count;
 }
 
-function splitJoin(haystack: string, needle: string, replacement: string): string {
+function splitJoin(
+  haystack: string,
+  needle: string,
+  replacement: string,
+): string {
   return haystack.split(needle).join(replacement);
 }

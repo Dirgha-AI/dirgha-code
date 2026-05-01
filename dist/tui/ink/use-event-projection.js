@@ -123,13 +123,34 @@ export function useEventProjection(events) {
                     setLiveItems((prev) => [...prev, item]);
                     return;
                 }
+                case "tool_exec_progress": {
+                    setLiveItems((prev) => prev.map((it) => it.kind === "tool" &&
+                        it.id === event.id &&
+                        it.status === "running"
+                        ? {
+                            ...it,
+                            outputPreview: it.outputPreview + event.message + "\n",
+                        }
+                        : it));
+                    return;
+                }
                 case "tool_exec_end": {
                     const status = event.isError ? "error" : "done";
+                    const diff = typeof event.metadata?.diff === "string"
+                        ? event.metadata.diff
+                        : undefined;
+                    const outputKind = diff !== undefined
+                        ? "diff"
+                        : hasDiffMarkers(event.output)
+                            ? "diff"
+                            : "text";
+                    const outputText = outputKind === "diff" && diff !== undefined ? diff : event.output;
                     setLiveItems((prev) => prev.map((it) => it.kind === "tool" && it.id === event.id
                         ? {
                             ...it,
                             status,
-                            outputPreview: event.output.slice(0, 200),
+                            outputPreview: outputText.slice(0, 2000),
+                            outputKind,
                             durationMs: event.durationMs,
                         }
                         : it));
@@ -199,5 +220,8 @@ function safeStringify(value) {
     catch {
         return String(value);
     }
+}
+function hasDiffMarkers(result) {
+    return /^[+-]|^@@\s/m.test(result);
 }
 //# sourceMappingURL=use-event-projection.js.map

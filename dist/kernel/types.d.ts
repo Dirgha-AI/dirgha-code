@@ -5,24 +5,24 @@
  * tools consume tool-use parts and emit tool-result parts, surfaces render
  * events, the daemon streams events over RPC. One shape, everywhere.
  */
-export type Role = 'system' | 'user' | 'assistant' | 'tool';
+export type Role = "system" | "user" | "assistant" | "tool";
 export interface TextPart {
-    type: 'text';
+    type: "text";
     text: string;
 }
 export interface ThinkingPart {
-    type: 'thinking';
+    type: "thinking";
     text: string;
     signature?: string;
 }
 export interface ToolUsePart {
-    type: 'tool_use';
+    type: "tool_use";
     id: string;
     name: string;
     input: unknown;
 }
 export interface ToolResultPart {
-    type: 'tool_result';
+    type: "tool_result";
     toolUseId: string;
     content: string;
     isError?: boolean;
@@ -33,7 +33,7 @@ export interface Message {
     content: string | ContentPart[];
     name?: string;
 }
-export type StopReason = 'end_turn' | 'tool_use' | 'max_tokens' | 'stop_sequence' | 'error' | 'aborted';
+export type StopReason = "end_turn" | "tool_use" | "max_tokens" | "stop_sequence" | "error" | "aborted";
 export interface UsageTotal {
     inputTokens: number;
     outputTokens: number;
@@ -41,70 +41,71 @@ export interface UsageTotal {
     costUsd: number;
 }
 export type AgentEvent = {
-    type: 'agent_start';
+    type: "agent_start";
     sessionId: string;
     model: string;
 } | {
-    type: 'turn_start';
+    type: "turn_start";
     turnId: string;
     turnIndex: number;
 } | {
-    type: 'text_start';
+    type: "text_start";
 } | {
-    type: 'text_delta';
+    type: "text_delta";
     delta: string;
 } | {
-    type: 'text_end';
+    type: "text_end";
 } | {
-    type: 'thinking_start';
+    type: "thinking_start";
 } | {
-    type: 'thinking_delta';
+    type: "thinking_delta";
     delta: string;
 } | {
-    type: 'thinking_end';
+    type: "thinking_end";
 } | {
-    type: 'toolcall_start';
+    type: "toolcall_start";
     id: string;
     name: string;
 } | {
-    type: 'toolcall_delta';
+    type: "toolcall_delta";
     id: string;
     deltaJson: string;
 } | {
-    type: 'toolcall_end';
+    type: "toolcall_end";
     id: string;
     input: unknown;
 } | {
-    type: 'tool_exec_start';
+    type: "tool_exec_start";
     id: string;
     name: string;
     input: unknown;
 } | {
-    type: 'tool_exec_progress';
+    type: "tool_exec_progress";
     id: string;
     message: string;
 } | {
-    type: 'tool_exec_end';
+    type: "tool_exec_end";
     id: string;
     output: string;
     isError: boolean;
     durationMs: number;
+    metadata?: Record<string, unknown>;
 } | {
-    type: 'usage';
+    type: "usage";
     inputTokens: number;
     outputTokens: number;
     cachedTokens?: number;
 } | {
-    type: 'turn_end';
+    type: "turn_end";
     turnId: string;
     stopReason: StopReason;
 } | {
-    type: 'agent_end';
+    type: "agent_end";
     sessionId: string;
     stopReason: StopReason;
     usage: UsageTotal;
 } | {
-    type: 'error';
+    type: "error";
     message: string;
     reason?: string;
     retryable?: boolean;
@@ -133,7 +134,7 @@ export interface StreamRequest {
     tools?: ToolDefinition[];
     temperature?: number;
     maxTokens?: number;
-    thinking?: 'off' | 'low' | 'medium' | 'high';
+    thinking?: "off" | "low" | "medium" | "high";
     signal?: AbortSignal;
 }
 export interface ImageGenRequest {
@@ -165,7 +166,7 @@ export interface ApprovalBus {
         tool: string;
         summary: string;
         diff?: string;
-    }): Promise<'approve' | 'deny' | 'approve_once' | 'deny_always'>;
+    }): Promise<"approve" | "deny" | "approve_once" | "deny_always">;
     requiresApproval(toolName: string, input: unknown): boolean;
 }
 export interface ErrorClassifier {
@@ -178,7 +179,7 @@ export interface ClassifiedError {
     reason: string;
 }
 export interface AgentHooks {
-    beforeTurn?: (turnIndex: number, messages: Message[]) => Promise<'continue' | 'abort'>;
+    beforeTurn?: (turnIndex: number, messages: Message[]) => Promise<"continue" | "abort">;
     beforeToolCall?: (call: ToolCall) => Promise<{
         block: true;
         reason: string;

@@ -13,5 +13,5 @@
  *           handles quoting + UTF-8 + multi-line scripts more cleanly
  *           than cmd.exe's relic Windows-95 parser.
  */
-import type { Tool } from './registry.js';
+import type { Tool } from "./registry.js";
 export declare const shellTool: Tool;

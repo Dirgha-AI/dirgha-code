@@ -445,6 +445,13 @@ export function App(props: AppProps): React.JSX.Element {
         registry: props.registry,
         cwd: props.cwd,
         sessionId: sessionIdRef.current,
+        onProgress: (toolId: string, message: string): void => {
+          props.events.emit({
+            type: "tool_exec_progress",
+            id: toolId,
+            message,
+          });
+        },
       });
       const sanitized = props.registry.sanitize({ descriptionLimit: 200 });
       const provider = props.providers.forModel(currentModel);
@@ -929,6 +936,7 @@ function renderTranscript(items: TranscriptItem[]): React.ReactNode[] {
         status: item.status,
         argSummary: item.argSummary,
         outputPreview: item.outputPreview,
+        outputKind: item.outputKind,
         startedAt: item.startedAt,
         durationMs: item.durationMs,
       });
@@ -968,6 +976,7 @@ function TranscriptRow({
           status={item.status}
           argSummary={item.argSummary}
           outputPreview={item.outputPreview}
+          outputKind={item.outputKind}
           startedAt={item.startedAt}
           durationMs={item.durationMs}
         />

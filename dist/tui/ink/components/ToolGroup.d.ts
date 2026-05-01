@@ -20,6 +20,7 @@ export interface ToolItem {
     status: ToolStatus;
     argSummary: string;
     outputPreview: string;
+    outputKind?: "text" | "diff";
     startedAt: number;
     durationMs?: number;
 }

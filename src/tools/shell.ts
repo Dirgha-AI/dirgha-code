@@ -14,9 +14,9 @@
  *           than cmd.exe's relic Windows-95 parser.
  */
 
-import { spawn, spawnSync } from 'node:child_process';
-import type { Tool } from './registry.js';
-import type { ToolResult } from '../kernel/types.js';
+import { spawn, spawnSync } from "node:child_process";
+import type { Tool } from "./registry.js";
+import type { ToolResult } from "../kernel/types.js";
 
 interface Input {
   command: string;
@@ -25,22 +25,32 @@ interface Input {
 }
 
 /** Cached PowerShell executable detection (per-process, never re-probed). */
-let cachedWindowsShell: { cmd: string; args: (script: string) => string[] } | null = null;
+let cachedWindowsShell: {
+  cmd: string;
+  args: (script: string) => string[];
+} | null = null;
 
-function resolveWindowsShell(): { cmd: string; args: (script: string) => string[] } {
+function resolveWindowsShell(): {
+  cmd: string;
+  args: (script: string) => string[];
+} {
   if (cachedWindowsShell) return cachedWindowsShell;
   // Prefer PowerShell 7+ (`pwsh`), then Windows PowerShell 5.1, then cmd.
-  for (const exe of ['pwsh', 'powershell']) {
-    const probe = spawnSync(exe, ['-NoLogo', '-Command', 'exit 0'], { timeout: 3000 });
+  for (const exe of ["pwsh", "powershell"]) {
+    const probe = spawnSync(exe, ["-NoLogo", "-Command", "exit 0"], {
+      timeout: 3000,
+    });
     if (probe.status === 0) {
       cachedWindowsShell = {
         cmd: exe,
         args: (script: string): string[] => [
-          '-NoLogo',
-          '-NoProfile',
-          '-NonInteractive',
-          '-OutputFormat', 'Text',
-          '-Command', script,
+          "-NoLogo",
+          "-NoProfile",
+          "-NonInteractive",
+          "-OutputFormat",
+          "Text",
+          "-Command",
+          script,
         ],
       };
       return cachedWindowsShell;
@@ -48,8 +58,8 @@ function resolveWindowsShell(): { cmd: string; args: (script: string) => string[
   }
   // Fallback: cmd.exe via shell:true (no /c needed since spawn handles it).
   cachedWindowsShell = {
-    cmd: process.env.ComSpec ?? 'cmd.exe',
-    args: (script: string): string[] => ['/d', '/s', '/c', script],
+    cmd: process.env.ComSpec ?? "cmd.exe",
+    args: (script: string): string[] => ["/d", "/s", "/c", script],
   };
   return cachedWindowsShell;
 }
@@ -65,18 +75,19 @@ const DEFAULT_TIMEOUT_MS = 120_000;
 const MAX_OUTPUT_BYTES = 256 * 1024;
 
 export const shellTool: Tool = {
-  name: 'shell',
-  description: process.platform === 'win32'
-    ? 'Execute a shell command via PowerShell (or cmd.exe fallback). Returns stdout, stderr, and exit code. The host is Windows: prefer PowerShell-style commands (Get-ChildItem, Where-Object, Select-String) over POSIX (ls, grep). For maximum portability use cross-platform tools (node, npm, git, python). Long-running commands time out.'
-    : 'Execute a shell command via /bin/sh. Returns stdout, stderr, and exit code. Long-running commands time out.',
+  name: "shell",
+  description:
+    process.platform === "win32"
+      ? "Execute a shell command via PowerShell (or cmd.exe fallback). Returns stdout, stderr, and exit code. The host is Windows: prefer PowerShell-style commands (Get-ChildItem, Where-Object, Select-String) over POSIX (ls, grep). For maximum portability use cross-platform tools (node, npm, git, python). Long-running commands time out."
+      : "Execute a shell command via /bin/sh. Returns stdout, stderr, and exit code. Long-running commands time out.",
   inputSchema: {
-    type: 'object',
+    type: "object",
     properties: {
-      command: { type: 'string' },
-      cwd: { type: 'string' },
-      timeoutMs: { type: 'integer', minimum: 1000 },
+      command: { type: "string" },
+      cwd: { type: "string" },
+      timeoutMs: { type: "integer", minimum: 1000 },
     },
-    required: ['command'],
+    required: ["command"],
   },
   requiresApproval: () => true,
   async execute(rawInput: unknown, ctx): Promise<ToolResult<Output>> {
@@ -87,22 +98,23 @@ export const shellTool: Tool = {
     // PowerShell handles UTF-8, quoting, and multi-line scripts more
     // cleanly than cmd.exe's legacy parser. On POSIX, plain shell:true
     // (= /bin/sh -c).
-    const child = process.platform === 'win32'
-      ? (() => {
-          const shell = resolveWindowsShell();
-          return spawn(shell.cmd, shell.args(input.command), {
+    const child =
+      process.platform === "win32"
+        ? (() => {
+            const shell = resolveWindowsShell();
+            return spawn(shell.cmd, shell.args(input.command), {
+              cwd,
+              env: ctx.env,
+              stdio: ["ignore", "pipe", "pipe"],
+              windowsHide: true,
+            });
+          })()
+        : spawn(input.command, {
             cwd,
             env: ctx.env,
-            stdio: ['ignore', 'pipe', 'pipe'],
-            windowsHide: true,
+            stdio: ["ignore", "pipe", "pipe"],
+            shell: true,
           });
-        })()
-      : spawn(input.command, {
-          cwd,
-          env: ctx.env,
-          stdio: ['ignore', 'pipe', 'pipe'],
-          shell: true,
-        });
 
     const stdoutChunks: Buffer[] = [];
     const stderrChunks: Buffer[] = [];
@@ -110,37 +122,62 @@ export const shellTool: Tool = {
     let stderrBytes = 0;
     let truncated = false;
 
-    const onData = (chunks: Buffer[], counter: (n: number) => number) => (buf: Buffer) => {
-      const remaining = MAX_OUTPUT_BYTES - counter(0);
-      if (remaining <= 0) { truncated = true; return; }
-      const slice = buf.length <= remaining ? buf : buf.subarray(0, remaining);
-      chunks.push(slice);
-      counter(slice.length);
-      if (buf.length > remaining) truncated = true;
-    };
+    const onData =
+      (chunks: Buffer[], counter: (n: number) => number) => (buf: Buffer) => {
+        const remaining = MAX_OUTPUT_BYTES - counter(0);
+        if (remaining <= 0) {
+          truncated = true;
+          return;
+        }
+        const slice =
+          buf.length <= remaining ? buf : buf.subarray(0, remaining);
+        chunks.push(slice);
+        counter(slice.length);
+        if (buf.length > remaining) truncated = true;
+        const text = slice.toString("utf8");
+        if (text.trim().length > 0) ctx.onProgress?.(text.trimEnd());
+      };
 
-    const stdoutCount = ((acc = 0) => (add: number) => { acc += add; stdoutBytes = acc; return acc; })();
-    const stderrCount = ((acc = 0) => (add: number) => { acc += add; stderrBytes = acc; return acc; })();
+    const stdoutCount = (
+      (acc = 0) =>
+      (add: number) => {
+        acc += add;
+        stdoutBytes = acc;
+        return acc;
+      }
+    )();
+    const stderrCount = (
+      (acc = 0) =>
+      (add: number) => {
+        acc += add;
+        stderrBytes = acc;
+        return acc;
+      }
+    )();
 
-    child.stdout.on('data', onData(stdoutChunks, stdoutCount));
-    child.stderr.on('data', onData(stderrChunks, stderrCount));
+    child.stdout.on("data", onData(stdoutChunks, stdoutCount));
+    child.stderr.on("data", onData(stderrChunks, stderrCount));
 
-    const timer = setTimeout(() => { child.kill('SIGKILL'); }, timeoutMs);
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+    }, timeoutMs);
 
-    const exitCode: number = await new Promise(resolveExit => {
-      child.on('error', () => resolveExit(-1));
-      child.on('exit', code => resolveExit(code ?? -1));
+    const exitCode: number = await new Promise((resolveExit) => {
+      child.on("error", () => resolveExit(-1));
+      child.on("exit", (code) => resolveExit(code ?? -1));
     });
     clearTimeout(timer);
 
-    const stdout = Buffer.concat(stdoutChunks).toString('utf8');
-    const stderr = Buffer.concat(stderrChunks).toString('utf8');
-    const banner = `exit=${exitCode}${truncated ? ' [output truncated]' : ''}`;
+    const stdout = Buffer.concat(stdoutChunks).toString("utf8");
+    const stderr = Buffer.concat(stderrChunks).toString("utf8");
+    const banner = `exit=${exitCode}${truncated ? " [output truncated]" : ""}`;
     const body = [
       banner,
-      stdout.length > 0 ? `STDOUT:\n${stdout}` : '',
-      stderr.length > 0 ? `STDERR:\n${stderr}` : '',
-    ].filter(Boolean).join('\n\n');
+      stdout.length > 0 ? `STDOUT:\n${stdout}` : "",
+      stderr.length > 0 ? `STDERR:\n${stderr}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
 
     return {
       content: body.length > 0 ? body : banner,

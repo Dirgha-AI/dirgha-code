@@ -9,14 +9,23 @@
  *       entirely.
  */
 
-import type { JsonSchema, ToolDefinition, ToolResult } from '../kernel/types.js';
+import type {
+  JsonSchema,
+  ToolDefinition,
+  ToolResult,
+} from "../kernel/types.js";
 
 export interface ToolContext {
   cwd: string;
   env: Record<string, string>;
   sessionId: string;
   signal: AbortSignal;
-  log?: (level: 'debug' | 'info' | 'warn' | 'error', msg: string, meta?: Record<string, unknown>) => void;
+  log?: (
+    level: "debug" | "info" | "warn" | "error",
+    msg: string,
+    meta?: Record<string, unknown>,
+  ) => void;
+  onProgress?: (message: string) => void;
 }
 
 export interface Tool {
@@ -75,9 +84,10 @@ export class ToolRegistry {
     for (const tool of this.tools.values()) {
       if (opts.allowlist && !opts.allowlist.has(tool.name)) continue;
       if (opts.denylist && opts.denylist.has(tool.name)) continue;
-      const description = tool.description.length > limit
-        ? `${tool.description.slice(0, limit - 3)}...`
-        : tool.description;
+      const description =
+        tool.description.length > limit
+          ? `${tool.description.slice(0, limit - 3)}...`
+          : tool.description;
       definitions.push({
         name: tool.name,
         description,

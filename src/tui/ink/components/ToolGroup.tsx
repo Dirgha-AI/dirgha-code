@@ -26,6 +26,7 @@ export interface ToolItem {
   status: ToolStatus;
   argSummary: string;
   outputPreview: string;
+  outputKind?: "text" | "diff";
   startedAt: number;
   durationMs?: number;
 }
@@ -47,6 +48,10 @@ const TOOL_LABEL: Record<string, string> = {
   git: "Git",
   task: "Task",
 };
+
+const DIFF_ADD_COLOUR = "#50fa7b";
+const DIFF_DEL_COLOUR = "#ff5555";
+const DIFF_HUNK_COLOUR = "#00ffff";
 
 export function ToolGroup(props: ToolGroupProps): React.JSX.Element | null {
   const palette = useTheme();
@@ -143,9 +148,20 @@ function FullToolRow({
 
   const label = TOOL_LABEL[tool.name] ?? tool.name.replace(/_/g, " ");
 
-  const preview = tool.outputPreview
-    ? tool.outputPreview.replace(/\s+/g, " ").slice(0, 200)
-    : "";
+  const diffMode =
+    tool.outputKind === "diff" ||
+    (tool.outputPreview !== undefined &&
+      /^[+-]|^@@\s/m.test(tool.outputPreview));
+
+  const preview =
+    !diffMode && tool.outputPreview
+      ? tool.outputPreview.replace(/\s+/g, " ").slice(0, 200)
+      : "";
+
+  const diffLines =
+    diffMode && tool.outputPreview
+      ? tool.outputPreview.split("\n").slice(0, 30)
+      : [];
 
   return (
     <Box flexDirection="column">
@@ -182,10 +198,29 @@ function FullToolRow({
           </Text>
         </Box>
       )}
+      {diffLines.length > 0 && (
+        <Box paddingLeft={4} flexDirection="column">
+          {diffLines.map((line, i) => {
+            let colour: string | undefined;
+            if (line.startsWith("+") && !line.startsWith("+++"))
+              colour = DIFF_ADD_COLOUR;
+            else if (line.startsWith("-") && !line.startsWith("---"))
+              colour = DIFF_DEL_COLOUR;
+            else if (/^@@\s/.test(line)) colour = DIFF_HUNK_COLOUR;
+            return (
+              <Box key={i} flexDirection="row">
+                <Text color={colour} dimColor={!colour}>
+                  {line || " "}
+                </Text>
+              </Box>
+            );
+          })}
+        </Box>
+      )}
       {divider && (
         <Box>
           <Text color={palette.border.default} dimColor>
-            {/* light separator between full tool rows */}{" "}
+            {" "}
           </Text>
         </Box>
       )}

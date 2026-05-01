@@ -7,5 +7,5 @@
  * can retry with more specific anchors. This is deterministic and
  * auditable — no "nearest fuzzy match" guessing.
  */
-import type { Tool } from './registry.js';
+import type { Tool } from "./registry.js";
 export declare const fsEditTool: Tool;

@@ -31,6 +31,7 @@ export type TranscriptItem = {
     argSummary: string;
     argJson?: string;
     outputPreview: string;
+    outputKind?: "text" | "diff";
     startedAt: number;
     durationMs?: number;
 } | {

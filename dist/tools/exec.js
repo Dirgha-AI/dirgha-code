@@ -5,6 +5,9 @@
  * the tool's execute() under the caller's AbortSignal, and returns a
  * ToolResult. Tools themselves own their error handling; the executor
  * converts unexpected exceptions into a uniform error result.
+ *
+ * When an onProgress callback is provided, tools that emit streaming
+ * progress push events back through the agent-loop event stream.
  */
 export function createToolExecutor(opts) {
     const env = opts.env ?? sanitiseEnv(process.env);
@@ -12,7 +15,10 @@ export function createToolExecutor(opts) {
         async execute(call, signal) {
             const tool = opts.registry.get(call.name);
             if (!tool) {
-                return { content: `Tool "${call.name}" is not registered.`, isError: true };
+                return {
+                    content: `Tool "${call.name}" is not registered.`,
+                    isError: true,
+                };
             }
             const ctx = {
                 cwd: opts.cwd,
@@ -20,6 +26,9 @@ export function createToolExecutor(opts) {
                 sessionId: opts.sessionId,
                 signal,
                 log: opts.log,
+                onProgress: opts.onProgress
+                    ? (msg) => opts.onProgress(call.id, msg)
+                    : undefined,
             };
             try {
                 return await runTool(tool, call.input, ctx);

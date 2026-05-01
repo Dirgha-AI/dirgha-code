@@ -279,6 +279,7 @@ async function executeToolCalls(
       output: result.content,
       isError: result.isError,
       durationMs,
+      ...(result.metadata !== undefined ? { metadata: result.metadata } : {}),
     });
     return { call: { ...call, input }, result };
   };

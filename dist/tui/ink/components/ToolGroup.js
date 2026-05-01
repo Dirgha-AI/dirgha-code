@@ -30,6 +30,9 @@ const TOOL_LABEL = {
     git: "Git",
     task: "Task",
 };
+const DIFF_ADD_COLOUR = "#50fa7b";
+const DIFF_DEL_COLOUR = "#ff5555";
+const DIFF_HUNK_COLOUR = "#00ffff";
 export function ToolGroup(props) {
     const palette = useTheme();
     if (props.tools.length === 0)
@@ -74,10 +77,25 @@ function FullToolRow({ tool, divider, palette, }) {
             ? formatElapsed(Date.now() - tool.startedAt)
             : "";
     const label = TOOL_LABEL[tool.name] ?? tool.name.replace(/_/g, " ");
-    const preview = tool.outputPreview
+    const diffMode = tool.outputKind === "diff" ||
+        (tool.outputPreview !== undefined &&
+            /^[+-]|^@@\s/m.test(tool.outputPreview));
+    const preview = !diffMode && tool.outputPreview
         ? tool.outputPreview.replace(/\s+/g, " ").slice(0, 200)
         : "";
-    return (_jsxs(Box, { flexDirection: "column", children: [_jsxs(Box, { flexDirection: "row", children: [_jsx(Box, { minWidth: 2, children: _jsx(Text, { color: glyphColour, bold: tool.status !== "running", children: glyph }) }), _jsx(Text, { color: palette.text.accent, children: iconFor(tool.name) }), _jsx(Text, { children: " " }), _jsx(Text, { bold: true, color: nameColour, children: label }), tool.argSummary && tool.argSummary.length > 0 && (_jsxs(_Fragment, { children: [_jsx(Text, { children: " " }), _jsx(Text, { color: palette.text.secondary, children: tool.argSummary })] })), elapsed && (_jsxs(_Fragment, { children: [_jsx(Text, { children: "  " }), _jsx(Text, { color: palette.text.secondary, dimColor: true, children: elapsed })] }))] }), preview && (_jsx(Box, { paddingLeft: 4, children: _jsxs(Text, { color: palette.text.secondary, dimColor: true, children: ["\u23BF ", preview] }) })), divider && (_jsx(Box, { children: _jsx(Text, { color: palette.border.default, dimColor: true, children: " " }) }))] }));
+    const diffLines = diffMode && tool.outputPreview
+        ? tool.outputPreview.split("\n").slice(0, 30)
+        : [];
+    return (_jsxs(Box, { flexDirection: "column", children: [_jsxs(Box, { flexDirection: "row", children: [_jsx(Box, { minWidth: 2, children: _jsx(Text, { color: glyphColour, bold: tool.status !== "running", children: glyph }) }), _jsx(Text, { color: palette.text.accent, children: iconFor(tool.name) }), _jsx(Text, { children: " " }), _jsx(Text, { bold: true, color: nameColour, children: label }), tool.argSummary && tool.argSummary.length > 0 && (_jsxs(_Fragment, { children: [_jsx(Text, { children: " " }), _jsx(Text, { color: palette.text.secondary, children: tool.argSummary })] })), elapsed && (_jsxs(_Fragment, { children: [_jsx(Text, { children: "  " }), _jsx(Text, { color: palette.text.secondary, dimColor: true, children: elapsed })] }))] }), preview && (_jsx(Box, { paddingLeft: 4, children: _jsxs(Text, { color: palette.text.secondary, dimColor: true, children: ["\u23BF ", preview] }) })), diffLines.length > 0 && (_jsx(Box, { paddingLeft: 4, flexDirection: "column", children: diffLines.map((line, i) => {
+                    let colour;
+                    if (line.startsWith("+") && !line.startsWith("+++"))
+                        colour = DIFF_ADD_COLOUR;
+                    else if (line.startsWith("-") && !line.startsWith("---"))
+                        colour = DIFF_DEL_COLOUR;
+                    else if (/^@@\s/.test(line))
+                        colour = DIFF_HUNK_COLOUR;
+                    return (_jsx(Box, { flexDirection: "row", children: _jsx(Text, { color: colour, dimColor: !colour, children: line || " " }) }, i));
+                }) })), divider && (_jsx(Box, { children: _jsx(Text, { color: palette.border.default, dimColor: true, children: " " }) }))] }));
 }
 function pickGroupColour(tools, palette) {
     if (tools.some((t) => t.status === "error"))

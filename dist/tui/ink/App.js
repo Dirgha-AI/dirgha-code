@@ -370,6 +370,13 @@ export function App(props) {
                 registry: props.registry,
                 cwd: props.cwd,
                 sessionId: sessionIdRef.current,
+                onProgress: (toolId, message) => {
+                    props.events.emit({
+                        type: "tool_exec_progress",
+                        id: toolId,
+                        message,
+                    });
+                },
             });
             const sanitized = props.registry.sanitize({ descriptionLimit: 200 });
             const provider = props.providers.forModel(currentModel);
@@ -722,6 +729,7 @@ function renderTranscript(items) {
                 status: item.status,
                 argSummary: item.argSummary,
                 outputPreview: item.outputPreview,
+                outputKind: item.outputKind,
                 startedAt: item.startedAt,
                 durationMs: item.durationMs,
             });
@@ -745,7 +753,7 @@ function TranscriptRow({ item, }) {
             // Should not be reached — tools are folded by renderTranscript() into
             // <ToolGroup>. Kept as a safety net so an unexpected tool item still
             // renders something rather than nothing.
-            return (_jsx(ToolBox, { name: item.name, status: item.status, argSummary: item.argSummary, outputPreview: item.outputPreview, startedAt: item.startedAt, durationMs: item.durationMs }));
+            return (_jsx(ToolBox, { name: item.name, status: item.status, argSummary: item.argSummary, outputPreview: item.outputPreview, outputKind: item.outputKind, startedAt: item.startedAt, durationMs: item.durationMs }));
         case "error":
             return (_jsxs(Box, { gap: 1, marginBottom: 1, children: [_jsx(Text, { color: "red", bold: true, children: "\u2717" }), _jsx(Text, { color: "red", children: item.message })] }));
         case "notice":
