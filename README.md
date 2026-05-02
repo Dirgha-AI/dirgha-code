@@ -6,13 +6,21 @@
 [![License](https://img.shields.io/badge/license-FSL--1.1--MIT-d4a373?style=flat-square)](./LICENSE)
 [![Sponsor](https://img.shields.io/badge/sponsor-%E2%99%A1-c25a4f?style=flat-square)](https://dirgha.ai/contribute)
 
-**Dirgha Code is a CLI coding agent built to help you accomplish complex agentic workflows and long-horizon development with leading LLM models, parallel agents, persistent memory, and security. Supports local models, BYOK, and skills.**
+**Dirgha Code is the open-source CLI coding agent — 17 providers, BYOK, offline-capable, parallel agents, persistent memory, security-audited. One install command. No vendor lock-in.**
 
 </div>
 
+## The Seed: Why the CLI Comes First
+
+Every operating system starts with a kernel. Dirgha Code — the open-source command-line agent — is the kernel of Dirgha AI OS. It is the smallest, most installable, most hackable piece of the stack: under 600 KB compressed, one install command, runs fully offline, ships under FSL → MIT.
+
+By design, the CLI is the entry point for every developer — whether you're on a 10 Gbps fiber line or a shared 4G hotspot, in a WeWork in Bengaluru or a basement in Berlin. No browser, no paid account, no telemetry by default. Just `npm install -g @dirgha/code` and a terminal.
+
+[Why a sovereign coding CLI matters](https://github.com/Dirgha-AI/Rama-I-Dirgha-AI-OS/blob/main/WHY_BHARAT_NEEDS_DIRGHA_CLI.md) — latency data, cost structure for independent developers, the layered view of AI sovereignty, and what the CLI does not solve.
+
 ## What it is
 
-A terminal coding assistant that reads your codebase, edits files, runs tests, commits, and audits every step. It runs on your keys — or entirely on your machine via llama.cpp / Ollama — with your transcripts staying local until you choose otherwise. When a model rate-limits or times out, the loop swaps to the next-priority key in your pool and resumes from the partial transcript. Your work doesn't vanish when an API hiccups.
+A terminal coding assistant that reads your codebase, edits files, runs tests, commits, and audits every step. It runs on your keys — or entirely on your machine via llama.cpp / Ollama — with your transcripts staying local until you choose otherwise. When a model rate-limits or times out, the 4-tier failover cascade (user choice → same-family → registry → free fallback) keeps the agent alive without losing context. HTTP streaming stalls are detected and aborted in 30 seconds. Your work doesn't vanish when an API hiccups.
 
 ## The five pillars
 
@@ -39,7 +47,7 @@ Information flows up. Old context gets distilled, not discarded.
 
 ### Parallel agents
 
-`dirgha fleet launch "<goal>"` decomposes the goal into N independent tasks, spawns each in its own git worktree, runs them in parallel, and merges the winners back. `dirgha fleet triple "<goal>"` runs three approaches and lets a judge pick. Inside any session, the agent can call the `task` tool to dispatch a fresh sub-agent with its own context budget for a sub-problem — no compaction loss on the parent.
+`dirgha fleet launch "<goal>"` decomposes the goal into N independent tasks, spawns each in its own git worktree, runs them in parallel, and merges the winners back. `dirgha fleet triple "<goal>"` runs three approaches and lets a judge pick. `dirgha fleet dag "step1..." "step2..." "step3..."` chains agents sequentially with cumulative context propagation — each step builds on the previous one's output. Inside any session, the agent can call the `task` tool to dispatch a fresh sub-agent with its own context budget for a sub-problem — no compaction loss on the parent.
 
 ### Skills, scanned
 
@@ -60,24 +68,25 @@ The interactive TUI is `dirgha` with no args. Resume a session with `dirgha resu
 
 ## What's in the box
 
-| | |
-|---|---|
-| **17 providers** | anthropic, openai, gemini, openrouter, nvidia, fireworks, deepseek, groq, cerebras, together, deepinfra, mistral, xai, perplexity, cohere, kimi, zai |
-| **34 model aliases** | `kimi`, `opus`, `sonnet`, `haiku`, `gemini`, `flash`, `deepseek`, `llama`, `ling`, `hy3`, … resolved before routing |
-| **12 built-in tools** | `fs_read`, `fs_write`, `fs_edit`, `fs_ls`, `shell`, `search_grep`, `search_glob`, `git`, `browser`, `checkpoint`, `cron`, `task` |
+|                       |                                                                                                                                                                  |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **17 providers**      | anthropic, openai, gemini, openrouter, nvidia, fireworks, deepseek, groq, cerebras, together, deepinfra, mistral, xai, perplexity, cohere, kimi, zai             |
+| **34 model aliases**  | `kimi`, `opus`, `sonnet`, `haiku`, `gemini`, `flash`, `deepseek`, `llama`, `ling`, `hy3`, … resolved before routing                                              |
+| **12 built-in tools** | `fs_read`, `fs_write`, `fs_edit`, `fs_ls`, `shell`, `search_grep`, `search_glob`, `git`, `browser`, `checkpoint`, `cron`, `task`                                 |
 | **20 slash commands** | `/account`, `/clear`, `/compact`, `/cost`, `/fleet`, `/keys`, `/login`, `/memory`, `/mode`, `/models`, `/resume`, `/session`, `/status`, `/theme`, `/upgrade`, … |
-| **18 subcommands** | `audit`, `audit-codebase`, `cost`, `kb`, `keys`, `ledger`, `login`, `models`, `resume`, `skills`, `undo`, `update`, `verify`, … |
-| **4 modes** | `act` · `plan` (read-only thinking) · `verify` (read-only audit) · `ask` (read-only Q&A) |
-| **MCP** | stdio + HTTP/SSE + `bearerProvider` async OAuth rotation |
-| **Source** | ~14.5 K LOC across 23 modules in `src/`. Hard rule: every src file ≤ 200 lines. |
+| **18 subcommands**    | `audit`, `audit-codebase`, `cost`, `kb`, `keys`, `ledger`, `login`, `models`, `resume`, `skills`, `undo`, `update`, `verify`, …                                  |
+| **4 modes**           | `act` · `plan` (read-only thinking) · `verify` (read-only audit) · `ask` (read-only Q&A)                                                                         |
+| **MCP**               | stdio + HTTP/SSE + `bearerProvider` async OAuth rotation                                                                                                         |
+| **Source**            | ~14.5 K LOC across 23 modules in `src/`. Hard rule: every src file ≤ 200 lines.                                                                                  |
 
 ## Numbers worth checking
 
-| | |
-|---|---|
-| Tests | **40/40** offline in ~16 s. CI green is a precondition for any PR. |
-| 17 providers | Multi-key BYOK pool with cooldown rotation. |
-| 112 skills | Scanned by the heuristic prompt-injection / supply-chain check at install + load. |
+|                                        |                                                                                                                             |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Tests                                  | **104/104** in ~11 s. TS 0 errors, ESLint 0 warnings. CI green is a precondition for any PR.                                |
+| 17 providers                           | Multi-key BYOK pool with cooldown rotation, 4-tier failover cascade, health scoring with compaction.                        |
+| 12 built-in tools                      | Per-tool timeout enforcement. Shell 300s, reads 30s, default 60s.                                                           |
+| 7 vulnerability classes fixed in v1.18 | Shell injection, path traversal, seatbelt injection, PowerShell injection, config injection, null spread crash, stdin hang. |
 
 ## Why this exists
 
@@ -87,15 +96,15 @@ The opposite assumption is the right one. Your laptop is the unit of sovereignty
 
 ## Documentation
 
-| | |
-|---|---|
-| Architecture | [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) |
-| Roadmap | [`docs/ROADMAP.md`](./docs/ROADMAP.md) |
-| Knowledge management | [`docs/memory/km-architecture.md`](./docs/memory/km-architecture.md) |
+|                         |                                                                                      |
+| ----------------------- | ------------------------------------------------------------------------------------ |
+| Architecture            | [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)                                     |
+| Roadmap                 | [`docs/ROADMAP.md`](./docs/ROADMAP.md)                                               |
+| Knowledge management    | [`docs/memory/km-architecture.md`](./docs/memory/km-architecture.md)                 |
 | Architecture efficiency | [`docs/memory/architecture-efficiency.md`](./docs/memory/architecture-efficiency.md) |
-| Skill security | [`docs/agents/skill-security.md`](./docs/agents/skill-security.md) |
-| Files & search contract | [`docs/agents/files-and-search.md`](./docs/agents/files-and-search.md) |
-| Per-release notes | [`changelog/`](./changelog) |
+| Skill security          | [`docs/agents/skill-security.md`](./docs/agents/skill-security.md)                   |
+| Files & search contract | [`docs/agents/files-and-search.md`](./docs/agents/files-and-search.md)               |
+| Per-release notes       | [`changelog/`](./changelog)                                                          |
 
 ## Contributing
 

@@ -1,36 +1,37 @@
 # dirgha-cli — Architecture
 
-A terminal coding agent that adapts to your workflow without forcing a fork. Headless one-shots, an Ink TUI, a readline REPL, parallel sub-agent fleets, and remote MCP servers all run on the same kernel + provider abstraction.
+A terminal coding agent that adapts to your workflow without forcing a fork. Headless one-shots, an Ink TUI, a readline REPL, parallel sub-agent fleets, DAG-chained sequential agents, and remote MCP servers all run on the same kernel + provider abstraction.
 
 ## Purpose
 
 Engineers ship working code. dirgha is a thin loop between an LLM and the filesystem / shell / git / browser, glued by audit-everything persistence so a long sprint survives context resets, network blips, and provider outages.
 
-It is **free-tier-first**: the same machinery runs on free OpenRouter `:free` models and on premium Claude / GPT / Gemini, with mid-session failover that swaps a dead key for a live one without losing the partial transcript.
+It is **free-tier-first**: the same machinery runs on free OpenRouter `:free` models and on premium Claude / GPT / Gemini, with a 4-tier failover cascade that swaps a dead model for the next-live alternative without losing the partial transcript.
 
 ## Vision
 
-1. **One source of truth.** The parity matrix file scores dirgha against every dimension a coding agent needs. Mean is currently **9.82 / 10**, sum-of-gaps is **0**, and 38 offline tests run in 16 s. Every fix cites code + test in the matrix.
+1. **One source of truth.** 104 tests pass in ~11 s. TypeScript 0 errors, ESLint 0 warnings. Every fix cites code + test in the SOTA scorecard.
 2. **Adapt to workflows; don't fork dirgha.** Skills, themes, hooks, MCP servers, and **TypeScript / ESM extensions** are loadable artifacts, not patches.
 3. **Every model. Every wire. Every transport.** OpenAI chat-completions, Anthropic messages, Gemini generate, MCP stdio, MCP HTTP/SSE — one factory, providers as config blobs.
 4. **Free-tier endpoints are first-class.** NVIDIA NIM (kimi/deepseek/qwen) and OpenRouter free models (hy3, ling) work end-to-end including multi-turn coding sprints — proven by dogfood runs.
-5. **Failover is silent and lossless.** When `claude-opus-4-7` has no Anthropic key, the request routes to `anthropic/claude-opus-4-7` via OR. Mid-session timeouts resume from the partial transcript with `maxTurns − turnCount` budget remaining.
-6. **Multi-key BYOK with cooldown rotation.** A free-tier 429 cools that key out for the rate-limit window; the next-priority key takes over without restarting the CLI. 17 providers known, lock-protected concurrent writes.
-7. **Crash-safe persistence.** Append-only JSONL sessions replayed on `dirgha resume`. Audit log with `kinds` tally and `--filter`. Ledger with TF-IDF cosine search for semantic memory across sessions.
+5. **Failover is multi-tier and lossless.** A 4-tier cascade (user → same-family → registry → free fallback) keeps the agent alive. Mid-session timeouts resume from the partial transcript. Stall detection aborts hung streams at 30s.
+6. **Multi-key BYOK with cooldown rotation.** A free-tier 429 cools that key out for the rate-limit window; the next-priority key takes over without restarting the CLI. 17 providers known. Health scoring with 60s TTL compaction.
+7. **Crash-safe persistence.** Append-only JSONL sessions replayed on `dirgha resume`. EPIPE/EIO crash guards suppress terminal-close noise. Crash log rotated at 10 MB. Audit log with `kinds` tally and `--filter`. Ledger with TF-IDF cosine search.
 8. **Every model has a soul.** A short Markdown file at `~/.dirgha/soul.md` (or the default that ships with the package) defines tone, boundaries, end-of-turn norms.
-9. **Self-update with permission.** `dirgha update --check` polls npm. `dirgha update [--yes]` installs after confirmation. `dirgha update --packages` refreshes installed skill packs. Audit-logged.
-10. **Self-fetching catalogue.** `dirgha models refresh` queries `/v1/models` on each configured provider in parallel, caches at `~/.dirgha/models-cache.json` with a 24 h TTL. Live: 499 models pulled in <1 s during dogfood.
+9. **Self-update with permission.** `dirgha update --check` polls npm. `dirgha update [--yes]` installs after confirmation. Audit-logged.
+10. **Self-fetching catalogue.** `dirgha models refresh` queries `/v1/models` on each configured provider in parallel, caches at `~/.dirgha/models-cache.json` with a 24 h TTL.
 
 ## What dirgha is
 
-- **Terminal coding agent.** `dirgha "prompt"` (one-shot), `dirgha` (Ink TUI), `dirgha resume <id>` (continue session), `dirgha fleet launch <goal>` (parallel git-worktree sub-agents), `dirgha verify "<goal>" --accept "<cmd>"` (gated agent loop).
+- **Terminal coding agent.** `dirgha "prompt"` (one-shot), `dirgha` (Ink TUI), `dirgha resume <id>` (continue session), `dirgha fleet launch <goal>` (parallel git-worktree sub-agents), `dirgha fleet dag "step1" "step2" "step3"` (sequential agent chaining), `dirgha verify "<goal>" --accept "<cmd>"` (gated agent loop).
 - **Multi-provider with one transport-abstraction.** Adding a new provider is a config-blob diff in `presets.ts`, not a new class.
-- **Tool surface:** `fs_read`, `fs_write`, `fs_edit`, `fs_ls`, `shell`, `search_grep`, `search_glob`, `git`, `browser`, `checkpoint`, `cron`, plus dynamic `task` for sub-agent dispatch.
+- **Tool surface:** `fs_read`, `fs_write`, `fs_edit`, `fs_ls`, `shell`, `search_grep`, `search_glob`, `git`, `browser`, `checkpoint`, `cron`, `task`. Per-tool timeout enforcement with configurable deadlines.
 - **MCP-aware** with stdio + HTTP/SSE transports and async `bearerProvider` for OAuth token rotation.
 - **20 slash commands** in interactive mode.
 - **18 subcommands** for headless workflows.
 - **Modes:** `act`, `plan`, `verify`, `ask`. Kernel-hook gate blocks every write tool in non-`act` modes.
-- **Model aliases** (kimi, opus, sonnet, haiku, gemini, flash, deepseek, llama, ling, hy3, …) resolved before routing.
+- **Config schema versioning** with migration hook — adding new fields never breaks old configs.
+- **Daemon mode** with graceful shutdown, AbortController-backed agent cancellation, and session flush.
 
 ## What dirgha is NOT (yet)
 
@@ -38,6 +39,7 @@ It is **free-tier-first**: the same machinery runs on free OpenRouter `:free` mo
 - Auto-updating without permission. Update is opt-in and prompts unless `--yes`.
 - Wired into npm marketplaces for plugin packs. Git-cloned skill packs work today; `dirgha install npm:@foo/pack` is roadmap.
 - OAuth-native for every provider. API-key BYOK + dirgha gateway device-code work today; per-provider OAuth (Anthropic Pro / ChatGPT Plus) is roadmap.
+- Distributed fleet execution. Fleet agents run on the local machine via git worktrees; multi-machine orchestration is roadmap.
 
 ## Architecture
 
@@ -109,13 +111,23 @@ Drop an ESM module at `~/.dirgha/extensions/<name>/index.mjs`:
 ```js
 export default async function (api) {
   api.registerTool({
-    name: 'deploy',
-    description: 'Deploy to staging',
-    inputSchema: { type: 'object', properties: { env: { type: 'string' } } },
-    execute: async (input) => ({ content: 'deployed', isError: false, durationMs: 0 }),
+    name: "deploy",
+    description: "Deploy to staging",
+    inputSchema: { type: "object", properties: { env: { type: "string" } } },
+    execute: async (input) => ({
+      content: "deployed",
+      isError: false,
+      durationMs: 0,
+    }),
   });
-  api.registerSlash({ name: 'stats', description: 'project stats', handler: () => 'OK' });
-  api.on('turn_start', (ev) => { /* observe every turn */ });
+  api.registerSlash({
+    name: "stats",
+    description: "project stats",
+    handler: () => "OK",
+  });
+  api.on("turn_start", (ev) => {
+    /* observe every turn */
+  });
 }
 ```
 
@@ -150,14 +162,14 @@ Compatible with the [agentskills.io](https://agentskills.io) frontmatter standar
 
 ## Roadmap
 
-| Sprint | Goal | Status |
-|---|---|---|
-| 1 | `dirgha update --check / --self / --packages` | ✓ shipped |
-| 2 | `dirgha models refresh` | ✓ shipped |
-| 3 | TS / ESM extensions API | ✓ shipped |
-| 4 | This doc + README + ROADMAP refresh | ✓ shipped |
-| 5 | Pi-package npm marketplace (`dirgha install npm:@foo/dirgha-pack`) | spec only |
-| 6 | OAuth flows for Anthropic Pro / ChatGPT Plus | spec only |
-| 7 | Web dashboard for audit + cost (live HTML view) | not started |
+| Sprint | Goal                                                               | Status      |
+| ------ | ------------------------------------------------------------------ | ----------- |
+| 1      | `dirgha update --check / --self / --packages`                      | ✓ shipped   |
+| 2      | `dirgha models refresh`                                            | ✓ shipped   |
+| 3      | TS / ESM extensions API                                            | ✓ shipped   |
+| 4      | This doc + README + ROADMAP refresh                                | ✓ shipped   |
+| 5      | Pi-package npm marketplace (`dirgha install npm:@foo/dirgha-pack`) | spec only   |
+| 6      | OAuth flows for Anthropic Pro / ChatGPT Plus                       | spec only   |
+| 7      | Web dashboard for audit + cost (live HTML view)                    | not started |
 
 The matrix file and the test sweep are the binding contract for each sprint.
