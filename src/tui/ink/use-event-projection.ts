@@ -421,6 +421,35 @@ export function useEventProjection(events: EventStream): EventProjection {
   }, [events, setLive]);
 
   const commitLive = React.useCallback((): TranscriptItem[] => {
+    // Cancel any pending flush timers so they don't fire against the
+    // cleared state after commit (race: fast provider, timer still pending).
+    if (flushTimerRef.current !== null) {
+      clearTimeout(flushTimerRef.current);
+      flushTimerRef.current = null;
+    }
+    if (flushThinkingTimerRef.current !== null) {
+      clearTimeout(flushThinkingTimerRef.current);
+      flushThinkingTimerRef.current = null;
+    }
+    // Flush any accumulated-but-not-yet-flushed text into liveItemsRef.
+    const pt = pendingTextRef.current;
+    if (pt) {
+      pendingTextRef.current = null;
+      liveItemsRef.current = liveItemsRef.current.map((it) =>
+        it.kind === "text" && it.id === pt.id
+          ? { ...it, content: pt.content }
+          : it,
+      );
+    }
+    const pk = pendingThinkingRef.current;
+    if (pk) {
+      pendingThinkingRef.current = null;
+      liveItemsRef.current = liveItemsRef.current.map((it) =>
+        it.kind === "thinking" && it.id === pk.id
+          ? { ...it, content: pk.content }
+          : it,
+      );
+    }
     // Read the ref synchronously — safe from async finally blocks.
     const committed = liveItemsRef.current;
     liveItemsRef.current = [];

@@ -2,6 +2,14 @@
 
 All notable changes are tracked here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); we use [Semantic Versioning](https://semver.org/).
 
+## [1.20.2] — 2026-05-02
+
+### Fixed
+
+- TUI streaming swallow: `commitLive()` now cancels pending flush timers before committing, preventing last-chunk token loss on fast providers.
+- TUI Static key: `committedItems` now carries the transcript snapshot; Static render receives `item.transcript` directly, eliminating stale-closure freeze and React key warning.
+- `dirgha ask --mode plan/verify/ask`: mode enforcement now correctly blocks write tools (shell, fs_write, fs_edit, git) — previously the `--mode` flag was silently ignored.
+
 ## [1.20.1] — 2026-05-02
 
 ### Fixed

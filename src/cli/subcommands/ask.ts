@@ -29,7 +29,9 @@ import {
 import { createEventStream } from "../../kernel/event-stream.js";
 import { runAgentLoop } from "../../kernel/agent-loop.js";
 import { renderStreamingEvents } from "../../tui/renderer.js";
+import { enforceMode } from "../../context/mode-enforcement.js";
 import type { Message } from "../../kernel/types.js";
+import type { Mode } from "../../context/mode.js";
 import type { Subcommand } from "./index.js";
 
 const DEFAULT_ASK_MAX_TURNS = 30;
@@ -75,6 +77,8 @@ export const askSubcommand: Subcommand = {
         ? Number.parseInt(flags["max-turns"], 10)
         : DEFAULT_ASK_MAX_TURNS;
     const json = flags.json === true;
+    const mode = (typeof flags.mode === "string" ? flags.mode : "act") as Mode;
+    const modeHooks = enforceMode(mode);
 
     const providers = new ProviderRegistry();
     const registry = createToolRegistry(builtInTools);
@@ -129,6 +133,7 @@ export const askSubcommand: Subcommand = {
       provider,
       toolExecutor: executor,
       events,
+      ...(modeHooks !== undefined ? { hooks: modeHooks } : {}),
     });
 
     if (!json) stdout.write("\n");

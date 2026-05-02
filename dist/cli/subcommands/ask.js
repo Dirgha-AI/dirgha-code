@@ -24,6 +24,7 @@ import { builtInTools, createToolExecutor, createToolRegistry, } from "../../too
 import { createEventStream } from "../../kernel/event-stream.js";
 import { runAgentLoop } from "../../kernel/agent-loop.js";
 import { renderStreamingEvents } from "../../tui/renderer.js";
+import { enforceMode } from "../../context/mode-enforcement.js";
 const DEFAULT_ASK_MAX_TURNS = 30;
 export const askSubcommand = {
     name: "ask",
@@ -61,6 +62,8 @@ export const askSubcommand = {
             ? Number.parseInt(flags["max-turns"], 10)
             : DEFAULT_ASK_MAX_TURNS;
         const json = flags.json === true;
+        const mode = (typeof flags.mode === "string" ? flags.mode : "act");
+        const modeHooks = enforceMode(mode);
         const providers = new ProviderRegistry();
         const registry = createToolRegistry(builtInTools);
         // Register `task` tool for sub-agent delegation (same pattern as main.ts).
@@ -105,6 +108,7 @@ export const askSubcommand = {
             provider,
             toolExecutor: executor,
             events,
+            ...(modeHooks !== undefined ? { hooks: modeHooks } : {}),
         });
         if (!json)
             stdout.write("\n");

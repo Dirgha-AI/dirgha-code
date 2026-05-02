@@ -793,12 +793,8 @@ export function App(props: AppProps): React.JSX.Element {
     // actually grows (new user msg or toolcall completes). Live items
     // streaming into the same item don't invalidate Static.
     const key = `committed-${transcript.length}`;
-    return [{ key }];
-  }, [transcript.length]);
-  const committedJsx = React.useMemo(
-    () => renderTranscript(transcript),
-    [transcript],
-  );
+    return [{ key, transcript }];
+  }, [transcript.length]); // intentional: re-key only when transcript grows, not on every delta
   const liveJsx = React.useMemo(
     () => renderTranscript(projection.liveItems),
     [projection.liveItems],
@@ -809,18 +805,16 @@ export function App(props: AppProps): React.JSX.Element {
     [models, currentModel],
   );
 
-  // BISECT: Static moved out of the transcript render. Logo stays
-  // in a one-item Static (its original placement). Both committed
-  // transcript and live items render in the regular dynamic Box. If
-  // streaming text appears now, the Static-around-transcript pattern
-  // was suppressing the live region updates. If still not, the bug
-  // is upstream in useEventProjection.
   return (
     <ThemeProvider activeTheme={themeName}>
       <SpinnerContext.Provider value={{ busy }}>
         <Box flexDirection="column">
           <Static items={committedItems}>
-            {(): React.JSX.Element => <>{committedJsx}</>}
+            {(item): React.JSX.Element => (
+              <Box key={item.key}>
+                {renderTranscript(item.transcript)}
+              </Box>
+            )}
           </Static>
           <Logo key="logo" version={VERSION} />
           <Box flexDirection="column">{liveJsx}</Box>

@@ -1,4 +1,4 @@
-import { Fragment as _Fragment, jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 /**
  * Ink root component for the dirgha TUI.
  *
@@ -689,18 +689,11 @@ export function App(props) {
         // actually grows (new user msg or toolcall completes). Live items
         // streaming into the same item don't invalidate Static.
         const key = `committed-${transcript.length}`;
-        return [{ key }];
-    }, [transcript.length]);
-    const committedJsx = React.useMemo(() => renderTranscript(transcript), [transcript]);
+        return [{ key, transcript }];
+    }, [transcript.length]); // intentional: re-key only when transcript grows, not on every delta
     const liveJsx = React.useMemo(() => renderTranscript(projection.liveItems), [projection.liveItems]);
     const providerEntries = React.useMemo(() => buildProviderEntries(models, currentModel), [models, currentModel]);
-    // BISECT: Static moved out of the transcript render. Logo stays
-    // in a one-item Static (its original placement). Both committed
-    // transcript and live items render in the regular dynamic Box. If
-    // streaming text appears now, the Static-around-transcript pattern
-    // was suppressing the live region updates. If still not, the bug
-    // is upstream in useEventProjection.
-    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: { busy }, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: committedItems, children: () => _jsx(_Fragment, { children: committedJsx }) }), _jsx(Logo, { version: VERSION }, "logo"), _jsx(Box, { flexDirection: "column", children: liveJsx }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
+    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: { busy }, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: committedItems, children: (item) => (_jsx(Box, { children: renderTranscript(item.transcript) }, item.key)) }), _jsx(Logo, { version: VERSION }, "logo"), _jsx(Box, { flexDirection: "column", children: liveJsx }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
                             approvalBusRef.current?.resolve(pendingApproval.id, decision);
                         } })), pendingFailover !== null && (_jsx(ModelSwitchPrompt, { failedModel: pendingFailover.failedModel, failoverModel: pendingFailover.failoverModel, onAccept: (failover) => {
                             const lastPrompt = pendingFailover.lastPrompt;
