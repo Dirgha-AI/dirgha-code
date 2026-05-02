@@ -48,6 +48,7 @@ export interface Message {
 export type StopReason =
   | "end_turn"
   | "tool_use"
+  | "max_turns"
   | "max_tokens"
   | "stop_sequence"
   | "error"

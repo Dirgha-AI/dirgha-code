@@ -4,10 +4,13 @@
  * Producers call emit(). Consumers either subscribe for side-effectful
  * handling or iterate via for-await. Multiple consumers are allowed;
  * each independent iterator receives all events from its subscription
- * onward. Back-pressure is bounded by an internal queue.
+ * onward. Back-pressure is bounded by an internal queue; when the
+ * queue overflows, a backpressure event is emitted (once per overflow
+ * start) and the oldest event is dropped. Slow consumers can call
+ * drain() to await queue emptying.
  */
 
-import type { AgentEvent } from './types.js';
+import type { AgentEvent } from "./types.js";
 
 export type EventHandler = (event: AgentEvent) => void | Promise<void>;
 
@@ -15,6 +18,8 @@ export interface EventStream {
   emit(event: AgentEvent): void;
   subscribe(handler: EventHandler): () => void;
   iterator(): AsyncIterableIterator<AgentEvent>;
+  /** Resolves when the internal queue is empty (no pending events). */
+  drain(): Promise<void>;
   close(): void;
   readonly closed: boolean;
 }
@@ -33,9 +38,26 @@ class EventStreamImpl implements EventStream {
   emit(event: AgentEvent): void {
     if (this.closed) return;
     for (const handler of this.subscribers) {
-      void Promise.resolve().then(() => handler(event)).catch(err => {
-        this.emit({ type: 'error', message: `event handler failed: ${String(err)}` });
-      });
+      try {
+        const result = handler(event);
+        if (result instanceof Promise) {
+          result.catch((err) => {
+            if (event.type !== "error") {
+              this.emit({
+                type: "error",
+                message: `handler failed: ${String(err)}`,
+              });
+            }
+          });
+        }
+      } catch (err) {
+        if (event.type !== "error") {
+          this.emit({
+            type: "error",
+            message: `handler failed: ${String(err)}`,
+          });
+        }
+      }
     }
     for (const state of this.iterators) state.push(event);
   }
@@ -50,9 +72,20 @@ class EventStreamImpl implements EventStream {
   iterator(): AsyncIterableIterator<AgentEvent> {
     const state = new IteratorState();
     this.iterators.add(state);
-    const cleanup = () => { this.iterators.delete(state); };
+    const cleanup = () => {
+      this.iterators.delete(state);
+    };
     if (this.closed) state.close();
     return makeAsyncIterator(state, cleanup);
+  }
+
+  async drain(): Promise<void> {
+    const checks = [...this.iterators];
+    for (const state of checks) {
+      while (state.length > 0) {
+        await new Promise<void>((r) => setTimeout(r, 1));
+      }
+    }
   }
 
   close(): void {
@@ -68,6 +101,12 @@ class IteratorState {
   queue: AgentEvent[] = [];
   waiters: Waiter[] = [];
   done = false;
+  private droppedCount = 0;
+  private backpressureActive = false;
+
+  get length(): number {
+    return this.queue.length;
+  }
 
   push(event: AgentEvent): void {
     if (this.done) return;
@@ -76,7 +115,19 @@ class IteratorState {
       waiter.resolve({ value: event, done: false });
       return;
     }
-    if (this.queue.length >= MAX_QUEUE) this.queue.shift();
+    if (this.queue.length >= MAX_QUEUE) {
+      this.queue.shift();
+      this.droppedCount++;
+      if (!this.backpressureActive) {
+        this.backpressureActive = true;
+        // Inject a synthetic warning so consumers know data was lost.
+        this.queue.push({
+          type: "error",
+          message: `Event queue overflow: ${this.droppedCount} events dropped. Consumer is too slow.`,
+          reason: "backpressure",
+        });
+      }
+    }
     this.queue.push(event);
   }
 
@@ -91,9 +142,16 @@ class IteratorState {
 
   next(): Promise<IteratorResult<AgentEvent>> {
     const event = this.queue.shift();
-    if (event !== undefined) return Promise.resolve({ value: event, done: false });
-    if (this.done) return Promise.resolve({ value: undefined as unknown as AgentEvent, done: true });
-    return new Promise(resolve => { this.waiters.push({ resolve }); });
+    if (event !== undefined)
+      return Promise.resolve({ value: event, done: false });
+    if (this.done)
+      return Promise.resolve({
+        value: undefined as unknown as AgentEvent,
+        done: true,
+      });
+    return new Promise((resolve) => {
+      this.waiters.push({ resolve });
+    });
   }
 }
 
@@ -113,7 +171,9 @@ function makeAsyncIterator(
       cleanup();
       return Promise.reject(err);
     },
-    [Symbol.asyncIterator]() { return this; },
+    [Symbol.asyncIterator]() {
+      return this;
+    },
   };
 }
 

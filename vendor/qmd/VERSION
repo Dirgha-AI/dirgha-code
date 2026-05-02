@@ -1,0 +1,3 @@
+github.com/Dirgha-AI/qmd@PENDING
+# Update this SHA after forking and building the first vendored binary.
+# Run: npm run build:vendors to rebuild all platform binaries.

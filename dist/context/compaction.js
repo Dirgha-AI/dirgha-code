@@ -7,33 +7,54 @@
  * summary, and the last N preserved turns. A compaction log entry is
  * written to the session so the operation is auditable.
  */
-import { estimateTokens, normaliseContent } from '../kernel/message.js';
-import { resolveModelForDispatch } from '../providers/dispatch.js';
+import { estimateTokens, normaliseContent } from "../kernel/message.js";
+import { resolveModelForDispatch } from "../providers/dispatch.js";
 export async function maybeCompact(messages, cfg, session) {
     const tokensBefore = messages.reduce((acc, m) => acc + estimateTokens(flatten(m)), 0);
     if (tokensBefore < cfg.triggerTokens) {
-        return { messages, compacted: false, tokensBefore, tokensAfter: tokensBefore };
+        return {
+            messages,
+            compacted: false,
+            tokensBefore,
+            tokensAfter: tokensBefore,
+        };
     }
     const { systems, rest } = splitSystems(messages);
     const preserveCount = countPreservedMessages(rest, cfg.preserveLastTurns);
     const historical = rest.slice(0, rest.length - preserveCount);
     const preserved = rest.slice(rest.length - preserveCount);
     if (historical.length === 0) {
-        return { messages, compacted: false, tokensBefore, tokensAfter: tokensBefore };
+        return {
+            messages,
+            compacted: false,
+            tokensBefore,
+            tokensAfter: tokensBefore,
+        };
     }
     if (cfg.hooks) {
-        const veto = await cfg.hooks.emit('compaction_before', { tokensBefore, historicalCount: historical.length });
+        const veto = await cfg.hooks.emit("compaction_before", {
+            tokensBefore,
+            historicalCount: historical.length,
+        });
         if (veto?.block) {
-            return { messages, compacted: false, tokensBefore, tokensAfter: tokensBefore };
+            return {
+                messages,
+                compacted: false,
+                tokensBefore,
+                tokensAfter: tokensBefore,
+            };
         }
     }
     const summary = await summarise(cfg, historical);
     const trimmed = [
         ...systems,
         {
-            role: 'user',
+            role: "user",
             content: [
-                { type: 'text', text: `[Compacted summary of earlier turns]\n${summary}\n[End compacted summary]` },
+                {
+                    type: "text",
+                    text: `[Compacted summary of earlier turns]\n${summary}\n[End compacted summary]`,
+                },
             ],
         },
         ...preserved,
@@ -41,67 +62,95 @@ export async function maybeCompact(messages, cfg, session) {
     const tokensAfter = trimmed.reduce((acc, m) => acc + estimateTokens(flatten(m)), 0);
     if (session) {
         await session.append({
-            type: 'compaction',
+            type: "compaction",
             ts: new Date().toISOString(),
             keptFrom: `last-${preserveCount}-messages`,
             summary,
         });
     }
     if (cfg.hooks) {
-        await cfg.hooks.emit('compaction_after', { tokensBefore, tokensAfter, summary });
+        await cfg.hooks.emit("compaction_after", {
+            tokensBefore,
+            tokensAfter,
+            summary,
+        });
     }
-    return { messages: trimmed, compacted: true, summary, tokensBefore, tokensAfter };
+    return {
+        messages: trimmed,
+        compacted: true,
+        summary,
+        tokensBefore,
+        tokensAfter,
+    };
 }
 async function summarise(cfg, historical) {
-    const transcript = historical.map(renderForSummary).join('\n\n');
+    const transcript = historical.map(renderForSummary).join("\n\n");
     const prompt = [
         {
-            role: 'system',
-            content: 'You summarise a coding agent conversation. Keep the summary terse, information-dense, ordered by topic. Retain every decision, file path, tool outcome, and open question. Omit greetings and pleasantries. Do not invent facts.',
+            role: "system",
+            content: "You summarise a coding agent conversation. Keep the summary terse, information-dense, ordered by topic. Retain every decision, file path, tool outcome, and open question. Omit greetings and pleasantries. Do not invent facts.",
         },
         {
-            role: 'user',
+            role: "user",
             content: `Summarise the following transcript. Produce a single plain-text summary under ${cfg.maxSummaryTokens ?? 800} tokens.\n\n${transcript}`,
         },
     ];
-    let summary = '';
-    for await (const ev of cfg.summarizer.stream({ model: resolveModelForDispatch(cfg.summaryModel), messages: prompt })) {
-        if (ev.type === 'text_delta')
-            summary += ev.delta;
+    let summary = "";
+    try {
+        for await (const ev of cfg.summarizer.stream({
+            model: resolveModelForDispatch(cfg.summaryModel),
+            messages: prompt,
+        })) {
+            if (ev.type === "text_delta")
+                summary += ev.delta;
+        }
     }
-    return summary.trim() || '[Empty summary]';
+    catch {
+        // If the summarizer call fails (network, bad model), return a
+        // raw transcript — better than aborting the agent loop.
+        return `${historical.map(renderForSummary).join("\n\n")}`;
+    }
+    return summary.trim() || "[Empty summary]";
 }
 function renderForSummary(msg) {
-    const body = normaliseContent(msg).map(p => {
+    const body = normaliseContent(msg)
+        .map((p) => {
         switch (p.type) {
-            case 'text': return p.text;
-            case 'thinking': return `(thinking) ${p.text}`;
-            case 'tool_use': return `(tool_use ${p.name}: ${truncate(JSON.stringify(p.input), 240)})`;
-            case 'tool_result': return `(tool_result ${p.toolUseId}${p.isError ? ' ERROR' : ''}: ${truncate(p.content, 360)})`;
+            case "text":
+                return p.text;
+            case "thinking":
+                return `(thinking) ${p.text}`;
+            case "tool_use":
+                return `(tool_use ${p.name}: ${truncate(JSON.stringify(p.input), 240)})`;
+            case "tool_result":
+                return `(tool_result ${p.toolUseId}${p.isError ? " ERROR" : ""}: ${truncate(p.content, 360)})`;
         }
-    }).join('\n');
+    })
+        .join("\n");
     return `### ${msg.role}\n${body}`;
 }
 function flatten(msg) {
-    if (typeof msg.content === 'string')
+    if (typeof msg.content === "string")
         return msg.content;
-    return msg.content.map(p => {
-        if (p.type === 'text')
+    return msg.content
+        .map((p) => {
+        if (p.type === "text")
             return p.text;
-        if (p.type === 'thinking')
+        if (p.type === "thinking")
             return p.text;
-        if (p.type === 'tool_use')
+        if (p.type === "tool_use")
             return JSON.stringify(p.input);
-        if (p.type === 'tool_result')
+        if (p.type === "tool_result")
             return p.content;
-        return '';
-    }).join(' ');
+        return "";
+    })
+        .join(" ");
 }
 function splitSystems(messages) {
     const systems = [];
     const rest = [];
     for (const m of messages) {
-        if (m.role === 'system')
+        if (m.role === "system")
             systems.push(m);
         else
             rest.push(m);
@@ -115,7 +164,7 @@ function countPreservedMessages(rest, preserveLastTurns) {
     let count = 0;
     for (let i = rest.length - 1; i >= 0; i--) {
         count++;
-        if (rest[i].role === 'user') {
+        if (rest[i].role === "user") {
             turns++;
             if (turns >= preserveLastTurns)
                 break;
@@ -126,7 +175,6 @@ function countPreservedMessages(rest, preserveLastTurns) {
 function truncate(s, max) {
     return s.length <= max ? s : `${s.slice(0, max - 1)}…`;
 }
-void undefined;
 /**
  * Build a `contextTransform` callback suitable for `runAgentLoop`'s
  * config. Each turn, the transform measures the running history and —

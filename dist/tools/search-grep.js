@@ -88,6 +88,7 @@ async function nodeScan(input, root, limit) {
                 const text = await readFile(abs, 'utf8').catch(() => '');
                 const lines = text.split('\n');
                 for (let i = 0; i < lines.length; i++) {
+                    regex.lastIndex = 0; // reset state between tests — global-flag RegExp retains lastIndex
                     if (regex.test(lines[i])) {
                         matches.push(`${abs}:${i + 1}:${lines[i]}`);
                         if (matches.length >= limit) {

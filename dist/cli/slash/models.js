@@ -12,6 +12,7 @@ const ENV_FOR_PROVIDER = {
     nvidia: "NVIDIA_API_KEY",
     openrouter: "OPENROUTER_API_KEY",
     ollama: "",
+    llamacpp: "",
 };
 function priceText(value) {
     return value === 0 ? "free" : `$${value.toFixed(2)}/M`;

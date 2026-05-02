@@ -134,7 +134,7 @@ export function InputBox(props) {
             setPasteExpanded(false);
         }
         props.onChange(sanitized);
-    }, [props]);
+    }, [props.onChange]);
     useInput((inputCh, key) => {
         // Ctrl+C handling — highest priority.
         //   1. If the buffer has text → clear it (don't arm exit).

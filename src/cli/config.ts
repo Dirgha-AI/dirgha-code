@@ -9,6 +9,8 @@ import { homedir } from "node:os";
 import { migrateDeprecatedModel } from "../intelligence/prices.js";
 
 export interface DirghaConfig {
+  /** Config schema version. Bumped on breaking changes. Current: 1. */
+  schemaVersion?: number;
   model: string;
   cheapModel: string;
   summaryModel: string;
@@ -106,7 +108,10 @@ export interface DirghaConfig {
   };
 }
 
+const CURRENT_SCHEMA = 1;
+
 export const DEFAULT_CONFIG: DirghaConfig = {
+  schemaVersion: CURRENT_SCHEMA,
   model: "moonshotai/kimi-k2.6",
   cheapModel: "meta/llama-3.1-8b-instruct",
   summaryModel: "moonshotai/kimi-k2.5",
@@ -131,6 +136,7 @@ export async function loadConfig(
 
   const merged = merge(DEFAULT_CONFIG, userPartial, projectPartial, envPartial);
   validate(merged);
+  migrateConfigSchema(merged);
   // Migrate any model IDs the upstream provider has dropped, so users
   // with stale `~/.dirgha/config.json` don't 400 on every call.
   merged.model = migrateDeprecatedModel(merged.model);
@@ -145,6 +151,9 @@ async function readJson(path: string): Promise<Partial<DirghaConfig>> {
   try {
     return JSON.parse(text) as Partial<DirghaConfig>;
   } catch {
+    process.stderr.write(
+      `[dirgha] Warning: ${path} contains malformed JSON — using defaults.\n`,
+    );
     return {};
   }
 }
@@ -167,7 +176,11 @@ function merge(...partials: Array<Partial<DirghaConfig>>): DirghaConfig {
     for (const key of Object.keys(p) as Array<keyof DirghaConfig>) {
       const value = p[key];
       if (value === undefined) continue;
-      if (typeof value === "object" && !Array.isArray(value)) {
+      if (
+        typeof value === "object" &&
+        value !== null &&
+        !Array.isArray(value)
+      ) {
         (out[key] as unknown) = {
           ...(out[key] as object),
           ...(value as object),
@@ -201,4 +214,13 @@ function validate(cfg: DirghaConfig): void {
       "[dirgha] warn: model is empty; LLM calls will fail\n",
     );
   }
+}
+
+function migrateConfigSchema(cfg: DirghaConfig): void {
+  if (cfg.schemaVersion === CURRENT_SCHEMA) return;
+  // Future migrations go here. Example:
+  // if (cfg.schemaVersion === undefined || cfg.schemaVersion < 2) {
+  //   // v1 → v2: rename field, add default
+  // }
+  cfg.schemaVersion = CURRENT_SCHEMA;
 }

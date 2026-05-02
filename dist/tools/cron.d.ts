@@ -16,7 +16,7 @@
  * field cron expressions, human strings like "every 1h", or ISO dates.
  * We only validate that it is non-empty.
  */
-import type { Tool } from './registry.js';
+import type { Tool } from "./registry.js";
 export interface CronJob {
     id: string;
     schedule: string;

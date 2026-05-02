@@ -15,7 +15,7 @@
  * tool for the older `agent-browser` shell-out implementation this tool
  * supersedes.
  */
-import type { Tool } from './registry.js';
+import type { Tool } from "./registry.js";
 /**
  * Shut down the browser instance and reset module state. Safe to call
  * repeatedly; a no-op when no browser is running. The shell should call

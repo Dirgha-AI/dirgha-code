@@ -21,8 +21,8 @@
  *   fleet triple <goal…>       — tripleshot + judge
  *   fleet cleanup              — remove every fleet/ worktree
  */
-import type { ApplyStrategy, WorktreeHandle } from './types.js';
-import type { SlashRegistry } from '../cli/slash.js';
+import type { ApplyStrategy, WorktreeHandle } from "./types.js";
+import type { SlashRegistry } from "../cli/slash.js";
 export interface FleetCommandOptions {
     cwd?: string;
     model?: string;

@@ -23,9 +23,9 @@
  * pull in any streaming/chat-completions internals.
  */
 
-import { readFile, stat, writeFile, mkdir } from 'node:fs/promises';
-import { resolve, extname, dirname } from 'node:path';
-import type { Tool, ToolContext } from './registry.js';
+import { readFile, stat, writeFile, mkdir } from "node:fs/promises";
+import { resolve, extname, dirname, sep } from "node:path";
+import type { Tool, ToolContext } from "./registry.js";
 import type {
   ImageGenRequest,
   ImageGenResult,
@@ -33,11 +33,11 @@ import type {
   Provider,
   StreamRequest,
   ToolResult,
-} from '../kernel/types.js';
-import { OpenAIProvider } from '../providers/openai.js';
-import { NvidiaProvider } from '../providers/nvidia.js';
+} from "../kernel/types.js";
+import { OpenAIProvider } from "../providers/openai.js";
+import { NvidiaProvider } from "../providers/nvidia.js";
 
-type Action = 'describe_image' | 'transcribe_audio' | 'generate_image';
+type Action = "describe_image" | "transcribe_audio" | "generate_image";
 
 interface Input {
   action: Action;
@@ -63,38 +63,38 @@ const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_AUDIO_BYTES = 16 * 1024 * 1024;
 
 const IMAGE_EXT: Record<string, string> = {
-  '.png':  'image/png',
-  '.jpg':  'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.gif':  'image/gif',
-  '.webp': 'image/webp',
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
 };
 
 const AUDIO_EXT: Record<string, string> = {
-  '.mp3':  'audio/mpeg',
-  '.wav':  'audio/wav',
-  '.m4a':  'audio/mp4',
-  '.ogg':  'audio/ogg',
-  '.flac': 'audio/flac',
+  ".mp3": "audio/mpeg",
+  ".wav": "audio/wav",
+  ".m4a": "audio/mp4",
+  ".ogg": "audio/ogg",
+  ".flac": "audio/flac",
 };
 
 const DEFAULT_IMAGE_WIDTH = 1024;
 const DEFAULT_IMAGE_HEIGHT = 1024;
 
 const NVIDIA_IMAGE_MODEL_HINTS = new Set<string>([
-  'flux.1-schnell',
-  'flux-schnell',
-  'nvidia/flux',
-  'flux',
-  'black-forest-labs/flux.1-schnell',
+  "flux.1-schnell",
+  "flux-schnell",
+  "nvidia/flux",
+  "flux",
+  "black-forest-labs/flux.1-schnell",
 ]);
 
 const OPENAI_IMAGE_MODEL_HINTS = new Set<string>([
-  'dall-e-3',
-  'dall-e-2',
-  'dall-e',
-  'dalle',
-  'openai/dall-e-3',
+  "dall-e-3",
+  "dall-e-2",
+  "dall-e",
+  "dalle",
+  "openai/dall-e-3",
 ]);
 
 export interface MultimodalToolOptions {
@@ -113,43 +113,74 @@ export interface MultimodalToolOptions {
 }
 
 export function createMultimodalTool(opts: MultimodalToolOptions): Tool {
-  const supportsMultimodal = opts.supportsMultimodal
-    ?? ((modelId: string) => opts.provider.supportsTools(modelId));
+  const supportsMultimodal =
+    opts.supportsMultimodal ??
+    ((modelId: string) => opts.provider.supportsTools(modelId));
 
   return {
-    name: 'multimodal',
-    description: 'Describe an image, transcribe audio, or generate an image. Pass action="describe_image" with path to an image, action="transcribe_audio" with path to an audio file, or action="generate_image" with a prompt (NVIDIA Flux Schnell by default, OpenAI DALL-E 3 fallback).',
+    name: "multimodal",
+    description:
+      'Describe an image, transcribe audio, or generate an image. Pass action="describe_image" with path to an image, action="transcribe_audio" with path to an audio file, or action="generate_image" with a prompt (NVIDIA Flux Schnell by default, OpenAI DALL-E 3 fallback).',
     inputSchema: {
-      type: 'object',
+      type: "object",
       properties: {
         action: {
-          type: 'string',
-          enum: ['describe_image', 'transcribe_audio', 'generate_image'],
-          description: 'Which multimodal operation to perform.',
+          type: "string",
+          enum: ["describe_image", "transcribe_audio", "generate_image"],
+          description: "Which multimodal operation to perform.",
         },
-        path: { type: 'string', description: 'Filesystem path to the image/audio file (required for describe/transcribe).' },
-        prompt: { type: 'string', description: 'Prompt text — used as the question for describe_image or the generation prompt.' },
-        model: { type: 'string', description: 'Override the model id. For generate_image, "flux.1-schnell" forces NVIDIA, "dall-e-3" forces OpenAI.' },
-        outputPath: { type: 'string', description: 'For generate_image: where to write the PNG. Defaults to ./dirgha-image-<timestamp>.png in the session cwd.' },
-        width: { type: 'number', description: 'Image width in pixels (default 1024).' },
-        height: { type: 'number', description: 'Image height in pixels (default 1024).' },
-        seed: { type: 'number', description: 'Optional deterministic seed (NVIDIA only).' },
-        steps: { type: 'number', description: 'Sampling steps (NVIDIA only, default 4 for Flux Schnell).' },
+        path: {
+          type: "string",
+          description:
+            "Filesystem path to the image/audio file (required for describe/transcribe).",
+        },
+        prompt: {
+          type: "string",
+          description:
+            "Prompt text — used as the question for describe_image or the generation prompt.",
+        },
+        model: {
+          type: "string",
+          description:
+            'Override the model id. For generate_image, "flux.1-schnell" forces NVIDIA, "dall-e-3" forces OpenAI.',
+        },
+        outputPath: {
+          type: "string",
+          description:
+            "For generate_image: where to write the PNG. Defaults to ./dirgha-image-<timestamp>.png in the session cwd.",
+        },
+        width: {
+          type: "number",
+          description: "Image width in pixels (default 1024).",
+        },
+        height: {
+          type: "number",
+          description: "Image height in pixels (default 1024).",
+        },
+        seed: {
+          type: "number",
+          description: "Optional deterministic seed (NVIDIA only).",
+        },
+        steps: {
+          type: "number",
+          description:
+            "Sampling steps (NVIDIA only, default 4 for Flux Schnell).",
+        },
       },
-      required: ['action'],
+      required: ["action"],
     },
     async execute(rawInput: unknown, ctx: ToolContext): Promise<ToolResult> {
       const input = rawInput as Input;
       const model = input.model ?? opts.defaultModel;
 
-      if (input.action === 'generate_image') {
+      if (input.action === "generate_image") {
         return generateImage({ input, ctx, activeProvider: opts.provider });
       }
 
-      if (input.action === 'describe_image') {
+      if (input.action === "describe_image") {
         return describeImage({
           path: input.path,
-          prompt: input.prompt ?? 'Describe this image in detail.',
+          prompt: input.prompt ?? "Describe this image in detail.",
           ctx,
           provider: opts.provider,
           model,
@@ -157,10 +188,12 @@ export function createMultimodalTool(opts: MultimodalToolOptions): Tool {
         });
       }
 
-      if (input.action === 'transcribe_audio') {
+      if (input.action === "transcribe_audio") {
         return transcribeAudio({
           path: input.path,
-          prompt: input.prompt ?? 'Transcribe this audio verbatim. Preserve speaker turns if distinguishable.',
+          prompt:
+            input.prompt ??
+            "Transcribe this audio verbatim. Preserve speaker turns if distinguishable.",
           ctx,
           provider: opts.provider,
           model,
@@ -186,85 +219,142 @@ interface DispatchArgs {
 }
 
 async function describeImage(a: DispatchArgs): Promise<ToolResult> {
-  if (!a.path) return { content: 'describe_image requires a `path` to an image file.', isError: true };
+  if (!a.path)
+    return {
+      content: "describe_image requires a `path` to an image file.",
+      isError: true,
+    };
 
-  const loaded = await loadMedia(a.path, a.ctx.cwd, IMAGE_EXT, MAX_IMAGE_BYTES, 'image');
-  if ('error' in loaded) return { content: loaded.error, isError: true };
+  const loaded = await loadMedia(
+    a.path,
+    a.ctx.cwd,
+    IMAGE_EXT,
+    MAX_IMAGE_BYTES,
+    "image",
+  );
+  if ("error" in loaded) return { content: loaded.error, isError: true };
 
   if (!a.capable) {
     return {
-      content: multimodalCapabilityNotice('describe_image', a.model, loaded.mime, loaded.bytes),
+      content: multimodalCapabilityNotice(
+        "describe_image",
+        a.model,
+        loaded.mime,
+        loaded.bytes,
+      ),
       isError: false,
-      metadata: { stub: true, reason: 'provider-multimodal-capability', model: a.model },
+      metadata: {
+        stub: true,
+        reason: "provider-multimodal-capability",
+        model: a.model,
+      },
     };
   }
 
   const messages = multimodalMessage({
     instruction: a.prompt,
-    mediaKind: 'image',
+    mediaKind: "image",
     dataUrl: loaded.dataUrl,
     mime: loaded.mime,
   });
-  return streamProviderText(a.provider, a.model, messages, 'describe_image');
+  return streamProviderText(a.provider, a.model, messages, "describe_image");
 }
 
 async function transcribeAudio(a: DispatchArgs): Promise<ToolResult> {
-  if (!a.path) return { content: 'transcribe_audio requires a `path` to an audio file.', isError: true };
+  if (!a.path)
+    return {
+      content: "transcribe_audio requires a `path` to an audio file.",
+      isError: true,
+    };
 
-  const loaded = await loadMedia(a.path, a.ctx.cwd, AUDIO_EXT, MAX_AUDIO_BYTES, 'audio');
-  if ('error' in loaded) return { content: loaded.error, isError: true };
+  const loaded = await loadMedia(
+    a.path,
+    a.ctx.cwd,
+    AUDIO_EXT,
+    MAX_AUDIO_BYTES,
+    "audio",
+  );
+  if ("error" in loaded) return { content: loaded.error, isError: true };
 
   if (!a.capable) {
     return {
-      content: multimodalCapabilityNotice('transcribe_audio', a.model, loaded.mime, loaded.bytes),
+      content: multimodalCapabilityNotice(
+        "transcribe_audio",
+        a.model,
+        loaded.mime,
+        loaded.bytes,
+      ),
       isError: false,
-      metadata: { stub: true, reason: 'provider-multimodal-capability', model: a.model },
+      metadata: {
+        stub: true,
+        reason: "provider-multimodal-capability",
+        model: a.model,
+      },
     };
   }
 
   const messages = multimodalMessage({
     instruction: a.prompt,
-    mediaKind: 'audio',
+    mediaKind: "audio",
     dataUrl: loaded.dataUrl,
     mime: loaded.mime,
   });
-  return streamProviderText(a.provider, a.model, messages, 'transcribe_audio');
+  return streamProviderText(a.provider, a.model, messages, "transcribe_audio");
 }
 
-interface MediaOk { dataUrl: string; mime: string; bytes: number }
-interface MediaErr { error: string }
+interface MediaOk {
+  dataUrl: string;
+  mime: string;
+  bytes: number;
+}
+interface MediaErr {
+  error: string;
+}
 
 async function loadMedia(
   path: string,
   cwd: string,
   allowed: Record<string, string>,
   maxBytes: number,
-  kind: 'image' | 'audio',
+  kind: "image" | "audio",
 ): Promise<MediaOk | MediaErr> {
   const abs = resolve(cwd, path);
+  if (!abs.startsWith(cwd + sep) && abs !== cwd) {
+    return { error: `Path escapes working directory: ${path}` };
+  }
   const info = await stat(abs).catch(() => undefined);
-  if (!info || !info.isFile()) return { error: `No such ${kind} file: ${path}` };
+  if (!info || !info.isFile())
+    return { error: `No such ${kind} file: ${path}` };
   if (info.size > maxBytes) {
-    return { error: `${kind} too large: ${info.size} bytes (max ${maxBytes}).` };
+    return {
+      error: `${kind} too large: ${info.size} bytes (max ${maxBytes}).`,
+    };
   }
   const ext = extname(abs).toLowerCase();
   const mime = allowed[ext];
   if (!mime) {
-    const supported = Object.keys(allowed).join(', ');
-    return { error: `Unsupported ${kind} extension "${ext}". Supported: ${supported}` };
+    const supported = Object.keys(allowed).join(", ");
+    return {
+      error: `Unsupported ${kind} extension "${ext}". Supported: ${supported}`,
+    };
   }
   const buf = await readFile(abs);
-  const dataUrl = `data:${mime};base64,${buf.toString('base64')}`;
+  const dataUrl = `data:${mime};base64,${buf.toString("base64")}`;
   return { dataUrl, mime, bytes: info.size };
 }
 
-function multimodalCapabilityNotice(action: Action, model: string, mime: string, bytes: number): string {
+function multimodalCapabilityNotice(
+  action: Action,
+  model: string,
+  mime: string,
+  bytes: number,
+): string {
   return [
     `Active model "${model}" does not expose a multimodal capability in this build.`,
-    `The ${action === 'describe_image' ? 'image' : 'audio'} was loaded successfully (${mime}, ${bytes} bytes)`,
+    `The ${action === "describe_image" ? "image" : "audio"} was loaded successfully (${mime}, ${bytes} bytes)`,
     `but the request was not sent. Switch to a vision- or audio-capable model`,
     `(e.g. gemini-1.5-pro, claude-3-5-sonnet, gpt-4o) and retry.`,
-  ].join(' ');
+  ].join(" ");
 }
 
 /**
@@ -277,17 +367,17 @@ function multimodalCapabilityNotice(action: Action, model: string, mime: string,
  */
 function multimodalMessage(args: {
   instruction: string;
-  mediaKind: 'image' | 'audio';
+  mediaKind: "image" | "audio";
   dataUrl: string;
   mime: string;
 }): Message[] {
   return [
     {
-      role: 'user',
+      role: "user",
       content: [
-        { type: 'text', text: args.instruction },
+        { type: "text", text: args.instruction },
         {
-          type: 'text',
+          type: "text",
           text: `[${args.mediaKind.toUpperCase()} ATTACHMENT mime=${args.mime}]\n${args.dataUrl}\n[/${args.mediaKind.toUpperCase()} ATTACHMENT]`,
         },
       ],
@@ -302,13 +392,13 @@ async function streamProviderText(
   action: Action,
 ): Promise<ToolResult> {
   const req: StreamRequest = { model, messages };
-  let text = '';
+  let text = "";
   let errored = false;
-  let errMsg = '';
+  let errMsg = "";
   try {
     for await (const ev of provider.stream(req)) {
-      if (ev.type === 'text_delta') text += ev.delta;
-      if (ev.type === 'error') {
+      if (ev.type === "text_delta") text += ev.delta;
+      if (ev.type === "error") {
         errored = true;
         errMsg = ev.message;
       }
@@ -319,10 +409,13 @@ async function streamProviderText(
   }
   const trimmed = text.trim();
   if (errored && !trimmed) {
-    return { content: `multimodal/${action} failed: ${errMsg || 'provider error'}`, isError: true };
+    return {
+      content: `multimodal/${action} failed: ${errMsg || "provider error"}`,
+      isError: true,
+    };
   }
   return {
-    content: trimmed || '(empty response)',
+    content: trimmed || "(empty response)",
     isError: false,
     metadata: { action, model, provider: provider.id },
   };
@@ -337,7 +430,7 @@ interface GenerateArgs {
 async function generateImage(a: GenerateArgs): Promise<ToolResult> {
   const prompt = a.input.prompt?.trim();
   if (!prompt) {
-    return { content: 'generate_image requires a `prompt`.', isError: true };
+    return { content: "generate_image requires a `prompt`.", isError: true };
   }
 
   const modelHint = a.input.model?.toLowerCase();
@@ -362,7 +455,8 @@ async function generateImage(a: GenerateArgs): Promise<ToolResult> {
 
   if (attempts.length === 0) {
     return {
-      content: 'generate_image: no image-capable provider available. Set NVIDIA_API_KEY or OPENAI_API_KEY.',
+      content:
+        "generate_image: no image-capable provider available. Set NVIDIA_API_KEY or OPENAI_API_KEY.",
       isError: true,
     };
   }
@@ -377,13 +471,15 @@ async function generateImage(a: GenerateArgs): Promise<ToolResult> {
       servingProvider = attempt.provider;
       break;
     } catch (err) {
-      errors.push(`${attempt.label}: ${err instanceof Error ? err.message : String(err)}`);
+      errors.push(
+        `${attempt.label}: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 
   if (!result || !servingProvider) {
     return {
-      content: `generate_image failed. Attempts: ${errors.join(' | ') || 'no provider exposed generateImage'}`,
+      content: `generate_image failed. Attempts: ${errors.join(" | ") || "no provider exposed generateImage"}`,
       isError: true,
     };
   }
@@ -391,7 +487,7 @@ async function generateImage(a: GenerateArgs): Promise<ToolResult> {
   const outputPath = resolveOutputPath(a.input.outputPath, a.ctx.cwd);
   try {
     await mkdir(dirname(outputPath), { recursive: true });
-    await writeFile(outputPath, Buffer.from(result.base64, 'base64'));
+    await writeFile(outputPath, Buffer.from(result.base64, "base64"));
   } catch (err) {
     return {
       content: `generate_image: decoded image but failed to write ${outputPath}: ${err instanceof Error ? err.message : String(err)}`,
@@ -411,7 +507,7 @@ async function generateImage(a: GenerateArgs): Promise<ToolResult> {
     isError: false,
     data,
     metadata: {
-      action: 'generate_image',
+      action: "generate_image",
       model: result.model,
       provider: servingProvider.id,
       mimeType: result.mimeType,
@@ -419,12 +515,12 @@ async function generateImage(a: GenerateArgs): Promise<ToolResult> {
   };
 }
 
-type ForcedProvider = 'nvidia' | 'openai' | undefined;
+type ForcedProvider = "nvidia" | "openai" | undefined;
 
 function resolveForcedProvider(modelHint: string | undefined): ForcedProvider {
   if (!modelHint) return undefined;
-  if (NVIDIA_IMAGE_MODEL_HINTS.has(modelHint)) return 'nvidia';
-  if (OPENAI_IMAGE_MODEL_HINTS.has(modelHint)) return 'openai';
+  if (NVIDIA_IMAGE_MODEL_HINTS.has(modelHint)) return "nvidia";
+  if (OPENAI_IMAGE_MODEL_HINTS.has(modelHint)) return "openai";
   return undefined;
 }
 
@@ -447,21 +543,25 @@ function buildProviderAttempts(args: {
     attempts.push({ provider: p, label });
   };
 
-  if (args.forced === 'nvidia') {
-    const nvidia = tryBuildNvidia(args.env) ?? (args.active.id === 'nvidia' ? args.active : undefined);
-    push(nvidia, 'nvidia');
+  if (args.forced === "nvidia") {
+    const nvidia =
+      tryBuildNvidia(args.env) ??
+      (args.active.id === "nvidia" ? args.active : undefined);
+    push(nvidia, "nvidia");
     return attempts;
   }
-  if (args.forced === 'openai') {
-    const openai = tryBuildOpenAI(args.env) ?? (args.active.id === 'openai' ? args.active : undefined);
-    push(openai, 'openai');
+  if (args.forced === "openai") {
+    const openai =
+      tryBuildOpenAI(args.env) ??
+      (args.active.id === "openai" ? args.active : undefined);
+    push(openai, "openai");
     return attempts;
   }
 
   // Default order: active provider (if it supports image gen), then NVIDIA, then OpenAI.
   push(args.active, `active(${args.active.id})`);
-  push(tryBuildNvidia(args.env), 'nvidia');
-  push(tryBuildOpenAI(args.env), 'openai');
+  push(tryBuildNvidia(args.env), "nvidia");
+  push(tryBuildOpenAI(args.env), "openai");
   return attempts;
 }
 
@@ -487,6 +587,6 @@ function tryBuildOpenAI(env: Record<string, string>): Provider | undefined {
 
 function resolveOutputPath(requested: string | undefined, cwd: string): string {
   if (requested && requested.length > 0) return resolve(cwd, requested);
-  const ts = new Date().toISOString().replace(/[:.]/g, '-');
+  const ts = new Date().toISOString().replace(/[:.]/g, "-");
   return resolve(cwd, `dirgha-image-${ts}.png`);
 }

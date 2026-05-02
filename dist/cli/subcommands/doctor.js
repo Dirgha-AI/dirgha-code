@@ -94,6 +94,51 @@ const LOCAL_PROBES = [
     { label: 'Ollama', url: 'http://localhost:11434/api/tags' },
     { label: 'llama.cpp', url: 'http://localhost:8080/v1/models' },
 ];
+async function checkPlaywright() {
+    try {
+        const { execSync } = await import('node:child_process');
+        // Try to find the playwright executable or chromium
+        try {
+            execSync('node -e "require(\'playwright\')"', { stdio: 'ignore', timeout: 3000 });
+            return { name: 'playwright', status: 'pass', detail: 'installed' };
+        }
+        catch {
+            return { name: 'playwright', status: 'warn', detail: 'not installed — browser tool will fail (run: npm install playwright && npx playwright install chromium)' };
+        }
+    }
+    catch {
+        return { name: 'playwright', status: 'warn', detail: 'check failed' };
+    }
+}
+async function checkLsp() {
+    try {
+        const { detectInstalledServers } = await import('../../lsp/detector.js');
+        const installed = await detectInstalledServers();
+        if (installed.length === 0) {
+            return { name: 'lsp', status: 'warn', detail: 'no language servers found — LSP tools will return errors (install typescript-language-server, pyright, rust-analyzer, etc.)' };
+        }
+        return { name: 'lsp', status: 'pass', detail: `${installed.length} server(s): ${installed.map((s) => s.id).join(', ')}` };
+    }
+    catch {
+        return { name: 'lsp', status: 'warn', detail: 'LSP detector unavailable' };
+    }
+}
+async function checkCron() {
+    const cronPath = join(homedir(), '.dirgha', 'cron', 'jobs.json');
+    try {
+        const { readFile } = await import('node:fs/promises');
+        const raw = await readFile(cronPath, 'utf8');
+        const jobs = JSON.parse(raw);
+        const count = Array.isArray(jobs) ? jobs.length : 0;
+        return { name: 'cron', status: 'pass', detail: `${count} job(s) scheduled at ${cronPath}` };
+    }
+    catch (err) {
+        if (err?.code === 'ENOENT') {
+            return { name: 'cron', status: 'pass', detail: 'no jobs scheduled yet' };
+        }
+        return { name: 'cron', status: 'warn', detail: `cron file unreadable: ${err?.message}` };
+    }
+}
 async function probeLocal(p) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -146,6 +191,9 @@ export const doctorSubcommand = {
         results.push(...probes);
         const locals = await Promise.all(LOCAL_PROBES.map(probeLocal));
         results.push(...locals);
+        results.push(await checkPlaywright());
+        results.push(await checkLsp());
+        results.push(await checkCron());
         if (json)
             printNdjson(results);
         else

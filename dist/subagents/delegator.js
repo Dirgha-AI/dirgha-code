@@ -12,6 +12,17 @@ import { runAgentLoop } from "../kernel/agent-loop.js";
 import { extractText } from "../kernel/message.js";
 import { createToolExecutor } from "../tools/exec.js";
 import { LoopDetector } from "../subagents/loop-detector.js";
+/**
+ * Safe default tool allowlist for sub-agents. Covers read/write/search and
+ * common dev operations while excluding high-privilege tools (e.g. network
+ * requests, approval bypass, registry mutation). A parent agent can grant
+ * additional tools by supplying an explicit toolAllowlist on SubagentRequest.
+ */
+export const DEFAULT_SUBAGENT_TOOLS = new Set([
+    'read_file', 'write_file', 'edit_file', 'search_grep', 'search_glob',
+    'shell', 'browser', 'go_to_definition', 'find_references', 'hover',
+    'list_symbols', 'git_read', 'task',
+]);
 export class SubagentDelegator {
     opts;
     constructor(opts) {
@@ -22,10 +33,8 @@ export class SubagentDelegator {
         const events = createEventStream();
         const allowlist = req.toolAllowlist
             ? new Set(req.toolAllowlist)
-            : undefined;
-        const filteredTools = allowlist
-            ? this.opts.registry.list().filter((t) => allowlist.has(t.name))
-            : this.opts.registry.list();
+            : DEFAULT_SUBAGENT_TOOLS;
+        const filteredTools = this.opts.registry.list().filter((t) => allowlist.has(t.name));
         const scoped = new Map();
         for (const t of filteredTools)
             scoped.set(t.name, t);
@@ -55,13 +64,21 @@ export class SubagentDelegator {
         const lastAssistant = [...result.messages]
             .reverse()
             .find((m) => m.role === "assistant");
-        return {
+        const returnValue = {
             output: lastAssistant ? extractText(lastAssistant) : "",
             usage: result.usage,
             transcript: result.messages,
             stopReason: result.stopReason,
             sessionId,
         };
+        if (req.tokenBudget !== undefined && result.usage.outputTokens > req.tokenBudget) {
+            // Log warning but don't throw — return what we have with a note
+            return {
+                ...returnValue,
+                output: returnValue.output + `\n\n[token budget of ${req.tokenBudget} exceeded: ${result.usage.outputTokens} output tokens used]`,
+            };
+        }
+        return returnValue;
     }
 }
 function createScopedRegistry(tools) {

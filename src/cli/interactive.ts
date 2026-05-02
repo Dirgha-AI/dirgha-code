@@ -6,6 +6,7 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { registerSession } from "../state/index.js";
 import { createInterface } from "node:readline";
 import type { Message, UsageTotal, Provider } from "../kernel/types.js";
 import { createEventStream } from "../kernel/event-stream.js";
@@ -55,6 +56,8 @@ export interface InteractiveOptions {
 export async function runInteractive(opts: InteractiveOptions): Promise<void> {
   const sessionId = randomUUID();
   const session = await opts.sessions.create(sessionId);
+  // Register in unified state index (fire-and-forget, never blocks).
+  void registerSession(sessionId, opts.config.model);
   const events = createEventStream();
   const slash = createDefaultSlashRegistry();
   await registerBuiltinSlashCommands(slash);
@@ -263,8 +266,14 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
           providerForCurrent: () => opts.providers.forModel(currentModel),
           summaryModel: opts.config.summaryModel,
         });
-        const result = await slash.dispatch(line, ctx);
-        if (result.output) process.stdout.write(`${result.output}\n`);
+        try {
+          const result = await slash.dispatch(line, ctx);
+          if (result.output) process.stdout.write(`${result.output}\n`);
+        } catch (e: unknown) {
+          process.stdout.write(
+            `\n  slash error: ${e instanceof Error ? e.message : String(e)}\n`,
+          );
+        }
         rl.prompt();
         return;
       }

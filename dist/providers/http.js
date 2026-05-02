@@ -16,19 +16,20 @@
  * sets Accept or Content-Type directly; extraHeaders is for custom
  * provider-specific keys (e.g., organisation id) only.
  */
-import { ProviderError } from './iface.js';
+import { ProviderError } from "./iface.js";
 const DEFAULT_TIMEOUT_MS = 60_000;
+const DEFAULT_STALL_TIMEOUT_MS = 30_000;
 function buildSseHeaders(apiKey, hasBody, extra) {
     const headers = {
         Authorization: `Bearer ${apiKey}`,
-        Accept: 'text/event-stream',
+        Accept: "text/event-stream",
     };
     if (hasBody)
-        headers['Content-Type'] = 'application/json';
+        headers["Content-Type"] = "application/json";
     if (extra) {
         for (const [k, v] of Object.entries(extra)) {
             const lower = k.toLowerCase();
-            if (lower === 'accept' || lower === 'content-type')
+            if (lower === "accept" || lower === "content-type")
                 continue;
             headers[k] = v;
         }
@@ -38,14 +39,14 @@ function buildSseHeaders(apiKey, hasBody, extra) {
 function buildJsonHeaders(apiKey, hasBody, extra) {
     const headers = {
         Authorization: `Bearer ${apiKey}`,
-        Accept: 'application/json',
+        Accept: "application/json",
     };
     if (hasBody)
-        headers['Content-Type'] = 'application/json';
+        headers["Content-Type"] = "application/json";
     if (extra) {
         for (const [k, v] of Object.entries(extra)) {
             const lower = k.toLowerCase();
-            if (lower === 'accept' || lower === 'content-type')
+            if (lower === "accept" || lower === "content-type")
                 continue;
             headers[k] = v;
         }
@@ -60,14 +61,14 @@ function linkedSignal(timeoutMs, external) {
         if (external.aborted)
             controller.abort(external.reason);
         else
-            external.addEventListener('abort', onExternal, { once: true });
+            external.addEventListener("abort", onExternal, { once: true });
     }
     return {
         signal: controller.signal,
         cancel: () => {
             clearTimeout(timer);
             if (external)
-                external.removeEventListener('abort', onExternal);
+                external.removeEventListener("abort", onExternal);
         },
     };
 }
@@ -83,7 +84,7 @@ export async function* streamSSE(req) {
     let response;
     try {
         response = await fetch(req.url, {
-            method: 'POST',
+            method: "POST",
             headers,
             body: hasBody ? JSON.stringify(req.body) : undefined,
             signal,
@@ -100,27 +101,44 @@ export async function* streamSSE(req) {
     }
     if (!response.body) {
         cancel();
-        throw new ProviderError('Empty response body', req.providerName);
+        throw new ProviderError("Empty response body", req.providerName);
     }
     const reader = response.body.getReader();
-    const decoder = new TextDecoder('utf-8');
-    let buffer = '';
+    const decoder = new TextDecoder("utf-8");
+    let buffer = "";
+    const stallMs = req.stallTimeoutMs ?? DEFAULT_STALL_TIMEOUT_MS;
+    let stallTimer;
     try {
         for (;;) {
-            const { value, done } = await reader.read();
+            stallTimer = undefined;
+            let result;
+            if (stallMs > 0) {
+                result = await Promise.race([
+                    reader.read(),
+                    new Promise((_, reject) => {
+                        stallTimer = setTimeout(() => reject(new Error(`Stream stalled: no bytes received in ${stallMs}ms`)), stallMs);
+                    }),
+                ]);
+            }
+            else {
+                result = await reader.read();
+            }
+            if (stallTimer !== undefined)
+                clearTimeout(stallTimer);
+            const { value, done } = result;
             if (done)
                 break;
             buffer += decoder.decode(value, { stream: true });
             let newlineIndex;
-            while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
+            while ((newlineIndex = buffer.indexOf("\n")) >= 0) {
                 const rawLine = buffer.slice(0, newlineIndex);
                 buffer = buffer.slice(newlineIndex + 1);
-                const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine;
+                const line = rawLine.endsWith("\r") ? rawLine.slice(0, -1) : rawLine;
                 if (line.length === 0)
                     continue;
-                if (line.startsWith(':'))
+                if (line.startsWith(":"))
                     continue;
-                if (!line.startsWith('data:'))
+                if (!line.startsWith("data:"))
                     continue;
                 const payload = line.slice(5).trim();
                 if (payload.length === 0)
@@ -129,7 +147,7 @@ export async function* streamSSE(req) {
             }
         }
         const tail = buffer.trim();
-        if (tail.startsWith('data:')) {
+        if (tail.startsWith("data:")) {
             const payload = tail.slice(5).trim();
             if (payload.length > 0)
                 yield payload;
@@ -140,7 +158,9 @@ export async function* streamSSE(req) {
         try {
             reader.releaseLock();
         }
-        catch { /* noop */ }
+        catch {
+            /* noop */
+        }
     }
 }
 /**
@@ -155,7 +175,7 @@ export async function postJSON(req) {
     let response;
     try {
         response = await fetch(req.url, {
-            method: 'POST',
+            method: "POST",
             headers,
             body: hasBody ? JSON.stringify(req.body) : undefined,
             signal,
@@ -179,7 +199,7 @@ async function safeReadText(response) {
         return await response.text();
     }
     catch {
-        return '<body unreadable>';
+        return "<body unreadable>";
     }
 }
 function isRetryableStatus(status) {

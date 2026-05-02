@@ -9,18 +9,7 @@ import { jsxs as _jsxs, jsx as _jsx } from "react/jsx-runtime";
 import * as React from "react";
 import { Box, Text, useStdout } from "ink";
 import { useTheme } from "../theme-context.js";
-const SPINNER_FRAMES = [
-    "⠋",
-    "⠙",
-    "⠹",
-    "⠸",
-    "⠼",
-    "⠴",
-    "⠦",
-    "⠧",
-    "⠇",
-    "⠏",
-];
+import { SpinnerContext, SPINNER_FRAMES } from "../spinner-context.js";
 function formatTokens(n) {
     if (n < 1000)
         return String(n);
@@ -58,15 +47,7 @@ export function StatusBar(props) {
     const { stdout } = useStdout();
     const palette = useTheme();
     const cols = stdout?.columns ?? 80;
-    const [frame, setFrame] = React.useState(0);
-    React.useEffect(() => {
-        if (!props.busy)
-            return;
-        const t = setInterval(() => {
-            setFrame((f) => (f + 1) % SPINNER_FRAMES.length);
-        }, 80);
-        return () => clearInterval(t);
-    }, [props.busy]);
+    const frame = React.useContext(SpinnerContext);
     const totalTokens = props.inputTokens + props.outputTokens;
     const costLabel = props.costUsd > 0 ? `$${props.costUsd.toFixed(3)}` : "";
     // Strip provider prefix so the footer reads short and human.

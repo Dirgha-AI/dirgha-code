@@ -101,6 +101,10 @@ export interface FleetConfig {
     verbose?: boolean;
     /** Optional per-subtask progress hook. */
     onAgent?: (agent: FleetAgent) => void;
+    /** Run ID for checkpoint files. Auto-generated if omitted. */
+    runId?: string;
+    /** If true, worktrees are checked out from existing branches (resume mode). */
+    reuseBranch?: boolean;
 }
 /** Result of a fleet run. */
 export interface FleetResult {

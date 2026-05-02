@@ -18,11 +18,15 @@ export interface DaemonServerOptions {
 export declare class DaemonServer {
     private opts;
     private active;
+    private inFlight;
+    private state;
+    private abort;
     private started;
     private totalUsage;
     constructor(opts: DaemonServerOptions);
     start(): void;
     private handle;
+    private gracefulShutdown;
     private healthResult;
     private sessionStart;
     private sessionResume;

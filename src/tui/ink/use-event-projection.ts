@@ -65,17 +65,84 @@ export function useEventProjection(events: EventStream): EventProjection {
   const flushTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
+  const pendingThinkingRef = React.useRef<{ id: string; content: string } | null>(null);
+  const flushThinkingTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Per-tool-id buffers for tool_exec_progress — same debounce pattern as text_delta.
+  const pendingProgressRef = React.useRef<Map<string, string>>(new Map());
+  const progressTimerRef = React.useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  // Mirror of liveItems kept in a ref so commitLive can read the latest
+  // value synchronously from an async context without relying on the
+  // functional-updater side-channel pattern (which only runs synchronously
+  // from React event handlers, not from async finally blocks).
+  const liveItemsRef = React.useRef<TranscriptItem[]>([]);
+
+  const setLive = React.useCallback(
+    (updater: TranscriptItem[] | ((prev: TranscriptItem[]) => TranscriptItem[])) => {
+      setLiveItems((prev) => {
+        const next = typeof updater === 'function' ? updater(prev) : updater;
+        liveItemsRef.current = next;
+        return next;
+      });
+    },
+    [],
+  );
 
   React.useEffect(() => {
     // Local ids used to attribute in-flight deltas to the right span.
     let currentTextId: string | null = null;
     let currentThinkingId: string | null = null;
+
+    function flushPending(): void {
+      const p = pendingTextRef.current;
+      if (!p) return;
+      pendingTextRef.current = null;
+      if (flushTimerRef.current !== null) {
+        clearTimeout(flushTimerRef.current);
+        flushTimerRef.current = null;
+      }
+      setLive((prev) =>
+        Array.isArray(prev)
+          ? prev.map((it) =>
+              it.kind === "text" && it.id === p.id
+                ? { ...it, content: p.content }
+                : it,
+            )
+          : prev,
+      );
+    }
+
+    function flushPendingThinking(): void {
+      const p = pendingThinkingRef.current;
+      if (!p) return;
+      pendingThinkingRef.current = null;
+      if (flushThinkingTimerRef.current !== null) {
+        clearTimeout(flushThinkingTimerRef.current);
+        flushThinkingTimerRef.current = null;
+      }
+      setLive((prev) =>
+        Array.isArray(prev)
+          ? prev.map((it) =>
+              it.kind === "thinking" && it.id === p.id
+                ? { ...it, content: p.content }
+                : it,
+            )
+          : prev,
+      );
+    }
+
+    const toolcallArgBuffers = new Map<string, string>();
+
     const unsubscribe = events.subscribe((event: AgentEvent) => {
       switch (event.type) {
+        case "agent_start":
+          // Clear stale live items from any aborted prior session so they
+          // don't bleed into the next turn's display.
+          setLive([]);
+          return;
         case "text_start":
           currentTextId = randomUUID();
           currentThinkingId = null;
-          setLiveItems((prev) => [
+          setLive((prev) => [
             ...prev,
             { kind: "text", id: currentTextId!, content: "" },
           ]);
@@ -89,27 +156,31 @@ export function useEventProjection(events: EventStream): EventProjection {
           };
           if (!flushTimerRef.current) {
             flushTimerRef.current = setTimeout(() => {
-              const p = pendingTextRef.current;
-              pendingTextRef.current = null;
               flushTimerRef.current = null;
+              // Read but do NOT clear — next delta will keep accumulating.
+              // pendingTextRef is only cleared by flushPending() at text_end.
+              const p = pendingTextRef.current;
               if (!p) return;
-              setLiveItems((prev) =>
-                prev.map((it) =>
-                  it.kind === "text" && it.id === p.id
-                    ? { ...it, content: p.content }
-                    : it,
-                ),
+              setLive((prev) =>
+                Array.isArray(prev)
+                  ? prev.map((it) =>
+                      it.kind === "text" && it.id === p.id
+                        ? { ...it, content: p.content }
+                        : it,
+                    )
+                  : prev,
               );
             }, 50);
           }
           return;
         }
         case "text_end":
+          flushPending();
           currentTextId = null;
           return;
         case "thinking_start":
           currentThinkingId = randomUUID();
-          setLiveItems((prev) => [
+          setLive((prev) => [
             ...prev,
             { kind: "thinking", id: currentThinkingId!, content: "" },
           ]);
@@ -117,16 +188,30 @@ export function useEventProjection(events: EventStream): EventProjection {
         case "thinking_delta": {
           const id = currentThinkingId;
           if (!id) return;
-          setLiveItems((prev) =>
-            prev.map((it) =>
-              it.kind === "thinking" && it.id === id
-                ? { ...it, content: it.content + event.delta }
-                : it,
-            ),
-          ) as any;
+          pendingThinkingRef.current = {
+            id,
+            content: (pendingThinkingRef.current?.content ?? "") + event.delta,
+          };
+          if (!flushThinkingTimerRef.current) {
+            flushThinkingTimerRef.current = setTimeout(() => {
+              flushThinkingTimerRef.current = null;
+              const p = pendingThinkingRef.current;
+              if (!p) return;
+              setLive((prev) =>
+                Array.isArray(prev)
+                  ? prev.map((it) =>
+                      it.kind === "thinking" && it.id === p.id
+                        ? { ...it, content: p.content }
+                        : it,
+                    )
+                  : prev,
+              );
+            }, 50);
+          }
           return;
         }
         case "thinking_end":
+          flushPendingThinking();
           currentThinkingId = null;
           return;
         case "toolcall_start": {
@@ -139,26 +224,26 @@ export function useEventProjection(events: EventStream): EventProjection {
             outputPreview: "",
             startedAt: Date.now(),
           };
-          setLiveItems((prev) => [...prev, item]);
+          setLive((prev) => [...prev, item]);
           return;
         }
         case "toolcall_delta": {
-          setLiveItems((prev) =>
-            prev.map((it) =>
-              it.kind === "tool" &&
-              it.id === event.id &&
-              it.status === "pending"
-                ? { ...it, argJson: (it.argJson ?? "") + event.deltaJson }
-                : it,
-            ),
-          );
+          // Buffer argJson in the item in-place without triggering a render.
+          // The pending "generating..." placeholder shows nothing meaningful
+          // until toolcall_end removes it; intermediate argJson updates
+          // produce zero visible change and only cause render thrashing.
+          // We still need to accumulate so toolcall_end can build a summary
+          // if needed — store in a local map keyed by event.id.
+          if (!toolcallArgBuffers.has(event.id)) toolcallArgBuffers.set(event.id, "");
+          toolcallArgBuffers.set(event.id, (toolcallArgBuffers.get(event.id) ?? "") + event.deltaJson);
           return;
         }
         case "toolcall_end":
           // Remove the pending "generating..." placeholder when the
           // tool call JSON is fully received. tool_exec_start follows
           // with the real item.
-          setLiveItems((prev) =>
+          toolcallArgBuffers.delete(event.id);
+          setLive((prev) =>
             prev.filter(
               (it) =>
                 !(
@@ -179,25 +264,42 @@ export function useEventProjection(events: EventStream): EventProjection {
             outputPreview: "",
             startedAt: Date.now(),
           };
-          setLiveItems((prev) => [...prev, item]);
+          setLive((prev) => [...prev, item]);
           return;
         }
         case "tool_exec_progress": {
-          setLiveItems((prev) =>
-            prev.map((it) =>
-              it.kind === "tool" &&
-              it.id === event.id &&
-              it.status === "running"
-                ? {
-                    ...it,
-                    outputPreview: it.outputPreview + event.message + "\n",
-                  }
-                : it,
-            ),
+          const toolId = event.id;
+          pendingProgressRef.current.set(
+            toolId,
+            (pendingProgressRef.current.get(toolId) ?? "") + event.message + "\n",
           );
+          if (!progressTimerRef.current.has(toolId)) {
+            progressTimerRef.current.set(
+              toolId,
+              setTimeout(() => {
+                progressTimerRef.current.delete(toolId);
+                const accumulated = pendingProgressRef.current.get(toolId);
+                if (!accumulated) return;
+                setLive((prev) =>
+                  prev.map((it) =>
+                    it.kind === "tool" && it.id === toolId && it.status === "running"
+                      ? { ...it, outputPreview: accumulated }
+                      : it,
+                  ),
+                );
+              }, 50),
+            );
+          }
           return;
         }
         case "tool_exec_end": {
+          // Flush any buffered progress before the final state overwrites it.
+          const pending = progressTimerRef.current.get(event.id);
+          if (pending !== undefined) {
+            clearTimeout(pending);
+            progressTimerRef.current.delete(event.id);
+          }
+          pendingProgressRef.current.delete(event.id);
           const status: ToolStatus = event.isError ? "error" : "done";
           const diff =
             typeof event.metadata?.diff === "string"
@@ -211,7 +313,7 @@ export function useEventProjection(events: EventStream): EventProjection {
                 : "text";
           const outputText =
             outputKind === "diff" && diff !== undefined ? diff : event.output;
-          setLiveItems((prev) =>
+          setLive((prev) =>
             prev.map((it) =>
               it.kind === "tool" && it.id === event.id
                 ? {
@@ -235,7 +337,7 @@ export function useEventProjection(events: EventStream): EventProjection {
           }));
           return;
         case "error":
-          setLiveItems((prev) => [
+          setLive((prev) => [
             ...prev,
             {
               kind: "error",
@@ -251,6 +353,8 @@ export function useEventProjection(events: EventStream): EventProjection {
           ]);
           return;
         case "turn_end":
+          flushPending();
+          flushPendingThinking();
           currentTextId = null;
           currentThinkingId = null;
           return;
@@ -259,23 +363,36 @@ export function useEventProjection(events: EventStream): EventProjection {
       }
     });
 
-    return unsubscribe;
-  }, [events]);
+    return () => {
+      unsubscribe();
+      if (flushTimerRef.current !== null) {
+        clearTimeout(flushTimerRef.current);
+        flushTimerRef.current = null;
+      }
+      if (flushThinkingTimerRef.current !== null) {
+        clearTimeout(flushThinkingTimerRef.current);
+        flushThinkingTimerRef.current = null;
+      }
+      for (const t of progressTimerRef.current.values()) clearTimeout(t);
+      progressTimerRef.current.clear();
+      pendingProgressRef.current.clear();
+    };
+  }, [events, setLive]);
 
   const commitLive = React.useCallback((): TranscriptItem[] => {
-    let committed: TranscriptItem[] = [];
-    setLiveItems((prev) => {
-      committed = prev;
-      return [];
-    });
+    // Read the ref synchronously — safe from async finally blocks.
+    const committed = liveItemsRef.current;
+    liveItemsRef.current = [];
+    setLiveItems([]);
     return committed;
   }, []);
 
   const appendLive = React.useCallback((item: TranscriptItem): void => {
-    setLiveItems((prev) => [...prev, item]);
-  }, []);
+    setLive((prev) => [...prev, item]);
+  }, [setLive]);
 
   const clear = React.useCallback((): void => {
+    liveItemsRef.current = [];
     setLiveItems([]);
     setTotals({ inputTokens: 0, outputTokens: 0, cachedTokens: 0, costUsd: 0 });
   }, []);

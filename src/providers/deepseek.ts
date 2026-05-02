@@ -14,12 +14,12 @@
  * the user explicitly forces DIRGHA_PROVIDER=deepseek.
  */
 
-import type { AgentEvent } from '../kernel/types.js';
-import type { Provider, StreamRequest, ProviderConfig } from './iface.js';
-import { ProviderError } from './iface.js';
-import { streamChatCompletions } from './openai-compat.js';
+import type { AgentEvent } from "../kernel/types.js";
+import type { Provider, StreamRequest, ProviderConfig } from "./iface.js";
+import { ProviderError } from "./iface.js";
+import { streamChatCompletions } from "./openai-compat.js";
 
-const DEFAULT_BASE = 'https://api.deepseek.com/v1';
+const DEFAULT_BASE = "https://api.deepseek.com/v1";
 
 // Canonical model IDs served by api.deepseek.com as of 2026-04.
 // deepseek-chat   = V3/V4 (flagship, general purpose)
@@ -28,32 +28,34 @@ const DEFAULT_BASE = 'https://api.deepseek.com/v1';
 // deepseek-reasoner = R1 (thinking/chain-of-thought)
 // deepseek-prover-v2 = math/theorem proving
 export const DEEPSEEK_MODELS: Array<{ id: string; label: string }> = [
-  { id: 'deepseek-chat',       label: 'DeepSeek V3 (default)' },
-  { id: 'deepseek-v4-flash',   label: 'DeepSeek V4 Flash (fast)' },
-  { id: 'deepseek-v4-pro',     label: 'DeepSeek V4 Pro (max quality)' },
-  { id: 'deepseek-reasoner',   label: 'DeepSeek R1 (reasoning)' },
-  { id: 'deepseek-prover-v2',  label: 'DeepSeek Prover V2 (math)' },
+  { id: "deepseek-chat", label: "DeepSeek V3 (default)" },
+  { id: "deepseek-v4-flash", label: "DeepSeek V4 Flash (fast)" },
+  { id: "deepseek-v4-pro", label: "DeepSeek V4 Pro (max quality)" },
+  { id: "deepseek-reasoner", label: "DeepSeek R1 (reasoning)" },
+  { id: "deepseek-prover-v2", label: "DeepSeek Prover V2 (math)" },
 ];
 
 // Models that surface a reasoning/thinking channel.
+// deepseek-v4-flash is intentionally excluded — it does not support
+// the reasoning_content field and is not confirmed on api.deepseek.com.
 const THINKING_MODELS = new Set<string>([
-  'deepseek-reasoner',
-  'deepseek-v4-pro',
-  'deepseek-v4-flash',
-  'deepseek-r1',
-  'deepseek-prover-v2',
+  "deepseek-reasoner",
+  "deepseek-v4-pro",
+  "deepseek-r1",
+  "deepseek-prover-v2",
 ]);
 
 export class DeepSeekProvider implements Provider {
-  readonly id = 'deepseek';
+  readonly id = "deepseek";
   private readonly apiKey: string;
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
 
   constructor(config: ProviderConfig = {}) {
-    this.apiKey = config.apiKey ?? process.env.DEEPSEEK_API_KEY ?? '';
-    if (!this.apiKey) throw new ProviderError('DEEPSEEK_API_KEY is required', this.id);
-    this.baseUrl = (config.baseUrl ?? DEFAULT_BASE).replace(/\/+$/, '');
+    this.apiKey = config.apiKey ?? process.env.DEEPSEEK_API_KEY ?? "";
+    if (!this.apiKey)
+      throw new ProviderError("DEEPSEEK_API_KEY is required", this.id);
+    this.baseUrl = (config.baseUrl ?? DEFAULT_BASE).replace(/\/+$/, "");
     // Reasoning models can take 30–60 s on first-token. Match OpenRouter's
     // headroom so multi-turn coding sprints don't cancel themselves.
     this.timeoutMs = config.timeoutMs ?? 300_000;
@@ -64,13 +66,12 @@ export class DeepSeekProvider implements Provider {
   }
 
   supportsThinking(modelId: string): boolean {
-    const base = modelId.replace(/^deepseek(?:-ai)?\//, '');
+    const base = modelId.replace(/^deepseek(?:-ai|-native)?\//, "");
     return THINKING_MODELS.has(base);
   }
 
   stream(req: StreamRequest): AsyncIterable<AgentEvent> {
-    // Strip OR-style or vendor prefixes — the native API uses bare IDs.
-    const model = req.model.replace(/^deepseek(?:-ai)?\//, '');
+    const model = req.model.replace(/^deepseek(?:-ai|-native)?\//, "");
     return streamChatCompletions({
       providerName: this.id,
       endpoint: `${this.baseUrl}/chat/completions`,
@@ -82,7 +83,8 @@ export class DeepSeekProvider implements Provider {
       maxTokens: req.maxTokens,
       timeoutMs: this.timeoutMs,
       signal: req.signal,
-      includeThinking: this.supportsThinking(req.model) && req.thinking !== 'off',
+      includeThinking:
+        this.supportsThinking(req.model) && req.thinking !== "off",
     });
   }
 }

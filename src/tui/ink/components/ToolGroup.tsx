@@ -19,6 +19,7 @@ import { useTheme } from "../theme-context.js";
 import { iconFor, TOOL_STATUS } from "../icons.js";
 import { DenseToolMessage, isDenseTool } from "./DenseToolMessage.js";
 import type { ToolStatus } from "./ToolBox.js";
+import { SpinnerContext, SPINNER_FRAMES as SPINNER } from "../spinner-context.js";
 
 export interface ToolItem {
   id: string;
@@ -34,8 +35,6 @@ export interface ToolItem {
 export interface ToolGroupProps {
   tools: ToolItem[];
 }
-
-const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"] as const;
 
 const TOOL_LABEL: Record<string, string> = {
   fs_read: "Read",
@@ -111,12 +110,7 @@ function FullToolRow({
   divider,
   palette,
 }: FullToolRowProps): React.JSX.Element {
-  const [frame, setFrame] = React.useState(0);
-  React.useEffect(() => {
-    if (tool.status !== "running") return;
-    const t = setInterval(() => setFrame((f) => (f + 1) % SPINNER.length), 80);
-    return (): void => clearInterval(t);
-  }, [tool.status]);
+  const frame = React.useContext(SpinnerContext);
 
   const glyph =
     tool.status === "error"

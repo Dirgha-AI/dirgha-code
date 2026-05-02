@@ -20,6 +20,8 @@ import { lspGoToDefinitionTool } from "./lsp-definition.js";
 import { lspFindReferencesTool } from "./lsp-references.js";
 import { lspHoverTool } from "./lsp-hover.js";
 import { lspDocumentSymbolsTool } from "./lsp-symbols.js";
+import { rtkTool } from "./rtk.js";
+import { qmdTool } from "./qmd.js";
 // multimodal is a factory (needs runtime Provider) — wired in main.ts, not baked into builtInTools
 // export { createMultimodalTool } from "./multimodal.js";
 export { createCronTool } from "./cron.js";
@@ -53,6 +55,8 @@ export const builtInTools: Tool[] = [
   lspFindReferencesTool,
   lspHoverTool,
   lspDocumentSymbolsTool,
+  rtkTool,
+  qmdTool,
 ];
 
 export {
@@ -71,4 +75,6 @@ export {
   lspFindReferencesTool,
   lspHoverTool,
   lspDocumentSymbolsTool,
+  rtkTool,
+  qmdTool,
 };

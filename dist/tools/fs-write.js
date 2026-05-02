@@ -5,7 +5,7 @@
  * overwrite contract.
  */
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { dirname, resolve, sep } from 'node:path';
 import { summariseDiff, unifiedDiff } from './diff.js';
 export const fsWriteTool = {
     name: 'fs_write',
@@ -23,6 +23,9 @@ export const fsWriteTool = {
     async execute(rawInput, ctx) {
         const input = rawInput;
         const abs = resolve(ctx.cwd, input.path);
+        if (!abs.startsWith(ctx.cwd + sep) && abs !== ctx.cwd) {
+            return { content: `Path escapes working directory: ${input.path}`, isError: true };
+        }
         let before = '';
         const existed = await stat(abs).then(() => true).catch(() => false);
         if (existed)

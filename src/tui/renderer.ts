@@ -21,7 +21,10 @@ export interface StreamRendererOptions {
 
 export function renderStreamingEvents(opts: StreamRendererOptions = {}) {
   const theme = opts.colour === false ? noColour() : opts.theme ?? defaultTheme;
-  const write = opts.write ?? ((chunk: string) => { process.stdout.write(chunk); });
+  const write = opts.write ?? ((chunk: string) => {
+    try { process.stdout.write(chunk); }
+    catch (e: any) { if (e?.code !== 'EPIPE' && e?.code !== 'EIO') throw e; }
+  });
   const showThinking = opts.showThinking ?? false;
   let thinkingBannerOpen = false;
 

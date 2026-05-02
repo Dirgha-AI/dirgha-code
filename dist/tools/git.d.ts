@@ -4,5 +4,5 @@
  * scope — the agent performs those via the shell tool so the user sees
  * a single "exec this command?" prompt per operation.
  */
-import type { Tool } from './registry.js';
+import type { Tool } from "./registry.js";
 export declare const gitTool: Tool;

@@ -44,8 +44,13 @@ export interface DaemonServerOptions {
   cwd: string;
 }
 
+type ServerState = "running" | "shuttingDown" | "exited";
+
 export class DaemonServer {
   private active = new Map<string, ActiveSession>();
+  private inFlight = new Set<Promise<void>>();
+  private state: ServerState = "running";
+  private abort = new AbortController();
   private started = Date.now();
   private totalUsage: UsageTotal = {
     inputTokens: 0,
@@ -77,6 +82,11 @@ export class DaemonServer {
   }
 
   private async handle(req: DaemonRequest): Promise<void> {
+    if (this.state !== "running" && req.method !== "daemon.shutdown") {
+      this.writeError(req.id, -32000, "Server is shutting down");
+      return;
+    }
+
     try {
       switch (req.method) {
         case "daemon.health":
@@ -84,7 +94,7 @@ export class DaemonServer {
           return;
         case "daemon.shutdown":
           this.writeResult(req.id, { ok: true });
-          process.exit(0);
+          await this.gracefulShutdown();
           return;
         case "session.start":
           this.writeResult(
@@ -125,6 +135,45 @@ export class DaemonServer {
         err instanceof Error ? err.message : String(err),
       );
     }
+  }
+
+  private async gracefulShutdown(): Promise<void> {
+    if (this.state !== "running") return;
+    this.state = "shuttingDown";
+
+    // 1. Signal all in-flight agent loops to abort.
+    this.abort.abort();
+
+    // 2. Stop accepting new stdin.
+    stdin.pause();
+
+    // 3. Wait for in-flight agent loops to finish (with timeout).
+    if (this.inFlight.size > 0) {
+      const deadline = Date.now() + 10_000;
+      const pending = [...this.inFlight];
+      try {
+        await Promise.race([
+          Promise.allSettled(pending),
+          new Promise<void>((r) => {
+            const check = setInterval(() => {
+              if (Date.now() > deadline) {
+                clearInterval(check);
+                r();
+              }
+            }, 100);
+          }),
+        ]);
+      } catch {
+        // Agent loops may reject after abort — expected.
+      }
+    }
+
+    // 4. Sessions are stateless JSONL files — no close needed.
+    // Clear the active map so GC can collect in-flight agent results.
+    this.active.clear();
+
+    this.state = "exited";
+    process.exit(0);
   }
 
   private healthResult(): HealthResult {
@@ -225,17 +274,19 @@ export class DaemonServer {
     });
     const sanitized = this.opts.registry.sanitize({ descriptionLimit: 200 });
 
-    void runAgentLoop({
-      sessionId: params.sessionId,
-      model: this.opts.config.model,
-      messages: active.history,
-      tools: sanitized.definitions,
-      maxTurns: this.opts.config.maxTurns,
-      provider,
-      toolExecutor: executor,
-      events,
-    })
-      .then(async (result) => {
+    const done = (async (): Promise<void> => {
+      try {
+        const result = await runAgentLoop({
+          sessionId: params.sessionId,
+          model: this.opts.config.model,
+          messages: active.history,
+          tools: sanitized.definitions,
+          maxTurns: this.opts.config.maxTurns,
+          provider,
+          toolExecutor: executor,
+          events,
+          signal: this.abort.signal,
+        });
         const savedCount = active.history.length;
         active.history.length = 0;
         active.history.push(...result.messages);
@@ -246,8 +297,8 @@ export class DaemonServer {
             message: msg,
           });
         }
-      })
-      .catch((err) => {
+      } catch (err) {
+        if (this.abort.signal.aborted) return;
         this.writeNotification("event.stream", {
           streamId,
           event: {
@@ -255,8 +306,13 @@ export class DaemonServer {
             message: err instanceof Error ? err.message : String(err),
           },
         } as EventNotification);
-      });
-
+      }
+    })();
+    const tracked = done;
+    tracked.finally(() => {
+      this.inFlight.delete(tracked);
+    });
+    this.inFlight.add(tracked);
     return { streamId };
   }
 

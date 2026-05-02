@@ -120,11 +120,12 @@ try {
     'text_delta from the stub never reached the projection');
 
   // Now type a second prompt while the turn is still busy and submit.
-  for (const ch of 'second prompt while busy') { send(ch); await sleep(15); }
+  for (const ch of 'second prompt while busy') { send(ch); await sleep(30); }
   await flush();
   send('\r');
   await flush();
   await flush();
+  await flush(); // extra tick: allow React deferred render of queue indicator
 
   const frameAfterQueue = lastFrame();
   assert('queue indicator renders count when 1 prompt is queued',
@@ -138,7 +139,7 @@ try {
     'input box should be empty after Enter — found queued text still in box');
 
   // Type and queue a third one to verify the count bumps.
-  for (const ch of 'third one') { send(ch); await sleep(15); }
+  for (const ch of 'third one') { send(ch); await sleep(30); }
   send('\r');
   await flush();
   await flush();

@@ -41,7 +41,7 @@ export function createApprovalBus(options: { alwaysApprove?: string[] } = {}): C
     },
     async request(req) {
       if (deny.has(req.tool)) return 'deny_always';
-      if (approve.has(req.tool)) return 'approve_once';
+      if (approve.has(req.tool)) return 'approve';
       for (const sub of subscribers) {
         const response = await sub(req);
         if (response !== undefined) {

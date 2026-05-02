@@ -8,6 +8,7 @@ import { appendFile, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { createReadStream } from "node:fs";
+import { dbOpenSession, dbAppendMessage } from "../state/db.js";
 export class SessionStore {
     dir;
     constructor(dir = join(homedir(), ".dirgha", "sessions")) {
@@ -21,6 +22,7 @@ export class SessionStore {
             .catch(() => false);
         if (!exists)
             await writeFile(path, "", "utf8");
+        void Promise.resolve().then(() => dbOpenSession(id));
         return new SessionImpl(id, path);
     }
     async open(id) {
@@ -55,6 +57,9 @@ class SessionImpl {
     }
     async append(entry) {
         await appendFile(this.path, `${JSON.stringify(entry)}\n`, "utf8");
+        if (entry.type === "message") {
+            void Promise.resolve().then(() => dbAppendMessage(this.id, entry.message));
+        }
     }
     async *replay() {
         const content = await readFile(this.path, "utf8").catch(() => "");

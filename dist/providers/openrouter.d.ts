@@ -5,8 +5,8 @@
  *     surfaces (HTTP-Referer, X-Title).
  *   - Supports free-tier models via the ":free" suffix.
  */
-import type { AgentEvent } from '../kernel/types.js';
-import type { Provider, StreamRequest, ProviderConfig } from './iface.js';
+import type { AgentEvent } from "../kernel/types.js";
+import type { Provider, StreamRequest, ProviderConfig } from "./iface.js";
 export declare class OpenRouterProvider implements Provider {
     readonly id = "openrouter";
     private readonly apiKey;

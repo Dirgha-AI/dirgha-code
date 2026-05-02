@@ -4,7 +4,7 @@
  * spending tokens on noisy metadata.
  */
 import { readdir, stat } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { resolve, sep } from 'node:path';
 // Paths where a blind fs_ls is almost never what the user actually
 // wanted. Typing `fs_ls .` at / or /root spills 100+ unrelated entries
 // into the model's context for no gain. Force a narrower ask.
@@ -22,6 +22,9 @@ export const fsLsTool = {
     async execute(rawInput, ctx) {
         const input = rawInput;
         const target = resolve(ctx.cwd, input.path ?? '.');
+        if (!target.startsWith(ctx.cwd + sep) && target !== ctx.cwd) {
+            return { content: `Path escapes working directory: ${input.path ?? '.'}`, isError: true };
+        }
         if (HUGE_ROOTS.has(target)) {
             return {
                 content: `Refusing to list ${target} — too broad. Supply a narrower path, or use search_glob / search_grep with a targeted pattern.`,

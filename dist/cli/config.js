@@ -6,7 +6,9 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { migrateDeprecatedModel } from "../intelligence/prices.js";
+const CURRENT_SCHEMA = 1;
 export const DEFAULT_CONFIG = {
+    schemaVersion: CURRENT_SCHEMA,
     model: "moonshotai/kimi-k2.6",
     cheapModel: "meta/llama-3.1-8b-instruct",
     summaryModel: "moonshotai/kimi-k2.5",
@@ -26,6 +28,7 @@ export async function loadConfig(cwd = process.cwd()) {
     const envPartial = readEnvOverrides();
     const merged = merge(DEFAULT_CONFIG, userPartial, projectPartial, envPartial);
     validate(merged);
+    migrateConfigSchema(merged);
     // Migrate any model IDs the upstream provider has dropped, so users
     // with stale `~/.dirgha/config.json` don't 400 on every call.
     merged.model = migrateDeprecatedModel(merged.model);
@@ -41,6 +44,7 @@ async function readJson(path) {
         return JSON.parse(text);
     }
     catch {
+        process.stderr.write(`[dirgha] Warning: ${path} contains malformed JSON — using defaults.\n`);
         return {};
     }
 }
@@ -65,7 +69,9 @@ function merge(...partials) {
             const value = p[key];
             if (value === undefined)
                 continue;
-            if (typeof value === "object" && !Array.isArray(value)) {
+            if (typeof value === "object" &&
+                value !== null &&
+                !Array.isArray(value)) {
                 out[key] = {
                     ...out[key],
                     ...value,
@@ -93,5 +99,14 @@ function validate(cfg) {
     if (!cfg.model || cfg.model.trim() === "") {
         process.stderr.write("[dirgha] warn: model is empty; LLM calls will fail\n");
     }
+}
+function migrateConfigSchema(cfg) {
+    if (cfg.schemaVersion === CURRENT_SCHEMA)
+        return;
+    // Future migrations go here. Example:
+    // if (cfg.schemaVersion === undefined || cfg.schemaVersion < 2) {
+    //   // v1 → v2: rename field, add default
+    // }
+    cfg.schemaVersion = CURRENT_SCHEMA;
 }
 //# sourceMappingURL=config.js.map

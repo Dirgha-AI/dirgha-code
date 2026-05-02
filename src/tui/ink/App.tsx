@@ -72,6 +72,7 @@ import { AtFileComplete } from "./components/AtFileComplete.js";
 import { SlashComplete } from "./components/SlashComplete.js";
 import { ThemePicker } from "./components/ThemePicker.js";
 import { ThemeProvider } from "./theme-context.js";
+import { SpinnerContext, SPINNER_FRAMES as GLOBAL_SPINNER_FRAMES } from "./spinner-context.js";
 import type { ThemeName } from "../theme.js";
 import { writeFile, mkdir, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -188,27 +189,42 @@ export function App(props: AppProps): React.JSX.Element {
   const [liveOutputTokens, setLiveOutputTokens] = React.useState(0);
   const [liveDurationMs, setLiveDurationMs] = React.useState(0);
   const turnStartRef = React.useRef<number>(0);
+  const liveOutputTokensAccRef = React.useRef<number>(0);
 
   React.useEffect(() => {
     const unsub = props.events.subscribe((ev) => {
       if (ev.type === "agent_start") {
         turnStartRef.current = Date.now();
+        liveOutputTokensAccRef.current = 0;
         setLiveOutputTokens(0);
         setLiveDurationMs(0);
       } else if (ev.type === "text_delta" || ev.type === "thinking_delta") {
-        // Approximate output-token count by char/4 — same heuristic
-        // the rest of the codebase uses for streaming-side estimates.
-        const delta = (ev.delta?.length ?? 0) / 4;
-        setLiveOutputTokens((prev) => prev + delta);
+        liveOutputTokensAccRef.current += (ev.delta?.length ?? 0) / 4;
       } else if (ev.type === "usage") {
-        setLiveOutputTokens(ev.outputTokens ?? 0);
+        // Only update the accumulator ref — the 1s tick interval reads it.
+        // Calling setLiveOutputTokens here would double-render on usage events.
+        liveOutputTokensAccRef.current = ev.outputTokens ?? 0;
       } else if (ev.type === "agent_end") {
         setLiveDurationMs(0);
         setLiveOutputTokens(0);
+        liveOutputTokensAccRef.current = 0;
       }
     });
     return unsub;
   }, [props.events]);
+
+  const [globalSpinnerFrame, setGlobalSpinnerFrame] = React.useState(0);
+  React.useEffect(() => {
+    if (!busy) {
+      setGlobalSpinnerFrame(0);
+      return;
+    }
+    const t = setInterval(
+      () => setGlobalSpinnerFrame((f) => (f + 1) % GLOBAL_SPINNER_FRAMES.length),
+      80,
+    );
+    return () => clearInterval(t);
+  }, [busy]);
 
   // Tick the duration so the tok/s number updates while streaming.
   React.useEffect(() => {
@@ -216,6 +232,7 @@ export function App(props: AppProps): React.JSX.Element {
     const t = setInterval(() => {
       if (turnStartRef.current > 0)
         setLiveDurationMs(Date.now() - turnStartRef.current);
+      setLiveOutputTokens(liveOutputTokensAccRef.current);
     }, 1000);
     return () => clearInterval(t);
   }, [busy]);
@@ -267,6 +284,11 @@ export function App(props: AppProps): React.JSX.Element {
     [props.models],
   );
   const slashCommands = props.slashCommands ?? [];
+
+  // runTurnRef ensures handleSubmit always calls the latest runTurn closure
+  // (which captures current currentModel, mode, etc.) without adding those
+  // values to handleSubmit's deps and causing it to recreate on every change.
+  const runTurnRef = React.useRef<() => Promise<void>>(() => Promise.resolve());
 
   const handleSubmit = React.useCallback(
     (raw: string): void => {
@@ -442,7 +464,7 @@ export function App(props: AppProps): React.JSX.Element {
       setTranscript((prev) => [...prev, userItem]);
       historyRef.current.push({ role: "user", content: value });
 
-      void runTurn();
+      void runTurnRef.current();
     },
     [busy, exit, props, projection, overlays],
   );
@@ -524,6 +546,7 @@ export function App(props: AppProps): React.JSX.Element {
       abortRef.current = null;
     }
   };
+  runTurnRef.current = runTurn;
 
   // Drain the prompt queue when a turn finishes. Pops the oldest queued
   // prompt and re-submits it through handleSubmit (which transitions
@@ -750,6 +773,20 @@ export function App(props: AppProps): React.JSX.Element {
     [overlays],
   );
 
+  const allTranscriptItems = React.useMemo(
+    () => [...transcript, ...projection.liveItems],
+    [transcript, projection.liveItems],
+  );
+  const renderedTranscript = React.useMemo(
+    () => renderTranscript(allTranscriptItems),
+    [allTranscriptItems],
+  );
+
+  const providerEntries = React.useMemo(
+    () => buildProviderEntries(models, currentModel),
+    [models, currentModel],
+  );
+
   // BISECT: Static moved out of the transcript render. Logo stays
   // in a one-item Static (its original placement). Both committed
   // transcript and live items render in the regular dynamic Box. If
@@ -758,12 +795,13 @@ export function App(props: AppProps): React.JSX.Element {
   // is upstream in useEventProjection.
   return (
     <ThemeProvider activeTheme={themeName}>
+    <SpinnerContext.Provider value={globalSpinnerFrame}>
       <Box flexDirection="column">
         <Static items={[{ key: "logo" }]}>
           {(_item): React.JSX.Element => <Logo key="logo" version={VERSION} />}
         </Static>
         <Box flexDirection="column">
-          {renderTranscript([...transcript, ...projection.liveItems])}
+          {renderedTranscript}
         </Box>
         {pendingApproval !== null && approvalBusRef.current && (
           <ApprovalPrompt
@@ -845,17 +883,13 @@ export function App(props: AppProps): React.JSX.Element {
         {overlays.active === "models" &&
           pickerStage === "provider" &&
           (() => {
-            // Build provider entries — only include providers that actually have
-            // models in our catalogue. Without this, the picker shows providers
-            // with 0 models and the user lands on an empty model list.
-            const providers = buildProviderEntries(models, currentModel);
-            if (providers.length === 0) {
+            if (providerEntries.length === 0) {
               // Fall through to flat ModelPicker if no providers (catalogue empty).
               return null;
             }
             return (
               <ProviderPicker
-                providers={providers}
+                providers={providerEntries}
                 onPick={(providerId): void => {
                   setPickerProvider(providerId);
                   setPickerStage("model");
@@ -918,6 +952,7 @@ export function App(props: AppProps): React.JSX.Element {
           liveDurationMs={liveDurationMs}
         />
       </Box>
+    </SpinnerContext.Provider>
     </ThemeProvider>
   );
 }

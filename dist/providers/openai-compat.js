@@ -30,30 +30,34 @@ export async function* streamChatCompletions(opts) {
     if (opts.extraBody)
         Object.assign(body, opts.extraBody);
     const state = new StreamState(opts.includeThinking ?? false);
-    for await (const payload of streamSSE({
-        providerName: opts.providerName,
-        url: opts.endpoint,
-        apiKey: opts.apiKey,
-        body,
-        extraHeaders: opts.extraHeaders,
-        signal: opts.signal,
-        timeoutMs: opts.timeoutMs,
-    })) {
-        if (payload === "[DONE]")
-            break;
-        let chunk;
-        try {
-            chunk = JSON.parse(payload);
+    try {
+        for await (const payload of streamSSE({
+            providerName: opts.providerName,
+            url: opts.endpoint,
+            apiKey: opts.apiKey,
+            body,
+            extraHeaders: opts.extraHeaders,
+            signal: opts.signal,
+            timeoutMs: opts.timeoutMs,
+        })) {
+            if (payload === "[DONE]")
+                break;
+            let chunk;
+            try {
+                chunk = JSON.parse(payload);
+            }
+            catch {
+                const repaired = repairJSON(payload);
+                if (!repaired || !repaired.choices)
+                    continue;
+                chunk = repaired;
+            }
+            yield* state.ingest(chunk);
         }
-        catch {
-            const repaired = repairJSON(payload);
-            if (!repaired || !repaired.choices)
-                continue;
-            chunk = repaired;
-        }
-        yield* state.ingest(chunk);
     }
-    yield* state.finalise();
+    finally {
+        yield* state.finalise();
+    }
 }
 function toOpenAIMessages(messages) {
     const out = [];
@@ -143,7 +147,6 @@ class StreamState {
     // chunks. Once we see the open tag, accumulate until the close tag
     // arrives. Anything before/after is text.
     inThinkBlock = false;
-    thinkBuffer = "";
     static THINK_OPEN_RE = /<(?:think|thinking|reasoning|thought|REASONING_SCRATCHPAD)>/i;
     static THINK_CLOSE_RE = /<\/(?:think|thinking|reasoning|thought|REASONING_SCRATCHPAD)>/i;
     /** Split a content delta into text + thinking pieces, honoring open <think> blocks across chunks. */
@@ -156,12 +159,10 @@ class StreamState {
                 const close = s.match(StreamState.THINK_CLOSE_RE);
                 if (!close || close.index === undefined) {
                     thinking += s;
-                    this.thinkBuffer += s;
                     s = "";
                     break;
                 }
                 thinking += s.slice(0, close.index);
-                this.thinkBuffer = "";
                 this.inThinkBlock = false;
                 s = s.slice(close.index + close[0].length);
             }
@@ -239,8 +240,10 @@ class StreamState {
                     id = tc.id;
                     this.toolIndexToId.set(index, id);
                 }
-                if (!id)
-                    continue;
+                if (!id) {
+                    id = `tc-${index}-${Date.now().toString(36)}`;
+                    this.toolIndexToId.set(index, id);
+                }
                 let entry = this.toolOpen.get(id);
                 if (!entry) {
                     const name = tc.function?.name ?? "";

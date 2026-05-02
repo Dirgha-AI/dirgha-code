@@ -16,13 +16,13 @@
  * supersedes.
  */
 
-import { mkdir } from 'node:fs/promises';
-import { homedir, tmpdir } from 'node:os';
-import { join } from 'node:path';
-import type { Tool, ToolContext } from './registry.js';
-import type { ToolResult } from '../kernel/types.js';
+import { mkdir } from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
+import { join } from "node:path";
+import type { Tool, ToolContext } from "./registry.js";
+import type { ToolResult } from "../kernel/types.js";
 
-type Action = 'goto' | 'click' | 'screenshot' | 'content' | 'close';
+type Action = "goto" | "click" | "screenshot" | "content" | "close";
 
 interface Input {
   action: Action;
@@ -32,7 +32,7 @@ interface Input {
   path?: string;
   fullPage?: boolean;
   timeoutMs?: number;
-  waitUntil?: 'load' | 'domcontentloaded' | 'networkidle';
+  waitUntil?: "load" | "domcontentloaded" | "networkidle";
 }
 
 interface BrowserOutput {
@@ -51,7 +51,10 @@ interface PwLocator {
   count(): Promise<number>;
 }
 interface PwPage {
-  goto(url: string, opts?: { waitUntil?: string; timeout?: number }): Promise<unknown>;
+  goto(
+    url: string,
+    opts?: { waitUntil?: string; timeout?: number },
+  ): Promise<unknown>;
   title(): Promise<string>;
   url(): string;
   content(): Promise<string>;
@@ -70,25 +73,28 @@ interface PwBrowser {
 
 const MAX_CONTENT_CHARS = 50_000;
 const DEFAULT_TIMEOUT_MS = 30_000;
-const SCREENSHOT_DIR = join(homedir(), '.dirgha', 'screenshots');
+const SCREENSHOT_DIR = join(homedir(), ".dirgha", "screenshots");
 
 let browser: PwBrowser | undefined;
 let page: PwPage | undefined;
 
 async function ensureBrowser(): Promise<PwPage> {
-  if (page && browser && (browser.isConnected?.() ?? true)) return page;
-
-  let chromium: { launch(opts: { headless: boolean; args?: string[] }): Promise<PwBrowser> };
+  if (page && browser?.isConnected?.() !== false) return page;
+  let chromium: {
+    launch(opts: { headless: boolean; args?: string[] }): Promise<PwBrowser>;
+  };
   try {
     // Dynamic import — resolved at runtime. Playwright is intentionally
     // not in package.json deps (heavy + optional). Hiding the literal
     // string behind a variable keeps TS's module resolver from looking
     // for type definitions for an absent package.
-    const pwModuleId = 'playwright';
+    const pwModuleId = "playwright";
     const mod: any = await import(pwModuleId);
     chromium = mod.chromium ?? mod.default?.chromium;
-    if (!chromium || typeof chromium.launch !== 'function') {
-      throw new Error('playwright module shape unexpected (no chromium.launch)');
+    if (!chromium || typeof chromium.launch !== "function") {
+      throw new Error(
+        "playwright module shape unexpected (no chromium.launch)",
+      );
     }
   } catch (err) {
     throw new Error(
@@ -98,7 +104,7 @@ async function ensureBrowser(): Promise<PwPage> {
 
   browser = await chromium.launch({
     headless: true,
-    args: ['--no-sandbox', '--disable-dev-shm-usage'],
+    args: ["--no-sandbox", "--disable-dev-shm-usage"],
   });
   page = await browser.newPage();
   return page;
@@ -118,29 +124,29 @@ function fail(content: string): ToolResult<BrowserOutput> {
 }
 
 async function doGoto(input: Input): Promise<ToolResult<BrowserOutput>> {
-  if (!input.url) return fail('url required for goto');
+  if (!input.url) return fail("url required for goto");
   const p = await ensureBrowser();
   await p.goto(input.url, {
-    waitUntil: input.waitUntil ?? 'domcontentloaded',
+    waitUntil: input.waitUntil ?? "domcontentloaded",
     timeout: input.timeoutMs ?? DEFAULT_TIMEOUT_MS,
   });
-  const title = await p.title().catch(() => '');
+  const title = await p.title().catch(() => "");
   return ok(
-    { action: 'goto', url: p.url(), title },
-    `navigated to ${p.url()}\ntitle: ${title || '(none)'}`,
+    { action: "goto", url: p.url(), title },
+    `navigated to ${p.url()}\ntitle: ${title || "(none)"}`,
   );
 }
 
 async function doClick(input: Input): Promise<ToolResult<BrowserOutput>> {
   if (!input.selector && !input.text) {
-    return fail('click requires selector or text');
+    return fail("click requires selector or text");
   }
   const p = await ensureBrowser();
   const timeout = input.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
   if (input.selector) {
     await p.click(input.selector, { timeout });
-    return ok({ action: 'click' }, `clicked selector: ${input.selector}`);
+    return ok({ action: "click" }, `clicked selector: ${input.selector}`);
   }
 
   // Text-based click — pick the first match to avoid ambiguity.
@@ -148,7 +154,7 @@ async function doClick(input: Input): Promise<ToolResult<BrowserOutput>> {
   const count = await locator.count().catch(() => 0);
   if (count === 0) return fail(`no element contains text: ${input.text}`);
   await locator.click({ timeout });
-  return ok({ action: 'click' }, `clicked text: ${input.text}`);
+  return ok({ action: "click" }, `clicked text: ${input.text}`);
 }
 
 async function doScreenshot(input: Input): Promise<ToolResult<BrowserOutput>> {
@@ -156,28 +162,34 @@ async function doScreenshot(input: Input): Promise<ToolResult<BrowserOutput>> {
   const outPath = input.path ?? join(SCREENSHOT_DIR, `shot-${Date.now()}.png`);
   await mkdir(SCREENSHOT_DIR, { recursive: true }).catch(() => undefined);
   await p.screenshot({ path: outPath, fullPage: input.fullPage ?? false });
-  return ok({ action: 'screenshot', path: outPath }, `screenshot saved: ${outPath}`);
+  return ok(
+    { action: "screenshot", path: outPath },
+    `screenshot saved: ${outPath}`,
+  );
 }
 
 async function doContent(_input: Input): Promise<ToolResult<BrowserOutput>> {
   const p = await ensureBrowser();
-  const text = await p.innerText('body').catch(async () => {
+  const text = await p.innerText("body").catch(async () => {
     // Fallback to raw HTML stripped of tags if body isn't available yet.
     const html = await p.content();
-    return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    return html
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
   });
   const url = p.url();
-  const title = await p.title().catch(() => '');
+  const title = await p.title().catch(() => "");
   const body = truncate(text);
   return ok(
-    { action: 'content', url, title },
+    { action: "content", url, title },
     `url: ${url}\ntitle: ${title}\n\n${body}`,
   );
 }
 
 async function doClose(): Promise<ToolResult<BrowserOutput>> {
   await closeBrowser();
-  return ok({ action: 'close' }, 'browser closed');
+  return ok({ action: "close" }, "browser closed");
 }
 
 /**
@@ -195,49 +207,70 @@ export async function closeBrowser(): Promise<void> {
 }
 
 export const browserTool: Tool = {
-  name: 'browser',
+  name: "browser",
   description:
-    'Control a headless Chromium browser. Actions: goto (url), click (selector or text), screenshot (path), content (returns page text), close. One page is kept alive across calls.',
+    "Control a headless Chromium browser. Actions: goto (url), click (selector or text), screenshot (path), content (returns page text), close. One page is kept alive across calls.",
   inputSchema: {
-    type: 'object',
+    type: "object",
     properties: {
       action: {
-        type: 'string',
-        enum: ['goto', 'click', 'screenshot', 'content', 'close'],
+        type: "string",
+        enum: ["goto", "click", "screenshot", "content", "close"],
       },
-      url: { type: 'string', description: 'Target URL for goto.' },
-      selector: { type: 'string', description: 'CSS selector for click.' },
-      text: { type: 'string', description: 'Visible text for click fallback.' },
-      path: { type: 'string', description: 'Output path for screenshot.' },
-      fullPage: { type: 'boolean', description: 'Whole-page screenshot.' },
-      timeoutMs: { type: 'integer', minimum: 1000 },
+      url: { type: "string", description: "Target URL for goto." },
+      selector: { type: "string", description: "CSS selector for click." },
+      text: { type: "string", description: "Visible text for click fallback." },
+      path: { type: "string", description: "Output path for screenshot." },
+      fullPage: { type: "boolean", description: "Whole-page screenshot." },
+      timeoutMs: { type: "integer", minimum: 1000 },
       waitUntil: {
-        type: 'string',
-        enum: ['load', 'domcontentloaded', 'networkidle'],
+        type: "string",
+        enum: ["load", "domcontentloaded", "networkidle"],
       },
     },
-    required: ['action'],
+    required: ["action"],
   },
   requiresApproval: (raw: unknown): boolean => {
     const input = raw as Input;
     // Approve network-touching or filesystem-writing actions. `content`
     // and `close` reuse the already-approved page so they don't.
-    return input.action === 'goto' || input.action === 'screenshot';
+    return input.action === "goto" || input.action === "screenshot";
   },
-  async execute(rawInput: unknown, _ctx: ToolContext): Promise<ToolResult<BrowserOutput>> {
+  async execute(
+    rawInput: unknown,
+    _ctx: ToolContext,
+  ): Promise<ToolResult<BrowserOutput>> {
     const input = rawInput as Input;
-    if (!input || typeof input.action !== 'string') {
-      return fail('action required');
+    if (!input || typeof input.action !== "string") {
+      return fail("action required");
+    }
+
+    // Probe playwright availability before attempting any action.
+    try {
+      const pwModuleId = "playwright";
+      await import(pwModuleId);
+    } catch {
+      return fail(
+        "Browser tool unavailable: Playwright is not installed. Run: npm install -g playwright && playwright install chromium",
+      );
     }
 
     try {
       switch (input.action) {
-        case 'goto': return await doGoto(input);
-        case 'click': return await doClick(input);
-        case 'screenshot': return await doScreenshot(input);
-        case 'content': return await doContent(input);
-        case 'close': return await doClose();
-        default: return fail(`unknown action: ${String((input as { action: unknown }).action)}`);
+        case "goto":
+          return await doGoto(input);
+        case "click":
+          return await doClick(input);
+        case "screenshot":
+          return await doScreenshot(input);
+        case "content":
+          return await doContent(input);
+        case "close":
+          return await doClose();
+        default:
+          return fail(
+            `unknown action: ${String((input as { action: unknown }).action)}`,
+          );
       }
     } catch (err) {
       return fail(`browser ${input.action} failed: ${(err as Error).message}`);

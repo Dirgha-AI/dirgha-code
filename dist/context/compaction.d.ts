@@ -7,9 +7,9 @@
  * summary, and the last N preserved turns. A compaction log entry is
  * written to the session so the operation is auditable.
  */
-import type { Provider, Message } from '../kernel/types.js';
-import type { Session } from './session.js';
-import type { HookRegistry } from '../hooks/registry.js';
+import type { Provider, Message } from "../kernel/types.js";
+import type { Session } from "./session.js";
+import type { HookRegistry } from "../hooks/registry.js";
 export interface CompactionConfig {
     triggerTokens: number;
     preserveLastTurns: number;

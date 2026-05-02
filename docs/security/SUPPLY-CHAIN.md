@@ -113,3 +113,81 @@ These would close us further toward SLSA Level 3, but each has a maintenance cos
 - GitHub Release page — auto-generated PR list + the SBOMs
 - `~/.dirgha/audit/` (local on every user's machine) — every event the CLI emitted, including auto-update timestamps and crash-report sends
 - Posthog (when telemetry opt-in) — version adoption + error class rates
+
+## Vendored third-party binaries (added 2026-05-02)
+
+### rtk v0.34.1 (Rust Token Killer)
+
+**Source**: https://github.com/rtk-ai/rtk  
+**License**: MIT  
+**Vendored at**: `vendor/rtk/linux-x64/rtk`  
+**SHA256**: `2ba0e2a5bf68e271190ace5f1be404b0b82ab9776efd19f1eace5376dbf74cc6`  
+**Integrity manifest**: `vendor/rtk/CHECKSUMS.txt`
+
+**Security audit findings** (2026-05-02):
+- **Telemetry on by default**: pings `https://telemetry.rtk-ai.app/ping` with salted device hash + aggregate command counts. No credentials, paths, or file content sent. Opt-out: `RTK_TELEMETRY_DISABLED=1`. **Dirgha sets this env var automatically** — users are not enrolled.
+- **Env var display**: `rtk env` subcommand masks sensitive env vars (GH_TOKEN, etc.) — does not forward them outbound.
+- **Filesystem**: reads `/proc/self/exe`, `/etc/resolv.conf` (stdlib/TLS). No credential store reads.
+- **No reproducible build**: upstream checksums cover tarballs, not raw binaries. Binary is stripped.
+- **Verdict**: CAUTION — not malicious, telemetry mitigated by env var, document for users.
+
+**Mitigations applied**:
+1. `RTK_TELEMETRY_DISABLED=1` injected into every rtk subprocess env.
+2. SHA256 in `vendor/rtk/CHECKSUMS.txt` for version pinning.
+3. All version ranges removed from package.json (`^` stripped).
+
+### @tobilu/qmd v0.9.0
+
+**Source**: https://github.com/tobi/qmd  
+**License**: MIT  
+**Bundled as**: npm dependency (exact version `0.9.0`, no semver range)
+
+**Security audit findings** (2026-05-02, full source scan of `qmd.ts`, `store.ts`, `llm.ts`, `collections.ts`, `mcp.ts`, `formatter.ts`):
+
+**Data exfiltration / telemetry**: CLEAN.
+Zero telemetry, analytics, or beacon endpoints.
+Only legitimate outbound call: `llm.ts:212` — a HEAD request to `huggingface.co` only when the user explicitly runs `qmd pull hf:…`; no user content is sent.
+`mcp.ts:591` binds to `localhost` only.
+
+**Dangerous APIs**:
+- HIGH: `qmd.ts:396` — `Bun.spawn(["/usr/bin/env", "bash", "-c", yamlCol.update])`.
+  `yamlCol.update` is a string from the user's own `~/.config/qmd/index.yml`.
+  If the config file is symlink-hijacked or written by another process, arbitrary shell commands execute.
+  Not injected by Dirgha — risk is in the qmd config, not in Dirgha's use of the tool.
+- All other `spawn` calls use hardcoded argument arrays. No `eval`, `new Function`, `execSync`, or dynamic `import` of user strings.
+
+**Environment variable harvesting**: CLEAN.
+Reads: `NO_COLOR`, `XDG_CACHE_HOME`, `HOME`, `PWD`, `INDEX_PATH`, `QMD_CONFIG_DIR`, `BREW_PREFIX`.
+None are secrets. None are sent outbound.
+
+**Filesystem access**: CLEAN.
+Reads and writes only under `~/.config/qmd/` and `~/.cache/qmd/` plus user-configured collection directories.
+`store.ts:447` uses `realpathSync` — no path traversal risk.
+
+**Runtime compatibility**: CRITICAL (addressed).
+Package requires Bun runtime — `bun:sqlite`, `Bun.CryptoHasher`, `Bun.spawnSync`, `Bun.argv` all crash in Node.js.
+No `main` / `exports` field — `import('@tobilu/qmd')` throws `ERR_MODULE_NOT_FOUND` in Node.js.
+**Mitigation**: `src/tools/qmd.ts` uses `execFile("qmd", …)` subprocess only; no JS import is ever attempted.
+
+**Dependency risk (highest to lowest)**:
+
+| Dep | Version | Risk |
+|---|---|---|
+| `node-llama-cpp` | `^3.14.5` | **HIGH** — postinstall (`node ./dist/cli/cli.js postinstall`) downloads prebuilt llama.cpp native binaries from GitHub Releases over HTTPS. Floating `^` range means a minor bump changes the binary. No integrity hash pinning. |
+| `@modelcontextprotocol/sdk` | `^1.25.1` | MEDIUM — floating `^`, large dep tree (hono, jose, eventsource). No install hook. |
+| `sqlite-vec` | `^0.1.7-alpha.2` | MEDIUM — alpha channel, floating `^`, native addon. No install hook. |
+| `@types/bun` | `latest` | MEDIUM — fully unpinned. Dev-only types. |
+| `yaml` | `^2.8.2` | LOW |
+| `zod` | `^4.2.1` | LOW |
+
+**Install-time network calls**: `node-llama-cpp` is the only dependency that makes network calls at `npm install` time.
+`@tobilu/qmd` itself has no `preinstall`/`postinstall` hook.
+
+**Overall verdict**: No malicious code, no telemetry, no credential harvesting.
+Primary risks: (1) Bun-only — mitigated by subprocess-only invocation; (2) `node-llama-cpp` postinstall downloads unsigned native binaries.
+
+**Mitigations applied**:
+1. JS import path removed from `src/tools/qmd.ts` — CLI subprocess only (`execFile("qmd", …)`).
+2. Exact version `0.9.0` pinned in `package.json` (no `^`).
+3. `node-llama-cpp` risk documented here; upgrade only after manual SHA verification of the new binary.
+4. `src/types/tobilu__qmd.d.ts` type stub satisfies TypeScript without importing the package at runtime.

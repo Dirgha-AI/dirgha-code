@@ -3,6 +3,8 @@
  * environment, and CLI flags. Results are cached on first read.
  */
 export interface DirghaConfig {
+    /** Config schema version. Bumped on breaking changes. Current: 1. */
+    schemaVersion?: number;
     model: string;
     cheapModel: string;
     summaryModel: string;

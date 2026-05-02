@@ -24,17 +24,17 @@ export function ThinkingBlock({
     if (key.return) {
       setExpanded((prev) => !prev);
     }
-  });
+  }, { isActive: false });
 
   if (content.length === 0) return null;
 
   if (!expanded) {
     return (
       <Box gap={1} marginBottom={1}>
-        <Text color="gray" dimColor>
+        <Text color="white" dimColor>
           ⠋
         </Text>
-        <Text color="gray" dimColor italic>
+        <Text color="white" dimColor italic>
           thinking… ({content.length} chars — Enter to expand)
         </Text>
       </Box>
@@ -43,10 +43,10 @@ export function ThinkingBlock({
 
   return (
     <Box gap={2} width={width} marginBottom={1}>
-      <Text color="gray" dimColor>
+      <Text color="white" dimColor>
         ⠋
       </Text>
-      <Text color="gray" dimColor italic wrap="wrap">
+      <Text color="white" dimColor italic wrap="wrap">
         {content}
       </Text>
     </Box>

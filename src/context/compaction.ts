@@ -8,11 +8,11 @@
  * written to the session so the operation is auditable.
  */
 
-import type { Provider, Message, UsageTotal } from '../kernel/types.js';
-import { estimateTokens, normaliseContent } from '../kernel/message.js';
-import { resolveModelForDispatch } from '../providers/dispatch.js';
-import type { Session } from './session.js';
-import type { HookRegistry } from '../hooks/registry.js';
+import type { Provider, Message } from "../kernel/types.js";
+import { estimateTokens, normaliseContent } from "../kernel/message.js";
+import { resolveModelForDispatch } from "../providers/dispatch.js";
+import type { Session } from "./session.js";
+import type { HookRegistry } from "../hooks/registry.js";
 
 export interface CompactionConfig {
   triggerTokens: number;
@@ -37,9 +37,17 @@ export async function maybeCompact(
   cfg: CompactionConfig,
   session?: Session,
 ): Promise<CompactionResult> {
-  const tokensBefore = messages.reduce((acc, m) => acc + estimateTokens(flatten(m)), 0);
+  const tokensBefore = messages.reduce(
+    (acc, m) => acc + estimateTokens(flatten(m)),
+    0,
+  );
   if (tokensBefore < cfg.triggerTokens) {
-    return { messages, compacted: false, tokensBefore, tokensAfter: tokensBefore };
+    return {
+      messages,
+      compacted: false,
+      tokensBefore,
+      tokensAfter: tokensBefore,
+    };
   }
 
   const { systems, rest } = splitSystems(messages);
@@ -48,13 +56,26 @@ export async function maybeCompact(
   const preserved = rest.slice(rest.length - preserveCount);
 
   if (historical.length === 0) {
-    return { messages, compacted: false, tokensBefore, tokensAfter: tokensBefore };
+    return {
+      messages,
+      compacted: false,
+      tokensBefore,
+      tokensAfter: tokensBefore,
+    };
   }
 
   if (cfg.hooks) {
-    const veto = await cfg.hooks.emit('compaction_before', { tokensBefore, historicalCount: historical.length });
+    const veto = await cfg.hooks.emit("compaction_before", {
+      tokensBefore,
+      historicalCount: historical.length,
+    });
     if (veto?.block) {
-      return { messages, compacted: false, tokensBefore, tokensAfter: tokensBefore };
+      return {
+        messages,
+        compacted: false,
+        tokensBefore,
+        tokensAfter: tokensBefore,
+      };
     }
   }
 
@@ -62,18 +83,24 @@ export async function maybeCompact(
   const trimmed: Message[] = [
     ...systems,
     {
-      role: 'user',
+      role: "user",
       content: [
-        { type: 'text', text: `[Compacted summary of earlier turns]\n${summary}\n[End compacted summary]` },
+        {
+          type: "text",
+          text: `[Compacted summary of earlier turns]\n${summary}\n[End compacted summary]`,
+        },
       ],
     },
     ...preserved,
   ];
-  const tokensAfter = trimmed.reduce((acc, m) => acc + estimateTokens(flatten(m)), 0);
+  const tokensAfter = trimmed.reduce(
+    (acc, m) => acc + estimateTokens(flatten(m)),
+    0,
+  );
 
   if (session) {
     await session.append({
-      type: 'compaction',
+      type: "compaction",
       ts: new Date().toISOString(),
       keptFrom: `last-${preserveCount}-messages`,
       summary,
@@ -81,72 +108,109 @@ export async function maybeCompact(
   }
 
   if (cfg.hooks) {
-    await cfg.hooks.emit('compaction_after', { tokensBefore, tokensAfter, summary });
+    await cfg.hooks.emit("compaction_after", {
+      tokensBefore,
+      tokensAfter,
+      summary,
+    });
   }
 
-  return { messages: trimmed, compacted: true, summary, tokensBefore, tokensAfter };
+  return {
+    messages: trimmed,
+    compacted: true,
+    summary,
+    tokensBefore,
+    tokensAfter,
+  };
 }
 
-async function summarise(cfg: CompactionConfig, historical: Message[]): Promise<string> {
-  const transcript = historical.map(renderForSummary).join('\n\n');
+async function summarise(
+  cfg: CompactionConfig,
+  historical: Message[],
+): Promise<string> {
+  const transcript = historical.map(renderForSummary).join("\n\n");
   const prompt: Message[] = [
     {
-      role: 'system',
-      content: 'You summarise a coding agent conversation. Keep the summary terse, information-dense, ordered by topic. Retain every decision, file path, tool outcome, and open question. Omit greetings and pleasantries. Do not invent facts.',
+      role: "system",
+      content:
+        "You summarise a coding agent conversation. Keep the summary terse, information-dense, ordered by topic. Retain every decision, file path, tool outcome, and open question. Omit greetings and pleasantries. Do not invent facts.",
     },
     {
-      role: 'user',
+      role: "user",
       content: `Summarise the following transcript. Produce a single plain-text summary under ${cfg.maxSummaryTokens ?? 800} tokens.\n\n${transcript}`,
     },
   ];
 
-  let summary = '';
-  for await (const ev of cfg.summarizer.stream({ model: resolveModelForDispatch(cfg.summaryModel), messages: prompt })) {
-    if (ev.type === 'text_delta') summary += ev.delta;
+  let summary = "";
+  try {
+    for await (const ev of cfg.summarizer.stream({
+      model: resolveModelForDispatch(cfg.summaryModel),
+      messages: prompt,
+    })) {
+      if (ev.type === "text_delta") summary += ev.delta;
+    }
+  } catch {
+    // If the summarizer call fails (network, bad model), return a
+    // raw transcript — better than aborting the agent loop.
+    return `${historical.map(renderForSummary).join("\n\n")}`;
   }
-  return summary.trim() || '[Empty summary]';
+  return summary.trim() || "[Empty summary]";
 }
 
 function renderForSummary(msg: Message): string {
-  const body = normaliseContent(msg).map(p => {
-    switch (p.type) {
-      case 'text': return p.text;
-      case 'thinking': return `(thinking) ${p.text}`;
-      case 'tool_use': return `(tool_use ${p.name}: ${truncate(JSON.stringify(p.input), 240)})`;
-      case 'tool_result': return `(tool_result ${p.toolUseId}${p.isError ? ' ERROR' : ''}: ${truncate(p.content, 360)})`;
-    }
-  }).join('\n');
+  const body = normaliseContent(msg)
+    .map((p) => {
+      switch (p.type) {
+        case "text":
+          return p.text;
+        case "thinking":
+          return `(thinking) ${p.text}`;
+        case "tool_use":
+          return `(tool_use ${p.name}: ${truncate(JSON.stringify(p.input), 240)})`;
+        case "tool_result":
+          return `(tool_result ${p.toolUseId}${p.isError ? " ERROR" : ""}: ${truncate(p.content, 360)})`;
+      }
+    })
+    .join("\n");
   return `### ${msg.role}\n${body}`;
 }
 
 function flatten(msg: Message): string {
-  if (typeof msg.content === 'string') return msg.content;
-  return msg.content.map(p => {
-    if (p.type === 'text') return p.text;
-    if (p.type === 'thinking') return p.text;
-    if (p.type === 'tool_use') return JSON.stringify(p.input);
-    if (p.type === 'tool_result') return p.content;
-    return '';
-  }).join(' ');
+  if (typeof msg.content === "string") return msg.content;
+  return msg.content
+    .map((p) => {
+      if (p.type === "text") return p.text;
+      if (p.type === "thinking") return p.text;
+      if (p.type === "tool_use") return JSON.stringify(p.input);
+      if (p.type === "tool_result") return p.content;
+      return "";
+    })
+    .join(" ");
 }
 
-function splitSystems(messages: Message[]): { systems: Message[]; rest: Message[] } {
+function splitSystems(messages: Message[]): {
+  systems: Message[];
+  rest: Message[];
+} {
   const systems: Message[] = [];
   const rest: Message[] = [];
   for (const m of messages) {
-    if (m.role === 'system') systems.push(m);
+    if (m.role === "system") systems.push(m);
     else rest.push(m);
   }
   return { systems, rest };
 }
 
-function countPreservedMessages(rest: Message[], preserveLastTurns: number): number {
+function countPreservedMessages(
+  rest: Message[],
+  preserveLastTurns: number,
+): number {
   if (preserveLastTurns <= 0) return 0;
   let turns = 0;
   let count = 0;
   for (let i = rest.length - 1; i >= 0; i--) {
     count++;
-    if (rest[i].role === 'user') {
+    if (rest[i].role === "user") {
       turns++;
       if (turns >= preserveLastTurns) break;
     }
@@ -157,8 +221,6 @@ function countPreservedMessages(rest: Message[], preserveLastTurns: number): num
 function truncate(s: string, max: number): string {
   return s.length <= max ? s : `${s.slice(0, max - 1)}…`;
 }
-
-void (undefined as UsageTotal | undefined);
 
 /**
  * Build a `contextTransform` callback suitable for `runAgentLoop`'s
@@ -181,13 +243,17 @@ export function createCompactionTransform(opts: {
 }): (messages: Message[]) => Promise<Message[]> {
   const triggerTokens = Math.floor(opts.contextWindow * 0.75);
   return async (messages: Message[]): Promise<Message[]> => {
-    const result = await maybeCompact(messages, {
-      triggerTokens,
-      preserveLastTurns: opts.preserveLastTurns ?? 4,
-      summarizer: opts.summarizer,
-      summaryModel: opts.summaryModel,
-      hooks: opts.hooks,
-    }, opts.session);
+    const result = await maybeCompact(
+      messages,
+      {
+        triggerTokens,
+        preserveLastTurns: opts.preserveLastTurns ?? 4,
+        summarizer: opts.summarizer,
+        summaryModel: opts.summaryModel,
+        hooks: opts.hooks,
+      },
+      opts.session,
+    );
     if (result.compacted) {
       // Replace the caller's mutable history in-place so post-turn
       // appends don't reintroduce the old un-compacted prefix.

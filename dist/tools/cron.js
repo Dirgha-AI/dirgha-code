@@ -16,43 +16,61 @@
  * field cron expressions, human strings like "every 1h", or ISO dates.
  * We only validate that it is non-empty.
  */
-import { readFile, writeFile, mkdir, stat } from 'node:fs/promises';
-import { join } from 'node:path';
-import { homedir } from 'node:os';
-import { randomUUID } from 'node:crypto';
-const DEFAULT_PATH = join(homedir(), '.dirgha', 'cron', 'jobs.json');
+import { readFile, writeFile, mkdir, stat, rename } from "node:fs/promises";
+import { join, dirname } from "node:path";
+import { homedir } from "node:os";
+import { randomUUID } from "node:crypto";
+const DEFAULT_PATH = join(homedir(), ".dirgha", "cron", "jobs.json");
 export function createCronTool(opts = {}) {
     const filePath = opts.filePath ?? DEFAULT_PATH;
     return {
-        name: 'cron',
-        description: 'Manage scheduled job declarations (add/remove/list/run_now). This tool only stores job declarations — a separate daemon is responsible for running them.',
+        name: "cron",
+        description: "Manage scheduled job declarations (add/remove/list/run_now). This tool only stores job declarations — a separate daemon is responsible for running them.",
         inputSchema: {
-            type: 'object',
+            type: "object",
             properties: {
-                action: { type: 'string', enum: ['add', 'remove', 'list', 'run_now'] },
-                id: { type: 'string', description: 'Job id (required for remove/run_now).' },
-                schedule: { type: 'string', description: 'Schedule string (cron expression, ISO date, or human phrase). Required for add.' },
-                command: { type: 'string', description: 'Shell command or agent prompt to run. Required for add.' },
-                nextRunAt: { type: 'string', description: 'Optional ISO timestamp of next run. Defaults to now.' },
+                action: { type: "string", enum: ["add", "remove", "list", "run_now"] },
+                id: {
+                    type: "string",
+                    description: "Job id (required for remove/run_now).",
+                },
+                schedule: {
+                    type: "string",
+                    description: "Schedule string (cron expression, ISO date, or human phrase). Required for add.",
+                },
+                command: {
+                    type: "string",
+                    description: "Shell command or agent prompt to run. Required for add.",
+                },
+                nextRunAt: {
+                    type: "string",
+                    description: "Optional ISO timestamp of next run. Defaults to now.",
+                },
             },
-            required: ['action'],
+            required: ["action"],
         },
         async execute(rawInput, _ctx) {
             const input = rawInput;
-            if (input.action === 'list') {
+            if (input.action === "list") {
                 const jobs = await readJobs(filePath);
                 return {
                     content: formatJobList(jobs),
-                    data: { action: 'list', count: jobs.length },
+                    data: { action: "list", count: jobs.length },
                     isError: false,
                 };
             }
-            if (input.action === 'add') {
+            if (input.action === "add") {
                 if (!input.schedule || !input.schedule.trim()) {
-                    return { content: 'add requires a non-empty `schedule`.', isError: true };
+                    return {
+                        content: "add requires a non-empty `schedule`.",
+                        isError: true,
+                    };
                 }
                 if (!input.command || !input.command.trim()) {
-                    return { content: 'add requires a non-empty `command`.', isError: true };
+                    return {
+                        content: "add requires a non-empty `command`.",
+                        isError: true,
+                    };
                 }
                 const jobs = await readJobs(filePath);
                 const job = {
@@ -66,30 +84,30 @@ export function createCronTool(opts = {}) {
                 await writeJobs(filePath, jobs);
                 return {
                     content: `Added cron job ${job.id} (${job.schedule}): ${job.command}`,
-                    data: { action: 'add', job },
+                    data: { action: "add", job },
                     isError: false,
                 };
             }
-            if (input.action === 'remove') {
+            if (input.action === "remove") {
                 if (!input.id)
-                    return { content: 'remove requires an `id`.', isError: true };
+                    return { content: "remove requires an `id`.", isError: true };
                 const jobs = await readJobs(filePath);
-                const next = jobs.filter(j => j.id !== input.id);
+                const next = jobs.filter((j) => j.id !== input.id);
                 if (next.length === jobs.length) {
                     return { content: `No job with id "${input.id}".`, isError: true };
                 }
                 await writeJobs(filePath, next);
                 return {
                     content: `Removed cron job ${input.id}.`,
-                    data: { action: 'remove', count: next.length },
+                    data: { action: "remove", count: next.length },
                     isError: false,
                 };
             }
-            if (input.action === 'run_now') {
+            if (input.action === "run_now") {
                 if (!input.id)
-                    return { content: 'run_now requires an `id`.', isError: true };
+                    return { content: "run_now requires an `id`.", isError: true };
                 const jobs = await readJobs(filePath);
-                const job = jobs.find(j => j.id === input.id);
+                const job = jobs.find((j) => j.id === input.id);
                 if (!job)
                     return { content: `No job with id "${input.id}".`, isError: true };
                 job.lastRunAt = new Date().toISOString();
@@ -99,8 +117,8 @@ export function createCronTool(opts = {}) {
                         `Marked cron job ${job.id} as manually run.`,
                         `This tool does not execute the command; a scheduler daemon`,
                         `should pick it up. Command was: ${job.command}`,
-                    ].join(' '),
-                    data: { action: 'run_now', job },
+                    ].join(" "),
+                    data: { action: "run_now", job },
                     isError: false,
                 };
             }
@@ -112,7 +130,7 @@ export function createCronTool(opts = {}) {
     };
 }
 async function readJobs(filePath) {
-    const raw = await readFile(filePath, 'utf8').catch(() => null);
+    const raw = await readFile(filePath, "utf8").catch(() => null);
     if (raw === null)
         return [];
     try {
@@ -127,10 +145,12 @@ async function readJobs(filePath) {
 }
 async function writeJobs(filePath, jobs) {
     await ensureParent(filePath);
-    await writeFile(filePath, `${JSON.stringify(jobs, null, 2)}\n`, 'utf8');
+    const tmp = filePath + ".tmp";
+    await writeFile(tmp, `${JSON.stringify(jobs, null, 2)}\n`, "utf8");
+    await rename(tmp, filePath);
 }
 async function ensureParent(filePath) {
-    const dir = filePath.slice(0, filePath.lastIndexOf('/'));
+    const dir = dirname(filePath);
     if (!dir)
         return;
     const info = await stat(dir).catch(() => undefined);
@@ -138,23 +158,23 @@ async function ensureParent(filePath) {
         await mkdir(dir, { recursive: true });
 }
 function isCronJob(value) {
-    if (!value || typeof value !== 'object')
+    if (!value || typeof value !== "object")
         return false;
     const v = value;
-    return (typeof v.id === 'string'
-        && typeof v.schedule === 'string'
-        && typeof v.command === 'string'
-        && typeof v.createdAt === 'string');
+    return (typeof v.id === "string" &&
+        typeof v.schedule === "string" &&
+        typeof v.command === "string" &&
+        typeof v.createdAt === "string");
 }
 function formatJobList(jobs) {
     if (jobs.length === 0)
         return '(no cron jobs — add one with action="add").';
-    const lines = [`${jobs.length} cron job${jobs.length === 1 ? '' : 's'}:`];
+    const lines = [`${jobs.length} cron job${jobs.length === 1 ? "" : "s"}:`];
     for (const job of jobs) {
-        const next = job.nextRunAt ? ` next=${job.nextRunAt}` : '';
-        const last = job.lastRunAt ? ` last=${job.lastRunAt}` : '';
+        const next = job.nextRunAt ? ` next=${job.nextRunAt}` : "";
+        const last = job.lastRunAt ? ` last=${job.lastRunAt}` : "";
         lines.push(`  ${job.id}  [${job.schedule}]${next}${last}  ${job.command}`);
     }
-    return lines.join('\n');
+    return lines.join("\n");
 }
 //# sourceMappingURL=cron.js.map

@@ -28,6 +28,7 @@ import type { Tool, ToolContext } from './registry.js';
 import type { ToolResult } from '../kernel/types.js';
 import type { Message } from '../kernel/types.js';
 import { SessionStore, type SessionEntry } from '../context/session.js';
+import { registerCheckpoint } from '../state/index.js';
 
 type Action = 'save' | 'restore' | 'list' | 'delete';
 
@@ -134,6 +135,8 @@ async function doSave(input: Input, ctx: ToolContext): Promise<ToolResult<Checkp
   };
   const path = checkpointPath(id);
   await writeFile(path, JSON.stringify(payload, null, 2), 'utf8');
+  // Register in unified state index (fire-and-forget, never blocks).
+  void registerCheckpoint(ctx.sessionId, id);
   const info = await stat(path).catch(() => undefined);
 
   const summary: CheckpointSummary = {

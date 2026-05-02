@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { rm, mkdir, access } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
@@ -21,8 +21,6 @@ class MountManager {
 
   private load(): void {
     try {
-      const { readFileSync, existsSync } =
-        require("node:fs") as typeof import("node:fs");
       if (existsSync(this.storePath)) {
         const data = JSON.parse(readFileSync(this.storePath, "utf8"));
         this.mounts = Array.isArray(data) ? data : [];
@@ -34,7 +32,6 @@ class MountManager {
 
   private save(): void {
     try {
-      const { writeFileSync } = require("node:fs") as typeof import("node:fs");
       const dir = join(homedir(), ".dirgha");
       try {
         mkdirSync(dir, { recursive: true });

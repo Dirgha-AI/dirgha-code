@@ -18,7 +18,7 @@ import { Box, Text } from "ink";
 import { useTheme } from "../theme-context.js";
 import { iconFor, TOOL_STATUS } from "../icons.js";
 import { DenseToolMessage, isDenseTool } from "./DenseToolMessage.js";
-const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+import { SpinnerContext, SPINNER_FRAMES as SPINNER } from "../spinner-context.js";
 const TOOL_LABEL = {
     fs_read: "Read",
     fs_write: "Write",
@@ -49,13 +49,7 @@ export function ToolGroup(props) {
             }) }) }));
 }
 function FullToolRow({ tool, divider, palette, }) {
-    const [frame, setFrame] = React.useState(0);
-    React.useEffect(() => {
-        if (tool.status !== "running")
-            return;
-        const t = setInterval(() => setFrame((f) => (f + 1) % SPINNER.length), 80);
-        return () => clearInterval(t);
-    }, [tool.status]);
+    const frame = React.useContext(SpinnerContext);
     const glyph = tool.status === "error"
         ? TOOL_STATUS.ERROR
         : tool.status === "done"

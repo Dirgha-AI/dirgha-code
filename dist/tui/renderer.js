@@ -11,7 +11,15 @@
 import { defaultTheme, noColour, style } from './theme.js';
 export function renderStreamingEvents(opts = {}) {
     const theme = opts.colour === false ? noColour() : opts.theme ?? defaultTheme;
-    const write = opts.write ?? ((chunk) => { process.stdout.write(chunk); });
+    const write = opts.write ?? ((chunk) => {
+        try {
+            process.stdout.write(chunk);
+        }
+        catch (e) {
+            if (e?.code !== 'EPIPE' && e?.code !== 'EIO')
+                throw e;
+        }
+    });
     const showThinking = opts.showThinking ?? false;
     let thinkingBannerOpen = false;
     return (event) => {

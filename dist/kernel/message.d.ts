@@ -1,11 +1,11 @@
 /**
  * Message manipulation helpers. Pure functions over Message[].
  */
-import type { Message, ContentPart, ToolUsePart, AgentEvent } from './types.js';
+import type { Message, ContentPart, ToolUsePart, AgentEvent } from "./types.js";
 export declare function normaliseContent(msg: Message): ContentPart[];
 export declare function extractText(msg: Message): string;
 export declare function extractToolUses(msg: Message): ToolUsePart[];
-export declare function toolResultMessage(toolUseId: string, content: string, isError?: boolean): Message;
+export declare function toolResultMessage(toolUseId: string, content: string, isError?: boolean, role?: "user" | "tool"): Message;
 export declare function appendToolResults(history: Message[], results: Array<{
     toolUseId: string;
     content: string;

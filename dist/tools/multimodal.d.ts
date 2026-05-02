@@ -22,8 +22,8 @@
  * when the active provider doesn't expose `generateImage`. It does not
  * pull in any streaming/chat-completions internals.
  */
-import type { Tool } from './registry.js';
-import type { Provider } from '../kernel/types.js';
+import type { Tool } from "./registry.js";
+import type { Provider } from "../kernel/types.js";
 export interface MultimodalToolOptions {
     /** Active provider, used for describe/transcribe actions. */
     provider: Provider;

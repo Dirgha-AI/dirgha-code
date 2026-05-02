@@ -12,37 +12,40 @@
  * when the judge misbehaves.
  */
 
-import { runFleet } from './runner.js';
-import { applyBack } from './apply-back.js';
-import { getHeadSha } from './worktree.js';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-import { ProviderRegistry } from '../providers/index.js';
-import { createEventStream, type EventStream } from '../kernel/event-stream.js';
-import type { AgentEvent, UsageTotal } from '../kernel/types.js';
-import { repairJSON } from '../utils/json-repair.js';
+import { runFleet } from "./runner.js";
+import { applyBack } from "./apply-back.js";
+import { getHeadSha } from "./worktree.js";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { ProviderRegistry } from "../providers/index.js";
+import { createEventStream, type EventStream } from "../kernel/event-stream.js";
+import type { AgentEvent, UsageTotal } from "../kernel/types.js";
+import { repairJSON } from "../utils/json-repair.js";
 import type {
   FleetConfig,
   FleetSubtask,
   TripleVariant,
   TripleshotResult,
   TripleshotShot,
-} from './types.js';
+} from "./types.js";
 
 const pexec = promisify(execFile);
 
 const VARIATIONS: Array<{ id: TripleVariant; style: string }> = [
   {
-    id: 'conservative',
-    style: 'Prioritize minimal changes, safety, and backward compatibility. Prefer the smallest diff that satisfies the goal.',
+    id: "conservative",
+    style:
+      "Prioritize minimal changes, safety, and backward compatibility. Prefer the smallest diff that satisfies the goal.",
   },
   {
-    id: 'balanced',
-    style: 'Balance correctness with cleanliness. Refactor only when it clearly improves readability and stay focused on the stated goal.',
+    id: "balanced",
+    style:
+      "Balance correctness with cleanliness. Refactor only when it clearly improves readability and stay focused on the stated goal.",
   },
   {
-    id: 'bold',
-    style: 'Optimize for long-term code quality. Aggressively refactor adjacent code that is clearly improved by the change, without breaking public APIs.',
+    id: "bold",
+    style:
+      "Optimize for long-term code quality. Aggressively refactor adjacent code that is clearly improved by the change, without breaking public APIs.",
   },
 ];
 
@@ -57,8 +60,10 @@ Pick the BEST one by:
 Output STRICT JSON only, no prose, no markdown:
 { "winner": "conservative|balanced|bold", "runner_up": "conservative|balanced|bold", "reason": "<1-2 sentences>" }`;
 
-export interface TripleshotConfig
-  extends Omit<FleetConfig, 'subtasks' | 'concurrency'> {
+export interface TripleshotConfig extends Omit<
+  FleetConfig,
+  "subtasks" | "concurrency"
+> {
   /** Auto-apply the winner's diff to the parent tree via applyBack. */
   autoMerge?: boolean;
   /** Override the judge model; defaults to `plannerModel` or `model`. */
@@ -70,11 +75,11 @@ export async function runTripleshot(
   config: TripleshotConfig,
 ): Promise<TripleshotResult> {
   const started = Date.now();
-  const subtasks: FleetSubtask[] = VARIATIONS.map(v => ({
+  const subtasks: FleetSubtask[] = VARIATIONS.map((v) => ({
     id: `${v.id}`,
     title: `[${v.id}] ${goal}`.slice(0, 80),
     task: `${goal}\n\nStylistic guidance: ${v.style}`,
-    type: 'code',
+    type: "code",
   }));
 
   const fleetResult = await runFleet({
@@ -85,26 +90,29 @@ export async function runTripleshot(
   });
 
   const providers = new ProviderRegistry();
-  const judgeModel = config.judgeModel ?? config.plannerModel ?? config.model ?? defaultModel();
+  const judgeModel =
+    config.judgeModel ?? config.plannerModel ?? config.model ?? defaultModel();
   const events = config.events ?? createEventStream();
 
   const shots: TripleshotShot[] = [];
   const repoRoot = fleetResult.worktrees[0]?.repoRoot;
-  const parentHead = repoRoot ? await getHeadSha(repoRoot) : '';
+  const parentHead = repoRoot ? await getHeadSha(repoRoot) : "";
 
   for (const a of fleetResult.agents) {
-    if (a.status !== 'completed') continue;
-    const variant = VARIATIONS.find(v => a.id === v.id)?.id;
+    if (a.status !== "completed") continue;
+    const variant = VARIATIONS.find((v) => a.id === v.id)?.id;
     if (!variant) continue;
-    let diff = '';
+    let diff = "";
     try {
-      await pexec('git', ['add', '-A'], { cwd: a.worktreePath });
-      const { stdout } = await pexec('git', ['diff', parentHead, '--'], {
+      await pexec("git", ["add", "-A"], { cwd: a.worktreePath });
+      const { stdout } = await pexec("git", ["diff", parentHead, "--"], {
         cwd: a.worktreePath,
         maxBuffer: 20 * 1024 * 1024,
       });
       diff = stdout;
-    } catch { /* skip empty */ }
+    } catch {
+      /* skip empty */
+    }
     if (diff.trim()) {
       shots.push({ variant, agent: a, diff: diff.slice(0, 8000) });
     }
@@ -117,7 +125,7 @@ export async function runTripleshot(
       goal,
       winner: null,
       runnerUp: null,
-      reason: 'No variant produced a diff',
+      reason: "No variant produced a diff",
       shots: [],
       agents: fleetResult.agents,
       worktrees: fleetResult.worktrees,
@@ -128,16 +136,18 @@ export async function runTripleshot(
 
   if (shots.length === 1) {
     const only = shots[0]!;
-    const ab = config.autoMerge
-      ? await applyBack(handleFor(fleetResult.worktrees, only.agent.worktreePath), {
-          message: `triple: ${only.variant} (${goal.slice(0, 40)})`,
-        })
-      : undefined;
+    const handle = handleFor(fleetResult.worktrees, only.agent.worktreePath);
+    const ab =
+      config.autoMerge && handle
+        ? await applyBack(handle, {
+            message: `triple: ${only.variant} (${goal.slice(0, 40)})`,
+          })
+        : undefined;
     return {
       goal,
       winner: only.variant,
       runnerUp: null,
-      reason: 'Only one variant completed',
+      reason: "Only one variant completed",
       shots,
       agents: fleetResult.agents,
       worktrees: fleetResult.worktrees,
@@ -147,17 +157,27 @@ export async function runTripleshot(
     };
   }
 
-  const { winner, runnerUp, reason, usage: judgeUsage } = await askJudge(
-    goal, shots, judgeModel, providers, events,
-  );
+  const {
+    winner,
+    runnerUp,
+    reason,
+    usage: judgeUsage,
+  } = await askJudge(goal, shots, judgeModel, providers, events);
   accumulate(tokens, judgeUsage);
 
-  let apply: TripleshotResult['apply'];
+  let apply: TripleshotResult["apply"];
   if (config.autoMerge && winner) {
-    const winShot = shots.find(s => s.variant === winner);
+    const winShot = shots.find((s) => s.variant === winner);
     if (winShot) {
-      const handle = handleFor(fleetResult.worktrees, winShot.agent.worktreePath);
-      apply = await applyBack(handle, { message: `triple: ${winner} (${goal.slice(0, 40)})` });
+      const handle = handleFor(
+        fleetResult.worktrees,
+        winShot.agent.worktreePath,
+      );
+      if (handle) {
+        apply = await applyBack(handle, {
+          message: `triple: ${winner} (${goal.slice(0, 40)})`,
+        });
+      }
     }
   }
 
@@ -193,9 +213,9 @@ async function askJudge(
 ): Promise<JudgeVerdict> {
   const prompt =
     `GOAL: ${goal}\n\n` +
-    shots.map(s =>
-      `=== ${s.variant.toUpperCase()} ===\n${s.diff}\n`,
-    ).join('\n') +
+    shots
+      .map((s) => `=== ${s.variant.toUpperCase()} ===\n${s.diff}\n`)
+      .join("\n") +
     `\nPick the best variant. Output JSON only.`;
 
   const provider = providers.forModel(judgeModel);
@@ -204,8 +224,8 @@ async function askJudge(
     for await (const ev of provider.stream({
       model: judgeModel,
       messages: [
-        { role: 'system', content: JUDGE_SYSTEM },
-        { role: 'user', content: prompt },
+        { role: "system", content: JUDGE_SYSTEM },
+        { role: "user", content: prompt },
       ],
     })) {
       streamEvents.push(ev);
@@ -221,27 +241,39 @@ async function askJudge(
   }
 
   const text = streamEvents
-    .filter((e): e is Extract<AgentEvent, { type: 'text_delta' }> => e.type === 'text_delta')
-    .map(e => e.delta)
-    .join('');
+    .filter(
+      (e): e is Extract<AgentEvent, { type: "text_delta" }> =>
+        e.type === "text_delta",
+    )
+    .map((e) => e.delta)
+    .join("");
 
   const usage = streamEvents
-    .filter((e): e is Extract<AgentEvent, { type: 'usage' }> => e.type === 'usage')
-    .reduce<UsageTotal>((acc, e) => ({
-      inputTokens: acc.inputTokens + e.inputTokens,
-      outputTokens: acc.outputTokens + e.outputTokens,
-      cachedTokens: acc.cachedTokens + (e.cachedTokens ?? 0),
-      costUsd: acc.costUsd,
-    }), { inputTokens: 0, outputTokens: 0, cachedTokens: 0, costUsd: 0 });
+    .filter(
+      (e): e is Extract<AgentEvent, { type: "usage" }> => e.type === "usage",
+    )
+    .reduce<UsageTotal>(
+      (acc, e) => ({
+        inputTokens: acc.inputTokens + e.inputTokens,
+        outputTokens: acc.outputTokens + e.outputTokens,
+        cachedTokens: acc.cachedTokens + (e.cachedTokens ?? 0),
+        costUsd: acc.costUsd,
+      }),
+      { inputTokens: 0, outputTokens: 0, cachedTokens: 0, costUsd: 0 },
+    );
 
   return parseVerdict(text, shots, usage);
 }
 
-function parseVerdict(text: string, shots: TripleshotShot[], usage: UsageTotal): JudgeVerdict {
+function parseVerdict(
+  text: string,
+  shots: TripleshotShot[],
+  usage: UsageTotal,
+): JudgeVerdict {
   const defaultVerdict: JudgeVerdict = {
     winner: shots[0]?.variant ?? null,
     runnerUp: shots[1]?.variant ?? null,
-    reason: 'Judge output unparseable; defaulted to first completed variant.',
+    reason: "Judge output unparseable; defaulted to first completed variant.",
     usage,
   };
 
@@ -249,17 +281,25 @@ function parseVerdict(text: string, shots: TripleshotShot[], usage: UsageTotal):
   if (!match) return defaultVerdict;
 
   const parsed = repairJSON(match[0]);
-  if (!parsed || typeof parsed !== 'object') return defaultVerdict;
+  if (!parsed || typeof parsed !== "object") return defaultVerdict;
 
   const rec = parsed as Record<string, unknown>;
   const winner = isVariant(rec.winner) ? rec.winner : defaultVerdict.winner;
-  const runnerUp = isVariant(rec.runner_up) ? rec.runner_up : defaultVerdict.runnerUp;
-  const reason = typeof rec.reason === 'string' ? rec.reason : 'No reason given.';
-  return { winner, runnerUp: winner === runnerUp ? null : runnerUp, reason, usage };
+  const runnerUp = isVariant(rec.runner_up)
+    ? rec.runner_up
+    : defaultVerdict.runnerUp;
+  const reason =
+    typeof rec.reason === "string" ? rec.reason : "No reason given.";
+  return {
+    winner,
+    runnerUp: winner === runnerUp ? null : runnerUp,
+    reason,
+    usage,
+  };
 }
 
 function isVariant(v: unknown): v is TripleVariant {
-  return v === 'conservative' || v === 'balanced' || v === 'bold';
+  return v === "conservative" || v === "balanced" || v === "bold";
 }
 
 function accumulate(total: UsageTotal, add: UsageTotal): void {
@@ -269,14 +309,14 @@ function accumulate(total: UsageTotal, add: UsageTotal): void {
   total.costUsd += add.costUsd;
 }
 
-function handleFor(worktrees: TripleshotResult['worktrees'], path: string): TripleshotResult['worktrees'][0] {
-  const wt = worktrees.find(w => w.path === path);
-  if (!wt) {
-    throw new Error(`tripleshot: no worktree handle for path ${path}`);
-  }
+function handleFor(
+  worktrees: TripleshotResult["worktrees"],
+  path: string,
+): TripleshotResult["worktrees"][0] | undefined {
+  const wt = worktrees.find((w) => w.path === path);
   return wt;
 }
 
 function defaultModel(): string {
-  return process.env['DIRGHA_MODEL'] ?? 'nvidia/minimaxai/minimax-m2.7';
+  return process.env["DIRGHA_MODEL"] ?? "nvidia/minimaxai/minimax-m2.7";
 }

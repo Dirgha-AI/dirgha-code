@@ -16,18 +16,7 @@ import * as React from "react";
 import { Box, Text } from "ink";
 import { iconFor } from "../icons.js";
 import { useTheme } from "../theme-context.js";
-const SPINNER_FRAMES = [
-    "⠋",
-    "⠙",
-    "⠹",
-    "⠸",
-    "⠼",
-    "⠴",
-    "⠦",
-    "⠧",
-    "⠇",
-    "⠏",
-];
+import { SpinnerContext, SPINNER_FRAMES } from "../spinner-context.js";
 const TOOL_LABEL = {
     fs_read: "Read",
     fs_write: "Write",
@@ -87,17 +76,8 @@ function diffShortPreview(text, maxLen = 80) {
 }
 export function ToolBox(props) {
     const palette = useTheme();
-    const [frame, setFrame] = React.useState(0);
-    const [tick, setTick] = React.useState(0);
-    React.useEffect(() => {
-        if (props.status !== "running")
-            return;
-        const t = setInterval(() => {
-            setFrame((f) => (f + 1) % SPINNER_FRAMES.length);
-            setTick((n) => n + 1);
-        }, 80);
-        return () => clearInterval(t);
-    }, [props.status]);
+    const frame = React.useContext(SpinnerContext);
+    const tick = frame;
     const icon = props.status === "error"
         ? "✗"
         : props.status === "done"

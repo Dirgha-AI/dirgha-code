@@ -13,8 +13,8 @@
  * (an OpenRouter routing slug) still go through the OR provider unless
  * the user explicitly forces DIRGHA_PROVIDER=deepseek.
  */
-import type { AgentEvent } from '../kernel/types.js';
-import type { Provider, StreamRequest, ProviderConfig } from './iface.js';
+import type { AgentEvent } from "../kernel/types.js";
+import type { Provider, StreamRequest, ProviderConfig } from "./iface.js";
 export declare const DEEPSEEK_MODELS: Array<{
     id: string;
     label: string;

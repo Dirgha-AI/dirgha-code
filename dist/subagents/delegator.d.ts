@@ -8,12 +8,20 @@
  */
 import type { Provider, UsageTotal, Message } from "../kernel/types.js";
 import type { ToolRegistry } from "../tools/registry.js";
+/**
+ * Safe default tool allowlist for sub-agents. Covers read/write/search and
+ * common dev operations while excluding high-privilege tools (e.g. network
+ * requests, approval bypass, registry mutation). A parent agent can grant
+ * additional tools by supplying an explicit toolAllowlist on SubagentRequest.
+ */
+export declare const DEFAULT_SUBAGENT_TOOLS: Set<string>;
 export interface SubagentRequest {
     prompt: string;
     system?: string;
     toolAllowlist?: string[];
     maxTurns?: number;
     model?: string;
+    tokenBudget?: number;
 }
 export interface SubagentResult {
     output: string;

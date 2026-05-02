@@ -17,7 +17,7 @@
  * provider-specific keys (e.g., organisation id) only.
  */
 
-import { ProviderError } from './iface.js';
+import { ProviderError } from "./iface.js";
 
 export interface SseRequest {
   url: string;
@@ -25,6 +25,8 @@ export interface SseRequest {
   body: unknown;
   extraHeaders?: Record<string, string>;
   timeoutMs?: number;
+  /** Abort if no bytes received in this many ms (0 = disabled). Default 30s. */
+  stallTimeoutMs?: number;
   signal?: AbortSignal;
   providerName: string;
 }
@@ -32,52 +34,67 @@ export interface SseRequest {
 export interface JsonRequest extends SseRequest {}
 
 const DEFAULT_TIMEOUT_MS = 60_000;
+const DEFAULT_STALL_TIMEOUT_MS = 30_000;
 
-function buildSseHeaders(apiKey: string, hasBody: boolean, extra?: Record<string, string>): Record<string, string> {
+function buildSseHeaders(
+  apiKey: string,
+  hasBody: boolean,
+  extra?: Record<string, string>,
+): Record<string, string> {
   const headers: Record<string, string> = {
     Authorization: `Bearer ${apiKey}`,
-    Accept: 'text/event-stream',
+    Accept: "text/event-stream",
   };
-  if (hasBody) headers['Content-Type'] = 'application/json';
+  if (hasBody) headers["Content-Type"] = "application/json";
   if (extra) {
     for (const [k, v] of Object.entries(extra)) {
       const lower = k.toLowerCase();
-      if (lower === 'accept' || lower === 'content-type') continue;
+      if (lower === "accept" || lower === "content-type") continue;
       headers[k] = v;
     }
   }
   return headers;
 }
 
-function buildJsonHeaders(apiKey: string, hasBody: boolean, extra?: Record<string, string>): Record<string, string> {
+function buildJsonHeaders(
+  apiKey: string,
+  hasBody: boolean,
+  extra?: Record<string, string>,
+): Record<string, string> {
   const headers: Record<string, string> = {
     Authorization: `Bearer ${apiKey}`,
-    Accept: 'application/json',
+    Accept: "application/json",
   };
-  if (hasBody) headers['Content-Type'] = 'application/json';
+  if (hasBody) headers["Content-Type"] = "application/json";
   if (extra) {
     for (const [k, v] of Object.entries(extra)) {
       const lower = k.toLowerCase();
-      if (lower === 'accept' || lower === 'content-type') continue;
+      if (lower === "accept" || lower === "content-type") continue;
       headers[k] = v;
     }
   }
   return headers;
 }
 
-function linkedSignal(timeoutMs: number, external?: AbortSignal): { signal: AbortSignal; cancel: () => void } {
+function linkedSignal(
+  timeoutMs: number,
+  external?: AbortSignal,
+): { signal: AbortSignal; cancel: () => void } {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(new Error(`Request timed out after ${timeoutMs}ms`)), timeoutMs);
+  const timer = setTimeout(
+    () => controller.abort(new Error(`Request timed out after ${timeoutMs}ms`)),
+    timeoutMs,
+  );
   const onExternal = () => controller.abort((external as AbortSignal).reason);
   if (external) {
     if (external.aborted) controller.abort(external.reason);
-    else external.addEventListener('abort', onExternal, { once: true });
+    else external.addEventListener("abort", onExternal, { once: true });
   }
   return {
     signal: controller.signal,
     cancel: () => {
       clearTimeout(timer);
-      if (external) external.removeEventListener('abort', onExternal);
+      if (external) external.removeEventListener("abort", onExternal);
     },
   };
 }
@@ -90,19 +107,27 @@ function linkedSignal(timeoutMs: number, external?: AbortSignal): { signal: Abor
 export async function* streamSSE(req: SseRequest): AsyncIterable<string> {
   const hasBody = req.body !== undefined && req.body !== null;
   const headers = buildSseHeaders(req.apiKey, hasBody, req.extraHeaders);
-  const { signal, cancel } = linkedSignal(req.timeoutMs ?? DEFAULT_TIMEOUT_MS, req.signal);
+  const { signal, cancel } = linkedSignal(
+    req.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    req.signal,
+  );
 
   let response: Response;
   try {
     response = await fetch(req.url, {
-      method: 'POST',
+      method: "POST",
       headers,
       body: hasBody ? JSON.stringify(req.body) : undefined,
       signal,
     });
   } catch (err) {
     cancel();
-    throw new ProviderError(`Network error: ${String((err as Error)?.message ?? err)}`, req.providerName, undefined, true);
+    throw new ProviderError(
+      `Network error: ${String((err as Error)?.message ?? err)}`,
+      req.providerName,
+      undefined,
+      true,
+    );
   }
 
   if (!response.ok) {
@@ -117,40 +142,67 @@ export async function* streamSSE(req: SseRequest): AsyncIterable<string> {
   }
   if (!response.body) {
     cancel();
-    throw new ProviderError('Empty response body', req.providerName);
+    throw new ProviderError("Empty response body", req.providerName);
   }
 
   const reader = response.body.getReader();
-  const decoder = new TextDecoder('utf-8');
-  let buffer = '';
+  const decoder = new TextDecoder("utf-8");
+  let buffer = "";
+  const stallMs = req.stallTimeoutMs ?? DEFAULT_STALL_TIMEOUT_MS;
+  let stallTimer: ReturnType<typeof setTimeout> | undefined;
 
   try {
     for (;;) {
-      const { value, done } = await reader.read();
+      stallTimer = undefined;
+      let result: { value?: Uint8Array; done: boolean };
+      if (stallMs > 0) {
+        result = await Promise.race([
+          reader.read(),
+          new Promise<never>((_, reject) => {
+            stallTimer = setTimeout(
+              () =>
+                reject(
+                  new Error(
+                    `Stream stalled: no bytes received in ${stallMs}ms`,
+                  ),
+                ),
+              stallMs,
+            );
+          }),
+        ]);
+      } else {
+        result = await reader.read();
+      }
+      if (stallTimer !== undefined) clearTimeout(stallTimer);
+      const { value, done } = result;
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
 
       let newlineIndex: number;
-      while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
+      while ((newlineIndex = buffer.indexOf("\n")) >= 0) {
         const rawLine = buffer.slice(0, newlineIndex);
         buffer = buffer.slice(newlineIndex + 1);
-        const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine;
+        const line = rawLine.endsWith("\r") ? rawLine.slice(0, -1) : rawLine;
         if (line.length === 0) continue;
-        if (line.startsWith(':')) continue;
-        if (!line.startsWith('data:')) continue;
+        if (line.startsWith(":")) continue;
+        if (!line.startsWith("data:")) continue;
         const payload = line.slice(5).trim();
         if (payload.length === 0) continue;
         yield payload;
       }
     }
     const tail = buffer.trim();
-    if (tail.startsWith('data:')) {
+    if (tail.startsWith("data:")) {
       const payload = tail.slice(5).trim();
       if (payload.length > 0) yield payload;
     }
   } finally {
     cancel();
-    try { reader.releaseLock(); } catch { /* noop */ }
+    try {
+      reader.releaseLock();
+    } catch {
+      /* noop */
+    }
   }
 }
 
@@ -162,19 +214,27 @@ export async function* streamSSE(req: SseRequest): AsyncIterable<string> {
 export async function postJSON<T>(req: JsonRequest): Promise<T> {
   const hasBody = req.body !== undefined && req.body !== null;
   const headers = buildJsonHeaders(req.apiKey, hasBody, req.extraHeaders);
-  const { signal, cancel } = linkedSignal(req.timeoutMs ?? DEFAULT_TIMEOUT_MS, req.signal);
+  const { signal, cancel } = linkedSignal(
+    req.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    req.signal,
+  );
 
   let response: Response;
   try {
     response = await fetch(req.url, {
-      method: 'POST',
+      method: "POST",
       headers,
       body: hasBody ? JSON.stringify(req.body) : undefined,
       signal,
     });
   } catch (err) {
     cancel();
-    throw new ProviderError(`Network error: ${String((err as Error)?.message ?? err)}`, req.providerName, undefined, true);
+    throw new ProviderError(
+      `Network error: ${String((err as Error)?.message ?? err)}`,
+      req.providerName,
+      undefined,
+      true,
+    );
   }
 
   if (!response.ok) {
@@ -193,7 +253,11 @@ export async function postJSON<T>(req: JsonRequest): Promise<T> {
 }
 
 async function safeReadText(response: Response): Promise<string> {
-  try { return await response.text(); } catch { return '<body unreadable>'; }
+  try {
+    return await response.text();
+  } catch {
+    return "<body unreadable>";
+  }
 }
 
 function isRetryableStatus(status: number): boolean {

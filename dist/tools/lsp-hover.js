@@ -20,8 +20,17 @@ export const lspHoverTool = {
     async execute(raw) {
         const input = raw;
         const filePath = resolve(input.filePath);
+        const lsp = getLspManager();
+        // Check if any language server is serving this file before calling.
+        const clients = await lsp.getClients(filePath);
+        if (clients.length === 0) {
+            return {
+                content: `No language server available for ${filePath}. Install the appropriate LSP server (e.g. typescript-language-server, pyright, rust-analyzer). Use search_grep as a fallback for symbol lookup.`,
+                data: { hover: null },
+                isError: false,
+            };
+        }
         try {
-            const lsp = getLspManager();
             const result = await lsp.hover(filePath, input.line, input.character);
             if (!result) {
                 return {

@@ -24,8 +24,19 @@ export const lspGoToDefinitionTool: Tool = {
   async execute(raw: unknown): Promise<ToolResult> {
     const input = raw as { filePath: string; line: number; character: number };
     const filePath = resolve(input.filePath);
+    const lsp = getLspManager();
+
+    // Check if any language server is serving this file before calling.
+    const clients = await lsp.getClients(filePath);
+    if (clients.length === 0) {
+      return {
+        content: `No language server available for ${filePath}. Install the appropriate LSP server (e.g. typescript-language-server, pyright, rust-analyzer). Use search_grep as a fallback for symbol lookup.`,
+        data: { definitions: [] },
+        isError: false,
+      };
+    }
+
     try {
-      const lsp = getLspManager();
       const locations = await lsp.goToDefinition(
         filePath,
         input.line,

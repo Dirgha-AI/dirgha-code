@@ -1,0 +1,82 @@
+/**
+ * fleet/state.ts — Checkpoint/resume for fleet runs.
+ *
+ * State file: ~/.dirgha/fleet-state/<goalSlug>-<runId>.json
+ * Written fire-and-forget after each agent turn and status transition.
+ * Used by `dirgha fleet resume` to restart incomplete agents.
+ */
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
+const STATE_DIR = join(homedir(), ".dirgha", "fleet-state");
+// Serialize concurrent writes to the same file path (multiple agents fire
+// turn_end simultaneously and all call writeFleetState with the same runId).
+const writeQueues = new Map();
+export async function writeFleetState(runId, goalSlug, config, agents) {
+    await mkdir(STATE_DIR, { recursive: true });
+    const filePath = join(STATE_DIR, `${goalSlug}-${runId}.json`);
+    const prev = writeQueues.get(filePath) ?? Promise.resolve();
+    const next = prev.then(async () => {
+        const state = {
+            version: 1,
+            runId,
+            goalSlug,
+            goal: config.goal,
+            model: config.model ?? "",
+            maxTurns: config.maxTurns ?? 15,
+            timeoutMs: config.timeoutMs ?? 600_000,
+            writtenAt: new Date().toISOString(),
+            agents: agents.map(agentToState),
+        };
+        await writeFile(filePath, JSON.stringify(state, null, 2), "utf8");
+    });
+    // Store a non-rejecting tail so the queue is never poisoned by a write error.
+    writeQueues.set(filePath, next.catch(() => { }));
+    await next;
+    return filePath;
+}
+export async function readFleetState(path) {
+    const raw = await readFile(path, "utf8");
+    const parsed = JSON.parse(raw);
+    if (parsed.version !== 1)
+        throw new Error(`Unsupported fleet state version: ${parsed.version}`);
+    return parsed;
+}
+export async function findLatestState(goalSubstring) {
+    const { readdir } = await import("node:fs/promises");
+    let files;
+    try {
+        files = await readdir(STATE_DIR);
+    }
+    catch {
+        return null;
+    }
+    const jsonFiles = files.filter((f) => f.endsWith(".json")).sort().reverse();
+    for (const f of jsonFiles) {
+        try {
+            const st = await readFleetState(join(STATE_DIR, f));
+            if (st.goal.toLowerCase().includes(goalSubstring.toLowerCase())) {
+                return join(STATE_DIR, f);
+            }
+        }
+        catch { /* corrupt state file — skip */ }
+    }
+    return null;
+}
+function agentToState(a) {
+    return {
+        id: a.id,
+        subtask: a.subtask,
+        status: a.status,
+        worktreePath: a.worktreePath,
+        branchName: a.branchName,
+        startedAt: a.startedAt,
+        completedAt: a.completedAt,
+        output: a.output,
+        error: a.error,
+        usage: a.usage,
+        turnCount: 0,
+        sessionId: a.sessionId,
+    };
+}
+//# sourceMappingURL=state.js.map

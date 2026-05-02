@@ -9,11 +9,14 @@
  *       entirely.
  */
 import type { JsonSchema, ToolDefinition, ToolResult } from "../kernel/types.js";
+import type { SandboxAdapter } from "../safety/sandbox/iface.js";
 export interface ToolContext {
     cwd: string;
     env: Record<string, string>;
     sessionId: string;
     signal: AbortSignal;
+    /** Platform sandbox adapter, or null when sandbox is unavailable. */
+    sandbox: SandboxAdapter | null;
     log?: (level: "debug" | "info" | "warn" | "error", msg: string, meta?: Record<string, unknown>) => void;
     onProgress?: (message: string) => void;
 }
@@ -21,6 +24,8 @@ export interface Tool {
     name: string;
     description: string;
     inputSchema: JsonSchema;
+    /** Maximum milliseconds before the executor aborts this tool. 0 = no limit. */
+    timeoutMs?: number;
     requiresApproval?: (input: unknown) => boolean;
     execute(input: unknown, ctx: ToolContext): Promise<ToolResult>;
 }

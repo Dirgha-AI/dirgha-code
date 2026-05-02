@@ -14,6 +14,7 @@
  *   6. Optional cleanup of worktrees.
  */
 
+import { randomUUID } from 'node:crypto';
 import { runAgentLoop } from '../kernel/agent-loop.js';
 import { createEventStream, type EventStream } from '../kernel/event-stream.js';
 import { extractText } from '../kernel/message.js';
@@ -24,6 +25,10 @@ import { createToolRegistry, type ToolRegistry } from '../tools/registry.js';
 import { createToolExecutor } from '../tools/exec.js';
 import { repairJSON } from '../utils/json-repair.js';
 import { createWorktree, destroyWorktree, getRepoRoot, slug } from './worktree.js';
+import { openScratchpad, type ScratchpadHandle } from './scratchpad.js';
+import { createScratchpadTools } from './scratchpad-tools.js';
+import { createLedgerHook, fleetLedgerScope } from './ledger-hook.js';
+import { writeFleetState } from './state.js';
 import {
   AGENT_TYPE_TOOLS,
   type AgentType,
@@ -70,6 +75,7 @@ export async function runFleet(config: FleetConfig): Promise<FleetResult> {
   const plannerModel = config.plannerModel ?? model;
   const events = config.events ?? createEventStream();
   const providers = new ProviderRegistry();
+  const runId = config.runId ?? randomUUID().slice(0, 8);
 
   const subtasks = config.subtasks && config.subtasks.length > 0
     ? config.subtasks.map(normalizeSubtask)
@@ -79,11 +85,16 @@ export async function runFleet(config: FleetConfig): Promise<FleetResult> {
   const agents: FleetAgent[] = [];
   const goalSlug = slug(config.goal);
 
+  // Shared scratchpad + ledger scope for the entire fleet run.
+  const scratchpad = await openScratchpad(repoRoot, goalSlug);
+  const ledgerScope = fleetLedgerScope(goalSlug);
+
   for (const sub of subtasks) {
     const branch = `fleet/${goalSlug}/${sub.id}`;
     const handle = await createWorktree(branch, {
       repoRoot,
       worktreeBase: config.worktreeBase,
+      reuseBranch: config.reuseBranch,
     });
     worktrees.push(handle);
     agents.push({
@@ -99,6 +110,9 @@ export async function runFleet(config: FleetConfig): Promise<FleetResult> {
     });
   }
 
+  // Initial checkpoint before any agent runs.
+  void writeFleetState(runId, goalSlug, config, agents).catch(() => {});
+
   emitFleetEvent(events, { type: 'fleet_start', goal: config.goal, agents: [...agents] });
   for (const a of agents) config.onAgent?.(a);
 
@@ -112,6 +126,12 @@ export async function runFleet(config: FleetConfig): Promise<FleetResult> {
     signal: config.signal,
     verbose: config.verbose ?? false,
     onAgent: config.onAgent,
+    scratchpad,
+    ledgerScope,
+    runId,
+    goalSlug,
+    fleetConfig: config,
+    allAgents: agents,
   });
 
   const successCount = agents.filter(a => a.status === 'completed').length;
@@ -157,6 +177,12 @@ interface RunOptions {
   signal: AbortSignal | undefined;
   verbose: boolean;
   onAgent: ((a: FleetAgent) => void) | undefined;
+  scratchpad: ScratchpadHandle;
+  ledgerScope: ReturnType<typeof fleetLedgerScope>;
+  runId: string;
+  goalSlug: string;
+  fleetConfig: FleetConfig;
+  allAgents: FleetAgent[];
 }
 
 async function runWithConcurrency(agents: FleetAgent[], opts: RunOptions): Promise<void> {
@@ -164,6 +190,7 @@ async function runWithConcurrency(agents: FleetAgent[], opts: RunOptions): Promi
   const inflight = new Set<Promise<void>>();
   while (queue.length > 0 || inflight.size > 0) {
     while (inflight.size < opts.concurrency && queue.length > 0) {
+      if (opts.signal?.aborted) break; // don't start new agents after fleet cancel
       const agent = queue.shift()!;
       const p = runOneAgent(agent, opts).finally(() => { inflight.delete(p); });
       inflight.add(p);
@@ -193,15 +220,24 @@ async function runOneAgent(agent: FleetAgent, opts: RunOptions): Promise<void> {
   opts.signal?.addEventListener('abort', parentListener, { once: true });
   const timer = setTimeout(() => { controller.abort(); }, opts.timeoutMs);
 
-  const registry = agentRegistry(agent.subtask);
+  const registry = agentRegistry(agent.subtask, opts.scratchpad, agent.id);
   const sanitized = registry.sanitize({ descriptionLimit: 200 });
   const executor = createToolExecutor({ registry, cwd: agent.worktreePath, sessionId });
+
+  // Ledger hook: auto-persists key findings after each turn.
+  const ledgerHookRaw = createLedgerHook(agent.id, opts.ledgerScope);
+  const ledgerHook = ledgerHookRaw as typeof ledgerHookRaw & { _state: { lastText: string } };
 
   // Per-agent local event stream — we relay into parent + collect usage.
   const localEvents = createEventStream();
   const unsubscribe = localEvents.subscribe(ev => {
     opts.events.emit(ev);
     onLocalEvent(agent, ev, opts);
+    // Feed last assistant text into the ledger hook.
+    if (ev.type === 'text_delta') ledgerHook._state.lastText += ev.delta;
+    if (ev.type === 'turn_end') {
+      void writeFleetState(opts.runId, opts.goalSlug, opts.fleetConfig, opts.allAgents).catch(() => {});
+    }
   });
 
   const messages: Message[] = [
@@ -220,12 +256,13 @@ async function runOneAgent(agent: FleetAgent, opts: RunOptions): Promise<void> {
       toolExecutor: executor,
       events: localEvents,
       signal: controller.signal,
+      hooks: ledgerHookRaw,
     });
     agent.transcript = result.messages;
     agent.stopReason = result.stopReason;
     agent.usage = result.usage;
     const lastAssistant = [...result.messages].reverse().find(m => m.role === 'assistant');
-    if (lastAssistant) agent.output = extractText(lastAssistant);
+    agent.output = lastAssistant ? extractText(lastAssistant) : '';
 
     if (result.stopReason === 'aborted') {
       agent.status = 'cancelled';
@@ -286,12 +323,14 @@ function onLocalEvent(agent: FleetAgent, ev: AgentEvent, opts: RunOptions): void
   }
 }
 
-function agentRegistry(subtask: FleetSubtask): ToolRegistry {
+function agentRegistry(subtask: FleetSubtask, scratchpad: ScratchpadHandle, agentId: string): ToolRegistry {
   const type: AgentType = subtask.type ?? 'code';
   const allow = subtask.toolAllowlist ?? AGENT_TYPE_TOOLS[type];
   const allowSet = new Set(allow);
   const scoped = builtInTools.filter(t => allowSet.size === 0 ? true : allowSet.has(t.name));
-  return createToolRegistry(scoped);
+  // Always inject scratchpad tools — they're safe for all agent types.
+  const [fleetNote, fleetRead] = createScratchpadTools(scratchpad, agentId);
+  return createToolRegistry([...scoped, fleetNote, fleetRead]);
 }
 
 function agentSystemPrompt(subtask: FleetSubtask): string {
@@ -306,6 +345,8 @@ Type: ${type}
 Cwd: your assigned worktree (relative paths only — never write outside it).
 
 ${toolMandate}
+
+You have two shared scratchpad tools: fleet_read (check early — see what other agents found) and fleet_note (record key discoveries for other agents). Use them.
 
 When the subtask is genuinely complete, respond with a short one-line
 summary of what you did — no apologies, no filler, no preamble.`;

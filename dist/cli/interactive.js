@@ -5,6 +5,7 @@
  * renderer subscribed to the shared event stream.
  */
 import { randomUUID } from "node:crypto";
+import { registerSession } from "../state/index.js";
 import { createInterface } from "node:readline";
 import { createEventStream } from "../kernel/event-stream.js";
 import { appendAudit } from "../audit/writer.js";
@@ -30,6 +31,8 @@ import { createErrorClassifier } from "../intelligence/error-classifier.js";
 export async function runInteractive(opts) {
     const sessionId = randomUUID();
     const session = await opts.sessions.create(sessionId);
+    // Register in unified state index (fire-and-forget, never blocks).
+    void registerSession(sessionId, opts.config.model);
     const events = createEventStream();
     const slash = createDefaultSlashRegistry();
     await registerBuiltinSlashCommands(slash);
@@ -216,9 +219,14 @@ export async function runInteractive(opts) {
                     providerForCurrent: () => opts.providers.forModel(currentModel),
                     summaryModel: opts.config.summaryModel,
                 });
-                const result = await slash.dispatch(line, ctx);
-                if (result.output)
-                    process.stdout.write(`${result.output}\n`);
+                try {
+                    const result = await slash.dispatch(line, ctx);
+                    if (result.output)
+                        process.stdout.write(`${result.output}\n`);
+                }
+                catch (e) {
+                    process.stdout.write(`\n  slash error: ${e instanceof Error ? e.message : String(e)}\n`);
+                }
                 rl.prompt();
                 return;
             }

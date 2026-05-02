@@ -4,7 +4,10 @@
  * Producers call emit(). Consumers either subscribe for side-effectful
  * handling or iterate via for-await. Multiple consumers are allowed;
  * each independent iterator receives all events from its subscription
- * onward. Back-pressure is bounded by an internal queue.
+ * onward. Back-pressure is bounded by an internal queue; when the
+ * queue overflows, a backpressure event is emitted (once per overflow
+ * start) and the oldest event is dropped. Slow consumers can call
+ * drain() to await queue emptying.
  */
 const MAX_QUEUE = 4096;
 class EventStreamImpl {
@@ -15,9 +18,27 @@ class EventStreamImpl {
         if (this.closed)
             return;
         for (const handler of this.subscribers) {
-            void Promise.resolve().then(() => handler(event)).catch(err => {
-                this.emit({ type: 'error', message: `event handler failed: ${String(err)}` });
-            });
+            try {
+                const result = handler(event);
+                if (result instanceof Promise) {
+                    result.catch((err) => {
+                        if (event.type !== "error") {
+                            this.emit({
+                                type: "error",
+                                message: `handler failed: ${String(err)}`,
+                            });
+                        }
+                    });
+                }
+            }
+            catch (err) {
+                if (event.type !== "error") {
+                    this.emit({
+                        type: "error",
+                        message: `handler failed: ${String(err)}`,
+                    });
+                }
+            }
         }
         for (const state of this.iterators)
             state.push(event);
@@ -31,10 +52,20 @@ class EventStreamImpl {
     iterator() {
         const state = new IteratorState();
         this.iterators.add(state);
-        const cleanup = () => { this.iterators.delete(state); };
+        const cleanup = () => {
+            this.iterators.delete(state);
+        };
         if (this.closed)
             state.close();
         return makeAsyncIterator(state, cleanup);
+    }
+    async drain() {
+        const checks = [...this.iterators];
+        for (const state of checks) {
+            while (state.length > 0) {
+                await new Promise((r) => setTimeout(r, 1));
+            }
+        }
     }
     close() {
         if (this.closed)
@@ -50,6 +81,11 @@ class IteratorState {
     queue = [];
     waiters = [];
     done = false;
+    droppedCount = 0;
+    backpressureActive = false;
+    get length() {
+        return this.queue.length;
+    }
     push(event) {
         if (this.done)
             return;
@@ -58,8 +94,19 @@ class IteratorState {
             waiter.resolve({ value: event, done: false });
             return;
         }
-        if (this.queue.length >= MAX_QUEUE)
+        if (this.queue.length >= MAX_QUEUE) {
             this.queue.shift();
+            this.droppedCount++;
+            if (!this.backpressureActive) {
+                this.backpressureActive = true;
+                // Inject a synthetic warning so consumers know data was lost.
+                this.queue.push({
+                    type: "error",
+                    message: `Event queue overflow: ${this.droppedCount} events dropped. Consumer is too slow.`,
+                    reason: "backpressure",
+                });
+            }
+        }
         this.queue.push(event);
     }
     close() {
@@ -76,8 +123,13 @@ class IteratorState {
         if (event !== undefined)
             return Promise.resolve({ value: event, done: false });
         if (this.done)
-            return Promise.resolve({ value: undefined, done: true });
-        return new Promise(resolve => { this.waiters.push({ resolve }); });
+            return Promise.resolve({
+                value: undefined,
+                done: true,
+            });
+        return new Promise((resolve) => {
+            this.waiters.push({ resolve });
+        });
     }
 }
 function makeAsyncIterator(state, cleanup) {
@@ -93,7 +145,9 @@ function makeAsyncIterator(state, cleanup) {
             cleanup();
             return Promise.reject(err);
         },
-        [Symbol.asyncIterator]() { return this; },
+        [Symbol.asyncIterator]() {
+            return this;
+        },
     };
 }
 export function createEventStream() {

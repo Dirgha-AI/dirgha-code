@@ -17,7 +17,7 @@
  * Returns structured ApplyResult; does NOT throw on merge conflicts —
  * caller inspects `conflicts`/`success` and decides.
  */
-import type { ApplyOptions, ApplyResult, WorktreeHandle } from './types.js';
+import type { ApplyOptions, ApplyResult, WorktreeHandle } from "./types.js";
 /**
  * Apply a worktree's changes back to the parent working tree.
  *

@@ -11,8 +11,8 @@
  * parsing is deterministic; we fall back to the first completed variant
  * when the judge misbehaves.
  */
-import type { FleetConfig, TripleshotResult } from './types.js';
-export interface TripleshotConfig extends Omit<FleetConfig, 'subtasks' | 'concurrency'> {
+import type { FleetConfig, TripleshotResult } from "./types.js";
+export interface TripleshotConfig extends Omit<FleetConfig, "subtasks" | "concurrency"> {
     /** Auto-apply the winner's diff to the parent tree via applyBack. */
     autoMerge?: boolean;
     /** Override the judge model; defaults to `plannerModel` or `model`. */

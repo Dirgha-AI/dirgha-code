@@ -155,6 +155,7 @@ try {
   await flush();
   events.emit({ type: 'text_delta', delta: 'world!' });
   await flush();
+  await flush(); // extra tick: let React complete its deferred render before asserting
   assert('text_delta projects to transcript during stream', /Hello, world!/.test(everSeen()));
 
   events.emit({ type: 'text_end' });

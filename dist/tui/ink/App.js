@@ -49,6 +49,7 @@ import { AtFileComplete } from "./components/AtFileComplete.js";
 import { SlashComplete } from "./components/SlashComplete.js";
 import { ThemePicker } from "./components/ThemePicker.js";
 import { ThemeProvider } from "./theme-context.js";
+import { SpinnerContext, SPINNER_FRAMES as GLOBAL_SPINNER_FRAMES } from "./spinner-context.js";
 import { writeFile, mkdir, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join as pathJoin } from "node:path";
@@ -122,29 +123,40 @@ export function App(props) {
     const [liveOutputTokens, setLiveOutputTokens] = React.useState(0);
     const [liveDurationMs, setLiveDurationMs] = React.useState(0);
     const turnStartRef = React.useRef(0);
+    const liveOutputTokensAccRef = React.useRef(0);
     React.useEffect(() => {
         const unsub = props.events.subscribe((ev) => {
             if (ev.type === "agent_start") {
                 turnStartRef.current = Date.now();
+                liveOutputTokensAccRef.current = 0;
                 setLiveOutputTokens(0);
                 setLiveDurationMs(0);
             }
             else if (ev.type === "text_delta" || ev.type === "thinking_delta") {
-                // Approximate output-token count by char/4 — same heuristic
-                // the rest of the codebase uses for streaming-side estimates.
-                const delta = (ev.delta?.length ?? 0) / 4;
-                setLiveOutputTokens((prev) => prev + delta);
+                liveOutputTokensAccRef.current += (ev.delta?.length ?? 0) / 4;
             }
             else if (ev.type === "usage") {
-                setLiveOutputTokens(ev.outputTokens ?? 0);
+                // Only update the accumulator ref — the 1s tick interval reads it.
+                // Calling setLiveOutputTokens here would double-render on usage events.
+                liveOutputTokensAccRef.current = ev.outputTokens ?? 0;
             }
             else if (ev.type === "agent_end") {
                 setLiveDurationMs(0);
                 setLiveOutputTokens(0);
+                liveOutputTokensAccRef.current = 0;
             }
         });
         return unsub;
     }, [props.events]);
+    const [globalSpinnerFrame, setGlobalSpinnerFrame] = React.useState(0);
+    React.useEffect(() => {
+        if (!busy) {
+            setGlobalSpinnerFrame(0);
+            return;
+        }
+        const t = setInterval(() => setGlobalSpinnerFrame((f) => (f + 1) % GLOBAL_SPINNER_FRAMES.length), 80);
+        return () => clearInterval(t);
+    }, [busy]);
     // Tick the duration so the tok/s number updates while streaming.
     React.useEffect(() => {
         if (!busy)
@@ -152,6 +164,7 @@ export function App(props) {
         const t = setInterval(() => {
             if (turnStartRef.current > 0)
                 setLiveDurationMs(Date.now() - turnStartRef.current);
+            setLiveOutputTokens(liveOutputTokensAccRef.current);
         }, 1000);
         return () => clearInterval(t);
     }, [busy]);
@@ -200,6 +213,10 @@ export function App(props) {
     }, [props.events, currentModel]);
     const models = React.useMemo(() => props.models ?? defaultModelCatalogue(), [props.models]);
     const slashCommands = props.slashCommands ?? [];
+    // runTurnRef ensures handleSubmit always calls the latest runTurn closure
+    // (which captures current currentModel, mode, etc.) without adding those
+    // values to handleSubmit's deps and causing it to recreate on every change.
+    const runTurnRef = React.useRef(() => Promise.resolve());
     const handleSubmit = React.useCallback((raw) => {
         const value = raw.trim();
         if (value.length === 0)
@@ -370,7 +387,7 @@ export function App(props) {
         };
         setTranscript((prev) => [...prev, userItem]);
         historyRef.current.push({ role: "user", content: value });
-        void runTurn();
+        void runTurnRef.current();
     }, [busy, exit, props, projection, overlays]);
     const runTurn = async () => {
         setBusy(true);
@@ -446,6 +463,7 @@ export function App(props) {
             abortRef.current = null;
         }
     };
+    runTurnRef.current = runTurn;
     // Drain the prompt queue when a turn finishes. Pops the oldest queued
     // prompt and re-submits it through handleSubmit (which transitions
     // back into busy=true via runTurn). Guarded on `!busy` so we never
@@ -648,72 +666,71 @@ export function App(props) {
             }
         })();
     }, [overlays]);
+    const allTranscriptItems = React.useMemo(() => [...transcript, ...projection.liveItems], [transcript, projection.liveItems]);
+    const renderedTranscript = React.useMemo(() => renderTranscript(allTranscriptItems), [allTranscriptItems]);
+    const providerEntries = React.useMemo(() => buildProviderEntries(models, currentModel), [models, currentModel]);
     // BISECT: Static moved out of the transcript render. Logo stays
     // in a one-item Static (its original placement). Both committed
     // transcript and live items render in the regular dynamic Box. If
     // streaming text appears now, the Static-around-transcript pattern
     // was suppressing the live region updates. If still not, the bug
     // is upstream in useEventProjection.
-    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: [{ key: "logo" }], children: (_item) => _jsx(Logo, { version: VERSION }, "logo") }), _jsx(Box, { flexDirection: "column", children: renderTranscript([...transcript, ...projection.liveItems]) }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
-                        approvalBusRef.current?.resolve(pendingApproval.id, decision);
-                    } })), pendingFailover !== null && (_jsx(ModelSwitchPrompt, { failedModel: pendingFailover.failedModel, failoverModel: pendingFailover.failoverModel, onAccept: (failover) => {
-                        const lastPrompt = pendingFailover.lastPrompt;
-                        setCurrentModel(failover);
-                        setPendingFailover(null);
-                        // Re-submit the failed prompt against the new model.
-                        if (lastPrompt) {
-                            setTimeout(() => handleSubmit(lastPrompt), 0);
-                        }
-                    }, onReject: () => setPendingFailover(null), onPicker: () => {
-                        setPendingFailover(null);
-                        overlays.openOverlay("models");
-                    } })), _jsx(PromptQueueIndicator, { queued: promptQueue }), _jsx(InputBox, { value: input, onChange: setInput, onSubmit: handleSubmit, busy: busy, vimMode: props.config.vimMode === true, onAtQueryChange: overlays.setAtQuery, onSlashQueryChange: overlays.setSlashQuery, onRequestOverlay: overlays.openOverlay, onRequestYoloToggle: () => {
-                        const next = mode === "yolo" ? "act" : "yolo";
-                        setMode(next);
-                        setTranscript((prev) => [
-                            ...prev,
-                            {
-                                kind: "notice",
-                                id: randomUUID(),
-                                text: next === "yolo"
-                                    ? "YOLO mode ON — every tool call is auto-approved. Ctrl+Y to exit."
-                                    : "YOLO mode OFF — back to standard confirmation.",
-                            },
-                        ]);
-                    }, inputFocus: inputFocus }), overlays.active === "atfile" && overlays.atQuery !== null && (_jsx(AtFileComplete, { cwd: props.cwd, query: overlays.atQuery, onPick: handleAtPick, onCancel: () => {
-                        overlays.setAtQuery(null);
-                        overlays.setActive(null);
-                    } })), overlays.active === "slash" && overlays.slashQuery !== null && (_jsx(SlashComplete, { commands: slashCommands, query: overlays.slashQuery, onPick: handleSlashPick, onCancel: () => {
-                        overlays.setSlashQuery(null);
-                        overlays.setActive(null);
-                    } })), overlays.active === "models" &&
-                    pickerStage === "provider" &&
-                    (() => {
-                        // Build provider entries — only include providers that actually have
-                        // models in our catalogue. Without this, the picker shows providers
-                        // with 0 models and the user lands on an empty model list.
-                        const providers = buildProviderEntries(models, currentModel);
-                        if (providers.length === 0) {
-                            // Fall through to flat ModelPicker if no providers (catalogue empty).
-                            return null;
-                        }
-                        return (_jsx(ProviderPicker, { providers: providers, onPick: (providerId) => {
-                                setPickerProvider(providerId);
-                                setPickerStage("model");
-                            }, onCancel: () => {
-                                setPickerStage("provider");
-                                setPickerProvider(null);
-                                overlays.closeOverlay();
-                            } }));
-                    })(), overlays.active === "models" && pickerStage === "model" && (_jsx(ModelPicker, { models: models.filter((m) => m.provider === pickerProvider), current: currentModel, onPick: (id) => {
-                        handleModelPick(id);
-                        setPickerStage("provider");
-                        setPickerProvider(null);
-                    }, onCancel: () => {
-                        // Esc inside ModelPicker → back to ProviderPicker (NOT close).
-                        setPickerStage("provider");
-                        setPickerProvider(null);
-                    } })), overlays.active === "help" && (_jsx(HelpOverlay, { slashCommands: slashCommands, onClose: overlays.closeOverlay })), overlays.active === "theme" && (_jsx(ThemePicker, { current: themeName, onPick: handleThemePick, onCancel: overlays.closeOverlay })), pendingKey && (_jsx(KeySetOverlay, { keyName: pendingKey.keyName, onSave: handleKeySetSave, onCancel: () => setPendingKey(null) })), _jsx(StatusBar, { model: currentModel, provider: providerIdForModel(currentModel), inputTokens: projection.totals.inputTokens, outputTokens: projection.totals.outputTokens, costUsd: projection.totals.costUsd, cwd: props.cwd, busy: busy, mode: mode, contextWindow: contextWindowFor(currentModel), liveOutputTokens: liveOutputTokens, liveDurationMs: liveDurationMs })] }) }));
+    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: globalSpinnerFrame, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: [{ key: "logo" }], children: (_item) => _jsx(Logo, { version: VERSION }, "logo") }), _jsx(Box, { flexDirection: "column", children: renderedTranscript }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
+                            approvalBusRef.current?.resolve(pendingApproval.id, decision);
+                        } })), pendingFailover !== null && (_jsx(ModelSwitchPrompt, { failedModel: pendingFailover.failedModel, failoverModel: pendingFailover.failoverModel, onAccept: (failover) => {
+                            const lastPrompt = pendingFailover.lastPrompt;
+                            setCurrentModel(failover);
+                            setPendingFailover(null);
+                            // Re-submit the failed prompt against the new model.
+                            if (lastPrompt) {
+                                setTimeout(() => handleSubmit(lastPrompt), 0);
+                            }
+                        }, onReject: () => setPendingFailover(null), onPicker: () => {
+                            setPendingFailover(null);
+                            overlays.openOverlay("models");
+                        } })), _jsx(PromptQueueIndicator, { queued: promptQueue }), _jsx(InputBox, { value: input, onChange: setInput, onSubmit: handleSubmit, busy: busy, vimMode: props.config.vimMode === true, onAtQueryChange: overlays.setAtQuery, onSlashQueryChange: overlays.setSlashQuery, onRequestOverlay: overlays.openOverlay, onRequestYoloToggle: () => {
+                            const next = mode === "yolo" ? "act" : "yolo";
+                            setMode(next);
+                            setTranscript((prev) => [
+                                ...prev,
+                                {
+                                    kind: "notice",
+                                    id: randomUUID(),
+                                    text: next === "yolo"
+                                        ? "YOLO mode ON — every tool call is auto-approved. Ctrl+Y to exit."
+                                        : "YOLO mode OFF — back to standard confirmation.",
+                                },
+                            ]);
+                        }, inputFocus: inputFocus }), overlays.active === "atfile" && overlays.atQuery !== null && (_jsx(AtFileComplete, { cwd: props.cwd, query: overlays.atQuery, onPick: handleAtPick, onCancel: () => {
+                            overlays.setAtQuery(null);
+                            overlays.setActive(null);
+                        } })), overlays.active === "slash" && overlays.slashQuery !== null && (_jsx(SlashComplete, { commands: slashCommands, query: overlays.slashQuery, onPick: handleSlashPick, onCancel: () => {
+                            overlays.setSlashQuery(null);
+                            overlays.setActive(null);
+                        } })), overlays.active === "models" &&
+                        pickerStage === "provider" &&
+                        (() => {
+                            if (providerEntries.length === 0) {
+                                // Fall through to flat ModelPicker if no providers (catalogue empty).
+                                return null;
+                            }
+                            return (_jsx(ProviderPicker, { providers: providerEntries, onPick: (providerId) => {
+                                    setPickerProvider(providerId);
+                                    setPickerStage("model");
+                                }, onCancel: () => {
+                                    setPickerStage("provider");
+                                    setPickerProvider(null);
+                                    overlays.closeOverlay();
+                                } }));
+                        })(), overlays.active === "models" && pickerStage === "model" && (_jsx(ModelPicker, { models: models.filter((m) => m.provider === pickerProvider), current: currentModel, onPick: (id) => {
+                            handleModelPick(id);
+                            setPickerStage("provider");
+                            setPickerProvider(null);
+                        }, onCancel: () => {
+                            // Esc inside ModelPicker → back to ProviderPicker (NOT close).
+                            setPickerStage("provider");
+                            setPickerProvider(null);
+                        } })), overlays.active === "help" && (_jsx(HelpOverlay, { slashCommands: slashCommands, onClose: overlays.closeOverlay })), overlays.active === "theme" && (_jsx(ThemePicker, { current: themeName, onPick: handleThemePick, onCancel: overlays.closeOverlay })), pendingKey && (_jsx(KeySetOverlay, { keyName: pendingKey.keyName, onSave: handleKeySetSave, onCancel: () => setPendingKey(null) })), _jsx(StatusBar, { model: currentModel, provider: providerIdForModel(currentModel), inputTokens: projection.totals.inputTokens, outputTokens: projection.totals.outputTokens, costUsd: projection.totals.costUsd, cwd: props.cwd, busy: busy, mode: mode, contextWindow: contextWindowFor(currentModel), liveOutputTokens: liveOutputTokens, liveDurationMs: liveDurationMs })] }) }) }));
 }
 /**
  * Walk the transcript and fold consecutive `tool` items into a single

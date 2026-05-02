@@ -17,6 +17,7 @@
 
 import { readFileSync, statSync } from "node:fs";
 import { join, parse, resolve } from "node:path";
+import { maybeInitKb } from "./kb-init.js";
 
 const PRIMER_FILES = ["DIRGHA.md", "CLAUDE.md"];
 const PRIMER_CAP_BYTES = 8_000;
@@ -49,6 +50,7 @@ export function loadProjectPrimer(startDir: string): PrimerResult {
               "\n\n[...primer truncated to 8 KB...]";
             truncated = true;
           }
+          void maybeInitKb(dir).catch(() => {});
           return { primer: content, source: path, truncated };
         }
       } catch {

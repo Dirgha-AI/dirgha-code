@@ -17,22 +17,37 @@
  * `matcher` regex applied against the tool name. Hooks without a
  * matcher fire for every call.
  */
-import { spawn } from 'node:child_process';
+import { spawn } from "node:child_process";
 async function runHook(entry, payload, timeoutMs = 10_000) {
-    return new Promise(resolve => {
-        const child = spawn(entry.command, { shell: true, stdio: ['pipe', 'pipe', 'pipe'] });
-        let out = '';
-        let err = '';
+    return new Promise((resolve) => {
+        const [bin, ...args] = entry.command.split(/\s+/);
+        const child = spawn(bin, args, {
+            stdio: ["pipe", "pipe", "pipe"],
+            shell: false,
+        });
+        let out = "";
+        let err = "";
         let killed = false;
-        const t = setTimeout(() => { killed = true; child.kill('SIGTERM'); }, timeoutMs);
-        child.stdout.on('data', d => { out += d.toString('utf8'); });
-        child.stderr.on('data', d => { err += d.toString('utf8'); });
-        child.on('error', () => { });
+        const t = setTimeout(() => {
+            killed = true;
+            child.kill("SIGTERM");
+        }, timeoutMs);
+        child.stdout.on("data", (d) => {
+            out += d.toString("utf8");
+        });
+        child.stderr.on("data", (d) => {
+            err += d.toString("utf8");
+        });
+        child.on("error", () => {
+            /* spawn failure handled by close handler */
+        });
         // EPIPE on stdin is expected when the hook command doesn't read
         // its input (e.g. `echo … && exit 1`). Listen to handle the error
         // so it doesn't crash the parent.
-        child.stdin.on('error', () => { });
-        child.on('close', code => {
+        child.stdin.on("error", () => {
+            /* swallow EPIPE */
+        });
+        child.on("close", (code) => {
             clearTimeout(t);
             resolve({ exit: killed ? 124 : (code ?? 1), stdout: out, stderr: err });
         });
@@ -40,7 +55,9 @@ async function runHook(entry, payload, timeoutMs = 10_000) {
             child.stdin.write(JSON.stringify(payload));
             child.stdin.end();
         }
-        catch { /* swallow */ }
+        catch {
+            /* swallow */
+        }
     });
 }
 function matches(entry, name) {
@@ -67,19 +84,23 @@ export function buildAgentHooksFromConfig(config) {
     if (hasBeforeTurn) {
         hooks.beforeTurn = async (turnIndex, messages) => {
             for (const entry of cfg.before_turn) {
-                const r = await runHook(entry, { event: 'before_turn', turnIndex, messages });
+                const r = await runHook(entry, {
+                    event: "before_turn",
+                    turnIndex,
+                    messages,
+                });
                 if (r.exit !== 0) {
                     process.stderr.write(`hook before_turn aborted: ${r.stderr.trim() || r.stdout.trim() || `exit=${r.exit}`}\n`);
-                    return 'abort';
+                    return "abort";
                 }
             }
-            return 'continue';
+            return "continue";
         };
     }
     if (hasAfterTurn) {
         hooks.afterTurn = async (turnIndex, usage) => {
             for (const entry of cfg.after_turn) {
-                await runHook(entry, { event: 'after_turn', turnIndex, usage });
+                await runHook(entry, { event: "after_turn", turnIndex, usage });
             }
         };
     }
@@ -88,9 +109,14 @@ export function buildAgentHooksFromConfig(config) {
             for (const entry of cfg.before_tool_call) {
                 if (!matches(entry, call.name))
                     continue;
-                const r = await runHook(entry, { event: 'before_tool_call', call });
+                const r = await runHook(entry, { event: "before_tool_call", call });
                 if (r.exit !== 0) {
-                    return { block: true, reason: r.stderr.trim() || r.stdout.trim() || `hook ${entry.command} exited ${r.exit}` };
+                    return {
+                        block: true,
+                        reason: r.stderr.trim() ||
+                            r.stdout.trim() ||
+                            `hook ${entry.command} exited ${r.exit}`,
+                    };
                 }
             }
             return undefined;
@@ -102,7 +128,11 @@ export function buildAgentHooksFromConfig(config) {
             for (const entry of cfg.after_tool_call) {
                 if (!matches(entry, call.name))
                     continue;
-                const r = await runHook(entry, { event: 'after_tool_call', call, result: current });
+                const r = await runHook(entry, {
+                    event: "after_tool_call",
+                    call,
+                    result: current,
+                });
                 // Convention: zero exit = pass through unchanged; non-zero exit
                 // with stdout = replace the result content with stdout.
                 if (r.exit !== 0 && r.stdout.length > 0) {

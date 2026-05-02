@@ -9,6 +9,7 @@
 import * as React from "react";
 import { Box, Text, useStdout } from "ink";
 import { useTheme } from "../theme-context.js";
+import { SpinnerContext, SPINNER_FRAMES } from "../spinner-context.js";
 
 export interface StatusBarProps {
   model: string;
@@ -30,19 +31,6 @@ export interface StatusBarProps {
   turnCount?: number;
   maxTurns?: number;
 }
-
-const SPINNER_FRAMES: readonly string[] = [
-  "⠋",
-  "⠙",
-  "⠹",
-  "⠸",
-  "⠼",
-  "⠴",
-  "⠦",
-  "⠧",
-  "⠇",
-  "⠏",
-];
 
 function formatTokens(n: number): string {
   if (n < 1000) return String(n);
@@ -90,15 +78,7 @@ export function StatusBar(props: StatusBarProps): React.JSX.Element {
   const { stdout } = useStdout();
   const palette = useTheme();
   const cols = stdout?.columns ?? 80;
-  const [frame, setFrame] = React.useState(0);
-
-  React.useEffect(() => {
-    if (!props.busy) return;
-    const t = setInterval(() => {
-      setFrame((f) => (f + 1) % SPINNER_FRAMES.length);
-    }, 80);
-    return (): void => clearInterval(t);
-  }, [props.busy]);
+  const frame = React.useContext(SpinnerContext);
 
   const totalTokens = props.inputTokens + props.outputTokens;
   const costLabel = props.costUsd > 0 ? `$${props.costUsd.toFixed(3)}` : "";

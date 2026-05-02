@@ -3,8 +3,8 @@
  * stdin; falls back to a line-based prompt when stdin is not a TTY
  * (e.g., piped invocations).
  */
-import { style, defaultTheme } from './theme.js';
-import { createInterface } from 'node:readline';
+import { style, defaultTheme } from "./theme.js";
+import { createInterface } from "node:readline";
 export function createTuiApprovalBus(autoApproveTools = new Set()) {
     return {
         requiresApproval(toolName) {
@@ -18,35 +18,59 @@ export function createTuiApprovalBus(autoApproveTools = new Set()) {
                 const preview = truncate(req.diff, 1200);
                 process.stdout.write(`${preview}\n`);
             }
-            process.stdout.write('> ');
+            process.stdout.write("> ");
             const answer = await readOneChar();
             switch (answer.toLowerCase()) {
-                case 'a':
+                case "a":
                     autoApproveTools.add(req.tool);
-                    return 'approve_once';
-                case 'd': return 'deny_always';
-                case 'n': return 'deny';
-                default: return 'approve';
+                    return "approve_once";
+                case "d":
+                    return "deny_always";
+                case "n":
+                    return "deny";
+                default:
+                    return "approve";
             }
         },
     };
 }
 function readOneChar() {
-    return new Promise(resolve => {
+    return new Promise((resolve, reject) => {
         if (!process.stdin.isTTY) {
-            const rl = createInterface({ input: process.stdin, output: process.stdout });
-            rl.question('', ans => { rl.close(); resolve(ans.trim()); });
+            const rl = createInterface({
+                input: process.stdin,
+                output: process.stdout,
+            });
+            rl.question("", (ans) => {
+                rl.close();
+                resolve(ans.trim());
+            });
             return;
         }
+        let settled = false;
         const onData = (buf) => {
+            if (settled)
+                return;
+            settled = true;
             process.stdin.setRawMode(false);
             process.stdin.pause();
-            process.stdin.off('data', onData);
-            resolve(buf.toString('utf8'));
+            process.stdin.off("data", onData);
+            process.stdin.off("error", onError);
+            resolve(buf.toString("utf8"));
+        };
+        const onError = (err) => {
+            if (settled)
+                return;
+            settled = true;
+            process.stdin.setRawMode(false);
+            process.stdin.off("data", onData);
+            process.stdin.off("error", onError);
+            reject(err);
         };
         process.stdin.setRawMode(true);
         process.stdin.resume();
-        process.stdin.once('data', onData);
+        process.stdin.once("data", onData);
+        process.stdin.once("error", onError);
     });
 }
 function truncate(s, max) {

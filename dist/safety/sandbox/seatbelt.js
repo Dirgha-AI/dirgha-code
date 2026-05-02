@@ -3,11 +3,11 @@
  * generated profile that allows reads inside the cwd, allows writes to
  * the declared writablePaths, and gates network access per options.
  */
-import { accessSync, constants } from 'node:fs';
-import { runDirect } from './noop.js';
-const SANDBOX_EXEC = '/usr/bin/sandbox-exec';
+import { accessSync, constants } from "node:fs";
+import { runDirect } from "./noop.js";
+const SANDBOX_EXEC = "/usr/bin/sandbox-exec";
 export class SeatbeltSandbox {
-    platform = 'macos';
+    platform = "macos";
     async available() {
         try {
             accessSync(SANDBOX_EXEC, constants.X_OK);
@@ -21,14 +21,18 @@ export class SeatbeltSandbox {
         const profile = buildProfile(opts);
         return runDirect({
             ...opts,
-            command: [SANDBOX_EXEC, '-p', profile, ...opts.command],
-        }, 'macos');
+            command: [SANDBOX_EXEC, "-p", profile, ...opts.command],
+        }, "macos");
     }
 }
 function buildProfile(opts) {
-    const read = (opts.readOnlyPaths ?? [opts.cwd]).map(p => `(subpath "${escape(p)}")`).join(' ');
-    const write = (opts.writablePaths ?? [opts.cwd]).map(p => `(subpath "${escape(p)}")`).join(' ');
-    const net = opts.networkAllowed ? '(allow network*)' : '(deny network*)';
+    const read = (opts.readOnlyPaths ?? [opts.cwd])
+        .map((p) => `(subpath "${escape(p)}")`)
+        .join(" ");
+    const write = (opts.writablePaths ?? [opts.cwd])
+        .map((p) => `(subpath "${escape(p)}")`)
+        .join(" ");
+    const net = opts.networkAllowed ? "(allow network*)" : "(deny network*)";
     return `
 (version 1)
 (deny default)
@@ -44,6 +48,9 @@ ${net}
 `.trim();
 }
 function escape(path) {
+    if (/[()"\n\r\t]/.test(path)) {
+        throw new Error(`Seatbelt sandbox path contains unsafe characters: ${path}`);
+    }
     return path.replace(/"/g, '\\"');
 }
 //# sourceMappingURL=seatbelt.js.map

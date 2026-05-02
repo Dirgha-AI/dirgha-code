@@ -5,7 +5,7 @@
  */
 
 import { readFile, stat } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { resolve, sep } from 'node:path';
 import type { Tool } from './registry.js';
 import type { ToolResult } from '../kernel/types.js';
 
@@ -32,6 +32,9 @@ export const fsReadTool: Tool = {
   async execute(rawInput: unknown, ctx): Promise<ToolResult<{ lines: number; truncated: boolean }>> {
     const input = rawInput as Input;
     const abs = resolve(ctx.cwd, input.path);
+    if (!abs.startsWith(ctx.cwd + sep) && abs !== ctx.cwd) {
+      return { content: `Path escapes working directory: ${input.path}`, isError: true };
+    }
     const info = await stat(abs).catch(() => undefined);
     if (!info) return { content: `No such file: ${input.path}`, isError: true };
     if (!info.isFile()) return { content: `Not a file: ${input.path}`, isError: true };

@@ -17,12 +17,12 @@
  * Returns structured ApplyResult; does NOT throw on merge conflicts —
  * caller inspects `conflicts`/`success` and decides.
  */
-import { execFile } from 'node:child_process';
-import { writeFile, unlink } from 'node:fs/promises';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
-import { promisify } from 'node:util';
-import { getRepoRoot, getHeadSha } from './worktree.js';
+import { execFile } from "node:child_process";
+import { writeFile, unlink } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { promisify } from "node:util";
+import { getRepoRoot } from "./worktree.js";
 const pexec = promisify(execFile);
 const MAX_DIFF_BYTES = 50 * 1024 * 1024;
 /**
@@ -32,9 +32,9 @@ const MAX_DIFF_BYTES = 50 * 1024 * 1024;
  * changes are staged + committed transparently before the apply.
  */
 export async function applyBack(worktree, options = {}) {
-    const strategy = options.strategy ?? '3way';
-    const repoRoot = options.repoRoot ?? await getRepoRoot(worktree.repoRoot);
-    const message = options.message ?? `fleet: ${worktree.branch.split('/').pop() ?? 'agent'}`;
+    const strategy = options.strategy ?? "3way";
+    const repoRoot = options.repoRoot ?? (await getRepoRoot(worktree.repoRoot));
+    const message = options.message ?? `fleet: ${worktree.branch.split("/").pop() ?? "agent"}`;
     try {
         await commitDirty(worktree, message);
     }
@@ -42,80 +42,101 @@ export async function applyBack(worktree, options = {}) {
         return fail(strategy, `commit failed: ${errMsg(err)}`);
     }
     switch (strategy) {
-        case '3way': return apply3way(worktree, repoRoot, options.paths);
-        case 'merge': return applyMerge(worktree, repoRoot);
-        case 'cherry-pick': return applyCherryPick(worktree, repoRoot);
+        case "3way":
+            return apply3way(worktree, repoRoot, options.paths);
+        case "merge":
+            return applyMerge(worktree, repoRoot);
+        case "cherry-pick":
+            return applyCherryPick(worktree, repoRoot);
     }
 }
 /** Commit every dirty file in the worktree (stage+commit). */
 async function commitDirty(worktree, message) {
-    await pexec('git', ['add', '-A'], { cwd: worktree.path });
-    const { stdout } = await pexec('git', ['status', '--porcelain'], { cwd: worktree.path });
+    await pexec("git", ["add", "-A"], { cwd: worktree.path });
+    const { stdout } = await pexec("git", ["status", "--porcelain"], {
+        cwd: worktree.path,
+    });
     if (!stdout.trim())
         return;
-    await pexec('git', ['commit', '-m', message, '--allow-empty'], { cwd: worktree.path });
+    await pexec("git", ["commit", "-m", message, "--allow-empty"], {
+        cwd: worktree.path,
+    });
 }
 /* -------------------------- 3-way apply -------------------------- */
 async function apply3way(worktree, repoRoot, pathsFilter) {
-    const parentHead = await getHeadSha(repoRoot);
-    let diff = '';
+    // Use the fork-point SHA, not the live parent HEAD — if the parent branch
+    // has advanced since this worktree was created, diffing against live HEAD
+    // would include parent-side changes that the agent never saw.
+    const base = worktree.baseCommit;
+    let diff = "";
     try {
-        const args = ['diff', parentHead, 'HEAD'];
+        const args = ["diff", base, "HEAD"];
         if (pathsFilter && pathsFilter.length > 0) {
-            args.push('--', ...pathsFilter);
+            args.push("--", ...pathsFilter);
         }
-        const { stdout } = await pexec('git', args, {
+        const { stdout } = await pexec("git", args, {
             cwd: worktree.path,
             maxBuffer: MAX_DIFF_BYTES,
         });
         diff = stdout;
     }
     catch (err) {
-        return fail('3way', `diff failed: ${errMsg(err)}`);
+        return fail("3way", `diff failed: ${errMsg(err)}`);
     }
     if (!diff.trim()) {
-        return { success: true, strategy: '3way', appliedFiles: [], conflicts: [] };
+        return { success: true, strategy: "3way", appliedFiles: [], conflicts: [] };
     }
     const appliedFiles = extractDiffPaths(diff);
     const patchPath = join(tmpdir(), `fleet-${Date.now()}-${Math.random().toString(36).slice(2)}.patch`);
-    await writeFile(patchPath, diff, 'utf8');
+    await writeFile(patchPath, diff, "utf8");
     try {
-        await pexec('git', ['apply', '--3way', patchPath], { cwd: repoRoot });
-        return { success: true, strategy: '3way', appliedFiles, conflicts: [] };
+        await pexec("git", ["apply", "--3way", patchPath], { cwd: repoRoot });
+        return { success: true, strategy: "3way", appliedFiles, conflicts: [] };
     }
     catch (err) {
         const stderr = extractStderr(err);
         const conflicts = extractConflicts(stderr);
         return {
             success: conflicts.length === 0 && !stderr,
-            strategy: '3way',
+            strategy: "3way",
             appliedFiles,
             conflicts,
-            error: conflicts.length > 0 ? `${conflicts.length} conflict(s)` : stderr.slice(0, 500),
+            error: conflicts.length > 0
+                ? `${conflicts.length} conflict(s)`
+                : stderr.slice(0, 500),
         };
     }
     finally {
         try {
             await unlink(patchPath);
         }
-        catch { /* best effort */ }
+        catch {
+            /* best effort */
+        }
     }
 }
 /* --------------------------- Merge -------------------------------- */
 async function applyMerge(worktree, repoRoot) {
     try {
-        await pexec('git', ['merge', '--no-ff', '--no-edit', worktree.branch], { cwd: repoRoot });
+        await pexec("git", ["merge", "--no-ff", "--no-edit", worktree.branch], {
+            cwd: repoRoot,
+        });
         // Diff the just-created merge commit vs its first parent.
-        const { stdout } = await pexec('git', ['diff', '--name-only', 'HEAD~1..HEAD'], { cwd: repoRoot });
-        const appliedFiles = stdout.split('\n').map(s => s.trim()).filter(Boolean);
-        return { success: true, strategy: 'merge', appliedFiles, conflicts: [] };
+        const { stdout } = await pexec("git", ["diff", "--name-only", "HEAD~1..HEAD"], { cwd: repoRoot });
+        const appliedFiles = stdout
+            .split("\n")
+            .map((s) => s.trim())
+            .filter(Boolean);
+        return { success: true, strategy: "merge", appliedFiles, conflicts: [] };
     }
     catch (err) {
+        // Abort before returning — conflicts leave MERGE_HEAD on disk, blocking all future git ops.
+        await pexec("git", ["merge", "--abort"], { cwd: repoRoot }).catch(() => { });
         const stderr = extractStderr(err);
         const conflicts = extractConflicts(stderr);
         return {
             success: false,
-            strategy: 'merge',
+            strategy: "merge",
             appliedFiles: [],
             conflicts,
             error: stderr.slice(0, 500) || errMsg(err),
@@ -125,23 +146,44 @@ async function applyMerge(worktree, repoRoot) {
 /* ---------------------- Cherry-pick range ------------------------- */
 async function applyCherryPick(worktree, repoRoot) {
     try {
-        const parentHead = await getHeadSha(repoRoot);
-        const { stdout: revList } = await pexec('git', ['rev-list', `${parentHead}..HEAD`], { cwd: worktree.path });
-        const shas = revList.split('\n').map(s => s.trim()).filter(Boolean).reverse();
+        // baseCommit is the fork-point SHA — more reliable than live parentHead when
+        // the parent branch has received commits since this worktree was created.
+        const base = worktree.baseCommit;
+        const { stdout: revList } = await pexec("git", ["rev-list", `${base}..HEAD`], { cwd: worktree.path });
+        const shas = revList
+            .split("\n")
+            .map((s) => s.trim())
+            .filter(Boolean)
+            .reverse();
         if (shas.length === 0) {
-            return { success: true, strategy: 'cherry-pick', appliedFiles: [], conflicts: [] };
+            return {
+                success: true,
+                strategy: "cherry-pick",
+                appliedFiles: [],
+                conflicts: [],
+            };
         }
-        await pexec('git', ['cherry-pick', ...shas], { cwd: repoRoot });
-        const { stdout } = await pexec('git', ['diff', '--name-only', `HEAD~${shas.length}..HEAD`], { cwd: repoRoot });
-        const appliedFiles = stdout.split('\n').map(s => s.trim()).filter(Boolean);
-        return { success: true, strategy: 'cherry-pick', appliedFiles, conflicts: [] };
+        await pexec("git", ["cherry-pick", ...shas], { cwd: repoRoot });
+        const { stdout } = await pexec("git", ["diff", "--name-only", `HEAD~${shas.length}..HEAD`], { cwd: repoRoot });
+        const appliedFiles = stdout
+            .split("\n")
+            .map((s) => s.trim())
+            .filter(Boolean);
+        return {
+            success: true,
+            strategy: "cherry-pick",
+            appliedFiles,
+            conflicts: [],
+        };
     }
     catch (err) {
+        // Abort the in-progress cherry-pick so subsequent git commands work.
+        await pexec("git", ["cherry-pick", "--abort"], { cwd: repoRoot }).catch(() => { });
         const stderr = extractStderr(err);
         const conflicts = extractConflicts(stderr);
         return {
             success: false,
-            strategy: 'cherry-pick',
+            strategy: "cherry-pick",
             appliedFiles: [],
             conflicts,
             error: stderr.slice(0, 500) || errMsg(err),
@@ -152,7 +194,7 @@ async function applyCherryPick(worktree, repoRoot) {
 function extractDiffPaths(diff) {
     const seen = new Set();
     for (const m of diff.matchAll(/^diff --git a\/(.+?) b\/(.+?)$/gm)) {
-        seen.add(m[2] ?? m[1] ?? '');
+        seen.add(m[2] ?? m[1] ?? "");
     }
     return [...seen].filter(Boolean);
 }
@@ -167,15 +209,15 @@ function extractConflicts(stderr) {
     return [...conflicts];
 }
 function extractStderr(err) {
-    if (err && typeof err === 'object') {
+    if (err && typeof err === "object") {
         const e = err;
-        if (typeof e.stderr === 'string')
+        if (typeof e.stderr === "string")
             return e.stderr;
         if (Buffer.isBuffer(e.stderr))
-            return e.stderr.toString('utf8');
-        if (typeof e.stdout === 'string')
+            return e.stderr.toString("utf8");
+        if (typeof e.stdout === "string")
             return e.stdout;
-        if (typeof e.message === 'string')
+        if (typeof e.message === "string")
             return e.message;
     }
     return String(err);

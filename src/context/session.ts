@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { createReadStream } from "node:fs";
 import type { Message, UsageTotal } from "../kernel/types.js";
+import { dbOpenSession, dbAppendMessage } from "../state/db.js";
 
 export type SessionEntry =
   | { type: "message"; ts: string; message: Message }
@@ -49,6 +50,7 @@ export class SessionStore {
       .then(() => true)
       .catch(() => false);
     if (!exists) await writeFile(path, "", "utf8");
+    void Promise.resolve().then(() => dbOpenSession(id));
     return new SessionImpl(id, path);
   }
 
@@ -84,6 +86,9 @@ class SessionImpl implements Session {
 
   async append(entry: SessionEntry): Promise<void> {
     await appendFile(this.path, `${JSON.stringify(entry)}\n`, "utf8");
+    if (entry.type === "message") {
+      void Promise.resolve().then(() => dbAppendMessage(this.id, entry.message));
+    }
   }
 
   async *replay(): AsyncIterable<SessionEntry> {

@@ -4,60 +4,62 @@
  * default ruleset ships in-code; user and project rules are merged at
  * config load time.
  */
-import { resolve } from 'node:path';
+import { resolve } from "node:path";
 export const DEFAULT_RULES = [
     {
-        id: 'read-inside-cwd',
-        applies: { actions: ['read'] },
+        id: "read-inside-cwd",
+        applies: { actions: ["read"] },
         when: { outsideCwd: false },
-        effect: 'allow',
-        reason: 'reads inside the working directory are permitted without prompting',
+        effect: "allow",
+        reason: "reads inside the working directory are permitted without prompting",
     },
     {
-        id: 'read-outside-cwd',
-        applies: { actions: ['read'] },
+        id: "read-outside-cwd",
+        applies: { actions: ["read"] },
         when: { outsideCwd: true },
-        effect: 'require_approval',
-        reason: 'reading outside the working directory requires approval',
+        effect: "require_approval",
+        reason: "reading outside the working directory requires approval",
     },
     {
-        id: 'write-inside-cwd',
-        applies: { actions: ['write'] },
+        id: "write-inside-cwd",
+        applies: { actions: ["write"] },
         when: { outsideCwd: false },
-        effect: 'require_approval',
-        reason: 'writes inside the working directory require approval',
+        effect: "require_approval",
+        reason: "writes inside the working directory require approval",
     },
     {
-        id: 'write-outside-cwd',
-        applies: { actions: ['write'] },
+        id: "write-outside-cwd",
+        applies: { actions: ["write"] },
         when: { outsideCwd: true },
-        effect: 'deny',
-        reason: 'writes outside the working directory are forbidden by default',
+        effect: "deny",
+        reason: "writes outside the working directory are forbidden by default",
     },
     {
-        id: 'delete',
-        applies: { actions: ['delete'] },
-        effect: 'require_approval',
-        reason: 'deletions require approval',
+        id: "delete",
+        applies: { actions: ["delete"] },
+        effect: "require_approval",
+        reason: "deletions require approval",
     },
     {
-        id: 'exec-danger-force',
-        applies: { actions: ['exec'] },
-        when: { commandMatches: '(?:rm -rf|git push --force|git reset --hard|DROP TABLE|kubectl delete)' },
-        effect: 'require_approval',
-        reason: 'potentially destructive command requires explicit approval',
+        id: "exec-danger-force",
+        applies: { actions: ["exec"] },
+        when: {
+            commandMatches: "(?:rm -rf|git push --force|git reset --hard|DROP TABLE|kubectl delete)",
+        },
+        effect: "require_approval",
+        reason: "potentially destructive command requires explicit approval",
     },
     {
-        id: 'exec-default',
-        applies: { actions: ['exec'] },
-        effect: 'require_approval',
-        reason: 'shell execution requires approval',
+        id: "exec-default",
+        applies: { actions: ["exec"] },
+        effect: "require_approval",
+        reason: "shell execution requires approval",
     },
     {
-        id: 'network-default',
-        applies: { actions: ['network'] },
-        effect: 'require_approval',
-        reason: 'network access requires approval',
+        id: "network-default",
+        applies: { actions: ["network"] },
+        effect: "require_approval",
+        reason: "network access requires approval",
     },
 ];
 export function createPolicyEngine(opts) {
@@ -73,7 +75,7 @@ export function createPolicyEngine(opts) {
         }
         return {
             allowed: true,
-            reason: 'default catch-all allow-with-approval',
+            reason: "default catch-all allow-with-approval",
             requiresApproval: true,
         };
     };
@@ -90,7 +92,7 @@ function conditionMatches(cond, req, cwd) {
     if (!cond)
         return true;
     if (cond.outsideCwd !== undefined) {
-        const inside = isInside(cwd, req.target);
+        const inside = isInside(cwd, req.target, cwd);
         if (cond.outsideCwd && inside)
             return false;
         if (!cond.outsideCwd && !inside)
@@ -112,20 +114,31 @@ function conditionMatches(cond, req, cwd) {
 }
 function decisionFor(rule) {
     switch (rule.effect) {
-        case 'allow':
-            return { allowed: true, reason: `${rule.id}: ${rule.reason}`, requiresApproval: false };
-        case 'deny':
-            return { allowed: false, reason: `${rule.id}: ${rule.reason}`, requiresApproval: false };
-        case 'require_approval':
-            return { allowed: true, reason: `${rule.id}: ${rule.reason}`, requiresApproval: true };
+        case "allow":
+            return {
+                allowed: true,
+                reason: `${rule.id}: ${rule.reason}`,
+                requiresApproval: false,
+            };
+        case "deny":
+            return {
+                allowed: false,
+                reason: `${rule.id}: ${rule.reason}`,
+                requiresApproval: false,
+            };
+        case "require_approval":
+            return {
+                allowed: true,
+                reason: `${rule.id}: ${rule.reason}`,
+                requiresApproval: true,
+            };
     }
 }
-function isInside(root, target) {
+function isInside(root, target, cwd) {
     if (!target)
         return false;
-    if (!target.startsWith('/'))
-        return true;
-    const normRoot = root.replace(/\/+$/, '');
-    return target === normRoot || target.startsWith(`${normRoot}/`);
+    const resolved = resolve(cwd, target);
+    const normRoot = root.replace(/\/+$/, "");
+    return resolved === normRoot || resolved.startsWith(`${normRoot}/`);
 }
 //# sourceMappingURL=policy.js.map

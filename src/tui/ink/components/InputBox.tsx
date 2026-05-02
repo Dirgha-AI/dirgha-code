@@ -171,7 +171,7 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
       }
       props.onChange(sanitized);
     },
-    [props],
+    [props.onChange],
   );
 
   useInput(

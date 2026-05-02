@@ -17,12 +17,12 @@
  * tools so the user knows what to install.
  */
 
-import { spawnSync } from 'node:child_process';
-import { writeFileSync, mkdirSync } from 'node:fs';
-import { homedir, tmpdir, platform } from 'node:os';
-import { join } from 'node:path';
-import { randomUUID } from 'node:crypto';
-import type { SlashCommand } from './types.js';
+import { spawnSync } from "node:child_process";
+import { writeFileSync, mkdirSync } from "node:fs";
+import { homedir, tmpdir, platform } from "node:os";
+import { join } from "node:path";
+import { randomUUID } from "node:crypto";
+import type { SlashCommand } from "./types.js";
 
 interface ClipboardImage {
   ok: true;
@@ -44,63 +44,123 @@ type ClipboardResult = ClipboardImage | ClipboardText | ClipboardError;
 function readClipboardImage(): ClipboardResult {
   const plat = platform();
   // macOS — pngpaste retrieves an image; falls back to pbpaste (text).
-  if (plat === 'darwin') {
+  if (plat === "darwin") {
     const tmp = join(tmpdir(), `dirgha-paste-${randomUUID()}.png`);
-    const png = spawnSync('pngpaste', [tmp]);
+    const png = spawnSync("pngpaste", [tmp]);
     if (png.status === 0) {
       try {
-        const fs = require('node:fs') as typeof import('node:fs');
+        const fs = require("node:fs") as typeof import("node:fs");
         const st = fs.statSync(tmp);
-        return { ok: true, path: tmp, bytes: st.size, mime: 'image/png' };
-      } catch { /* fall through */ }
+        return { ok: true, path: tmp, bytes: st.size, mime: "image/png" };
+      } catch {
+        /* fall through */
+      }
     }
-    const txt = spawnSync('pbpaste', [], { encoding: 'utf8' });
-    if (txt.status === 0 && typeof txt.stdout === 'string' && txt.stdout.length > 0) {
+    const txt = spawnSync("pbpaste", [], { encoding: "utf8" });
+    if (
+      txt.status === 0 &&
+      typeof txt.stdout === "string" &&
+      txt.stdout.length > 0
+    ) {
       return { ok: true, text: txt.stdout };
     }
-    return { ok: false, error: 'macOS: install `pngpaste` (brew install pngpaste) to paste images. Text paste needs `pbpaste`.' };
+    return {
+      ok: false,
+      error:
+        "macOS: install `pngpaste` (brew install pngpaste) to paste images. Text paste needs `pbpaste`.",
+    };
   }
   // Linux Wayland → wl-paste
-  if (plat === 'linux') {
+  if (plat === "linux") {
     const tmp = join(tmpdir(), `dirgha-paste-${randomUUID()}.png`);
-    const wl = spawnSync('wl-paste', ['--type', 'image/png', '-o', tmp]);
+    const wl = spawnSync("wl-paste", ["--type", "image/png", "-o", tmp]);
     if (wl.status === 0) {
       try {
-        const fs = require('node:fs') as typeof import('node:fs');
+        const fs = require("node:fs") as typeof import("node:fs");
         const st = fs.statSync(tmp);
-        if (st.size > 0) return { ok: true, path: tmp, bytes: st.size, mime: 'image/png' };
-      } catch { /* */ }
+        if (st.size > 0)
+          return { ok: true, path: tmp, bytes: st.size, mime: "image/png" };
+      } catch {
+        /* */
+      }
     }
     // X11 → xclip image target
-    const xc = spawnSync('xclip', ['-selection', 'clipboard', '-t', 'image/png', '-o'], { encoding: 'buffer' });
-    if (xc.status === 0 && Buffer.isBuffer(xc.stdout) && xc.stdout.length > 100) {
+    const xc = spawnSync(
+      "xclip",
+      ["-selection", "clipboard", "-t", "image/png", "-o"],
+      { encoding: "buffer" },
+    );
+    if (
+      xc.status === 0 &&
+      Buffer.isBuffer(xc.stdout) &&
+      xc.stdout.length > 100
+    ) {
       writeFileSync(tmp, xc.stdout);
-      return { ok: true, path: tmp, bytes: xc.stdout.length, mime: 'image/png' };
+      return {
+        ok: true,
+        path: tmp,
+        bytes: xc.stdout.length,
+        mime: "image/png",
+      };
     }
     // Fallback to text
-    const wlText = spawnSync('wl-paste', [], { encoding: 'utf8' });
-    if (wlText.status === 0 && wlText.stdout) return { ok: true, text: wlText.stdout };
-    const xcText = spawnSync('xclip', ['-selection', 'clipboard', '-o'], { encoding: 'utf8' });
-    if (xcText.status === 0 && xcText.stdout) return { ok: true, text: xcText.stdout };
-    return { ok: false, error: 'Linux: install `wl-paste` (Wayland: wl-clipboard pkg) or `xclip` (X11). For image paste both must be present.' };
+    const wlText = spawnSync("wl-paste", [], { encoding: "utf8" });
+    if (wlText.status === 0 && wlText.stdout)
+      return { ok: true, text: wlText.stdout };
+    const xcText = spawnSync("xclip", ["-selection", "clipboard", "-o"], {
+      encoding: "utf8",
+    });
+    if (xcText.status === 0 && xcText.stdout)
+      return { ok: true, text: xcText.stdout };
+    return {
+      ok: false,
+      error:
+        "Linux: install `wl-paste` (Wayland: wl-clipboard pkg) or `xclip` (X11). For image paste both must be present.",
+    };
   }
   // Windows — clip.exe is OUTPUT-only; image paste needs PowerShell.
-  if (plat === 'win32') {
+  if (plat === "win32") {
     const tmp = join(tmpdir(), `dirgha-paste-${randomUUID()}.png`);
-    const ps = spawnSync('powershell.exe', ['-Command', `Add-Type -AssemblyName System.Windows.Forms; $img = [System.Windows.Forms.Clipboard]::GetImage(); if ($img) { $img.Save('${tmp.replace(/'/g, "''")}'); Write-Host 'OK' } else { Write-Host 'NOIMAGE' }`], { encoding: 'utf8' });
-    if (ps.status === 0 && /OK/.test(ps.stdout || '')) {
+    // Use base64-encoded PowerShell to prevent command injection through
+    // the tmp path. The path is passed via -EncodedCommand which is a
+    // safe binary argument, not interpolated into the script string.
+    const script = `Add-Type -AssemblyName System.Windows.Forms; $img = [System.Windows.Forms.Clipboard]::GetImage(); if ($img) { $img.Save([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('${Buffer.from(tmp, "utf8").toString("base64")}'))); Write-Host 'OK' } else { Write-Host 'NOIMAGE' }`;
+    const ps = spawnSync(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-EncodedCommand",
+        Buffer.from(script, "utf16le").toString("base64"),
+      ],
+      { encoding: "utf8" },
+    );
+    if (ps.status === 0 && /OK/.test(ps.stdout || "")) {
       try {
-        const fs = require('node:fs') as typeof import('node:fs');
+        const fs = require("node:fs") as typeof import("node:fs");
         const st = fs.statSync(tmp);
-        return { ok: true, path: tmp, bytes: st.size, mime: 'image/png' };
-      } catch { /* */ }
+        return { ok: true, path: tmp, bytes: st.size, mime: "image/png" };
+      } catch {
+        /* */
+      }
     }
     // Text fallback
-    const txt = spawnSync('powershell.exe', ['-Command', 'Get-Clipboard -Raw'], { encoding: 'utf8' });
-    if (txt.status === 0 && typeof txt.stdout === 'string' && txt.stdout.length > 0) {
+    const txt = spawnSync(
+      "powershell.exe",
+      ["-Command", "Get-Clipboard -Raw"],
+      { encoding: "utf8" },
+    );
+    if (
+      txt.status === 0 &&
+      typeof txt.stdout === "string" &&
+      txt.stdout.length > 0
+    ) {
       return { ok: true, text: txt.stdout };
     }
-    return { ok: false, error: 'Windows: PowerShell clipboard read failed. Make sure something is copied first.' };
+    return {
+      ok: false,
+      error:
+        "Windows: PowerShell clipboard read failed. Make sure something is copied first.",
+    };
   }
   return { ok: false, error: `unsupported platform: ${plat}` };
 }
@@ -112,23 +172,34 @@ function readClipboardImage(): ClipboardResult {
  * the next user turn. Idempotent — overwritten on each call.
  */
 function recordPending(result: ClipboardImage | ClipboardText): void {
-  const dir = join(homedir(), '.dirgha');
+  const dir = join(homedir(), ".dirgha");
   mkdirSync(dir, { recursive: true });
-  const path = join(dir, 'pending-paste.json');
-  const body = 'path' in result
-    ? { kind: 'image', path: result.path, mime: result.mime, bytes: result.bytes, ts: new Date().toISOString() }
-    : { kind: 'text', text: result.text.slice(0, 4000), ts: new Date().toISOString() };
+  const path = join(dir, "pending-paste.json");
+  const body =
+    "path" in result
+      ? {
+          kind: "image",
+          path: result.path,
+          mime: result.mime,
+          bytes: result.bytes,
+          ts: new Date().toISOString(),
+        }
+      : {
+          kind: "text",
+          text: result.text.slice(0, 4000),
+          ts: new Date().toISOString(),
+        };
   writeFileSync(path, JSON.stringify(body, null, 2));
 }
 
 export const pasteCommand: SlashCommand = {
-  name: 'paste',
-  description: 'Paste from system clipboard (image or text) into the next turn',
+  name: "paste",
+  description: "Paste from system clipboard (image or text) into the next turn",
   async execute(_args, _ctx) {
     const r = readClipboardImage();
     if (!r.ok) return `clipboard: ${r.error}`;
     recordPending(r);
-    if ('path' in r) {
+    if ("path" in r) {
       return `clipboard image attached (${(r.bytes / 1024).toFixed(1)} KB ${r.mime}). It will be sent with your next message.\nFile: ${r.path}`;
     }
     return `clipboard text attached (${r.text.length} chars). It will be sent with your next message.`;

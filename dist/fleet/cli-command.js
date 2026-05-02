@@ -21,11 +21,13 @@
  *   fleet triple <goal…>       — tripleshot + judge
  *   fleet cleanup              — remove every fleet/ worktree
  */
-import { createEventStream } from '../kernel/event-stream.js';
-import { runFleet } from './runner.js';
-import { runTripleshot } from './tripleshot.js';
-import { applyBack } from './apply-back.js';
-import { createWorktree, deleteBranch, destroyWorktree, detachFromCleanup, getRepoRoot, listWorktrees, } from './worktree.js';
+import { existsSync } from "node:fs";
+import { createEventStream } from "../kernel/event-stream.js";
+import { runFleet } from "./runner.js";
+import { runTripleshot } from "./tripleshot.js";
+import { applyBack } from "./apply-back.js";
+import { createWorktree, deleteBranch, destroyWorktree, detachFromCleanup, getRepoRoot, listWorktrees, } from "./worktree.js";
+import { findLatestState, readFleetState } from "./state.js";
 /**
  * Entry point for `dirgha fleet …` — returns a POSIX exit code.
  * `argv` is the list of tokens AFTER the `fleet` verb.
@@ -34,17 +36,25 @@ export async function fleetCommand(argv, opts = {}) {
     const [sub, ...rest] = argv;
     switch (sub) {
         case undefined:
-        case '--help':
-        case '-h':
-        case 'help':
+        case "--help":
+        case "-h":
+        case "help":
             printHelp();
             return 0;
-        case 'launch': return doLaunch(rest, opts);
-        case 'triple': return doTriple(rest, opts);
-        case 'list': return doList(opts);
-        case 'merge': return doMerge(rest, opts);
-        case 'discard': return doDiscard(rest, opts);
-        case 'cleanup': return doCleanup(opts);
+        case "launch":
+            return doLaunch(rest, opts);
+        case "resume":
+            return doResume(rest, opts);
+        case "triple":
+            return doTriple(rest, opts);
+        case "list":
+            return doList(opts);
+        case "merge":
+            return doMerge(rest, opts);
+        case "discard":
+            return doDiscard(rest, opts);
+        case "cleanup":
+            return doCleanup(opts);
         default:
             process.stderr.write(`fleet: unknown subcommand "${sub}"\n`);
             printHelp();
@@ -60,40 +70,48 @@ async function doLaunch(argv, opts) {
     // `--auto-merge`, `--strategy=<kind>`. Anything else with a leading
     // `-` is dropped from the goal so it doesn't end up in the subtask
     // title.
-    const FLAG_TAKES_VALUE = new Set(['-m', '--model', '--max-turns', '--concurrency', '--planner', '--strategy', '--timeout-ms']);
+    const FLAG_TAKES_VALUE = new Set([
+        "-m",
+        "--model",
+        "--max-turns",
+        "--concurrency",
+        "--planner",
+        "--strategy",
+        "--timeout-ms",
+    ]);
     const positional = [];
     let single = false;
     let branchOverride;
     for (let i = 0; i < argv.length; i++) {
         const a = argv[i];
-        if (a === '--single') {
+        if (a === "--single") {
             single = true;
             continue;
         }
-        if (a.startsWith('--branch=')) {
-            branchOverride = a.slice('--branch='.length);
+        if (a.startsWith("--branch=")) {
+            branchOverride = a.slice("--branch=".length);
             continue;
         }
-        if (a === '--branch') {
+        if (a === "--branch") {
             branchOverride = argv[i + 1];
             i++;
             continue;
         }
-        if (a === '--verbose' || a === '--json' || a === '--auto-merge') {
+        if (a === "--verbose" || a === "--json" || a === "--auto-merge") {
             continue;
         }
         if (FLAG_TAKES_VALUE.has(a)) {
             i++;
             continue;
         } // skip flag + its value
-        if (a.startsWith('-')) {
+        if (a.startsWith("-")) {
             continue;
         } // unknown flag, drop
         positional.push(a);
     }
-    const goal = positional.join(' ').trim();
+    const goal = positional.join(" ").trim();
     if (!goal) {
-        process.stderr.write('usage: dirgha fleet launch [--single] [--branch=<name>] <goal>\n');
+        process.stderr.write("usage: dirgha fleet launch [--single] [--branch=<name>] <goal>\n");
         return 1;
     }
     const events = createEventStream();
@@ -109,19 +127,102 @@ async function doLaunch(argv, opts) {
         timeoutMs: opts.timeoutMs,
         events,
         verbose: opts.verbose,
-        ...(single ? { subtasks: [{ id: branchOverride ?? 'task', title: goal, task: goal, type: 'code' }] } : {}),
+        ...(single
+            ? {
+                subtasks: [
+                    {
+                        id: branchOverride ?? "task",
+                        title: goal,
+                        task: goal,
+                        type: "code",
+                    },
+                ],
+            }
+            : {}),
     };
     process.stderr.write(single
         ? `[fleet] launching single-task agent…\n`
         : `[fleet] decomposing and launching…\n`);
     const result = await runFleet(config);
-    emitResult('launch', result, opts);
+    emitResult("launch", result, opts);
+    return result.failCount > 0 && result.successCount === 0 ? 1 : 0;
+}
+async function doResume(argv, opts) {
+    const arg = argv[0];
+    if (!arg) {
+        process.stderr.write("usage: dirgha fleet resume <goal-substring|state-file.json> [--skip-failed]\n");
+        return 1;
+    }
+    const skipFailed = argv.includes("--skip-failed");
+    // Resolve state file.
+    let statePath;
+    if (arg.endsWith(".json") && existsSync(arg)) {
+        statePath = arg;
+    }
+    else {
+        statePath = await findLatestState(arg);
+        if (!statePath) {
+            process.stderr.write(`fleet resume: no state file found matching "${arg}" in ~/.dirgha/fleet-state/\n`);
+            return 1;
+        }
+    }
+    const state = await readFleetState(statePath);
+    process.stderr.write(`[fleet] resuming run ${state.runId} — goal: ${state.goal}\n`);
+    // Partition agents.
+    const toRun = state.agents.filter((a) => {
+        if (a.status === "completed")
+            return false;
+        if ((a.status === "failed" || a.status === "cancelled") && skipFailed)
+            return false;
+        return true;
+    });
+    if (!toRun.length) {
+        process.stdout.write("All agents already completed. Nothing to resume.\n");
+        return 0;
+    }
+    const cwd = opts.cwd ?? process.cwd();
+    const events = createEventStream();
+    if (opts.verbose)
+        subscribeVerbose(events);
+    // Rebuild FleetAgent objects from state. Agents that were `running` when
+    // the process died restart as pending — their branch has prior commits.
+    const agents = toRun.map((s) => ({
+        id: s.id,
+        subtask: {
+            ...s.subtask,
+            task: s.status === "running"
+                ? `[RESUMING] Your prior run was interrupted mid-turn. Check \`git log --oneline -5\` to see prior commits. Continue from where you left off.\n\n${s.subtask.task}`
+                : s.subtask.task,
+        },
+        status: "pending",
+        worktreePath: s.worktreePath,
+        branchName: s.branchName,
+        startedAt: 0,
+        output: "",
+        bytesWritten: 0,
+        usage: { inputTokens: 0, outputTokens: 0, cachedTokens: 0, costUsd: 0 },
+    }));
+    const config = {
+        goal: state.goal,
+        subtasks: agents.map((a) => a.subtask),
+        cwd,
+        model: opts.model ?? state.model,
+        maxTurns: opts.maxTurns ?? state.maxTurns,
+        concurrency: opts.concurrency ?? 3,
+        timeoutMs: opts.timeoutMs ?? state.timeoutMs,
+        events,
+        verbose: opts.verbose,
+        runId: state.runId,
+        reuseBranch: true, // check out existing branches, do NOT delete prior commits
+    };
+    const result = await runFleet(config);
+    emitResult("resume", result, opts);
     return result.failCount > 0 && result.successCount === 0 ? 1 : 0;
 }
 async function doTriple(argv, opts) {
-    const goal = argv.join(' ').trim();
+    const goal = argv.join(" ").trim();
     if (!goal) {
-        process.stderr.write('usage: dirgha fleet triple <goal>\n');
+        process.stderr.write("usage: dirgha fleet triple <goal>\n");
         return 1;
     }
     const events = createEventStream();
@@ -143,12 +244,12 @@ async function doTriple(argv, opts) {
 }
 async function doList(opts) {
     const repoRoot = await getRepoRoot(opts.cwd ?? process.cwd());
-    const wts = (await listWorktrees(repoRoot)).filter(w => w.branch.startsWith('fleet/'));
+    const wts = (await listWorktrees(repoRoot)).filter((w) => w.branch.startsWith("fleet/"));
     if (opts.json) {
         process.stdout.write(`${JSON.stringify({ worktrees: wts }, null, 2)}\n`);
     }
     else if (wts.length === 0) {
-        process.stdout.write('No fleet worktrees.\n');
+        process.stdout.write("No fleet worktrees.\n");
     }
     else {
         process.stdout.write(`Fleet worktrees (${wts.length}):\n`);
@@ -161,19 +262,19 @@ async function doList(opts) {
 async function doMerge(argv, opts) {
     const target = argv[0];
     if (!target) {
-        process.stderr.write('usage: dirgha fleet merge <branch|agent-id>\n');
+        process.stderr.write("usage: dirgha fleet merge <branch|agent-id>\n");
         return 1;
     }
     const repoRoot = await getRepoRoot(opts.cwd ?? process.cwd());
-    const wt = (await listWorktrees(repoRoot)).find(w => w.branch === target
-        || w.branch.endsWith(`/${target}`)
-        || w.branch.includes(`/${target}`));
+    const wt = (await listWorktrees(repoRoot)).find((w) => w.branch === target ||
+        w.branch.endsWith(`/${target}`) ||
+        w.branch.includes(`/${target}`));
     if (!wt) {
         process.stderr.write(`fleet: no worktree found for "${target}". Try \`dirgha fleet list\`.\n`);
         return 1;
     }
     const result = await applyBack(wt, {
-        strategy: opts.strategy ?? '3way',
+        strategy: opts.strategy ?? "3way",
         message: `fleet: ${target}`,
         repoRoot,
     });
@@ -184,9 +285,9 @@ async function doMerge(argv, opts) {
         process.stdout.write(`Applied ${result.appliedFiles.length} file(s) via ${result.strategy}. Review with \`git diff\`.\n`);
     }
     else {
-        process.stderr.write(`fleet: merge failed — ${result.error ?? 'unknown error'}\n`);
+        process.stderr.write(`fleet: merge failed — ${result.error ?? "unknown error"}\n`);
         if (result.conflicts.length) {
-            process.stderr.write(`Conflicts:\n${result.conflicts.map(c => `  - ${c}`).join('\n')}\n`);
+            process.stderr.write(`Conflicts:\n${result.conflicts.map((c) => `  - ${c}`).join("\n")}\n`);
         }
     }
     return result.success ? 0 : 1;
@@ -194,13 +295,13 @@ async function doMerge(argv, opts) {
 async function doDiscard(argv, opts) {
     const target = argv[0];
     if (!target) {
-        process.stderr.write('usage: dirgha fleet discard <branch|agent-id>\n');
+        process.stderr.write("usage: dirgha fleet discard <branch|agent-id>\n");
         return 1;
     }
     const repoRoot = await getRepoRoot(opts.cwd ?? process.cwd());
-    const wt = (await listWorktrees(repoRoot)).find(w => w.branch === target
-        || w.branch.endsWith(`/${target}`)
-        || w.branch.includes(`/${target}`));
+    const wt = (await listWorktrees(repoRoot)).find((w) => w.branch === target ||
+        w.branch.endsWith(`/${target}`) ||
+        w.branch.includes(`/${target}`));
     if (!wt) {
         process.stderr.write(`fleet: no worktree found for "${target}".\n`);
         return 1;
@@ -217,7 +318,7 @@ async function doDiscard(argv, opts) {
 }
 async function doCleanup(opts) {
     const repoRoot = await getRepoRoot(opts.cwd ?? process.cwd());
-    const wts = (await listWorktrees(repoRoot)).filter(w => w.branch.startsWith('fleet/'));
+    const wts = (await listWorktrees(repoRoot)).filter((w) => w.branch.startsWith("fleet/"));
     let removed = 0;
     for (const w of wts) {
         try {
@@ -225,7 +326,9 @@ async function doCleanup(opts) {
             await deleteBranch(repoRoot, w.branch, true);
             removed++;
         }
-        catch { /* skip */ }
+        catch {
+            /* skip */
+        }
     }
     process.stdout.write(`Removed ${removed}/${wts.length} fleet worktrees.\n`);
     return 0;
@@ -239,25 +342,31 @@ function emitResult(phase, r, opts) {
     process.stdout.write(`\nFleet done: ${r.successCount}/${r.agents.length} succeeded · ${Math.floor(r.durationMs / 1000)}s\n`);
     let noopCount = 0;
     for (const a of r.agents) {
-        const noop = a.status === 'completed' && (a.toolExecCount ?? 0) === 0;
+        const noop = a.status === "completed" && (a.toolExecCount ?? 0) === 0;
         if (noop)
             noopCount++;
-        const dot = a.status === 'completed'
-            ? (noop ? '⚠' : '✓')
-            : a.status === 'failed' ? '✗'
-                : a.status === 'cancelled' ? '⊘'
-                    : '·';
+        const dot = a.status === "completed"
+            ? noop
+                ? "⚠"
+                : "✓"
+            : a.status === "failed"
+                ? "✗"
+                : a.status === "cancelled"
+                    ? "⊘"
+                    : "·";
         const dur = a.completedAt && a.startedAt
             ? `${Math.floor((a.completedAt - a.startedAt) / 1000)}s`
-            : '';
-        const toolNote = noop ? ' (no tool calls — likely hallucinated)' : '';
+            : "";
+        const toolNote = noop ? " (no tool calls — likely hallucinated)" : "";
         process.stdout.write(`  ${dot} ${a.subtask.title.padEnd(40)} ${a.branchName.padEnd(30)} ${dur}${toolNote}\n`);
     }
     if (noopCount > 0) {
         process.stdout.write(`\n⚠  ${noopCount} agent(s) finished without invoking any tool. Re-run with a stronger model or a more specific prompt — current LLM may be hallucinating completion.\n`);
     }
-    if (r.failed.length === 0 && r.successCount > 0 && noopCount < r.agents.length) {
-        process.stdout.write('\nNext:\n  dirgha fleet list\n  dirgha fleet merge <branch>\n  dirgha fleet discard <branch>\n');
+    if (r.failed.length === 0 &&
+        r.successCount > 0 &&
+        noopCount < r.agents.length) {
+        process.stdout.write("\nNext:\n  dirgha fleet list\n  dirgha fleet merge <branch>\n  dirgha fleet discard <branch>\n");
     }
 }
 function emitTripleshot(r, opts) {
@@ -265,8 +374,8 @@ function emitTripleshot(r, opts) {
         process.stdout.write(`${JSON.stringify(r, null, 2)}\n`);
         return;
     }
-    process.stdout.write(`\nTripleShot: ${r.winner ?? '(none)'}\n`);
-    process.stdout.write(`  runner-up: ${r.runnerUp ?? '(none)'}\n`);
+    process.stdout.write(`\nTripleShot: ${r.winner ?? "(none)"}\n`);
+    process.stdout.write(`  runner-up: ${r.runnerUp ?? "(none)"}\n`);
     process.stdout.write(`  reason:    ${r.reason}\n`);
     if (r.apply) {
         if (r.apply.success) {
@@ -278,10 +387,10 @@ function emitTripleshot(r, opts) {
     }
 }
 function subscribeVerbose(events) {
-    events.subscribe(ev => {
-        if (ev.type === 'text_delta')
+    events.subscribe((ev) => {
+        if (ev.type === "text_delta")
             process.stderr.write(ev.delta);
-        else if (ev.type === 'error')
+        else if (ev.type === "error")
             process.stderr.write(`\n[err] ${ev.message}\n`);
     });
 }
@@ -316,7 +425,11 @@ export function registerFleetSlash(registry, opts = {}) {
     const fleetHandler = async (args) => {
         const captured = captureStdout();
         try {
-            await fleetCommand(args, { cwd: opts.cwd, model: opts.model, plannerModel: opts.plannerModel });
+            await fleetCommand(args, {
+                cwd: opts.cwd,
+                model: opts.model,
+                plannerModel: opts.plannerModel,
+            });
         }
         finally {
             captured.restore();
@@ -326,8 +439,10 @@ export function registerFleetSlash(registry, opts = {}) {
     const tripleHandler = async (args) => {
         const captured = captureStdout();
         try {
-            await fleetCommand(['triple', ...args], {
-                cwd: opts.cwd, model: opts.model, plannerModel: opts.plannerModel,
+            await fleetCommand(["triple", ...args], {
+                cwd: opts.cwd,
+                model: opts.model,
+                plannerModel: opts.plannerModel,
             });
         }
         finally {
@@ -338,26 +453,28 @@ export function registerFleetSlash(registry, opts = {}) {
     const worktreesHandler = async () => {
         const captured = captureStdout();
         try {
-            await fleetCommand(['list'], { cwd: opts.cwd });
+            await fleetCommand(["list"], { cwd: opts.cwd });
         }
         finally {
             captured.restore();
         }
         return captured.stdout || undefined;
     };
-    registry.register('fleet', fleetHandler);
-    registry.register('triple', tripleHandler);
-    registry.register('worktrees', worktreesHandler);
+    registry.register("fleet", fleetHandler);
+    registry.register("triple", tripleHandler);
+    registry.register("worktrees", worktreesHandler);
 }
 function captureStdout() {
-    const original = process.stdout.write.bind(process.stdout);
-    let buffer = '';
-    process.stdout.write = ((chunk) => {
-        buffer += typeof chunk === 'string' ? chunk : String(chunk);
+    const original = process.stdout.write;
+    let buffer = "";
+    process.stdout.write = (chunk) => {
+        buffer += typeof chunk === "string" ? chunk : String(chunk);
         return true;
-    });
+    };
     return {
-        get stdout() { return buffer; },
+        get stdout() {
+            return buffer;
+        },
         restore() {
             process.stdout.write = original;
         },
@@ -368,8 +485,8 @@ function captureStdout() {
  * (e.g. scripts wrapping fleet).
  */
 export async function openWorktreeByBranch(branch, opts = {}) {
-    const repoRoot = opts.repoRoot ?? await getRepoRoot(opts.cwd ?? process.cwd());
-    const existing = (await listWorktrees(repoRoot)).find(w => w.branch === branch);
+    const repoRoot = opts.repoRoot ?? (await getRepoRoot(opts.cwd ?? process.cwd()));
+    const existing = (await listWorktrees(repoRoot)).find((w) => w.branch === branch);
     if (existing) {
         detachFromCleanup(existing);
         return existing;

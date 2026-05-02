@@ -74,6 +74,7 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
     cachedTokens: 0,
     costUsd: 0,
   };
+  const maxTurns = Math.max(0, Math.min(1000, cfg.maxTurns));
   let stopReason: StopReason = "end_turn";
   let turnCount = 0;
   let retriesForTurn = 0;
@@ -86,7 +87,7 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
   });
 
   try {
-    for (let turnIndex = 0; turnIndex < cfg.maxTurns; turnIndex++) {
+    for (let turnIndex = 0; turnIndex < maxTurns; turnIndex++) {
       if (cfg.signal?.aborted) {
         stopReason = "aborted";
         break;
@@ -115,9 +116,21 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
       turnCount = turnIndex + 1;
       const turnId = `t${turnIndex}-${Date.now().toString(36)}`;
 
-      const messagesForCall = cfg.contextTransform
-        ? await cfg.contextTransform(history)
-        : history;
+      let messagesForCall: Message[];
+      try {
+        messagesForCall = cfg.contextTransform
+          ? await cfg.contextTransform(history)
+          : history;
+      } catch (err) {
+        stopReason = "error";
+        events.emit({
+          type: "error",
+          message: `contextTransform failed: ${err instanceof Error ? err.message : String(err)}`,
+          retryable: false,
+        });
+        events.emit({ type: "turn_end", turnId, stopReason });
+        break;
+      }
 
       const streamEvents: AgentEvent[] = [];
       try {
@@ -143,6 +156,7 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
           cfg.signal?.aborted === true;
         if (isAbort) {
           stopReason = "aborted";
+          recordRequest(cfg.provider.id, false, 0);
           events.emit({ type: "turn_end", turnId, stopReason });
           break;
         }
@@ -189,6 +203,13 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
         break;
       }
 
+      // Abort via signal.aborted break (not thrown AbortError): treat identically.
+      if (cfg.signal?.aborted) {
+        stopReason = "aborted";
+        events.emit({ type: "turn_end", turnId, stopReason });
+        break;
+      }
+
       const assembled = assembleTurn(streamEvents);
       totals.inputTokens += assembled.inputTokens;
       totals.outputTokens += assembled.outputTokens;
@@ -202,15 +223,31 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
           assembled.cachedTokens,
         );
       }
-      history.push(assembled.message);
+      // Skip empty assistant messages — providers reject content:[].
+      const parts = Array.isArray(assembled.message.content)
+        ? assembled.message.content
+        : [];
+      if (parts.length > 0) {
+        history.push(assembled.message);
+      }
 
       const toolUses = extractToolUses(assembled.message);
-      cfg.loopDetector?.track({
-        toolCalls: toolUses.map((t) => ({ name: t.name, args: t.input })),
-      });
-      if (toolUses.length === 0) {
+      try {
+        cfg.loopDetector?.track({
+          toolCalls: toolUses.map((t) => ({ name: t.name, args: t.input })),
+        });
+      } catch {
+        // loopDetector.track may throw with malformed tool inputs;
+        // don't let it poison history — treat as no tools and exit.
         events.emit({ type: "turn_end", turnId, stopReason: "end_turn" });
-        await cfg.hooks?.afterTurn?.(turnIndex, totals);
+        break;
+      }
+      if (toolUses.length === 0) {
+        if (turnIndex >= maxTurns - 1) stopReason = "max_turns";
+        events.emit({ type: "turn_end", turnId, stopReason: "end_turn" });
+        try {
+          await cfg.hooks?.afterTurn?.(turnIndex, totals);
+        } catch {}
         break;
       }
 
@@ -227,7 +264,9 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
       history.push(...appended);
 
       events.emit({ type: "turn_end", turnId, stopReason: "tool_use" });
-      await cfg.hooks?.afterTurn?.(turnIndex, totals);
+      try {
+        await cfg.hooks?.afterTurn?.(turnIndex, totals);
+      } catch {}
     }
   } finally {
     events.emit({
@@ -270,11 +309,24 @@ async function executeToolCalls(
       cfg.approvalBus?.requiresApproval(call.name, input) &&
       !cfg.autoApprove
     ) {
-      const decision = await cfg.approvalBus.request({
-        id: call.id,
-        tool: call.name,
-        summary: `${call.name}: ${truncateForSummary(input)}`,
-      });
+      // Race against abort so Esc while an approval prompt is showing
+      // doesn't leave the TUI frozen with busy=true forever.
+      const decision = await Promise.race([
+        cfg.approvalBus.request({
+          id: call.id,
+          tool: call.name,
+          summary: `${call.name}: ${truncateForSummary(input)}`,
+        }),
+        new Promise<"deny">((res) => {
+          if (cfg.signal?.aborted) {
+            res("deny");
+            return;
+          }
+          cfg.signal?.addEventListener("abort", () => res("deny"), {
+            once: true,
+          });
+        }),
+      ]);
       if (decision === "deny" || decision === "deny_always") {
         return {
           call,
@@ -321,11 +373,12 @@ async function executeToolCalls(
 
   if (cfg.toolConcurrency === "parallel" && toolUses.length > 1) {
     const results = await Promise.allSettled(toolUses.map(run));
-    return results.map((r) =>
+    return results.map((r, i) =>
       r.status === "fulfilled"
         ? r.value
         : {
-            call: { id: "", name: "error", input: {} } as ToolCall,
+            // Preserve original call so toolUseId in the next API message is non-empty.
+            call: toolUses[i]!,
             result: {
               content: `Tool execution failed: ${String(r.reason)}`,
               isError: true,

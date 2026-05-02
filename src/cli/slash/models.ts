@@ -15,6 +15,7 @@ const ENV_FOR_PROVIDER: Record<string, string> = {
   nvidia: "NVIDIA_API_KEY",
   openrouter: "OPENROUTER_API_KEY",
   ollama: "",
+  llamacpp: "",
 };
 
 function priceText(value: number): string {

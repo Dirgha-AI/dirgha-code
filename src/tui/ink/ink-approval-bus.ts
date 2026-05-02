@@ -47,7 +47,10 @@ export function createInkApprovalBus(autoApprove: Set<string> = new Set()): InkA
 
   return {
     requiresApproval(toolName: string): boolean {
-      if (denied) return false; // denyAll short-circuits — kernel sees deny via request resolving deny
+      // When denyAll() was called, return true so the kernel calls request(),
+      // which returns 'deny'. Returning false would skip the approval gate
+      // entirely and let the tool execute unconditionally.
+      if (denied) return true;
       return !autoApprove.has(toolName);
     },
 

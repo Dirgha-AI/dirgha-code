@@ -12,6 +12,6 @@
  *
  * Non-TTY: prints a static how-to instead of prompting (CI-safe).
  */
-import type { Subcommand } from '../subcommands/index.js';
+import type { Subcommand } from "../subcommands/index.js";
 export declare function runWizard(argv: string[]): Promise<number>;
 export declare const wizardSubcommand: Subcommand;

@@ -22,7 +22,7 @@ export function createApprovalBus(options = {}) {
             if (deny.has(req.tool))
                 return 'deny_always';
             if (approve.has(req.tool))
-                return 'approve_once';
+                return 'approve';
             for (const sub of subscribers) {
                 const response = await sub(req);
                 if (response !== undefined) {

@@ -22,6 +22,8 @@ export interface SseRequest {
     body: unknown;
     extraHeaders?: Record<string, string>;
     timeoutMs?: number;
+    /** Abort if no bytes received in this many ms (0 = disabled). Default 30s. */
+    stallTimeoutMs?: number;
     signal?: AbortSignal;
     providerName: string;
 }

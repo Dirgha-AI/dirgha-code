@@ -9,7 +9,7 @@
  */
 
 import { readFile, stat, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { resolve, sep } from "node:path";
 import type { Tool } from "./registry.js";
 import type { ToolResult } from "../kernel/types.js";
 import { summariseDiff, unifiedDiff } from "./diff.js";
@@ -44,6 +44,9 @@ export const fsEditTool: Tool = {
   > {
     const input = rawInput as Input;
     const abs = resolve(ctx.cwd, input.path);
+    if (!abs.startsWith(ctx.cwd + sep) && abs !== ctx.cwd) {
+      return { content: `Path escapes working directory: ${input.path}`, isError: true };
+    }
     const info = await stat(abs).catch(() => undefined);
     if (!info || !info.isFile())
       return { content: `No such file: ${input.path}`, isError: true };

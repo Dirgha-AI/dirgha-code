@@ -1,0 +1,6 @@
+# Vendored rtk binaries — supply chain integrity manifest
+# Version: 0.34.1
+# Source: https://github.com/rtk-ai/rtk/releases/tag/v0.34.1
+# Verify: sha256sum vendor/rtk/<platform>/rtk
+
+linux-x64  2ba0e2a5bf68e271190ace5f1be404b0b82ab9776efd19f1eace5376dbf74cc6

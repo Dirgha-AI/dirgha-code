@@ -16,5 +16,5 @@
  * On no clipboard tool found: returns a hint listing the supported
  * tools so the user knows what to install.
  */
-import type { SlashCommand } from './types.js';
+import type { SlashCommand } from "./types.js";
 export declare const pasteCommand: SlashCommand;

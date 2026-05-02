@@ -20,7 +20,7 @@
 
 import { appendFile, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 export type LedgerEntryKind =
   | "goal" // user-stated goal or sub-goal
@@ -59,8 +59,8 @@ export function ledgerScope(
 }
 
 async function ensureDir(path: string): Promise<void> {
-  const dir = path.slice(0, path.lastIndexOf("/"));
-  if (!dir) return;
+  const dir = dirname(path);
+  if (!dir || dir === path) return;
   const info = await stat(dir).catch(() => undefined);
   if (!info) await mkdir(dir, { recursive: true });
 }

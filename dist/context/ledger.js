@@ -19,7 +19,7 @@
  */
 import { appendFile, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 const DEFAULT_DIR = ".dirgha/ledger";
 export function ledgerScope(name, home = homedir()) {
     const dir = join(home, DEFAULT_DIR);
@@ -30,8 +30,8 @@ export function ledgerScope(name, home = homedir()) {
     };
 }
 async function ensureDir(path) {
-    const dir = path.slice(0, path.lastIndexOf("/"));
-    if (!dir)
+    const dir = dirname(path);
+    if (!dir || dir === path)
         return;
     const info = await stat(dir).catch(() => undefined);
     if (!info)

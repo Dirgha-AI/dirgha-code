@@ -2,6 +2,76 @@
 
 All notable changes are tracked here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); we use [Semantic Versioning](https://semver.org/).
 
+## [1.18.0] — Kernel hardening + long-term architecture
+
+### Stability
+
+- EPIPE/EIO crash guards: process stdout/stderr/stdin error handlers prevent crash-log spam on PTY close.
+- Stall detection: HTTP streaming aborts after 30s of no bytes received (prevents 5-min hangs).
+- Crash log rotation: auto-rotates at 10 MB, keeps last 200 entries.
+- Per-tool timeout enforcement: every tool gets a configurable `timeoutMs`; shell defaults to 5 min.
+- Event queue backpressure: queue overflow emits a synthetic `backpressure` error event instead of silent drops; `drain()` API added.
+
+### Daemon
+
+- Graceful shutdown: state-machine (`running → shuttingDown → exited`), AbortController signals all in-flight agents, 10s deadline, session flush.
+
+### Providers
+
+- Failover cascade: `buildFailoverChain()` — 4-tier chain (user → same-family → registry → free), health-aware.
+- DeepSeek-native prefix stripping (`deepseek-native/`).
+- OpenRouter thinking pattern fix for `tencent/hy3` models.
+- OpenAI-compat: synthetic tool call IDs, try/finally around SSE loop, dead `thinkBuffer` removed.
+- Health scoring: 60s TTL compaction prunes stale windows; NaN/latency/cost fixes.
+
+### Security
+
+- Shell injection fix in hooks config-bridge (argv splitting, shell: false).
+- Path traversal bypass fixed in safety policy (relative path resolution).
+- Seatbelt profile injection blocked (reject unsafe chars).
+- PowerShell command injection fixed in /paste.
+
+### Kernel
+
+- Event-stream handler recursion guard (max depth 1).
+- contextTransform errors isolated from provider errors.
+- `toolResultMessage` accepts configurable role.
+- `assembleTurn` handles duplicate tool IDs, unmatched toolcall_end, missing toolcall_start.
+- `maxTurns` clamping (0–1000), validated at config load.
+- `StopReason` union expanded with `max_turns`.
+
+### Tools
+
+- Git cwd separator fix (`startsWith` → `startsWith(cwd + sep)`).
+- Shell `exit` → `close` event for pipe closure handling.
+- Cron atomic writes (temp file + rename), `dirname()` instead of `lastIndexOf('/')`.
+- Browser connection check (`isConnected?.() !== false`).
+- Multimodal path containment check.
+- Tripleshot `handleFor` null-safe return.
+
+### CLI/TUI
+
+- Config schema versioning (`schemaVersion: 1`) with `migrateConfigSchema()`.
+- Silent config loss now warns to stderr.
+- Null config spread guard (`value !== null` check).
+- ThinkingBlock: `useInput({ isActive: false })` fixes Enter-after-paste; text color changed to white.
+- commitLive race condition fixed (liveItemsRef synchronous mirror).
+- Slash dispatch errors caught and surfaced instead of freezing REPL.
+- Fleet stdout monkey-patch scoped and restored.
+- Input approval stdin error handling.
+
+### Fleet
+
+- DAG workflows: `runDag()` chains agents sequentially with cumulative context propagation.
+- `withLock` timeout recovery with atomic write fallback.
+- `ledger-hook` empty array guard.
+
+### Tests
+
+- 104 tests passing (97 → 104: +4 fleet DAG, +3 TUI render).
+- TypeScript 0 errors, ESLint 0 warnings.
+- All 30+ CLI subcommands smoke-tested.
+
 ## Unreleased — CI-5 supply-chain hardening
 
 - `npm audit --audit-level=high --omit=dev` is now a CI gate (blocks PRs with high+ CVEs).
@@ -13,111 +83,99 @@ All notable changes are tracked here. Format loosely follows [Keep a Changelog](
 
 ## [1.13.1](https://github.com/Dirgha-AI/dirgha-code/compare/v1.13.0...v1.13.1) (2026-04-30)
 
-
 ### Bug Fixes
 
-* reasoning_content multi-turn + /up alias ([9920e61](https://github.com/Dirgha-AI/dirgha-code/commit/9920e61a2b2244d7fde4debe2d5b5ff49c77b54b))
+- reasoning_content multi-turn + /up alias ([9920e61](https://github.com/Dirgha-AI/dirgha-code/commit/9920e61a2b2244d7fde4debe2d5b5ff49c77b54b))
 
 ## [1.13.0](https://github.com/Dirgha-AI/dirgha-code/compare/v1.12.3...v1.13.0) (2026-04-30)
 
-
 ### Features
 
-* **providers:** add DeepSeek native models + fix NVIDIA NIM routing ([48eb272](https://github.com/Dirgha-AI/dirgha-code/commit/48eb27211157a57d50cbc3e68ebeffb63f345239))
-
+- **providers:** add DeepSeek native models + fix NVIDIA NIM routing ([48eb272](https://github.com/Dirgha-AI/dirgha-code/commit/48eb27211157a57d50cbc3e68ebeffb63f345239))
 
 ### Bug Fixes
 
-* inline key setup overlay + pack update resilience + Windows update crash ([af259cc](https://github.com/Dirgha-AI/dirgha-code/commit/af259cc4112cd3be0641eeaf6253dd2e8de2f4e5))
-* **tests:** update dispatch tests + add DeepSeek V4/Prover prices ([1d4856f](https://github.com/Dirgha-AI/dirgha-code/commit/1d4856f1d18abca83ad301e3be4969143c136193))
+- inline key setup overlay + pack update resilience + Windows update crash ([af259cc](https://github.com/Dirgha-AI/dirgha-code/commit/af259cc4112cd3be0641eeaf6253dd2e8de2f4e5))
+- **tests:** update dispatch tests + add DeepSeek V4/Prover prices ([1d4856f](https://github.com/Dirgha-AI/dirgha-code/commit/1d4856f1d18abca83ad301e3be4969143c136193))
 
 ## [1.12.3](https://github.com/Dirgha-AI/dirgha-code/compare/v1.12.2...v1.12.3) (2026-04-28)
 
-
 ### Bug Fixes
 
-* **slash:** /provider list reads from dispatch — adds 8 missing providers ([5a2741e](https://github.com/Dirgha-AI/dirgha-code/commit/5a2741e9177d325731292dd5302841cf6ff16565))
+- **slash:** /provider list reads from dispatch — adds 8 missing providers ([5a2741e](https://github.com/Dirgha-AI/dirgha-code/commit/5a2741e9177d325731292dd5302841cf6ff16565))
 
 ## [1.12.2](https://github.com/Dirgha-AI/dirgha-code/compare/v1.12.1...v1.12.2) (2026-04-28)
 
-
 ### Bug Fixes
 
-* **windows:** cross-platform shell + auto readline-fallback + mount banner ([ecef403](https://github.com/Dirgha-AI/dirgha-code/commit/ecef4038249961fe3da6f73925d9a0851df2c7b0))
+- **windows:** cross-platform shell + auto readline-fallback + mount banner ([ecef403](https://github.com/Dirgha-AI/dirgha-code/commit/ecef4038249961fe3da6f73925d9a0851df2c7b0))
 
 ## [1.12.1](https://github.com/Dirgha-AI/dirgha-code/compare/v1.12.0...v1.12.1) (2026-04-28)
 
-
 ### Bug Fixes
 
-* **tui:** Ink-native approval prompt — fixes tool-stall on Windows ([2612454](https://github.com/Dirgha-AI/dirgha-code/commit/26124547222fe8d556fec10b294627bdb8c7361e))
+- **tui:** Ink-native approval prompt — fixes tool-stall on Windows ([2612454](https://github.com/Dirgha-AI/dirgha-code/commit/26124547222fe8d556fec10b294627bdb8c7361e))
 
 ## [1.12.0](https://github.com/Dirgha-AI/dirgha-code/compare/v1.11.0...v1.12.0) (2026-04-28)
 
-
 ### Features
 
-* **tui:** two-step provider→model picker + 2026-04-28 OpenRouter top models ([ceaa720](https://github.com/Dirgha-AI/dirgha-code/commit/ceaa720d93d4de00d97717516a06f3154ef510b8))
+- **tui:** two-step provider→model picker + 2026-04-28 OpenRouter top models ([ceaa720](https://github.com/Dirgha-AI/dirgha-code/commit/ceaa720d93d4de00d97717516a06f3154ef510b8))
 
 ## [1.11.0](https://github.com/Dirgha-AI/dirgha-code/compare/v1.10.0...v1.11.0) (2026-04-28)
 
-
 ### Features
 
-* **providers:** add 8 native providers + missing-key warning on /models switch ([4b07807](https://github.com/Dirgha-AI/dirgha-code/commit/4b078075c067eb9a0db49484c208f951b789f908))
+- **providers:** add 8 native providers + missing-key warning on /models switch ([4b07807](https://github.com/Dirgha-AI/dirgha-code/commit/4b078075c067eb9a0db49484c208f951b789f908))
 
 ## [1.10.0](https://github.com/Dirgha-AI/dirgha-code/compare/v1.9.0...v1.10.0) (2026-04-28)
 
-
 ### Features
 
-* model-switch prompt + opencode picker + /provider skill ([587fe72](https://github.com/Dirgha-AI/dirgha-code/commit/587fe72b87a5a7f495386c859df6dff7ab35c23b))
-* **tui:** connected-border tool group + DenseToolMessage (gemini parity) ([72077c7](https://github.com/Dirgha-AI/dirgha-code/commit/72077c72d5c35dd080da5574239748516aa80cbd))
-* **tui:** native markdown rendering + semantic theme tokens + 5 themes ([49130b1](https://github.com/Dirgha-AI/dirgha-code/commit/49130b1ca7191b186fd3d72eb1b0943cccfeee93))
-
+- model-switch prompt + opencode picker + /provider skill ([587fe72](https://github.com/Dirgha-AI/dirgha-code/commit/587fe72b87a5a7f495386c859df6dff7ab35c23b))
+- **tui:** connected-border tool group + DenseToolMessage (gemini parity) ([72077c7](https://github.com/Dirgha-AI/dirgha-code/commit/72077c72d5c35dd080da5574239748516aa80cbd))
+- **tui:** native markdown rendering + semantic theme tokens + 5 themes ([49130b1](https://github.com/Dirgha-AI/dirgha-code/commit/49130b1ca7191b186fd3d72eb1b0943cccfeee93))
 
 ### Bug Fixes
 
-* auto-migrate deprecated model IDs + readable theme + busy-state hint ([50c0c50](https://github.com/Dirgha-AI/dirgha-code/commit/50c0c507a390d2da17c0f8b262ca93b8bb806557))
-* **tui:** busy-hint reads 'ctrl+c clear' instead of 'ctrl+c×2 exit' ([6b0f367](https://github.com/Dirgha-AI/dirgha-code/commit/6b0f367295d3a30ccc1ae8fe7911b69e561d1709))
+- auto-migrate deprecated model IDs + readable theme + busy-state hint ([50c0c50](https://github.com/Dirgha-AI/dirgha-code/commit/50c0c507a390d2da17c0f8b262ca93b8bb806557))
+- **tui:** busy-hint reads 'ctrl+c clear' instead of 'ctrl+c×2 exit' ([6b0f367](https://github.com/Dirgha-AI/dirgha-code/commit/6b0f367295d3a30ccc1ae8fe7911b69e561d1709))
 
 ## [1.9.0](https://github.com/Dirgha-AI/dirgha-code/compare/v1.8.1...v1.9.0) (2026-04-28)
 
-
 ### Features
 
-* **providers,ask:** DeepSeek native provider + dirgha ask --cwd ([ab4351f](https://github.com/Dirgha-AI/dirgha-code/commit/ab4351f8cd9ae76973fc4af1afdfd3b3c0135ce9))
-
+- **providers,ask:** DeepSeek native provider + dirgha ask --cwd ([ab4351f](https://github.com/Dirgha-AI/dirgha-code/commit/ab4351f8cd9ae76973fc4af1afdfd3b3c0135ce9))
 
 ### Bug Fixes
 
-* **audit-codebase,gitignore:** add --help handler + un-ignore dist/ ([76c3c0a](https://github.com/Dirgha-AI/dirgha-code/commit/76c3c0a31dbb9337710f195c24b2e52497d154b7))
+- **audit-codebase,gitignore:** add --help handler + un-ignore dist/ ([76c3c0a](https://github.com/Dirgha-AI/dirgha-code/commit/76c3c0a31dbb9337710f195c24b2e52497d154b7))
 
 ## [1.8.1](https://github.com/Dirgha-AI/dirgha-code/compare/v1.8.0...v1.8.1) (2026-04-28)
 
-
 ### Bug Fixes
 
-* **ci:** pin ossf/scorecard-action to correct v2.4.3 SHA ([b92f002](https://github.com/Dirgha-AI/dirgha-code/commit/b92f0022877a531d7b16edc9442b839e25ab518f))
-* **ci:** repin three actions to verified-real SHAs ([491e799](https://github.com/Dirgha-AI/dirgha-code/commit/491e799ba239a60996a3a770052d2792be10d523))
+- **ci:** pin ossf/scorecard-action to correct v2.4.3 SHA ([b92f002](https://github.com/Dirgha-AI/dirgha-code/commit/b92f0022877a531d7b16edc9442b839e25ab518f))
+- **ci:** repin three actions to verified-real SHAs ([491e799](https://github.com/Dirgha-AI/dirgha-code/commit/491e799ba239a60996a3a770052d2792be10d523))
 
 ## [1.8.0](https://github.com/Dirgha-AI/dirgha-code/compare/v1.7.15...v1.8.0) (2026-04-28)
 
-
 ### Features
 
-* **scaffold:** dirgha scaffold "&lt;prompt&gt;" — instant Vite/Hono starter ([1ff456b](https://github.com/Dirgha-AI/dirgha-code/commit/1ff456b6defda145881509963b723a69b8e343bb))
-* **tui:** Ctrl+C clears buffer + non-disruptive prompt queue ([12fe781](https://github.com/Dirgha-AI/dirgha-code/commit/12fe7817b16f8710fbf99f8900f3ba6fd9fc6579))
+- **scaffold:** dirgha scaffold "&lt;prompt&gt;" — instant Vite/Hono starter ([1ff456b](https://github.com/Dirgha-AI/dirgha-code/commit/1ff456b6defda145881509963b723a69b8e343bb))
+- **tui:** Ctrl+C clears buffer + non-disruptive prompt queue ([12fe781](https://github.com/Dirgha-AI/dirgha-code/commit/12fe7817b16f8710fbf99f8900f3ba6fd9fc6579))
 
 ## 1.7.12 — 2026-04-28
 
 **CI-6 — Posthog telemetry endpoint live + minimal-data schema.**
 
 ### Added
+
 - `src_v2/telemetry/sender.ts` — Posthog-compatible sender, fires events on subcommand exit (when opt-in).
 - 1s `Promise.race` cap so a slow Posthog never blocks the user.
 
 ### Changed
+
 - Telemetry payload tightened to **5 fields** for command events (event, version, command, os, node) — no more `os_release`, `arch`, `duration_ms`. **6 fields** on errors (+ `error_class`).
 - `docs/privacy/CLI-TELEMETRY.md` updated with the exact minimum data table.
 
@@ -126,11 +184,13 @@ All notable changes are tracked here. Format loosely follows [Keep a Changelog](
 **CI-3 + CI-4 — multi-agent UX scorer + telemetry scaffold.**
 
 ### Added
+
 - `tools/ux-scorer/run.mjs` — N-judge fleet records 5 scripted journeys via tmux, scores against `tools/ux-scorer/rubric.md`. Median ≥ 7.0 release-blocking.
 - Default judge: `inclusionai/ling-2.6-1t:free`. Optional: `tencent/hy3-preview:free`, `deepseek-v4-pro`, `kimi-k2`.
 - `dirgha telemetry <status|enable|disable|endpoint>` subcommand. Default OFF.
 
 ### Fixed
+
 - ux-scorer unsets `CI`/`GITHUB_ACTIONS`/`CONTINUOUS_INTEGRATION` before launching `dirgha` inside tmux so Ink doesn't suppress dynamic output (`is-in-ci` detection).
 
 ## 1.7.10 — 2026-04-28
@@ -138,11 +198,13 @@ All notable changes are tracked here. Format loosely follows [Keep a Changelog](
 **CI-2 — headless Ink overlay tests + StatusBar tok/s.**
 
 ### Added
+
 - `scripts/qa-app/ink_unit_test.mjs` extended to 11 assertions — `/help`, `/theme`, `/models` slash overlay journeys.
 - `FakeStdin` upgraded to a Readable-stream mimic (Ink listens on `'readable'`, not `'data'`).
 - StatusBar now actually computes `tok/s` (was a declared-but-unused prop). 4 cases covered: arithmetic, idle, zero-output, sub-250ms warmup.
 
 ### Fixed
+
 - `tool_exec_end → done` Ink test regex allows the tool icon glyph between ✓ and "Shell".
 - Ink CI-mode suppressed dynamic output → `debug:true` escape.
 - `kb` test reclassified `needs: 'NETWORK'` (was sneakily network-bound).
@@ -152,9 +214,11 @@ All notable changes are tracked here. Format loosely follows [Keep a Changelog](
 **CI-1 — production-grade pre-release gates + `/theme` bug fix.**
 
 ### Fixed
+
 - `/theme` overlay race condition (1.7.8 regression): SlashComplete `onPick` and InputBox `onSubmit` both fire on Enter; explicit `setActive(null)` was overwriting `openOverlay('theme')`. Removed the explicit clear; the `useEffect` on `slashQuery=null` handles cleanup safely.
 
 ### Added
+
 - ESLint flat config + `npm run lint` (max-warnings 25 baseline).
 - `npm run license-check` (fails on GPL/AGPL/LGPL).
 - Cross-OS CI matrix: ubuntu × macos × windows × Node 20/22.
@@ -337,10 +401,10 @@ Second-generation CLI core under `src_v2/`, shipped as the `dirgha-v2` binary al
 
 Adopted industry-standard terms from the multi-agent workspace ecosystem audit (ccpm, claudio, genie, devteam, citadel, maw, agent-worktree):
 
-| Term | Meaning |
-|---|---|
-| **worktree** | Isolation unit (git worktree) |
-| **fleet** | Parallel agents on one goal |
-| **subtask** | Parallelizable stream within a fleet |
-| **runtime** | Compute environment (local / worktree / SSH — future) |
-| **skill** | Reusable capability bundle (CLI-Anything) |
+| Term         | Meaning                                               |
+| ------------ | ----------------------------------------------------- |
+| **worktree** | Isolation unit (git worktree)                         |
+| **fleet**    | Parallel agents on one goal                           |
+| **subtask**  | Parallelizable stream within a fleet                  |
+| **runtime**  | Compute environment (local / worktree / SSH — future) |
+| **skill**    | Reusable capability bundle (CLI-Anything)             |

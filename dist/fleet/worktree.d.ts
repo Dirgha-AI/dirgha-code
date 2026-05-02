@@ -34,6 +34,11 @@ export interface CreateWorktreeOptions {
  *
  * Idempotent: if the target path already exists and git already knows
  * about it, we return the existing handle instead of failing.
+ *
+ * Stale-branch recovery: if a prior fleet run was killed mid-way, the git
+ * branch ref survives even after the worktree directory was cleaned up.
+ * We detect this and force-delete the stale ref before re-creating so
+ * re-launch of the same goal never fails with "branch already exists".
  */
 export declare function createWorktree(branch: string, opts: CreateWorktreeOptions): Promise<WorktreeHandle>;
 /** Remove a worktree. Falls back to `rm -rf` if git refuses. */

@@ -17,6 +17,6 @@
  * `matcher` regex applied against the tool name. Hooks without a
  * matcher fire for every call.
  */
-import type { AgentHooks } from '../kernel/types.js';
-import type { DirghaConfig } from '../cli/config.js';
+import type { AgentHooks } from "../kernel/types.js";
+import type { DirghaConfig } from "../cli/config.js";
 export declare function buildAgentHooksFromConfig(config: DirghaConfig): AgentHooks | undefined;

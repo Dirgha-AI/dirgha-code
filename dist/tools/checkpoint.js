@@ -24,6 +24,7 @@ import { mkdir, readdir, readFile, stat, unlink, writeFile } from 'node:fs/promi
 import { homedir } from 'node:os';
 import { join, basename } from 'node:path';
 import { SessionStore } from '../context/session.js';
+import { registerCheckpoint } from '../state/index.js';
 const CHECKPOINT_DIR = join(homedir(), '.dirgha', 'checkpoints');
 async function ensureDir() {
     await mkdir(CHECKPOINT_DIR, { recursive: true }).catch(() => undefined);
@@ -93,6 +94,8 @@ async function doSave(input, ctx) {
     };
     const path = checkpointPath(id);
     await writeFile(path, JSON.stringify(payload, null, 2), 'utf8');
+    // Register in unified state index (fire-and-forget, never blocks).
+    void registerCheckpoint(ctx.sessionId, id);
     const info = await stat(path).catch(() => undefined);
     const summary = {
         id,

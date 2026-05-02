@@ -17,7 +17,7 @@ import * as React from "react";
 import { Box, Text } from "ink";
 import { useTheme } from "../theme-context.js";
 import { iconFor, TOOL_STATUS } from "../icons.js";
-const SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+import { SpinnerContext, SPINNER_FRAMES as SPINNER } from "../spinner-context.js";
 const TOOL_LABEL = {
     fs_read: "Read",
     fs_write: "Write",
@@ -31,13 +31,7 @@ const TOOL_LABEL = {
 };
 export function DenseToolMessage(props) {
     const palette = useTheme();
-    const [frame, setFrame] = React.useState(0);
-    React.useEffect(() => {
-        if (props.status !== "running")
-            return;
-        const t = setInterval(() => setFrame((f) => (f + 1) % SPINNER.length), 80);
-        return () => clearInterval(t);
-    }, [props.status]);
+    const frame = React.useContext(SpinnerContext);
     const glyph = props.status === "error"
         ? TOOL_STATUS.ERROR
         : props.status === "done"

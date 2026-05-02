@@ -6,7 +6,7 @@
  */
 
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { dirname, resolve, sep } from 'node:path';
 import type { Tool } from './registry.js';
 import type { ToolResult } from '../kernel/types.js';
 import { summariseDiff, unifiedDiff } from './diff.js';
@@ -33,6 +33,9 @@ export const fsWriteTool: Tool = {
   async execute(rawInput: unknown, ctx): Promise<ToolResult<{ bytesWritten: number; added: number; removed: number }>> {
     const input = rawInput as Input;
     const abs = resolve(ctx.cwd, input.path);
+    if (!abs.startsWith(ctx.cwd + sep) && abs !== ctx.cwd) {
+      return { content: `Path escapes working directory: ${input.path}`, isError: true };
+    }
     let before = '';
     const existed = await stat(abs).then(() => true).catch(() => false);
     if (existed) before = await readFile(abs, 'utf8');

@@ -4,7 +4,7 @@
  * cat -n style numbering so the model can cite line numbers reliably.
  */
 import { readFile, stat } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { resolve, sep } from 'node:path';
 const MAX_BYTES = 2 * 1024 * 1024;
 export const fsReadTool = {
     name: 'fs_read',
@@ -21,6 +21,9 @@ export const fsReadTool = {
     async execute(rawInput, ctx) {
         const input = rawInput;
         const abs = resolve(ctx.cwd, input.path);
+        if (!abs.startsWith(ctx.cwd + sep) && abs !== ctx.cwd) {
+            return { content: `Path escapes working directory: ${input.path}`, isError: true };
+        }
         const info = await stat(abs).catch(() => undefined);
         if (!info)
             return { content: `No such file: ${input.path}`, isError: true };

@@ -12,6 +12,9 @@ import { createToolExecutor } from "../tools/exec.js";
 export class DaemonServer {
     opts;
     active = new Map();
+    inFlight = new Set();
+    state = "running";
+    abort = new AbortController();
     started = Date.now();
     totalUsage = {
         inputTokens: 0,
@@ -44,6 +47,10 @@ export class DaemonServer {
         });
     }
     async handle(req) {
+        if (this.state !== "running" && req.method !== "daemon.shutdown") {
+            this.writeError(req.id, -32000, "Server is shutting down");
+            return;
+        }
         try {
             switch (req.method) {
                 case "daemon.health":
@@ -51,7 +58,7 @@ export class DaemonServer {
                     return;
                 case "daemon.shutdown":
                     this.writeResult(req.id, { ok: true });
-                    process.exit(0);
+                    await this.gracefulShutdown();
                     return;
                 case "session.start":
                     this.writeResult(req.id, await this.sessionStart(req.params));
@@ -75,6 +82,41 @@ export class DaemonServer {
         catch (err) {
             this.writeError(req.id, -32000, err instanceof Error ? err.message : String(err));
         }
+    }
+    async gracefulShutdown() {
+        if (this.state !== "running")
+            return;
+        this.state = "shuttingDown";
+        // 1. Signal all in-flight agent loops to abort.
+        this.abort.abort();
+        // 2. Stop accepting new stdin.
+        stdin.pause();
+        // 3. Wait for in-flight agent loops to finish (with timeout).
+        if (this.inFlight.size > 0) {
+            const deadline = Date.now() + 10_000;
+            const pending = [...this.inFlight];
+            try {
+                await Promise.race([
+                    Promise.allSettled(pending),
+                    new Promise((r) => {
+                        const check = setInterval(() => {
+                            if (Date.now() > deadline) {
+                                clearInterval(check);
+                                r();
+                            }
+                        }, 100);
+                    }),
+                ]);
+            }
+            catch {
+                // Agent loops may reject after abort — expected.
+            }
+        }
+        // 4. Sessions are stateless JSONL files — no close needed.
+        // Clear the active map so GC can collect in-flight agent results.
+        this.active.clear();
+        this.state = "exited";
+        process.exit(0);
     }
     healthResult() {
         return {
@@ -162,37 +204,47 @@ export class DaemonServer {
             sessionId: params.sessionId,
         });
         const sanitized = this.opts.registry.sanitize({ descriptionLimit: 200 });
-        void runAgentLoop({
-            sessionId: params.sessionId,
-            model: this.opts.config.model,
-            messages: active.history,
-            tools: sanitized.definitions,
-            maxTurns: this.opts.config.maxTurns,
-            provider,
-            toolExecutor: executor,
-            events,
-        })
-            .then(async (result) => {
-            const savedCount = active.history.length;
-            active.history.length = 0;
-            active.history.push(...result.messages);
-            for (const msg of result.messages.slice(savedCount)) {
-                await active.session.append({
-                    type: "message",
-                    ts: new Date().toISOString(),
-                    message: msg,
+        const done = (async () => {
+            try {
+                const result = await runAgentLoop({
+                    sessionId: params.sessionId,
+                    model: this.opts.config.model,
+                    messages: active.history,
+                    tools: sanitized.definitions,
+                    maxTurns: this.opts.config.maxTurns,
+                    provider,
+                    toolExecutor: executor,
+                    events,
+                    signal: this.abort.signal,
+                });
+                const savedCount = active.history.length;
+                active.history.length = 0;
+                active.history.push(...result.messages);
+                for (const msg of result.messages.slice(savedCount)) {
+                    await active.session.append({
+                        type: "message",
+                        ts: new Date().toISOString(),
+                        message: msg,
+                    });
+                }
+            }
+            catch (err) {
+                if (this.abort.signal.aborted)
+                    return;
+                this.writeNotification("event.stream", {
+                    streamId,
+                    event: {
+                        type: "error",
+                        message: err instanceof Error ? err.message : String(err),
+                    },
                 });
             }
-        })
-            .catch((err) => {
-            this.writeNotification("event.stream", {
-                streamId,
-                event: {
-                    type: "error",
-                    message: err instanceof Error ? err.message : String(err),
-                },
-            });
+        })();
+        const tracked = done;
+        tracked.finally(() => {
+            this.inFlight.delete(tracked);
         });
+        this.inFlight.add(tracked);
         return { streamId };
     }
     writeResult(id, result) {

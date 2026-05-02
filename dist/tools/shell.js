@@ -63,11 +63,17 @@ export const shellTool = {
         },
         required: ["command"],
     },
+    timeoutMs: 300_000, // 5 min — generous for multi-step shell commands
     requiresApproval: () => true,
     async execute(rawInput, ctx) {
         const input = rawInput;
         const cwd = input.cwd ?? ctx.cwd;
         const timeoutMs = input.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+        // TODO: use context.sandbox when SandboxAdapter.exec() is wired.
+        // ctx.sandbox is now populated by createToolExecutor() — replace the
+        // spawn() block below with ctx.sandbox.exec({ command, cwd, env, ... })
+        // once the mapping from Input → SandboxExecOptions is validated.
+        //
         // Platform-aware spawn. On Windows, prefer pwsh > powershell > cmd.
         // PowerShell handles UTF-8, quoting, and multi-line scripts more
         // cleanly than cmd.exe's legacy parser. On POSIX, plain shell:true
@@ -93,41 +99,44 @@ export const shellTool = {
         let stdoutBytes = 0;
         let stderrBytes = 0;
         let truncated = false;
-        const onData = (chunks, counter) => (buf) => {
-            const remaining = MAX_OUTPUT_BYTES - counter(0);
+        // Shared total so combined stdout+stderr never exceeds MAX_OUTPUT_BYTES.
+        let totalBytes = 0;
+        const onData = (chunks, trackBytes) => (buf) => {
+            const remaining = MAX_OUTPUT_BYTES - totalBytes;
             if (remaining <= 0) {
                 truncated = true;
                 return;
             }
             const slice = buf.length <= remaining ? buf : buf.subarray(0, remaining);
             chunks.push(slice);
-            counter(slice.length);
+            totalBytes += slice.length;
+            trackBytes(slice.length);
             if (buf.length > remaining)
                 truncated = true;
             const text = slice.toString("utf8");
             if (text.trim().length > 0)
                 ctx.onProgress?.(text.trimEnd());
         };
-        const stdoutCount = ((acc = 0) => (add) => {
-            acc += add;
-            stdoutBytes = acc;
-            return acc;
-        })();
-        const stderrCount = ((acc = 0) => (add) => {
-            acc += add;
-            stderrBytes = acc;
-            return acc;
-        })();
-        child.stdout.on("data", onData(stdoutChunks, stdoutCount));
-        child.stderr.on("data", onData(stderrChunks, stderrCount));
+        child.stdout.on("data", onData(stdoutChunks, (n) => {
+            stdoutBytes += n;
+        }));
+        child.stderr.on("data", onData(stderrChunks, (n) => {
+            stderrBytes += n;
+        }));
         const timer = setTimeout(() => {
             child.kill("SIGKILL");
         }, timeoutMs);
+        // Wire abort signal so Esc/cancel kills the child immediately.
+        const onAbort = () => {
+            child.kill("SIGKILL");
+        };
+        ctx.signal?.addEventListener("abort", onAbort, { once: true });
         const exitCode = await new Promise((resolveExit) => {
             child.on("error", () => resolveExit(-1));
-            child.on("exit", (code) => resolveExit(code ?? -1));
+            child.on("close", (code) => resolveExit(code ?? -1));
         });
         clearTimeout(timer);
+        ctx.signal?.removeEventListener("abort", onAbort);
         const stdout = Buffer.concat(stdoutChunks).toString("utf8");
         const stderr = Buffer.concat(stderrChunks).toString("utf8");
         const banner = `exit=${exitCode}${truncated ? " [output truncated]" : ""}`;

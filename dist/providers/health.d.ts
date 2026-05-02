@@ -4,10 +4,13 @@
  *
  * Dimensions: latency (timer), error rate (window), rate limit hits (decay), cost factor.
  * Score decay: exponential with 5min half-life so stale data doesn't dominate.
+ *
+ * A 60s compaction timer prunes entries older than the sliding window
+ * to prevent unbounded map growth in long-running daemon processes.
  */
 import type { ProviderId } from "./dispatch.js";
 export declare function recordRequest(provider: string, ok: boolean, latMs: number): void;
 export declare function recordRateLimit(provider: string): void;
 export declare function healthScore(provider: string): number;
-export declare function bestProvider(providers: ProviderId[]): ProviderId;
+export declare function bestProvider(providers: readonly ProviderId[]): ProviderId;
 export declare function resetHealth(provider: string): void;

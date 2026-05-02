@@ -57,27 +57,30 @@ export async function* streamChatCompletions(
 
   const state = new StreamState(opts.includeThinking ?? false);
 
-  for await (const payload of streamSSE({
-    providerName: opts.providerName,
-    url: opts.endpoint,
-    apiKey: opts.apiKey,
-    body,
-    extraHeaders: opts.extraHeaders,
-    signal: opts.signal,
-    timeoutMs: opts.timeoutMs,
-  })) {
-    if (payload === "[DONE]") break;
-    let chunk: ChatCompletionChunk;
-    try {
-      chunk = JSON.parse(payload) as ChatCompletionChunk;
-    } catch {
-      const repaired = repairJSON(payload) as ChatCompletionChunk;
-      if (!repaired || !repaired.choices) continue;
-      chunk = repaired;
+  try {
+    for await (const payload of streamSSE({
+      providerName: opts.providerName,
+      url: opts.endpoint,
+      apiKey: opts.apiKey,
+      body,
+      extraHeaders: opts.extraHeaders,
+      signal: opts.signal,
+      timeoutMs: opts.timeoutMs,
+    })) {
+      if (payload === "[DONE]") break;
+      let chunk: ChatCompletionChunk;
+      try {
+        chunk = JSON.parse(payload) as ChatCompletionChunk;
+      } catch {
+        const repaired = repairJSON(payload) as ChatCompletionChunk;
+        if (!repaired || !repaired.choices) continue;
+        chunk = repaired;
+      }
+      yield* state.ingest(chunk);
     }
-    yield* state.ingest(chunk);
+  } finally {
+    yield* state.finalise();
   }
-  yield* state.finalise();
 }
 
 function toOpenAIMessages(messages: Message[]): OpenAIMessage[] {
@@ -172,7 +175,6 @@ class StreamState {
   // chunks. Once we see the open tag, accumulate until the close tag
   // arrives. Anything before/after is text.
   private inThinkBlock = false;
-  private thinkBuffer = "";
   private static readonly THINK_OPEN_RE =
     /<(?:think|thinking|reasoning|thought|REASONING_SCRATCHPAD)>/i;
   private static readonly THINK_CLOSE_RE =
@@ -188,12 +190,10 @@ class StreamState {
         const close = s.match(StreamState.THINK_CLOSE_RE);
         if (!close || close.index === undefined) {
           thinking += s;
-          this.thinkBuffer += s;
           s = "";
           break;
         }
         thinking += s.slice(0, close.index);
-        this.thinkBuffer = "";
         this.inThinkBlock = false;
         s = s.slice(close.index + close[0].length);
       } else {
@@ -274,7 +274,10 @@ class StreamState {
           id = tc.id;
           this.toolIndexToId.set(index, id);
         }
-        if (!id) continue;
+        if (!id) {
+          id = `tc-${index}-${Date.now().toString(36)}`;
+          this.toolIndexToId.set(index, id);
+        }
         let entry = this.toolOpen.get(id);
         if (!entry) {
           const name = tc.function?.name ?? "";

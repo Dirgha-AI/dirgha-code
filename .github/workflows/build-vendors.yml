@@ -1,0 +1,143 @@
+name: Build vendor binaries
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'vendor/rtk/VERSION'
+      - 'vendor/qmd/VERSION'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  build-rtk:
+    name: Build rtk (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - target: linux-x64
+            runner: ubuntu-latest
+            cargo_target: x86_64-unknown-linux-musl
+            out: vendor/rtk/linux-x64/rtk
+          - target: darwin-arm64
+            runner: macos-14
+            cargo_target: aarch64-apple-darwin
+            out: vendor/rtk/darwin-arm64/rtk
+          - target: darwin-x64
+            runner: macos-13
+            cargo_target: x86_64-apple-darwin
+            out: vendor/rtk/darwin-x64/rtk
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - name: Read fork SHA
+        id: ver
+        run: |
+          sha=$(grep '^github.com' vendor/rtk/VERSION | sed 's/.*@//')
+          echo "sha=$sha" >> $GITHUB_OUTPUT
+      - name: Checkout rtk fork
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        with:
+          repository: Dirgha-AI/rtk
+          ref: ${{ steps.ver.outputs.sha }}
+          path: _rtk_src
+      - name: Install musl tools (linux)
+        if: matrix.target == 'linux-x64'
+        run: sudo apt-get install -y musl-tools
+      - name: Add cargo target
+        run: rustup target add ${{ matrix.cargo_target }}
+      - name: Build rtk (telemetry disabled at source)
+        run: cargo build --release --target ${{ matrix.cargo_target }} --no-default-features
+        working-directory: _rtk_src
+      - name: Copy binary
+        run: |
+          mkdir -p $(dirname ${{ matrix.out }})
+          cp _rtk_src/target/${{ matrix.cargo_target }}/release/rtk ${{ matrix.out }}
+          chmod +x ${{ matrix.out }}
+          sha256sum ${{ matrix.out }} > ${{ matrix.out }}.sha256
+      - uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f2 # v4.3.1
+        with:
+          name: rtk-${{ matrix.target }}
+          path: ${{ matrix.out }}*
+
+  build-qmd:
+    name: Build qmd (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - target: linux-x64
+            runner: ubuntu-latest
+            bun_target: bun-linux-x64
+            out: vendor/qmd/linux-x64/qmd
+          - target: darwin-arm64
+            runner: macos-14
+            bun_target: bun-darwin-arm64
+            out: vendor/qmd/darwin-arm64/qmd
+          - target: darwin-x64
+            runner: macos-13
+            bun_target: bun-darwin-x64
+            out: vendor/qmd/darwin-x64/qmd
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - name: Read fork SHA
+        id: ver
+        run: |
+          sha=$(grep '^github.com' vendor/qmd/VERSION | sed 's/.*@//')
+          echo "sha=$sha" >> $GITHUB_OUTPUT
+      - name: Checkout qmd fork
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        with:
+          repository: Dirgha-AI/qmd
+          ref: ${{ steps.ver.outputs.sha }}
+          path: _qmd_src
+      - uses: oven-sh/setup-bun@d3603274aca5625baad52ec06108517a089db4c5 # v1.2.0
+        with:
+          bun-version: latest
+      - name: Install deps (no postinstall — node-llama-cpp removed in fork)
+        run: bun install --frozen-lockfile
+        working-directory: _qmd_src
+      - name: Compile qmd binary
+        run: |
+          bun build --compile --minify --target=${{ matrix.bun_target }} ./src/cli.ts --outfile=dist/qmd
+        working-directory: _qmd_src
+      - name: Copy binary
+        run: |
+          mkdir -p $(dirname ${{ matrix.out }})
+          cp _qmd_src/dist/qmd ${{ matrix.out }}
+          chmod +x ${{ matrix.out }}
+          sha256sum ${{ matrix.out }} > ${{ matrix.out }}.sha256
+      - uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f2 # v4.3.1
+        with:
+          name: qmd-${{ matrix.target }}
+          path: ${{ matrix.out }}*
+
+  update-vendors:
+    name: Commit vendor binaries
+    needs: [build-rtk, build-qmd]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - uses: actions/download-artifact@87c55149d96e628cc2ef7e6fc2aab372015aec85 # v4.1.3
+        with:
+          path: _artifacts
+          merge-multiple: true
+      - name: Place binaries
+        run: |
+          find _artifacts -name '*.sha256' -delete
+          cp -r _artifacts/vendor .
+          find vendor -name 'rtk' -o -name 'qmd' | xargs chmod +x
+          # Regenerate combined CHECKSUMS.txt
+          sha256sum vendor/rtk/*/rtk vendor/qmd/*/qmd 2>/dev/null > vendor/CHECKSUMS.txt || true
+      - name: Open PR
+        uses: peter-evans/create-pull-request@5e914681df9dc83aa4e4905692ca88beb2f9e91f # v7.0.5
+        with:
+          commit-message: "chore: update vendor binaries"
+          branch: chore/vendor-binaries-update
+          title: "chore: update vendor binaries"
+          body: |
+            Automated rebuild of rtk and qmd vendored binaries.
+
+            Triggered by VERSION file change. Review CHECKSUMS.txt before merging.

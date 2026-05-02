@@ -9,6 +9,9 @@
  */
 import { argv, cwd, exit, stdin, stdout } from "node:process";
 import { randomUUID } from "node:crypto";
+import { statSync, truncateSync, existsSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
 import { createEventStream } from "../kernel/event-stream.js";
 import { runAgentLoop } from "../kernel/agent-loop.js";
 import { ProviderRegistry } from "../providers/index.js";
@@ -20,6 +23,7 @@ import { runInkTUI } from "../tui/ink/index.js";
 import { builtinSlashCommands } from "./slash/index.js";
 import { renderStreamingEvents } from "../tui/renderer.js";
 import { createSessionStore } from "../context/session.js";
+import { registerSession } from "../state/index.js";
 import { runSubmitPaper } from "./submit-paper.js";
 import { runLogin, runLogout, runSetup, findSubcommand, } from "./subcommands/index.js";
 import { appendAudit } from "../audit/writer.js";
@@ -257,7 +261,9 @@ async function main() {
     registry.register(createTaskTool({
         delegate: async (req) => {
             if (!taskDelegatorRef.current)
-                throw new Error("subagent delegator not yet initialised");
+                throw new Error("subagent delegator not initialised — the task tool requires an active provider session. " +
+                    "This should not happen in normal usage; if you see this, the CLI started before " +
+                    "the provider was resolved. Try restarting or submitting your first prompt first.");
             return taskDelegatorRef.current.delegate(req);
         },
     }));
@@ -309,6 +315,17 @@ async function main() {
                 description: c.description,
                 ...(c.aliases !== undefined ? { aliases: c.aliases } : {}),
             }));
+            // Initialise the subagent delegator now that provider + registry are
+            // ready. This must happen before runInkTUI() because the TUI path
+            // returns early (line ~395) and never reaches the non-interactive
+            // initialisation below, leaving taskDelegatorRef.current = null.
+            taskDelegatorRef.current = new SubagentDelegator({
+                registry,
+                provider: providers.forModel(model),
+                defaultModel: model,
+                cwd: cwd(),
+                parentSessionId: randomUUID(),
+            });
             // Mount banner — on Windows the readline→ink raw-mode handoff
             // takes 1-2s during which nothing renders. Without this the user
             // sees a blank screen and assumes the app froze. The line is
@@ -353,6 +370,8 @@ async function main() {
     // so `dirgha stats` sees real message + token counts. Mirrors what
     // `runInteractive` already does for the readline path.
     const session = await sessions.create(sessionId);
+    // Register in unified state index (fire-and-forget, never blocks).
+    void registerSession(sessionId, model);
     const sessionTs = () => new Date().toISOString();
     // Compute USD cost from the price catalogue so persisted usage entries
     // and `dirgha stats` aren't always $0.00. Provider id is resolved from
@@ -593,13 +612,13 @@ async function main() {
 }
 async function isFirstRun() {
     const { stat } = await import("node:fs/promises");
-    const { homedir } = await import("node:os");
-    const { join } = await import("node:path");
-    const home = homedir();
+    const { homedir: getHomedir } = await import("node:os");
+    const { join: pathJoin } = await import("node:path");
+    const home = getHomedir();
     const candidates = [
-        join(home, ".dirgha", "keys.json"),
-        join(home, ".dirgha", "credentials.json"),
-        join(home, ".dirgha", "config.json"),
+        pathJoin(home, ".dirgha", "keys.json"),
+        pathJoin(home, ".dirgha", "credentials.json"),
+        pathJoin(home, ".dirgha", "config.json"),
     ];
     for (const p of candidates) {
         const exists = await stat(p)
@@ -664,8 +683,59 @@ Environment:
   GEMINI_API_KEY / GOOGLE_API_KEY
 `);
 }
+// Suppress EPIPE/EIO — these occur when the user closes the terminal or
+// pipes output to `head`. Without these guards every PTY close logs a
+// crash and exits non-zero.
+process.stdout.on("error", (e) => {
+    if (e.code === "EPIPE" || e.code === "EIO")
+        process.exit(0);
+});
+process.stderr.on("error", () => { });
+process.stdin.on("error", (e) => {
+    if (e.code === "EIO" || e.code === "EPIPE")
+        process.exit(0);
+});
+process.on("uncaughtException", (e) => {
+    if (e.code === "EPIPE" || e.code === "EIO")
+        process.exit(0);
+    throw e;
+});
+rotateCrashLog();
 main().catch((err) => {
     stdout.write(`\nFatal: ${err instanceof Error ? err.message : String(err)}\n`);
     exit(2);
 });
+function rotateCrashLog() {
+    const dir = join(homedir(), ".dirgha");
+    const path = join(dir, "crash.log");
+    try {
+        if (!existsSync(path))
+            return;
+        const info = statSync(path);
+        // Rotate if > 10 MB or > 2000 lines (approximate)
+        if (info.size < 10 * 1024 * 1024)
+            return;
+        const rotated = `${path}.old`;
+        try {
+            truncateSync(rotated, 0);
+        }
+        catch {
+            /* */
+        }
+        // Keep last 200 entries
+        const raw = require("node:fs").readFileSync(path, "utf8");
+        const entries = raw.split("\n[").filter(Boolean);
+        const kept = entries.slice(-200);
+        const rebuilt = (kept[0]?.startsWith("[") ? kept[0] : `[${kept[0]}`) +
+            kept
+                .slice(1)
+                .map((e) => `[${e}`)
+                .join("");
+        require("node:fs").writeFileSync(rotated, raw, "utf8");
+        require("node:fs").writeFileSync(path, rebuilt, "utf8");
+    }
+    catch {
+        /* best effort — crash log rotation is cosmetic */
+    }
+}
 //# sourceMappingURL=main.js.map

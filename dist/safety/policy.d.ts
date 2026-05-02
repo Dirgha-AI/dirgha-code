@@ -4,15 +4,15 @@
  * default ruleset ships in-code; user and project rules are merged at
  * config load time.
  */
-import type { PermissionCheck, PermissionDecision } from '../tools/permission.js';
+import type { PermissionCheck, PermissionDecision } from "../tools/permission.js";
 export interface PolicyRule {
     id: string;
     applies: {
         tools?: string[];
-        actions?: PermissionCheck['action'][];
+        actions?: PermissionCheck["action"][];
     };
     when?: PolicyCondition;
-    effect: 'allow' | 'deny' | 'require_approval';
+    effect: "allow" | "deny" | "require_approval";
     reason: string;
 }
 export interface PolicyCondition {

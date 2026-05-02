@@ -5,7 +5,7 @@
  */
 
 import { readdir, stat } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { resolve, sep } from 'node:path';
 import type { Tool } from './registry.js';
 import type { ToolResult } from '../kernel/types.js';
 
@@ -32,6 +32,9 @@ export const fsLsTool: Tool = {
   async execute(rawInput: unknown, ctx): Promise<ToolResult<{ entries: number }>> {
     const input = rawInput as Input;
     const target = resolve(ctx.cwd, input.path ?? '.');
+    if (!target.startsWith(ctx.cwd + sep) && target !== ctx.cwd) {
+      return { content: `Path escapes working directory: ${input.path ?? '.'}`, isError: true };
+    }
     if (HUGE_ROOTS.has(target)) {
       return {
         content: `Refusing to list ${target} — too broad. Supply a narrower path, or use search_glob / search_grep with a targeted pattern.`,
