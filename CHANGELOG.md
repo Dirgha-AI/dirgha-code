@@ -2,6 +2,13 @@
 
 All notable changes are tracked here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); we use [Semantic Versioning](https://semver.org/).
 
+## [1.20.3] — 2026-05-02
+
+### Fixed
+
+- TUI streaming: reverted Static-around-transcript regression introduced in 1.20.2; committed turns now render in a dynamic Box, preventing duplicate frozen snapshots that pushed the live stream off screen.
+- TUI: fixed React key warning on Logo inside Static (`key="logo"` on returned element).
+
 ## [1.20.2] — 2026-05-02
 
 ### Fixed

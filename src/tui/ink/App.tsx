@@ -788,13 +788,10 @@ export function App(props: AppProps): React.JSX.Element {
     [overlays],
   );
 
-  const committedItems = React.useMemo(() => {
-    // Key on transcript length so Static re-renders only when transcript
-    // actually grows (new user msg or toolcall completes). Live items
-    // streaming into the same item don't invalidate Static.
-    const key = `committed-${transcript.length}`;
-    return [{ key, transcript }];
-  }, [transcript.length]); // intentional: re-key only when transcript grows, not on every delta
+  const committedJsx = React.useMemo(
+    () => renderTranscript(transcript),
+    [transcript],
+  );
   const liveJsx = React.useMemo(
     () => renderTranscript(projection.liveItems),
     [projection.liveItems],
@@ -809,14 +806,10 @@ export function App(props: AppProps): React.JSX.Element {
     <ThemeProvider activeTheme={themeName}>
       <SpinnerContext.Provider value={{ busy }}>
         <Box flexDirection="column">
-          <Static items={committedItems}>
-            {(item): React.JSX.Element => (
-              <Box key={item.key}>
-                {renderTranscript(item.transcript)}
-              </Box>
-            )}
+          <Static items={[{ key: "logo" }]}>
+            {(): React.JSX.Element => <Logo key="logo" version={VERSION} />}
           </Static>
-          <Logo key="logo" version={VERSION} />
+          <Box flexDirection="column">{committedJsx}</Box>
           <Box flexDirection="column">{liveJsx}</Box>
           {pendingApproval !== null && approvalBusRef.current && (
             <ApprovalPrompt

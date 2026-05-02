@@ -684,16 +684,10 @@ export function App(props) {
             }
         })();
     }, [overlays]);
-    const committedItems = React.useMemo(() => {
-        // Key on transcript length so Static re-renders only when transcript
-        // actually grows (new user msg or toolcall completes). Live items
-        // streaming into the same item don't invalidate Static.
-        const key = `committed-${transcript.length}`;
-        return [{ key, transcript }];
-    }, [transcript.length]); // intentional: re-key only when transcript grows, not on every delta
+    const committedJsx = React.useMemo(() => renderTranscript(transcript), [transcript]);
     const liveJsx = React.useMemo(() => renderTranscript(projection.liveItems), [projection.liveItems]);
     const providerEntries = React.useMemo(() => buildProviderEntries(models, currentModel), [models, currentModel]);
-    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: { busy }, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: committedItems, children: (item) => (_jsx(Box, { children: renderTranscript(item.transcript) }, item.key)) }), _jsx(Logo, { version: VERSION }, "logo"), _jsx(Box, { flexDirection: "column", children: liveJsx }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
+    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: { busy }, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: [{ key: "logo" }], children: () => _jsx(Logo, { version: VERSION }, "logo") }), _jsx(Box, { flexDirection: "column", children: committedJsx }), _jsx(Box, { flexDirection: "column", children: liveJsx }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
                             approvalBusRef.current?.resolve(pendingApproval.id, decision);
                         } })), pendingFailover !== null && (_jsx(ModelSwitchPrompt, { failedModel: pendingFailover.failedModel, failoverModel: pendingFailover.failoverModel, onAccept: (failover) => {
                             const lastPrompt = pendingFailover.lastPrompt;
