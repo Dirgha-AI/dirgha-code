@@ -2,6 +2,36 @@
 
 All notable changes are tracked here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); we use [Semantic Versioning](https://semver.org/).
 
+## [1.20.0] — 2026-05-02
+
+### Added
+
+- BYOK multi-key pool: rotate across multiple provider keys, health-aware eviction.
+- `dirgha update` command: self-update CLI to latest npm release.
+- `dirgha cost` command: show token spend per session and cumulative totals.
+- `dirgha undo` command: revert last agent-applied file change.
+- Ask mode: `--ask` flag gates all tool executions behind a confirmation prompt.
+- 34 new model aliases across NVIDIA, OpenRouter, and local Ollama.
+- 41 new unit + integration tests (vitest).
+- MCP OAuth bearer rotation: auto-refresh expired MCP server tokens.
+- StatusBar tok/s display: real-time tokens-per-second in the TUI footer.
+- `git_state` injection: current branch + dirty status appended to system prompt.
+- Compaction telemetry: log context compaction events to crash-log.
+- Ledger ranked search: cost ledger now supports ranked/fuzzy queries.
+- TS extensions API: `dirgha.extensions.register()` for first-party plugin hooks.
+- `audit-codebase` one-liner skill shortcut.
+- Prepublish guard: blocks `npm publish` if dist/ is stale or tests are failing.
+
+### Fixed
+
+- NIM delta.reasoning streaming: correctly buffers partial reasoning_content chunks.
+- Mid-session failover: provider failover no longer drops the current tool result.
+- BYOK env hydration: env-var keys are now loaded before first request, not lazily.
+- Login flag passthrough: `--login` correctly forwarded through the CLI entry point.
+- Task tool wiring: TaskCreate/TaskUpdate/TaskGet now resolve in agent tool loop.
+- ErrorClassifier wiring: classifier applied to all provider errors, not just OpenAI.
+- Skills install URL flag-injection rejection: `dirgha skills install` validates URLs.
+
 ## [1.18.0] — Kernel hardening, supply-chain hardening, security audit
 
 ### Stability
