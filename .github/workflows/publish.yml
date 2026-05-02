@@ -150,7 +150,7 @@ jobs:
           npm pack --dry-run 2>/dev/null
           npm pack >/dev/null
           BYTES=$(stat -c%s dirgha-code-*.tgz)
-          BUDGET=614400  # 600 KB
+          BUDGET=6291456  # 6 MB (vendor/rtk linux binary ~4.9 MB packed)
           echo "Tarball size: $BYTES bytes (budget: $BUDGET)"
           if [ "$BYTES" -gt "$BUDGET" ]; then
             echo "::error::Bundle size $BYTES exceeds budget $BUDGET — bump deliberately"
