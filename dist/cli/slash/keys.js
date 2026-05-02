@@ -4,22 +4,32 @@
  * and read on start-up so keys survive across shells without touching
  * ~/.bashrc. Values are masked on display.
  */
-import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
 const KNOWN_PROVIDERS = [
-    'NVIDIA_API_KEY',
-    'OPENROUTER_API_KEY',
-    'ANTHROPIC_API_KEY',
-    'OPENAI_API_KEY',
-    'GEMINI_API_KEY',
-    'FIREWORKS_API_KEY',
+    "NVIDIA_API_KEY",
+    "OPENROUTER_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "OPENAI_API_KEY",
+    "GEMINI_API_KEY",
+    "DEEPSEEK_API_KEY",
+    "FIREWORKS_API_KEY",
+    "MISTRAL_API_KEY",
+    "COHERE_API_KEY",
+    "CEREBRAS_API_KEY",
+    "TOGETHER_API_KEY",
+    "PERPLEXITY_API_KEY",
+    "XAI_API_KEY",
+    "GROQ_API_KEY",
+    "ZAI_API_KEY",
+    "SEAMLESS_KEY",
 ];
 function keyPath() {
-    return join(homedir(), '.dirgha', 'keys.json');
+    return join(homedir(), ".dirgha", "keys.json");
 }
 async function read() {
-    const text = await readFile(keyPath(), 'utf8').catch(() => '');
+    const text = await readFile(keyPath(), "utf8").catch(() => "");
     if (!text)
         return {};
     try {
@@ -31,37 +41,39 @@ async function read() {
 }
 async function write(store) {
     const path = keyPath();
-    await mkdir(join(homedir(), '.dirgha'), { recursive: true });
-    await writeFile(path, JSON.stringify(store, null, 2) + '\n', 'utf8');
+    await mkdir(join(homedir(), ".dirgha"), { recursive: true });
+    await writeFile(path, JSON.stringify(store, null, 2) + "\n", "utf8");
     try {
         await chmod(path, 0o600);
     }
-    catch { /* non-POSIX */ }
+    catch {
+        /* non-POSIX */
+    }
 }
 function mask(value) {
     if (value.length < 10)
-        return '***';
+        return "***";
     return `${value.slice(0, 4)}…${value.slice(-4)}`;
 }
 function usage() {
     return [
-        'Usage:',
-        '  /keys                        List stored keys (masked)',
-        '  /keys set <ENV> <value>      Set a provider key',
-        '  /keys clear <ENV>            Remove a key',
-        '  /keys clear all              Remove every key',
-        `Known ENV vars: ${KNOWN_PROVIDERS.join(', ')}`,
-    ].join('\n');
+        "Usage:",
+        "  /keys                        List stored keys (masked)",
+        "  /keys set <ENV> <value>      Set a provider key",
+        "  /keys clear <ENV>            Remove a key",
+        "  /keys clear all              Remove every key",
+        `Known ENV vars: ${KNOWN_PROVIDERS.join(", ")}`,
+    ].join("\n");
 }
 export const keysCommand = {
-    name: 'keys',
-    description: 'Manage BYOK API keys at ~/.dirgha/keys.json',
-    async execute(args) {
+    name: "keys",
+    description: "Manage BYOK API keys at ~/.dirgha/keys.json",
+    async execute(args, ctx) {
         const [op, envVar, value] = args;
         const store = await read();
-        if (!op || op === 'list') {
+        if (!op || op === "list") {
             const all = new Set([...KNOWN_PROVIDERS, ...Object.keys(store)]);
-            const lines = ['Stored keys:'];
+            const lines = ["Stored keys:"];
             for (const key of [...all].sort()) {
                 const stored = store[key];
                 const envInherit = process.env[key];
@@ -69,25 +81,29 @@ export const keysCommand = {
                     ? `stored  ${mask(stored)}`
                     : envInherit
                         ? `env     ${mask(envInherit)}`
-                        : 'unset';
+                        : "unset";
                 lines.push(`  ${key.padEnd(22)}  ${state}`);
             }
             lines.push(`\nFile: ${keyPath()}`);
-            return lines.join('\n');
+            return lines.join("\n");
         }
-        if (op === 'set') {
-            if (!envVar || !value)
+        if (op === "set") {
+            if (!envVar)
                 return `Missing argument.\n${usage()}`;
+            if (!value) {
+                ctx.requestKey(envVar);
+                return `Paste your ${envVar} key below — no restart needed.`;
+            }
             store[envVar] = value;
             await write(store);
             return `Stored ${envVar} (${mask(value)}).`;
         }
-        if (op === 'clear') {
+        if (op === "clear") {
             if (!envVar)
                 return `Missing argument.\n${usage()}`;
-            if (envVar === 'all') {
+            if (envVar === "all") {
                 await write({});
-                return 'Cleared every stored key.';
+                return "Cleared every stored key.";
             }
             if (!(envVar in store))
                 return `${envVar} is not set.`;

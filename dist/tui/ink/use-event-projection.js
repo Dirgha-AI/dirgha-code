@@ -22,8 +22,10 @@ export function useEventProjection(events) {
     // avoid re-parsing full markdown on every single delta (O(n²) parse
     // cost causes visible lag at the end of long streaming responses).
     const pendingTextRef = React.useRef(null);
+    const lastFlushedTextRef = React.useRef("");
     const flushTimerRef = React.useRef(null);
     const pendingThinkingRef = React.useRef(null);
+    const lastFlushedThinkingRef = React.useRef("");
     const flushThinkingTimerRef = React.useRef(null);
     // Per-tool-id buffers for tool_exec_progress — same debounce pattern as text_delta.
     const pendingProgressRef = React.useRef(new Map());
@@ -33,9 +35,18 @@ export function useEventProjection(events) {
     // functional-updater side-channel pattern (which only runs synchronously
     // from React event handlers, not from async finally blocks).
     const liveItemsRef = React.useRef([]);
+    // Adaptive flush: longer text → slower flush to keep rendering smooth.
+    // Short responses stay snappy; long responses avoid the 20Hz jitter trap.
+    function flushDelay(totalChars) {
+        if (totalChars < 500)
+            return 30;
+        if (totalChars < 2000)
+            return 80;
+        return 150;
+    }
     const setLive = React.useCallback((updater) => {
         setLiveItems((prev) => {
-            const next = typeof updater === 'function' ? updater(prev) : updater;
+            const next = typeof updater === "function" ? updater(prev) : updater;
             liveItemsRef.current = next;
             return next;
         });
@@ -49,6 +60,7 @@ export function useEventProjection(events) {
             if (!p)
                 return;
             pendingTextRef.current = null;
+            lastFlushedTextRef.current = "";
             if (flushTimerRef.current !== null) {
                 clearTimeout(flushTimerRef.current);
                 flushTimerRef.current = null;
@@ -64,6 +76,7 @@ export function useEventProjection(events) {
             if (!p)
                 return;
             pendingThinkingRef.current = null;
+            lastFlushedThinkingRef.current = "";
             if (flushThinkingTimerRef.current !== null) {
                 clearTimeout(flushThinkingTimerRef.current);
                 flushThinkingTimerRef.current = null;
@@ -80,6 +93,8 @@ export function useEventProjection(events) {
                 case "agent_start":
                     // Clear stale live items from any aborted prior session so they
                     // don't bleed into the next turn's display.
+                    lastFlushedTextRef.current = "";
+                    lastFlushedThinkingRef.current = "";
                     setLive([]);
                     return;
                 case "text_start":
@@ -101,17 +116,18 @@ export function useEventProjection(events) {
                     if (!flushTimerRef.current) {
                         flushTimerRef.current = setTimeout(() => {
                             flushTimerRef.current = null;
-                            // Read but do NOT clear — next delta will keep accumulating.
-                            // pendingTextRef is only cleared by flushPending() at text_end.
                             const p = pendingTextRef.current;
                             if (!p)
                                 return;
+                            if (p.content === lastFlushedTextRef.current)
+                                return;
+                            lastFlushedTextRef.current = p.content;
                             setLive((prev) => Array.isArray(prev)
                                 ? prev.map((it) => it.kind === "text" && it.id === p.id
                                     ? { ...it, content: p.content }
                                     : it)
                                 : prev);
-                        }, 50);
+                        }, flushDelay(pendingTextRef.current?.content.length ?? 0));
                     }
                     return;
                 }
@@ -140,12 +156,15 @@ export function useEventProjection(events) {
                             const p = pendingThinkingRef.current;
                             if (!p)
                                 return;
+                            if (p.content === lastFlushedThinkingRef.current)
+                                return;
+                            lastFlushedThinkingRef.current = p.content;
                             setLive((prev) => Array.isArray(prev)
                                 ? prev.map((it) => it.kind === "thinking" && it.id === p.id
                                     ? { ...it, content: p.content }
                                     : it)
                                 : prev);
-                        }, 50);
+                        }, flushDelay(pendingThinkingRef.current?.content.length ?? 0));
                     }
                     return;
                 }
@@ -202,14 +221,18 @@ export function useEventProjection(events) {
                 }
                 case "tool_exec_progress": {
                     const toolId = event.id;
-                    pendingProgressRef.current.set(toolId, (pendingProgressRef.current.get(toolId) ?? "") + event.message + "\n");
+                    pendingProgressRef.current.set(toolId, (pendingProgressRef.current.get(toolId) ?? "") +
+                        event.message +
+                        "\n");
                     if (!progressTimerRef.current.has(toolId)) {
                         progressTimerRef.current.set(toolId, setTimeout(() => {
                             progressTimerRef.current.delete(toolId);
                             const accumulated = pendingProgressRef.current.get(toolId);
                             if (!accumulated)
                                 return;
-                            setLive((prev) => prev.map((it) => it.kind === "tool" && it.id === toolId && it.status === "running"
+                            setLive((prev) => prev.map((it) => it.kind === "tool" &&
+                                it.id === toolId &&
+                                it.status === "running"
                                 ? { ...it, outputPreview: accumulated }
                                 : it));
                         }, 50));
@@ -307,10 +330,12 @@ export function useEventProjection(events) {
     }, [setLive]);
     const clear = React.useCallback(() => {
         liveItemsRef.current = [];
+        lastFlushedTextRef.current = "";
+        lastFlushedThinkingRef.current = "";
         setLiveItems([]);
         setTotals({ inputTokens: 0, outputTokens: 0, cachedTokens: 0, costUsd: 0 });
     }, []);
-    return { liveItems, totals, commitLive, appendLive, clear };
+    return React.useMemo(() => ({ liveItems, totals, commitLive, appendLive, clear }), [liveItems, totals, commitLive, appendLive, clear]);
 }
 function summariseInput(input, max = 60) {
     if (input === undefined || input === null)

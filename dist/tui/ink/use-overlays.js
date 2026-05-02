@@ -6,7 +6,7 @@
  * App.tsx. Extracted so App stays under 500 LOC as the feature surface
  * grew (model picker, help, vim mode, paste-collapse, at-file complete).
  */
-import * as React from 'react';
+import * as React from "react";
 export function useOverlays() {
     const [active, setActive] = React.useState(null);
     const [atQuery, setAtQuery] = React.useState(null);
@@ -14,22 +14,22 @@ export function useOverlays() {
     // Keep the @-file overlay in sync with the input token.
     React.useEffect(() => {
         if (atQuery === null) {
-            if (active === 'atfile')
+            if (active === "atfile")
                 setActive(null);
             return;
         }
-        if (active === null || active === 'slash')
-            setActive('atfile');
+        if (active === null || active === "slash")
+            setActive("atfile");
     }, [atQuery, active]);
     // Keep the slash overlay in sync with the input token.
     React.useEffect(() => {
         if (slashQuery === null) {
-            if (active === 'slash')
+            if (active === "slash")
                 setActive(null);
             return;
         }
         if (active === null)
-            setActive('slash');
+            setActive("slash");
     }, [slashQuery, active]);
     const openOverlay = React.useCallback((k) => {
         setActive(k);
@@ -40,25 +40,25 @@ export function useOverlays() {
         setSlashQuery(null);
     }, []);
     const spliceAtSelection = React.useCallback((value, selected) => {
-        const idx = value.lastIndexOf('@');
+        const idx = value.lastIndexOf("@");
         if (idx === -1)
             return value;
         // Replace `@query` (up to next whitespace or end) with the path.
         let end = idx + 1;
-        while (end < value.length && !/\s/.test(value[end] ?? ''))
+        while (end < value.length && !/\s/.test(value[end] ?? ""))
             end += 1;
         return `${value.slice(0, idx)}@${selected}${value.slice(end)}`;
     }, []);
     const spliceSlashSelection = React.useCallback((value, selected) => {
-        if (!value.startsWith('/'))
+        if (!value.startsWith("/"))
             return `/${selected}`;
         // Replace `/query` up to first whitespace; preserve the tail.
         let end = 1;
-        while (end < value.length && !/\s/.test(value[end] ?? ''))
+        while (end < value.length && !/\s/.test(value[end] ?? ""))
             end += 1;
         return `/${selected}${value.slice(end)}`;
     }, []);
-    return {
+    return React.useMemo(() => ({
         active,
         setActive,
         atQuery,
@@ -69,6 +69,14 @@ export function useOverlays() {
         closeOverlay,
         spliceAtSelection,
         spliceSlashSelection,
-    };
+    }), [
+        active,
+        atQuery,
+        slashQuery,
+        openOverlay,
+        closeOverlay,
+        spliceAtSelection,
+        spliceSlashSelection,
+    ]);
 }
 //# sourceMappingURL=use-overlays.js.map

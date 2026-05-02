@@ -43,7 +43,10 @@ export class SlashRegistry {
             else if (prefixMatches.length > 1) {
                 return {
                     handled: true,
-                    output: `Ambiguous command "/${name}" — matches: ${prefixMatches.sort().map((n) => `/${n}`).join(', ')}. Type more characters.`,
+                    output: `Ambiguous command "/${name}" — matches: ${prefixMatches
+                        .sort()
+                        .map((n) => `/${n}`)
+                        .join(", ")}. Type more characters.`,
                 };
             }
             else {

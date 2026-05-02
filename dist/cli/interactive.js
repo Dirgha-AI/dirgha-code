@@ -403,6 +403,9 @@ function buildSlashCtx(a) {
         getSummaryModel() {
             return a.summaryModel;
         },
+        requestKey(keyName) {
+            process.stdout.write(`\n  Run: dirgha keys set ${keyName} <your-key>\n\n`);
+        },
     };
 }
 //# sourceMappingURL=interactive.js.map

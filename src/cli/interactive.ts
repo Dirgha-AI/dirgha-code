@@ -488,5 +488,10 @@ function buildSlashCtx(a: SlashCtxArgs): SlashContext {
     getSummaryModel(): string {
       return a.summaryModel;
     },
+    requestKey(keyName: string): void {
+      process.stdout.write(
+        `\n  Run: dirgha keys set ${keyName} <your-key>\n\n`,
+      );
+    },
   };
 }

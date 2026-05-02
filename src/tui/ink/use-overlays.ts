@@ -7,9 +7,15 @@
  * grew (model picker, help, vim mode, paste-collapse, at-file complete).
  */
 
-import * as React from 'react';
+import * as React from "react";
 
-export type OverlayKind = 'models' | 'help' | 'atfile' | 'slash' | 'theme' | null;
+export type OverlayKind =
+  | "models"
+  | "help"
+  | "atfile"
+  | "slash"
+  | "theme"
+  | null;
 
 export interface OverlayApi {
   active: OverlayKind;
@@ -18,7 +24,7 @@ export interface OverlayApi {
   setAtQuery: (q: string | null) => void;
   slashQuery: string | null;
   setSlashQuery: (q: string | null) => void;
-  openOverlay: (k: 'models' | 'help' | 'theme') => void;
+  openOverlay: (k: "models" | "help" | "theme") => void;
   closeOverlay: () => void;
   /**
    * Splice a selected @-file path back into `value`, replacing the
@@ -42,24 +48,27 @@ export function useOverlays(): OverlayApi {
   // Keep the @-file overlay in sync with the input token.
   React.useEffect(() => {
     if (atQuery === null) {
-      if (active === 'atfile') setActive(null);
+      if (active === "atfile") setActive(null);
       return;
     }
-    if (active === null || active === 'slash') setActive('atfile');
+    if (active === null || active === "slash") setActive("atfile");
   }, [atQuery, active]);
 
   // Keep the slash overlay in sync with the input token.
   React.useEffect(() => {
     if (slashQuery === null) {
-      if (active === 'slash') setActive(null);
+      if (active === "slash") setActive(null);
       return;
     }
-    if (active === null) setActive('slash');
+    if (active === null) setActive("slash");
   }, [slashQuery, active]);
 
-  const openOverlay = React.useCallback((k: 'models' | 'help' | 'theme'): void => {
-    setActive(k);
-  }, []);
+  const openOverlay = React.useCallback(
+    (k: "models" | "help" | "theme"): void => {
+      setActive(k);
+    },
+    [],
+  );
 
   const closeOverlay = React.useCallback((): void => {
     setActive(null);
@@ -67,33 +76,50 @@ export function useOverlays(): OverlayApi {
     setSlashQuery(null);
   }, []);
 
-  const spliceAtSelection = React.useCallback((value: string, selected: string): string => {
-    const idx = value.lastIndexOf('@');
-    if (idx === -1) return value;
-    // Replace `@query` (up to next whitespace or end) with the path.
-    let end = idx + 1;
-    while (end < value.length && !/\s/.test(value[end] ?? '')) end += 1;
-    return `${value.slice(0, idx)}@${selected}${value.slice(end)}`;
-  }, []);
+  const spliceAtSelection = React.useCallback(
+    (value: string, selected: string): string => {
+      const idx = value.lastIndexOf("@");
+      if (idx === -1) return value;
+      // Replace `@query` (up to next whitespace or end) with the path.
+      let end = idx + 1;
+      while (end < value.length && !/\s/.test(value[end] ?? "")) end += 1;
+      return `${value.slice(0, idx)}@${selected}${value.slice(end)}`;
+    },
+    [],
+  );
 
-  const spliceSlashSelection = React.useCallback((value: string, selected: string): string => {
-    if (!value.startsWith('/')) return `/${selected}`;
-    // Replace `/query` up to first whitespace; preserve the tail.
-    let end = 1;
-    while (end < value.length && !/\s/.test(value[end] ?? '')) end += 1;
-    return `/${selected}${value.slice(end)}`;
-  }, []);
+  const spliceSlashSelection = React.useCallback(
+    (value: string, selected: string): string => {
+      if (!value.startsWith("/")) return `/${selected}`;
+      // Replace `/query` up to first whitespace; preserve the tail.
+      let end = 1;
+      while (end < value.length && !/\s/.test(value[end] ?? "")) end += 1;
+      return `/${selected}${value.slice(end)}`;
+    },
+    [],
+  );
 
-  return {
-    active,
-    setActive,
-    atQuery,
-    setAtQuery,
-    slashQuery,
-    setSlashQuery,
-    openOverlay,
-    closeOverlay,
-    spliceAtSelection,
-    spliceSlashSelection,
-  };
+  return React.useMemo(
+    () => ({
+      active,
+      setActive,
+      atQuery,
+      setAtQuery,
+      slashQuery,
+      setSlashQuery,
+      openOverlay,
+      closeOverlay,
+      spliceAtSelection,
+      spliceSlashSelection,
+    }),
+    [
+      active,
+      atQuery,
+      slashQuery,
+      openOverlay,
+      closeOverlay,
+      spliceAtSelection,
+      spliceSlashSelection,
+    ],
+  );
 }

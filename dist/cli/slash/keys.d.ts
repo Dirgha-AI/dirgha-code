@@ -4,5 +4,5 @@
  * and read on start-up so keys survive across shells without touching
  * ~/.bashrc. Values are masked on display.
  */
-import type { SlashCommand } from './types.js';
+import type { SlashCommand } from "./types.js";
 export declare const keysCommand: SlashCommand;

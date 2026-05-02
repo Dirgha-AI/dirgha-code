@@ -404,6 +404,9 @@ export function App(props: AppProps): React.JSX.Element {
               { kind: "notice", id: randomUUID(), text: msg },
             ]);
           },
+          requestKey: (keyName: string) => {
+            setPendingKey({ keyName, retryInput: "" });
+          },
           getMode: () => mode,
           setMode: (m: Mode) => setMode(m),
           getTheme: () =>
@@ -457,7 +460,26 @@ export function App(props: AppProps): React.JSX.Element {
 
       void runTurnRef.current();
     },
-    [busy, exit, props, projection, overlays],
+    [
+      busy,
+      exit,
+      props.registry,
+      props.cwd,
+      props.events,
+      props.providers,
+      props.sessions,
+      props.config,
+      props.ledgerContext,
+      props.slashCommands,
+      props.systemPrompt,
+      projection.clear,
+      overlays.openOverlay,
+      overlays.closeOverlay,
+      overlays.setAtQuery,
+      overlays.setSlashQuery,
+      overlays.setActive,
+      overlays.active,
+    ],
   );
 
   const runTurn = async (): Promise<void> => {

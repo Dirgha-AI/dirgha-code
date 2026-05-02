@@ -331,6 +331,9 @@ export function App(props) {
                         { kind: "notice", id: randomUUID(), text: msg },
                     ]);
                 },
+                requestKey: (keyName) => {
+                    setPendingKey({ keyName, retryInput: "" });
+                },
                 getMode: () => mode,
                 setMode: (m) => setMode(m),
                 getTheme: () => props.config.theme ?? "readable",
@@ -382,7 +385,26 @@ export function App(props) {
         setTranscript((prev) => [...prev, userItem]);
         historyRef.current.push({ role: "user", content: value });
         void runTurnRef.current();
-    }, [busy, exit, props, projection, overlays]);
+    }, [
+        busy,
+        exit,
+        props.registry,
+        props.cwd,
+        props.events,
+        props.providers,
+        props.sessions,
+        props.config,
+        props.ledgerContext,
+        props.slashCommands,
+        props.systemPrompt,
+        projection.clear,
+        overlays.openOverlay,
+        overlays.closeOverlay,
+        overlays.setAtQuery,
+        overlays.setSlashQuery,
+        overlays.setActive,
+        overlays.active,
+    ]);
     const runTurn = async () => {
         setBusy(true);
         const abort = new AbortController();

@@ -31,6 +31,9 @@ export interface SlashContext {
     upgradeUrl(): string;
     /** Emit a transient status line above the next prompt. */
     status(message: string): void;
+    /** Trigger the key-entry popup overlay so the user can paste a key
+     *  without restarting the REPL. Only works in the Ink TUI path. */
+    requestKey(keyName: string): void;
     /** Active execution mode (plan / act / verify). */
     getMode(): Mode;
     /** Swap the mode live — the next turn's system prompt picks it up. */
