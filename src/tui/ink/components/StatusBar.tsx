@@ -75,7 +75,9 @@ function modeStyle(
   }
 }
 
-export function StatusBar(props: StatusBarProps): React.JSX.Element {
+export const StatusBar = React.memo(function StatusBar(
+  props: StatusBarProps,
+): React.JSX.Element {
   const { stdout } = useStdout();
   const palette = useTheme();
   const cols = stdout?.columns ?? 80;
@@ -169,4 +171,4 @@ export function StatusBar(props: StatusBarProps): React.JSX.Element {
       </Box>
     </Box>
   );
-}
+});

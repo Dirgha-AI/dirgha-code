@@ -21,7 +21,7 @@ import { join } from "node:path";
 import { defaultTheme, style } from "../../tui/theme.js";
 import { pollDeviceAuth, saveToken, startDeviceAuth, } from "../../integrations/device-auth.js";
 import { PRICES } from "../../intelligence/prices.js";
-const PROVIDERS = [
+export const PROVIDERS = [
     {
         id: "dirgha",
         label: "Dirgha hosted",
@@ -156,7 +156,7 @@ const PROVIDERS = [
         blurb: "GLM-4.6 + 4.5 series · long context",
     },
 ];
-const DEFAULT_MODEL_PER_PROVIDER = {
+export const DEFAULT_MODEL_PER_PROVIDER = {
     anthropic: "claude-sonnet-4-6",
     openai: "gpt-5",
     gemini: "gemini-2.5-pro",

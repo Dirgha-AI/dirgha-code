@@ -13,18 +13,21 @@ export interface ThinkingBlockProps {
   content: string;
 }
 
-export function ThinkingBlock({
+export const ThinkingBlock = React.memo(function ThinkingBlock({
   content,
 }: ThinkingBlockProps): React.JSX.Element | null {
   const { stdout } = useStdout();
   const width = Math.max(20, (stdout?.columns ?? 80) - 6);
   const [expanded, setExpanded] = React.useState(false);
 
-  useInput((_, key) => {
-    if (key.return) {
-      setExpanded((prev) => !prev);
-    }
-  }, { isActive: true });
+  useInput(
+    (_, key) => {
+      if (key.return) {
+        setExpanded((prev) => !prev);
+      }
+    },
+    { isActive: true },
+  );
 
   if (content.length === 0) return null;
 
@@ -51,4 +54,4 @@ export function ThinkingBlock({
       </Text>
     </Box>
   );
-}
+});

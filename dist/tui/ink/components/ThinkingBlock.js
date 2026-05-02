@@ -8,7 +8,7 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
  */
 import * as React from "react";
 import { Box, Text, useInput, useStdout } from "ink";
-export function ThinkingBlock({ content, }) {
+export const ThinkingBlock = React.memo(function ThinkingBlock({ content, }) {
     const { stdout } = useStdout();
     const width = Math.max(20, (stdout?.columns ?? 80) - 6);
     const [expanded, setExpanded] = React.useState(false);
@@ -23,5 +23,5 @@ export function ThinkingBlock({ content, }) {
         return (_jsxs(Box, { gap: 1, marginBottom: 1, children: [_jsx(Text, { color: "white", dimColor: true, children: "\u280B" }), _jsxs(Text, { color: "white", dimColor: true, italic: true, children: ["thinking\u2026 (", content.length, " chars \u2014 Enter to expand)"] })] }));
     }
     return (_jsxs(Box, { gap: 2, width: width, marginBottom: 1, children: [_jsx(Text, { color: "white", dimColor: true, children: "\u280B" }), _jsx(Text, { color: "white", dimColor: true, italic: true, wrap: "wrap", children: content })] }));
-}
+});
 //# sourceMappingURL=ThinkingBlock.js.map

@@ -8,10 +8,67 @@
  * AST — markdown blocks are independent at this level so a flat
  * array is enough.
  *
+ * Incremental mode (`createIncrementalParser`) keeps a prefix cache so
+ * streaming delta-only re-parses aren't O(n²). When text grows, only the
+ * new tail is re-evaluated; the cached prefix blocks are reused.
+ *
  * Adapted from gemini-cli's MarkdownDisplay.tsx parsing loop
  * (Apache-2.0). Logic preserved; types & module structure are
  * dirgha-native so the renderer can iterate plain data.
  */
+/**
+ * Incremental parser — reuse cached blocks when text grows.
+ * During streaming, markdown text only appends; re-parsing the
+ * entire accumulated string is O(n²). This class holds the last
+ * full parse result and only re-evaluates the delta tail.
+ */
+export class IncrementalParser {
+    lastText = "";
+    cachedBlocks = [];
+    parse(text) {
+        if (!text)
+            return [];
+        // Full text shorter than cached → reset (e.g. cleared / new message).
+        if (text.length < this.lastText.length) {
+            const blocks = parse(text);
+            this.lastText = text;
+            this.cachedBlocks = blocks;
+            return blocks;
+        }
+        // Same text → return cached.
+        if (text === this.lastText)
+            return this.cachedBlocks;
+        // Text grew — only re-parse the tail.
+        const delta = text.slice(this.lastText.length);
+        const deltaLines = delta.split(/\r?\n/);
+        // If the cached blocks end with a "soft" block (paragraph, blockquote)
+        // that can absorb the delta, merge it.
+        const lastBlock = this.cachedBlocks[this.cachedBlocks.length - 1];
+        if (lastBlock &&
+            (lastBlock.kind === "paragraph" || lastBlock.kind === "blockquote") &&
+            !delta.startsWith("\n")) {
+            // Remove last block, re-parse it + delta together, splice back.
+            const prefixBeforeLast = this.cachedBlocks.slice(0, -1);
+            let lastText2 = "";
+            if (lastBlock.kind === "paragraph")
+                lastText2 = lastBlock.text;
+            if (lastBlock.kind === "blockquote")
+                lastText2 = lastBlock.text;
+            const mergedText = lastText2 + delta;
+            const rewritten = parse(mergedText);
+            this.cachedBlocks = [...prefixBeforeLast, ...rewritten];
+        }
+        else if (deltaLines.length > 0 && delta !== "\n") {
+            // Parse only delta lines and append new blocks.
+            const deltaBlocks = parse(delta);
+            if (deltaBlocks.length > 0) {
+                this.cachedBlocks = [...this.cachedBlocks, ...deltaBlocks];
+            }
+        }
+        this.lastText = text;
+        return this.cachedBlocks;
+    }
+}
 const HEADING = /^ *(#{1,4}) +(.*)/;
 const FENCE = /^ *(`{3,}|~{3,}) *(\w*?) *$/;
 const UL_ITEM = /^([ \t]*)([-*+]) +(.*)/;
@@ -29,10 +86,10 @@ export function parse(text) {
     while (i < lines.length) {
         const line = lines[i];
         // Blank line.
-        if (line.trim() === '') {
+        if (line.trim() === "") {
             // Coalesce runs of blanks into a single block.
-            if (out.length > 0 && out[out.length - 1].kind !== 'blank') {
-                out.push({ kind: 'blank' });
+            if (out.length > 0 && out[out.length - 1].kind !== "blank") {
+                out.push({ kind: "blank" });
             }
             i += 1;
             continue;
@@ -55,20 +112,20 @@ export function parse(text) {
                 codeLines.push(lines[i]);
                 i += 1;
             }
-            out.push({ kind: 'code', lang, lines: codeLines });
+            out.push({ kind: "code", lang, lines: codeLines });
             continue;
         }
         // Heading.
         const headingM = line.match(HEADING);
         if (headingM) {
             const level = Math.min(4, headingM[1].length);
-            out.push({ kind: 'heading', level, text: headingM[2] });
+            out.push({ kind: "heading", level, text: headingM[2] });
             i += 1;
             continue;
         }
         // Horizontal rule.
         if (HR.test(line)) {
-            out.push({ kind: 'rule' });
+            out.push({ kind: "rule" });
             i += 1;
             continue;
         }
@@ -87,7 +144,7 @@ export function parse(text) {
                 rows.push(splitRow(rowM[1]));
                 i += 1;
             }
-            out.push({ kind: 'table', headers, rows, align });
+            out.push({ kind: "table", headers, rows, align });
             continue;
         }
         // Blockquote.
@@ -100,13 +157,13 @@ export function parse(text) {
                 buf.push(m[1]);
                 i += 1;
             }
-            out.push({ kind: 'blockquote', text: buf.join('\n') });
+            out.push({ kind: "blockquote", text: buf.join("\n") });
             continue;
         }
         // List (unordered or ordered).
         if (UL_ITEM.test(line) || OL_ITEM.test(line)) {
             const { items, ordered, consumed } = consumeList(lines, i);
-            out.push({ kind: 'list', ordered, items });
+            out.push({ kind: "list", ordered, items });
             i += consumed;
             continue;
         }
@@ -115,7 +172,7 @@ export function parse(text) {
         i += 1;
         while (i < lines.length) {
             const next2 = lines[i];
-            if (next2.trim() === '' ||
+            if (next2.trim() === "" ||
                 FENCE.test(next2) ||
                 HEADING.test(next2) ||
                 HR.test(next2) ||
@@ -128,7 +185,7 @@ export function parse(text) {
             paraLines.push(next2);
             i += 1;
         }
-        out.push({ kind: 'paragraph', text: paraLines.join('\n') });
+        out.push({ kind: "paragraph", text: paraLines.join("\n") });
     }
     return out;
 }
@@ -156,23 +213,23 @@ function consumeList(lines, start) {
     return { items, ordered, consumed: i - start };
 }
 function splitRow(inner) {
-    return inner.split('|').map(c => c.trim());
+    return inner.split("|").map((c) => c.trim());
 }
 function parseAlign(sep) {
     return sep
-        .replace(/^\s*\|?/, '')
-        .replace(/\|?\s*$/, '')
-        .split('|')
-        .map(c => c.trim())
+        .replace(/^\s*\|?/, "")
+        .replace(/\|?\s*$/, "")
+        .split("|")
+        .map((c) => c.trim())
         .map((c) => {
-        const left = c.startsWith(':');
-        const right = c.endsWith(':');
+        const left = c.startsWith(":");
+        const right = c.endsWith(":");
         if (left && right)
-            return 'center';
+            return "center";
         if (right)
-            return 'right';
+            return "right";
         if (left)
-            return 'left';
+            return "left";
         return null;
     });
 }

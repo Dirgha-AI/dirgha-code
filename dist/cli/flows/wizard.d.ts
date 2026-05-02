@@ -13,5 +13,16 @@
  * Non-TTY: prints a static how-to instead of prompting (CI-safe).
  */
 import type { Subcommand } from "../subcommands/index.js";
+interface ProviderChoice {
+    id: string;
+    label: string;
+    hosted: boolean;
+    env?: string;
+    helpUrl?: string;
+    blurb: string;
+}
+export declare const PROVIDERS: ProviderChoice[];
+export declare const DEFAULT_MODEL_PER_PROVIDER: Record<string, string>;
 export declare function runWizard(argv: string[]): Promise<number>;
 export declare const wizardSubcommand: Subcommand;
+export {};

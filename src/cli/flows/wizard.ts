@@ -37,7 +37,7 @@ interface ProviderChoice {
   blurb: string;
 }
 
-const PROVIDERS: ProviderChoice[] = [
+export const PROVIDERS: ProviderChoice[] = [
   {
     id: "dirgha",
     label: "Dirgha hosted",
@@ -173,7 +173,7 @@ const PROVIDERS: ProviderChoice[] = [
   },
 ];
 
-const DEFAULT_MODEL_PER_PROVIDER: Record<string, string> = {
+export const DEFAULT_MODEL_PER_PROVIDER: Record<string, string> = {
   anthropic: "claude-sonnet-4-6",
   openai: "gpt-5",
   gemini: "gemini-2.5-pro",

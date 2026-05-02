@@ -9,4 +9,4 @@ import * as React from "react";
 export interface ThinkingBlockProps {
     content: string;
 }
-export declare function ThinkingBlock({ content, }: ThinkingBlockProps): React.JSX.Element | null;
+export declare const ThinkingBlock: React.NamedExoticComponent<ThinkingBlockProps>;

@@ -23,7 +23,7 @@ interface ProviderEntry {
   suggested: string[];
 }
 
-const PROVIDERS: ProviderEntry[] = [
+export const PROVIDERS: ProviderEntry[] = [
   {
     label: "NVIDIA NIM",
     env: "NVIDIA_API_KEY",

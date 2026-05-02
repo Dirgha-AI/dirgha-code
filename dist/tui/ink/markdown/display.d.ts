@@ -17,13 +17,12 @@
  *   --- → horizontal rule
  *   ``` lang → bordered code block, syntax-highlighted
  */
-import * as React from 'react';
-import type { Palette } from '../../theme.js';
+import * as React from "react";
+import type { Palette } from "../../theme.js";
 interface MarkdownProps {
     text: string;
     palette: Palette;
-    /** Available width for cell-based layouts (table). Defaults to 80. */
     width?: number;
 }
-export declare function MarkdownDisplay(props: MarkdownProps): React.ReactElement | null;
+export declare const MarkdownDisplay: React.NamedExoticComponent<MarkdownProps>;
 export {};

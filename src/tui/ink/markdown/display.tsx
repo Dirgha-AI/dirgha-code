@@ -18,25 +18,28 @@
  *   ``` lang → bordered code block, syntax-highlighted
  */
 
-import * as React from 'react';
-import { Box, Text } from 'ink';
-import type { Palette } from '../../theme.js';
-import { parse, type Block, type ListItem } from './parser.js';
-import { RenderInline } from './inline.js';
-import { CodeColorizer } from './colorizer.js';
-import { TableRenderer } from './table.js';
+import * as React from "react";
+import { Box, Text } from "ink";
+import type { Palette } from "../../theme.js";
+import { type Block, type ListItem, IncrementalParser } from "./parser.js";
+import { RenderInline } from "./inline.js";
+import { CodeColorizer } from "./colorizer.js";
+import { TableRenderer } from "./table.js";
+
+const incremental = new IncrementalParser();
 
 interface MarkdownProps {
   text: string;
   palette: Palette;
-  /** Available width for cell-based layouts (table). Defaults to 80. */
   width?: number;
 }
 
-export function MarkdownDisplay(props: MarkdownProps): React.ReactElement | null {
+export const MarkdownDisplay = React.memo(function MarkdownDisplay(
+  props: MarkdownProps,
+): React.ReactElement | null {
   const { text, palette, width = 80 } = props;
   if (!text) return null;
-  const blocks = parse(text);
+  const blocks = incremental.parse(text);
   return (
     <Box flexDirection="column">
       {blocks.map((b, i) => (
@@ -44,7 +47,7 @@ export function MarkdownDisplay(props: MarkdownProps): React.ReactElement | null
       ))}
     </Box>
   );
-}
+});
 
 interface BlockViewProps {
   block: Block;
@@ -53,39 +56,61 @@ interface BlockViewProps {
   idx: number;
 }
 
-function BlockView({ block, palette, width, idx }: BlockViewProps): React.ReactElement | null {
+function BlockView({
+  block,
+  palette,
+  width,
+  idx,
+}: BlockViewProps): React.ReactElement | null {
   switch (block.kind) {
-    case 'blank':
+    case "blank":
       return <Box height={1} />;
 
-    case 'heading': {
+    case "heading": {
       const colour =
-        block.level === 1 ? palette.text.accent
-        : block.level === 2 ? palette.text.accent
-        : palette.text.primary;
-      const prefix = '#'.repeat(block.level);
+        block.level === 1
+          ? palette.text.accent
+          : block.level === 2
+            ? palette.text.accent
+            : palette.text.primary;
+      const prefix = "#".repeat(block.level);
       return (
-        <Box marginTop={idx === 0 ? 0 : 1} marginBottom={0} flexDirection="column">
+        <Box
+          marginTop={idx === 0 ? 0 : 1}
+          marginBottom={0}
+          flexDirection="column"
+        >
           <Text>
-            <Text color={palette.ui.symbol} dimColor>{prefix} </Text>
+            <Text color={palette.ui.symbol} dimColor>
+              {prefix}{" "}
+            </Text>
             <Text bold color={colour}>
-              <RenderInline text={block.text} palette={palette} baseColor={colour} keyPrefix={`h${idx}`} />
+              <RenderInline
+                text={block.text}
+                palette={palette}
+                baseColor={colour}
+                keyPrefix={`h${idx}`}
+              />
             </Text>
           </Text>
         </Box>
       );
     }
 
-    case 'paragraph':
+    case "paragraph":
       return (
         <Box>
-          <RenderInline text={block.text} palette={palette} keyPrefix={`p${idx}`} />
+          <RenderInline
+            text={block.text}
+            palette={palette}
+            keyPrefix={`p${idx}`}
+          />
         </Box>
       );
 
-    case 'code': {
+    case "code": {
       const lang = block.lang;
-      const codeText = block.lines.join('\n');
+      const codeText = block.lines.join("\n");
       return (
         <Box
           marginY={0}
@@ -107,7 +132,7 @@ function BlockView({ block, palette, width, idx }: BlockViewProps): React.ReactE
       );
     }
 
-    case 'list':
+    case "list":
       return (
         <Box flexDirection="column">
           {block.items.map((item, i) => (
@@ -123,14 +148,16 @@ function BlockView({ block, palette, width, idx }: BlockViewProps): React.ReactE
         </Box>
       );
 
-    case 'rule':
+    case "rule":
       return (
         <Box marginY={1}>
-          <Text color={palette.border.default}>{'─'.repeat(Math.max(20, Math.min(60, width - 4)))}</Text>
+          <Text color={palette.border.default}>
+            {"─".repeat(Math.max(20, Math.min(60, width - 4)))}
+          </Text>
         </Box>
       );
 
-    case 'table':
+    case "table":
       return (
         <TableRenderer
           headers={block.headers}
@@ -141,7 +168,7 @@ function BlockView({ block, palette, width, idx }: BlockViewProps): React.ReactE
         />
       );
 
-    case 'blockquote':
+    case "blockquote":
       return (
         <Box flexDirection="row" marginY={0}>
           <Box marginRight={1}>
@@ -149,7 +176,12 @@ function BlockView({ block, palette, width, idx }: BlockViewProps): React.ReactE
           </Box>
           <Box flexDirection="column" flexGrow={1}>
             <Text italic color={palette.text.secondary}>
-              <RenderInline text={block.text} palette={palette} baseColor={palette.text.secondary} keyPrefix={`q${idx}`} />
+              <RenderInline
+                text={block.text}
+                palette={palette}
+                baseColor={palette.text.secondary}
+                keyPrefix={`q${idx}`}
+              />
             </Text>
           </Box>
         </Box>
@@ -165,11 +197,17 @@ interface ListItemRowProps {
   keyPrefix: string;
 }
 
-function ListItemRow({ item, palette, ordered, numberWidth, keyPrefix }: ListItemRowProps): React.ReactElement {
+function ListItemRow({
+  item,
+  palette,
+  ordered,
+  numberWidth,
+  keyPrefix,
+}: ListItemRowProps): React.ReactElement {
   const indent = Math.floor(item.depth / 2);
-  const bullets = ['•', '◦', '▪', '▫'];
+  const bullets = ["•", "◦", "▪", "▫"];
   const bullet = ordered
-    ? `${item.marker.padStart(numberWidth, ' ')}.`
+    ? `${item.marker.padStart(numberWidth, " ")}.`
     : bullets[indent % bullets.length];
   return (
     <Box flexDirection="row" paddingLeft={indent * 2}>
@@ -177,7 +215,11 @@ function ListItemRow({ item, palette, ordered, numberWidth, keyPrefix }: ListIte
         <Text color={palette.text.accent}>{bullet}</Text>
       </Box>
       <Box flexGrow={1}>
-        <RenderInline text={item.text} palette={palette} keyPrefix={keyPrefix} />
+        <RenderInline
+          text={item.text}
+          palette={palette}
+          keyPrefix={keyPrefix}
+        />
       </Box>
     </Box>
   );

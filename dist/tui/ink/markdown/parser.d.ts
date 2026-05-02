@@ -8,37 +8,41 @@
  * AST — markdown blocks are independent at this level so a flat
  * array is enough.
  *
+ * Incremental mode (`createIncrementalParser`) keeps a prefix cache so
+ * streaming delta-only re-parses aren't O(n²). When text grows, only the
+ * new tail is re-evaluated; the cached prefix blocks are reused.
+ *
  * Adapted from gemini-cli's MarkdownDisplay.tsx parsing loop
  * (Apache-2.0). Logic preserved; types & module structure are
  * dirgha-native so the renderer can iterate plain data.
  */
 export type Block = {
-    kind: 'heading';
+    kind: "heading";
     level: 1 | 2 | 3 | 4;
     text: string;
 } | {
-    kind: 'paragraph';
+    kind: "paragraph";
     text: string;
 } | {
-    kind: 'code';
+    kind: "code";
     lang: string | null;
     lines: string[];
 } | {
-    kind: 'list';
+    kind: "list";
     ordered: boolean;
     items: ListItem[];
 } | {
-    kind: 'rule';
+    kind: "rule";
 } | {
-    kind: 'table';
+    kind: "table";
     headers: string[];
     rows: string[][];
-    align: Array<'left' | 'right' | 'center' | null>;
+    align: Array<"left" | "right" | "center" | null>;
 } | {
-    kind: 'blockquote';
+    kind: "blockquote";
     text: string;
 } | {
-    kind: 'blank';
+    kind: "blank";
 };
 export interface ListItem {
     /** Indentation depth (column where the marker started). */
@@ -46,5 +50,16 @@ export interface ListItem {
     /** Bullet char for unordered (-, *, +) or string number for ordered (`1`, `2`). */
     marker: string;
     text: string;
+}
+/**
+ * Incremental parser — reuse cached blocks when text grows.
+ * During streaming, markdown text only appends; re-parsing the
+ * entire accumulated string is O(n²). This class holds the last
+ * full parse result and only re-evaluates the delta tail.
+ */
+export declare class IncrementalParser {
+    private lastText;
+    private cachedBlocks;
+    parse(text: string): Block[];
 }
 export declare function parse(text: string): Block[];

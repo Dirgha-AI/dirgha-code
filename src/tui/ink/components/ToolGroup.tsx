@@ -53,7 +53,9 @@ const DIFF_ADD_COLOUR = "#50fa7b";
 const DIFF_DEL_COLOUR = "#ff5555";
 const DIFF_HUNK_COLOUR = "#00ffff";
 
-export function ToolGroup(props: ToolGroupProps): React.JSX.Element | null {
+export const ToolGroup = React.memo(function ToolGroup(
+  props: ToolGroupProps,
+): React.JSX.Element | null {
   const palette = useTheme();
   if (props.tools.length === 0) return null;
 
@@ -98,7 +100,7 @@ export function ToolGroup(props: ToolGroupProps): React.JSX.Element | null {
       </Box>
     </Box>
   );
-}
+});
 
 interface FullToolRowProps {
   tool: ToolItem;
@@ -159,7 +161,9 @@ function FullToolRow({
             <SpinnerGlyph isActive={busy} color={glyphColour} />
           ) : (
             <Text color={glyphColour} bold>
-              {tool.status === "error" ? TOOL_STATUS.ERROR : TOOL_STATUS.SUCCESS}
+              {tool.status === "error"
+                ? TOOL_STATUS.ERROR
+                : TOOL_STATUS.SUCCESS}
             </Text>
           )}
         </Box>

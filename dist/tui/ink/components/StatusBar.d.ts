@@ -26,4 +26,4 @@ export interface StatusBarProps {
     turnCount?: number;
     maxTurns?: number;
 }
-export declare function StatusBar(props: StatusBarProps): React.JSX.Element;
+export declare const StatusBar: React.NamedExoticComponent<StatusBarProps>;

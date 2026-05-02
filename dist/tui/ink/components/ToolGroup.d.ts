@@ -27,4 +27,4 @@ export interface ToolItem {
 export interface ToolGroupProps {
     tools: ToolItem[];
 }
-export declare function ToolGroup(props: ToolGroupProps): React.JSX.Element | null;
+export declare const ToolGroup: React.NamedExoticComponent<ToolGroupProps>;

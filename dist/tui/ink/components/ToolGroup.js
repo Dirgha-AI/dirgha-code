@@ -34,7 +34,7 @@ const TOOL_LABEL = {
 const DIFF_ADD_COLOUR = "#50fa7b";
 const DIFF_DEL_COLOUR = "#ff5555";
 const DIFF_HUNK_COLOUR = "#00ffff";
-export function ToolGroup(props) {
+export const ToolGroup = React.memo(function ToolGroup(props) {
     const palette = useTheme();
     if (props.tools.length === 0)
         return null;
@@ -48,7 +48,7 @@ export function ToolGroup(props) {
                 }
                 return (_jsx(FullToolRow, { tool: tool, divider: !isLast, palette: palette }, tool.id));
             }) }) }));
-}
+});
 function FullToolRow({ tool, divider, palette, }) {
     const { busy } = React.useContext(SpinnerContext);
     const glyphColour = tool.status === "error"
@@ -76,7 +76,9 @@ function FullToolRow({ tool, divider, palette, }) {
     const diffLines = diffMode && tool.outputPreview
         ? tool.outputPreview.split("\n").slice(0, 30)
         : [];
-    return (_jsxs(Box, { flexDirection: "column", children: [_jsxs(Box, { flexDirection: "row", children: [_jsx(Box, { minWidth: 2, children: tool.status === "running" ? (_jsx(SpinnerGlyph, { isActive: busy, color: glyphColour })) : (_jsx(Text, { color: glyphColour, bold: true, children: tool.status === "error" ? TOOL_STATUS.ERROR : TOOL_STATUS.SUCCESS })) }), _jsx(Text, { color: palette.text.accent, children: iconFor(tool.name) }), _jsx(Text, { children: " " }), _jsx(Text, { bold: true, color: nameColour, children: label }), tool.argSummary && tool.argSummary.length > 0 && (_jsxs(_Fragment, { children: [_jsx(Text, { children: " " }), _jsx(Text, { color: palette.text.secondary, children: tool.argSummary })] })), elapsed && (_jsxs(_Fragment, { children: [_jsx(Text, { children: "  " }), _jsx(Text, { color: palette.text.secondary, dimColor: true, children: elapsed })] }))] }), preview && (_jsx(Box, { paddingLeft: 4, children: _jsxs(Text, { color: palette.text.secondary, dimColor: true, children: ["\u23BF ", preview] }) })), diffLines.length > 0 && (_jsx(Box, { paddingLeft: 4, flexDirection: "column", children: diffLines.map((line, i) => {
+    return (_jsxs(Box, { flexDirection: "column", children: [_jsxs(Box, { flexDirection: "row", children: [_jsx(Box, { minWidth: 2, children: tool.status === "running" ? (_jsx(SpinnerGlyph, { isActive: busy, color: glyphColour })) : (_jsx(Text, { color: glyphColour, bold: true, children: tool.status === "error"
+                                ? TOOL_STATUS.ERROR
+                                : TOOL_STATUS.SUCCESS })) }), _jsx(Text, { color: palette.text.accent, children: iconFor(tool.name) }), _jsx(Text, { children: " " }), _jsx(Text, { bold: true, color: nameColour, children: label }), tool.argSummary && tool.argSummary.length > 0 && (_jsxs(_Fragment, { children: [_jsx(Text, { children: " " }), _jsx(Text, { color: palette.text.secondary, children: tool.argSummary })] })), elapsed && (_jsxs(_Fragment, { children: [_jsx(Text, { children: "  " }), _jsx(Text, { color: palette.text.secondary, dimColor: true, children: elapsed })] }))] }), preview && (_jsx(Box, { paddingLeft: 4, children: _jsxs(Text, { color: palette.text.secondary, dimColor: true, children: ["\u23BF ", preview] }) })), diffLines.length > 0 && (_jsx(Box, { paddingLeft: 4, flexDirection: "column", children: diffLines.map((line, i) => {
                     let colour;
                     if (line.startsWith("+") && !line.startsWith("+++"))
                         colour = DIFF_ADD_COLOUR;

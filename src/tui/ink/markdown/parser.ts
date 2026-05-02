@@ -8,20 +8,29 @@
  * AST — markdown blocks are independent at this level so a flat
  * array is enough.
  *
+ * Incremental mode (`createIncrementalParser`) keeps a prefix cache so
+ * streaming delta-only re-parses aren't O(n²). When text grows, only the
+ * new tail is re-evaluated; the cached prefix blocks are reused.
+ *
  * Adapted from gemini-cli's MarkdownDisplay.tsx parsing loop
  * (Apache-2.0). Logic preserved; types & module structure are
  * dirgha-native so the renderer can iterate plain data.
  */
 
 export type Block =
-  | { kind: 'heading'; level: 1 | 2 | 3 | 4; text: string }
-  | { kind: 'paragraph'; text: string }
-  | { kind: 'code'; lang: string | null; lines: string[] }
-  | { kind: 'list'; ordered: boolean; items: ListItem[] }
-  | { kind: 'rule' }
-  | { kind: 'table'; headers: string[]; rows: string[][]; align: Array<'left' | 'right' | 'center' | null> }
-  | { kind: 'blockquote'; text: string }
-  | { kind: 'blank' };
+  | { kind: "heading"; level: 1 | 2 | 3 | 4; text: string }
+  | { kind: "paragraph"; text: string }
+  | { kind: "code"; lang: string | null; lines: string[] }
+  | { kind: "list"; ordered: boolean; items: ListItem[] }
+  | { kind: "rule" }
+  | {
+      kind: "table";
+      headers: string[];
+      rows: string[][];
+      align: Array<"left" | "right" | "center" | null>;
+    }
+  | { kind: "blockquote"; text: string }
+  | { kind: "blank" };
 
 export interface ListItem {
   /** Indentation depth (column where the marker started). */
@@ -29,6 +38,63 @@ export interface ListItem {
   /** Bullet char for unordered (-, *, +) or string number for ordered (`1`, `2`). */
   marker: string;
   text: string;
+}
+
+/**
+ * Incremental parser — reuse cached blocks when text grows.
+ * During streaming, markdown text only appends; re-parsing the
+ * entire accumulated string is O(n²). This class holds the last
+ * full parse result and only re-evaluates the delta tail.
+ */
+export class IncrementalParser {
+  private lastText = "";
+  private cachedBlocks: Block[] = [];
+
+  parse(text: string): Block[] {
+    if (!text) return [];
+
+    // Full text shorter than cached → reset (e.g. cleared / new message).
+    if (text.length < this.lastText.length) {
+      const blocks = parse(text);
+      this.lastText = text;
+      this.cachedBlocks = blocks;
+      return blocks;
+    }
+
+    // Same text → return cached.
+    if (text === this.lastText) return this.cachedBlocks;
+
+    // Text grew — only re-parse the tail.
+    const delta = text.slice(this.lastText.length);
+    const deltaLines = delta.split(/\r?\n/);
+
+    // If the cached blocks end with a "soft" block (paragraph, blockquote)
+    // that can absorb the delta, merge it.
+    const lastBlock = this.cachedBlocks[this.cachedBlocks.length - 1];
+    if (
+      lastBlock &&
+      (lastBlock.kind === "paragraph" || lastBlock.kind === "blockquote") &&
+      !delta.startsWith("\n")
+    ) {
+      // Remove last block, re-parse it + delta together, splice back.
+      const prefixBeforeLast = this.cachedBlocks.slice(0, -1);
+      let lastText2 = "";
+      if (lastBlock.kind === "paragraph") lastText2 = lastBlock.text;
+      if (lastBlock.kind === "blockquote") lastText2 = lastBlock.text;
+      const mergedText = lastText2 + delta;
+      const rewritten = parse(mergedText);
+      this.cachedBlocks = [...prefixBeforeLast, ...rewritten];
+    } else if (deltaLines.length > 0 && delta !== "\n") {
+      // Parse only delta lines and append new blocks.
+      const deltaBlocks = parse(delta);
+      if (deltaBlocks.length > 0) {
+        this.cachedBlocks = [...this.cachedBlocks, ...deltaBlocks];
+      }
+    }
+
+    this.lastText = text;
+    return this.cachedBlocks;
+  }
 }
 
 const HEADING = /^ *(#{1,4}) +(.*)/;
@@ -50,10 +116,10 @@ export function parse(text: string): Block[] {
     const line = lines[i];
 
     // Blank line.
-    if (line.trim() === '') {
+    if (line.trim() === "") {
       // Coalesce runs of blanks into a single block.
-      if (out.length > 0 && out[out.length - 1].kind !== 'blank') {
-        out.push({ kind: 'blank' });
+      if (out.length > 0 && out[out.length - 1].kind !== "blank") {
+        out.push({ kind: "blank" });
       }
       i += 1;
       continue;
@@ -79,7 +145,7 @@ export function parse(text: string): Block[] {
         codeLines.push(lines[i]);
         i += 1;
       }
-      out.push({ kind: 'code', lang, lines: codeLines });
+      out.push({ kind: "code", lang, lines: codeLines });
       continue;
     }
 
@@ -87,14 +153,14 @@ export function parse(text: string): Block[] {
     const headingM = line.match(HEADING);
     if (headingM) {
       const level = Math.min(4, headingM[1].length) as 1 | 2 | 3 | 4;
-      out.push({ kind: 'heading', level, text: headingM[2] });
+      out.push({ kind: "heading", level, text: headingM[2] });
       i += 1;
       continue;
     }
 
     // Horizontal rule.
     if (HR.test(line)) {
-      out.push({ kind: 'rule' });
+      out.push({ kind: "rule" });
       i += 1;
       continue;
     }
@@ -113,7 +179,7 @@ export function parse(text: string): Block[] {
         rows.push(splitRow(rowM[1]));
         i += 1;
       }
-      out.push({ kind: 'table', headers, rows, align });
+      out.push({ kind: "table", headers, rows, align });
       continue;
     }
 
@@ -126,14 +192,14 @@ export function parse(text: string): Block[] {
         buf.push(m[1]);
         i += 1;
       }
-      out.push({ kind: 'blockquote', text: buf.join('\n') });
+      out.push({ kind: "blockquote", text: buf.join("\n") });
       continue;
     }
 
     // List (unordered or ordered).
     if (UL_ITEM.test(line) || OL_ITEM.test(line)) {
       const { items, ordered, consumed } = consumeList(lines, i);
-      out.push({ kind: 'list', ordered, items });
+      out.push({ kind: "list", ordered, items });
       i += consumed;
       continue;
     }
@@ -144,7 +210,7 @@ export function parse(text: string): Block[] {
     while (i < lines.length) {
       const next2 = lines[i];
       if (
-        next2.trim() === '' ||
+        next2.trim() === "" ||
         FENCE.test(next2) ||
         HEADING.test(next2) ||
         HR.test(next2) ||
@@ -158,7 +224,7 @@ export function parse(text: string): Block[] {
       paraLines.push(next2);
       i += 1;
     }
-    out.push({ kind: 'paragraph', text: paraLines.join('\n') });
+    out.push({ kind: "paragraph", text: paraLines.join("\n") });
   }
 
   return out;
@@ -191,21 +257,21 @@ function consumeList(
 }
 
 function splitRow(inner: string): string[] {
-  return inner.split('|').map(c => c.trim());
+  return inner.split("|").map((c) => c.trim());
 }
 
-function parseAlign(sep: string): Array<'left' | 'right' | 'center' | null> {
+function parseAlign(sep: string): Array<"left" | "right" | "center" | null> {
   return sep
-    .replace(/^\s*\|?/, '')
-    .replace(/\|?\s*$/, '')
-    .split('|')
-    .map(c => c.trim())
-    .map((c): 'left' | 'right' | 'center' | null => {
-      const left = c.startsWith(':');
-      const right = c.endsWith(':');
-      if (left && right) return 'center';
-      if (right) return 'right';
-      if (left) return 'left';
+    .replace(/^\s*\|?/, "")
+    .replace(/\|?\s*$/, "")
+    .split("|")
+    .map((c) => c.trim())
+    .map((c): "left" | "right" | "center" | null => {
+      const left = c.startsWith(":");
+      const right = c.endsWith(":");
+      if (left && right) return "center";
+      if (right) return "right";
+      if (left) return "left";
       return null;
     });
 }

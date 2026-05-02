@@ -44,7 +44,7 @@ function modeStyle(mode) {
             return { label: "ACT", symbol: "▸" };
     }
 }
-export function StatusBar(props) {
+export const StatusBar = React.memo(function StatusBar(props) {
     const { stdout } = useStdout();
     const palette = useTheme();
     const cols = stdout?.columns ?? 80;
@@ -96,5 +96,5 @@ export function StatusBar(props) {
     //   right: spinner (when busy) · short model · context-meter or cost
     return (_jsxs(Box, { width: cols, paddingX: 1, justifyContent: "space-between", children: [_jsxs(Box, { gap: 1, children: [_jsxs(Text, { color: modeColour, bold: true, children: [ms.symbol, " ", ms.label] }), _jsx(Text, { color: palette.textMuted, dimColor: true, children: "\u00B7" }), _jsx(Text, { color: palette.textMuted, children: cwdLabel(props.cwd) })] }), _jsxs(Box, { gap: 1, children: [props.busy && _jsx(SpinnerGlyph, { isActive: true }), typeof props.turnCount === "number" &&
                         typeof props.maxTurns === "number" && (_jsx(Text, { color: palette.textMuted, dimColor: true, children: `Turn ${props.turnCount}/${props.maxTurns}` })), _jsx(Text, { color: palette.brand, children: modelDisplay }), props.busy && (_jsx(Text, { color: palette.textMuted, dimColor: true, children: "\u00B7 Ctrl+C to stop" })), tokRateLabel !== "" && (_jsx(Text, { color: palette.textMuted, dimColor: true, children: tokRateLabel })), contextMeter !== "" && (_jsx(Text, { color: palette.textMuted, dimColor: true, children: contextMeter })), costLabel !== "" && (_jsx(Text, { color: palette.textMuted, dimColor: true, children: costLabel }))] })] }));
-}
+});
 //# sourceMappingURL=StatusBar.js.map

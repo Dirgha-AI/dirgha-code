@@ -13,7 +13,7 @@ import { createInterface } from "node:readline";
 import { dirname, join } from "node:path";
 import { DEFAULT_CONFIG } from "./config.js";
 import { style, defaultTheme } from "../tui/theme.js";
-const PROVIDERS = [
+export const PROVIDERS = [
     {
         label: "NVIDIA NIM",
         env: "NVIDIA_API_KEY",
