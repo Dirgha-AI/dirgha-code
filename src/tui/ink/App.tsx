@@ -788,13 +788,20 @@ export function App(props: AppProps): React.JSX.Element {
     [overlays],
   );
 
-  const allTranscriptItems = React.useMemo(
-    () => [...transcript, ...projection.liveItems],
-    [transcript, projection.liveItems],
+  const committedItems = React.useMemo(() => {
+    // Key on transcript length so Static re-renders only when transcript
+    // actually grows (new user msg or toolcall completes). Live items
+    // streaming into the same item don't invalidate Static.
+    const key = `committed-${transcript.length}`;
+    return [{ key }];
+  }, [transcript.length]);
+  const committedJsx = React.useMemo(
+    () => renderTranscript(transcript),
+    [transcript],
   );
-  const renderedTranscript = React.useMemo(
-    () => renderTranscript(allTranscriptItems),
-    [allTranscriptItems],
+  const liveJsx = React.useMemo(
+    () => renderTranscript(projection.liveItems),
+    [projection.liveItems],
   );
 
   const providerEntries = React.useMemo(
@@ -812,12 +819,11 @@ export function App(props: AppProps): React.JSX.Element {
     <ThemeProvider activeTheme={themeName}>
       <SpinnerContext.Provider value={{ busy }}>
         <Box flexDirection="column">
-          <Static items={[{ key: "logo" }]}>
-            {(_item): React.JSX.Element => (
-              <Logo key="logo" version={VERSION} />
-            )}
+          <Static items={committedItems}>
+            {(): React.JSX.Element => <>{committedJsx}</>}
           </Static>
-          <Box flexDirection="column">{renderedTranscript}</Box>
+          <Logo key="logo" version={VERSION} />
+          <Box flexDirection="column">{liveJsx}</Box>
           {pendingApproval !== null && approvalBusRef.current && (
             <ApprovalPrompt
               request={pendingApproval}
