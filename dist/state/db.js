@@ -27,7 +27,7 @@ function getDb() {
         initSchema(_db);
         return _db;
     }
-    catch (err) {
+    catch {
         throw new Error(`SQLite unavailable (optional feature) — run "dirgha setup --features" to install.`);
     }
 }

@@ -78,7 +78,7 @@ async function extractNodeFromTarGz(tarGzPath, outDir) {
     });
     if (tarResult.status === 0) {
         // Find extracted .node file.
-        const { readdirSync, statSync: ss } = await import('node:fs');
+        const { readdirSync } = await import('node:fs');
         function findNode(dir) {
             for (const entry of readdirSync(dir, { withFileTypes: true })) {
                 const full = join(dir, entry.name);
@@ -100,12 +100,10 @@ async function extractNodeFromTarGz(tarGzPath, outDir) {
         const { createReadStream } = require('node:fs');
         const gunzip = createGunzip();
         const rs = createReadStream(tarGzPath);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const chunks = [];
         rs.pipe(gunzip);
         gunzip.on('data', (chunk) => chunks.push(chunk));
         gunzip.on('end', () => {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
             const buf = Buffer.concat(chunks);
             let offset = 0;
             let foundPath = null;
@@ -400,7 +398,7 @@ export async function runFeatureSetup() {
         stdout.write('\n');
         // Track results for summary.
         let sqliteOk = status.sqliteAvailable;
-        let qmdOk = status.qmdAvailable;
+        const qmdOk = status.qmdAvailable;
         // ── better-sqlite3 ──────────────────────────────────────────────────
         if (installSqliteNow) {
             stdout.write('► installing better-sqlite3…\n');

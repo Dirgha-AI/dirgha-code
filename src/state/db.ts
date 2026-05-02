@@ -35,7 +35,7 @@ function getDb(): import("better-sqlite3").Database {
     (_db as import("better-sqlite3").Database).pragma("synchronous = NORMAL");
     initSchema(_db as import("better-sqlite3").Database);
     return _db as import("better-sqlite3").Database;
-  } catch (err) {
+  } catch {
     throw new Error(
       `SQLite unavailable (optional feature) — run "dirgha setup --features" to install.`,
     );

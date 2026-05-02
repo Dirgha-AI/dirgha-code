@@ -16,8 +16,8 @@ import { stdin, stdout } from 'node:process';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { mkdirSync, createWriteStream, existsSync, renameSync, unlinkSync } from 'node:fs';
-import { access, constants, readFile, writeFile, mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir, homedir } from 'node:os';
+import { access, constants, mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { createGunzip } from 'node:zlib';
 import * as https from 'node:https';
 import { execFile, spawnSync } from 'node:child_process';
@@ -81,7 +81,7 @@ async function extractNodeFromTarGz(tarGzPath: string, outDir: string): Promise<
   });
   if (tarResult.status === 0) {
     // Find extracted .node file.
-    const { readdirSync, statSync: ss } = await import('node:fs');
+    const { readdirSync } = await import('node:fs');
     function findNode(dir: string): string | null {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
         const full = join(dir, entry.name);
@@ -102,13 +102,11 @@ async function extractNodeFromTarGz(tarGzPath: string, outDir: string): Promise<
     const { createReadStream } = require('node:fs') as typeof import('node:fs');
     const gunzip = createGunzip();
     const rs = createReadStream(tarGzPath);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const chunks: any[] = [];
+    const chunks: Uint8Array[] = [];
 
     rs.pipe(gunzip);
-    gunzip.on('data', (chunk: unknown) => chunks.push(chunk));
+    gunzip.on('data', (chunk: Uint8Array) => chunks.push(chunk));
     gunzip.on('end', () => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       const buf: Buffer = Buffer.concat(chunks);
       let offset = 0;
       let foundPath: string | null = null;
@@ -452,7 +450,7 @@ export async function runFeatureSetup(): Promise<number> {
 
     // Track results for summary.
     let sqliteOk = status.sqliteAvailable;
-    let qmdOk = status.qmdAvailable;
+    const qmdOk = status.qmdAvailable;
 
     // ── better-sqlite3 ──────────────────────────────────────────────────
     if (installSqliteNow) {
