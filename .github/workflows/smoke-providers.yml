@@ -1,0 +1,85 @@
+name: Nightly Provider Smoke
+
+on:
+  schedule:
+    - cron: "0 5 * * *" # 05:00 UTC daily
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Smoke mode (free or all)"
+        required: false
+        default: "free"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Provider Smoke Matrix (${{ github.event.inputs.mode || 'free' }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Build
+        run: npm run build
+
+      - name: Smoke providers
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          FIREWORKS_API_KEY: ${{ secrets.FIREWORKS_API_KEY }}
+        run: bash scripts/smoke-matrix-providers.sh ${{ github.event.inputs.mode || 'free' }}
+
+      - name: Upload smoke report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: provider-smoke-${{ github.run_id }}
+          path: /tmp/dirgha-smoke-providers-*/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  bundle-trend:
+    name: Bundle Size Trend
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name == 'schedule'
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Build
+        run: npm run build
+
+      - name: Measure bundle size
+        run: node scripts/bundle-trend.mjs
+
+      - name: Upload trend data
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: bundle-trend-${{ github.run_id }}
+          path: /tmp/dirgha-bundle-trend.json
+          retention-days: 90
+          if-no-files-found: ignore

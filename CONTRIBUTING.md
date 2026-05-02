@@ -74,6 +74,7 @@ You can also just ask: open an issue with "what should I work on?" and we'll sug
 ### Bugs and feature requests
 
 Open an issue. Include:
+
 - What you expected
 - What actually happened
 - Reproduction steps, OS, Node version, Dirgha version (`dirgha --version`)
@@ -110,6 +111,7 @@ Open an issue. Include:
 ## Scope — what belongs here
 
 **Belongs in `@dirgha/code`:**
+
 - Terminal UI improvements
 - LLM provider integrations (new providers, streaming, tool calling)
 - Agent-mode headless command surface
@@ -119,6 +121,7 @@ Open an issue. Include:
 - Cross-platform fixes (Windows / macOS / Linux)
 
 **Does not belong here:**
+
 - Billing, quota enforcement, user management — those live in the Dirgha Gateway (not open source)
 - Web/mobile UI — separate repos
 - Model weights — those are upstream at the provider
@@ -141,25 +144,25 @@ If your PR doesn't add a new user-facing capability, it's a patch.
 
 As of v1.12.2, Dirgha Code routes to **17 providers** out of the box. You only need keys for the ones you want to use.
 
-| Provider | Env var | Best for |
-|---|---|---|
-| Anthropic | `ANTHROPIC_API_KEY` | Claude Opus / Sonnet / Haiku — strongest reasoning |
-| OpenAI | `OPENAI_API_KEY` | GPT-5.5 family, o1/o3 |
-| Google AI | `GEMINI_API_KEY` | Gemini Pro / Flash, long context |
-| OpenRouter | `OPENROUTER_API_KEY` | 370+ models incl. free tier (hy3, ling, gemma, nemotron) |
-| NVIDIA NIM | `NVIDIA_API_KEY` | Free tier · Kimi K2.5, DeepSeek V4, Qwen 3, Llama |
-| Mistral | `MISTRAL_API_KEY` | Mistral Large, Codestral, Magistral |
-| Cohere | `COHERE_API_KEY` | Command R / Command A — RAG-tuned |
-| Cerebras | `CEREBRAS_API_KEY` | Wafer-scale inference, very fast |
-| Together AI | `TOGETHER_API_KEY` | Open-source model hub — Llama, Qwen, DeepSeek |
-| Perplexity | `PERPLEXITY_API_KEY` | Sonar — search-grounded answers |
-| xAI (Grok) | `XAI_API_KEY` | Grok 4 family — code + reasoning |
-| Groq | `GROQ_API_KEY` | LPU-accelerated · very low latency |
-| Z.AI / GLM | `ZAI_API_KEY` | GLM-4.6 — long-context |
-| Fireworks | `FIREWORKS_API_KEY` | Hosted open models, fast |
-| DeepSeek (native) | `DEEPSEEK_API_KEY` | Direct DeepSeek API — own quota, no shared 429s |
-| Ollama (local) | — (URL only) | Privacy-first, no key needed |
-| llama.cpp (local) | — (URL only) | Privacy-first, no key needed |
+| Provider          | Env var              | Best for                                                 |
+| ----------------- | -------------------- | -------------------------------------------------------- |
+| Anthropic         | `ANTHROPIC_API_KEY`  | Claude Opus / Sonnet / Haiku — strongest reasoning       |
+| OpenAI            | `OPENAI_API_KEY`     | GPT-5.5 family, o1/o3                                    |
+| Google AI         | `GEMINI_API_KEY`     | Gemini Pro / Flash, long context                         |
+| OpenRouter        | `OPENROUTER_API_KEY` | 370+ models incl. free tier (hy3, ling, gemma, nemotron) |
+| NVIDIA NIM        | `NVIDIA_API_KEY`     | Free tier · Kimi K2.5, DeepSeek V4, Qwen 3, Llama        |
+| Mistral           | `MISTRAL_API_KEY`    | Mistral Large, Codestral, Magistral                      |
+| Cohere            | `COHERE_API_KEY`     | Command R / Command A — RAG-tuned                        |
+| Cerebras          | `CEREBRAS_API_KEY`   | Wafer-scale inference, very fast                         |
+| Together AI       | `TOGETHER_API_KEY`   | Open-source model hub — Llama, Qwen, DeepSeek            |
+| Perplexity        | `PERPLEXITY_API_KEY` | Sonar — search-grounded answers                          |
+| xAI (Grok)        | `XAI_API_KEY`        | Grok 4 family — code + reasoning                         |
+| Groq              | `GROQ_API_KEY`       | LPU-accelerated · very low latency                       |
+| Z.AI / GLM        | `ZAI_API_KEY`        | GLM-4.6 — long-context                                   |
+| Fireworks         | `FIREWORKS_API_KEY`  | Hosted open models, fast                                 |
+| DeepSeek (native) | `DEEPSEEK_API_KEY`   | Direct DeepSeek API — own quota, no shared 429s          |
+| Ollama (local)    | — (URL only)         | Privacy-first, no key needed                             |
+| llama.cpp (local) | — (URL only)         | Privacy-first, no key needed                             |
 
 Add a key with `dirgha keys add <ENV_VAR> <key>`. List with `dirgha keys list`. Switch model in-session with `/models`.
 
@@ -170,127 +173,244 @@ Add a key with `dirgha keys add <ENV_VAR> <key>`. List with `dirgha keys list`. 
 Plain-English definitions for every term in the codebase, docs, and this guide. Sorted alphabetically.
 
 ### Agent loop
+
 The "ReAct" execution model. Dirgha sends the user's prompt + the conversation so far + a list of available tools to the LLM. The LLM responds with either text (final answer) or one or more tool calls. Dirgha runs each tool call, appends the result to the conversation, and loops back. Continues until the LLM produces text-only or `--max-turns` is hit. Lives in `src/kernel/agent-loop.ts`.
 
 ### Approval bus
+
 The mechanism that asks the user "do you want me to run this `shell` command?" before a tool executes. Tools mark themselves `requiresApproval: true` (e.g., shell, fs_write, fs_edit). The bus presents a yes/no prompt. Replaced in v1.12.1 with an Ink-native version that fixes a Windows-specific stall. See `src/tui/ink/ink-approval-bus.ts`.
 
 ### BYOK (Bring Your Own Key)
+
 You supply API keys for the LLM provider. Dirgha sends your prompts to that provider on your behalf using your key — bills go to your account, not to us. The opposite is "hosted" (single login, we proxy through our gateway with our keys). Dirgha is BYOK by default.
 
 ### Catalogue
+
 The list of models Dirgha knows about, with prices, context windows, and tool-call support flags. Lives in `src/intelligence/prices.ts`. The picker reads from it; `dirgha cost` uses prices to compute spend.
 
 ### Compaction
+
 When the conversation gets close to the model's context window, Dirgha summarises old turns to free up tokens. Triggered automatically at 75% of the model's window. The summarisation uses `summaryModel` from config. See `src/context/compaction.ts`.
 
 ### Context window
+
 The maximum number of tokens (≈ words) a model can read in a single request. Most current models are 128k–256k tokens; some go to 1M (Llama 4 Maverick, grok-4-fast). When you're about to exceed it, compaction kicks in.
 
 ### Conventional commits
+
 A commit-message format that lets release-please decide the next version automatically. `feat:` triggers a minor bump, `fix:` a patch, `feat!:` or `BREAKING CHANGE:` a major. The prefix matters; the rest is free-form.
 
 ### Dispatch
+
 The function that maps a model id (`claude-sonnet-4-6`, `cohere/command-a-03-2025`, `tencent/hy3-preview:free`) to the provider that handles it (`anthropic`, `cohere`, `openrouter`). Pure function in `src/providers/dispatch.ts`. Adding a new provider is a one-line change here.
 
 ### Failover
+
 When a model returns an error that's "fixable by switching" (deprecated id, rate limit, 5xx), Dirgha looks up a known-good substitute from `MODEL_FAILOVERS` in `prices.ts`. The user sees an inline `[y/n/p=picker]` prompt and can accept the swap to retry the failed turn.
 
 ### Fleet
+
 A set of agents running in parallel git worktrees, each with its own task. `dirgha fleet launch ...`. Useful for trying four approaches to the same problem and merging the winner. See `src/fleet/`.
 
 ### Frontmatter
+
 The YAML block at the top of a markdown skill file that names it and describes when to invoke it. Dirgha's skill scanner reads frontmatter to decide which skill matches the user's request.
 
 ### Headless mode
+
 Running Dirgha non-interactively: `dirgha "your prompt"` for one-shot, `--print` for plain-text output, `--json` for an event stream you can pipe into another tool. No TUI, no overlays.
 
 ### Ink
+
 The React-for-the-terminal library Dirgha's TUI is built on. Components are JSX, layout uses flexbox-like primitives, and rendering is differential (only changed regions repaint). Ships at `node_modules/ink`.
 
 ### Kernel
+
 The lowest-level orchestration code — the agent loop, the event stream, the tool executor. Provider-agnostic, UI-agnostic. Lives in `src/kernel/`. If you change something here, every model and every UI is affected.
 
 ### Local model
+
 An LLM running on your machine via Ollama or llama.cpp instead of a cloud provider. Privacy-first; no key needed; speed depends on your hardware.
 
 ### Memory
+
 Long-term notes Dirgha remembers across sessions. `dirgha memory add user "I prefer pnpm over npm"`. Stored in `~/.dirgha/memory/`. Different from session history (which is per-conversation) and from skills (which are reusable workflows).
 
 ### Native provider
+
 A provider whose API Dirgha calls directly using its own endpoint and credentials, vs. routing through OpenRouter. `mistral`, `cohere`, `xai`, `groq`, etc. are all native. Lower latency, your own quota, no aggregator margin.
 
 ### OpenRouter
+
 A model aggregator. One API key, one endpoint, 370+ models. Free tier exists (`:free` suffix). Useful when you want to try a model without signing up for the vendor directly. Not always the cheapest — vendor's native API is usually cheaper if you commit.
 
 ### Overlay
+
 A modal UI element in the TUI: model picker, theme picker, slash autocomplete, file picker, help. Mounted on top of the regular transcript via `overlays.openOverlay('models')` in `App.tsx`.
 
 ### Picker
+
 A modal that lets you choose something interactively. Provider picker (stage 1) → model picker (stage 2) is the flow as of 1.12.0. Theme picker is a single stage. Both navigate with `↑↓`, pick with Enter, filter by typing.
 
 ### Prompt queue
+
 While the agent is working on your last prompt, you can keep typing. Submissions go into a FIFO queue and drain after the current turn ends. No need to wait. See `App.tsx`'s `promptQueue` state.
 
 ### Provider
+
 The LLM vendor — Anthropic, OpenAI, Mistral, etc. Each has a class in `src/providers/<name>.ts` that knows how to talk to that vendor's API. The provider object exposes `stream()`, which yields `AgentEvent`s.
 
 ### ReAct
+
 "Reason + Act" — the agent loop pattern where the model alternates between thinking text and tool calls. Each cycle is called a "turn." Default cap is 30 turns per `dirgha ask`.
 
 ### Release-please
+
 The GitHub Action that watches commits on `main`, detects conventional-commit prefixes, opens a "release X.Y.Z" PR with an auto-generated CHANGELOG entry, and tags + creates a GitHub Release when you merge it. Configured in `.github/workflows/release-please.yml`.
 
 ### Semantic tokens (theme)
+
 The colour-token shape Dirgha's TUI uses: `palette.text.primary`, `palette.status.success`, `palette.ui.active` etc. Maps to a per-theme hex value. Changing the theme swaps colours without changing component code.
 
 ### Session
+
 A single conversation with the agent. Has an id, a history (messages), and usage totals. Saved to `~/.dirgha/sessions/`. List with `dirgha audit list`.
 
 ### Skill
+
 A markdown file the agent reads to perform a multi-step task. Has frontmatter describing when to invoke it and a body explaining the steps. `add-provider.md` is the canonical example. Skills live in `src/skills/` (built-in) and `~/.dirgha/skills/` (user-installed).
 
 ### Slash command
+
 Commands you type in the REPL with a leading `/`. `/help`, `/models`, `/theme`, `/clear`, `/mode`, `/provider list`. Different from subcommands (which run before the REPL starts). Listed in `src/cli/slash/`.
 
 ### Static / dynamic ink rendering
+
 Ink has two render modes: `<Static>` items render once at the top and never repaint (the logo); regular components in the dynamic region repaint on every state change. Dirgha uses `<Static>` for the logo and dynamic for the transcript + overlays.
 
 ### Streaming
+
 Reading the model's response token-by-token instead of waiting for the whole answer. All providers in Dirgha stream by default. The wire protocol is OpenAI-style Server-Sent Events for most; Anthropic and Gemini use their own.
 
 ### Subcommand
+
 The non-REPL surface: `dirgha keys list`, `dirgha doctor`, `dirgha cost`, `dirgha audit`. Each is a separate file in `src/cli/subcommands/`. Subcommands exit when done; they don't open a TUI.
 
 ### Telemetry
+
 Anonymous usage data Dirgha can send to help us catch regressions. **Off by default**, opt-in once during setup. 5 fields per command (event, version, command, os, node), 6 on errors. Never sends prompts, responses, file contents, or key values. Disable any time with `dirgha telemetry disable`.
 
 ### Theme
+
 A named colour palette: `readable` (default), `dark`, `light`, `dracula`, `github-dark`, `tokyonight`, `atom-one-dark`, `ayu-dark`, `midnight`, `ocean`, `solarized`, `nord`, `cosmic`, `ember`, `sakura`, `obsidian-gold`, `crimson`, `violet-storm`, `warm`, `none`. Switch with `/theme <name>`.
 
 ### Tool
+
 A function the agent can call. Has a name, description, JSON schema for inputs, and an `execute()` that returns a `ToolResult`. Built-ins: `fs_read`, `fs_write`, `fs_edit`, `fs_ls`, `search_grep`, `search_glob`, `shell`, `git`, `browser`, `task`. Add new ones in `src/tools/`.
 
 ### TUI
+
 Terminal User Interface. The interactive Ink-based screen with the logo, transcript, input box, and overlays. As opposed to the headless mode (`--print` / `--json`).
 
 ### Turn
+
 One round-trip in the agent loop: send messages → get response → maybe execute tools → append to history. `--max-turns 30` is the default cap to prevent runaway loops.
 
 ### useInput / useStdout
+
 Ink hooks. `useInput((char, key) => {...})` listens for keystrokes. `useStdout()` reads terminal dimensions. Multiple `useInput` listeners co-exist; whichever handles the key first wins.
 
 ### Vim mode
+
 Optional input-box behavior where Esc switches to NORMAL and `i` switches to INSERT. Toggle in config: `vimMode: true`.
 
 ### Worktree
+
 A separate working copy of a git branch in a sibling directory. `dirgha fleet` uses worktrees so parallel agents don't collide on the same files. Standard git feature; see `git worktree --help`.
 
 ---
+
+## Development workflow
+
+### Pre-push gate
+
+Before pushing, run the gate script. It checks everything that CI checks:
+
+```bash
+bash scripts/gate.sh
+```
+
+This runs 8 checks in sequence:
+
+1. TypeScript typecheck (`tsc --noEmit`)
+2. ESLint (`--max-warnings 0`)
+3. Unit tests (138 vitest tests)
+4. Build (`tsc` + postbuild)
+5. License audit (fail on GPL/AGPL/LGPL)
+6. npm audit (fail on high+ CVE in production deps)
+7. CLI version check
+8. CLI smoke tests (41 offline tests)
+
+If any check fails, the script shows the failure and stops.
+
+### Prepublish guard
+
+The prepublish guard runs automatically before `npm publish`. It checks:
+
+- No legacy files in the package
+- `dist/` is built and valid
+- Required files exist (README, LICENSE, CHANGELOG, CREDITS)
+- No test directories leaked into dist/
+- No secrets in distribution files
+- Tarball size under 6 MB budget
+- CLI binary launches correctly
+
+Run it manually: `npm run prepublish-guard`
+
+### Bundle size tracking
+
+Track tarball size over time:
+
+```bash
+node scripts/bundle-trend.mjs          # measure + append to trend
+node scripts/bundle-trend.mjs --json   # machine-readable output
+node scripts/bundle-trend.mjs --summary  # no append, just print
+```
+
+Trend data is stored in `/tmp/dirgha-bundle-trend.json`. The nightly CI
+workflow (`smoke-providers.yml`) records a measurement and uploads it as
+a 90-day artifact.
+
+### Multi-provider smoke
+
+Test all providers with free-tier models:
+
+```bash
+bash scripts/smoke-matrix-providers.sh        # free models only
+bash scripts/smoke-matrix-providers.sh all    # include paid models
+bash scripts/smoke-matrix-providers.sh list   # show the matrix
+```
+
+Requires `OPENROUTER_API_KEY` env var. Runs a "say OK" round trip through
+each provider and produces a pass/fail report at `/tmp/dirgha-smoke-providers-*/REPORT.md`.
+
+## Release checklist
+
+1. **Gate:** `bash scripts/gate.sh` — all 8 checks pass
+2. **Bundle size:** `node scripts/bundle-trend.mjs --summary` — verify no unexpected growth
+3. **Prepublish guard:** `npm run prepublish-guard` — 11 checks pass
+4. **Build:** `npm run build` — dist/ is current
+5. **Version:** Edit `package.json` `version` field
+6. **CHANGELOG:** `node scripts/changelog-bump.mjs`
+7. **Commit:** `git add . && git commit -m "chore: bump version to vX.Y.Z"`
+8. **Tag:** `git tag vX.Y.Z`
+9. **Push:** `git push && git push --tags`
+10. **Verify:** CI publishes to npm. Check `npm install -g @dirgha/code` works.
 
 ## Questions
 
 - Issues: https://github.com/Dirgha-AI/dirgha-code/issues
 - Email: team@dirgha.ai
+- Docs: [docs/tutorials/](docs/tutorials/) — fleet, init, subagents
 
 Made with care in Delhi · Patan · everywhere.
