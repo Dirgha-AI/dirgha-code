@@ -12,7 +12,7 @@
 
 ## The Seed: Why the CLI Comes First
 
-Every operating system starts with a kernel. Dirgha Code — the open-source command-line agent — is the kernel of Dirgha AI OS. It is the smallest, most installable, most hackable piece of the stack: under 600 KB compressed, one install command, runs fully offline, ships under FSL → MIT.
+Every operating system starts with a kernel. Dirgha Code — the open-source command-line agent — is the kernel of Dirgha AI OS. It is the smallest, most installable, most hackable piece of the stack: one install command, runs fully offline, ships under FSL → MIT.
 
 By design, the CLI is the entry point for every developer — whether you're on a 10 Gbps fiber line or a shared 4G hotspot, in a WeWork in Bengaluru or a basement in Berlin. No browser, no paid account, no telemetry by default. Just `npm install -g @dirgha/code` and a terminal.
 
@@ -83,10 +83,10 @@ The interactive TUI is `dirgha` with no args. Resume a session with `dirgha resu
 
 |                                        |                                                                                                                             |
 | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| Tests                                  | **104/104** in ~11 s. TS 0 errors, ESLint 0 warnings. CI green is a precondition for any PR.                                |
-| 17 providers                           | Multi-key BYOK pool with cooldown rotation, 4-tier failover cascade, health scoring with compaction.                        |
-| 12 built-in tools                      | Per-tool timeout enforcement. Shell 300s, reads 30s, default 60s.                                                           |
-| 7 vulnerability classes fixed in v1.18 | Shell injection, path traversal, seatbelt injection, PowerShell injection, config injection, null spread crash, stdin hang. |
+| Tests                                    | **104/104** in ~8 s. TS 0 errors, ESLint 0 warnings. CI green is a precondition for any PR.                                                                                        |
+| 17 providers                             | Multi-key BYOK pool with cooldown rotation, 4-tier failover cascade, health scoring with compaction.                                                                                |
+| 12 built-in tools                        | Per-tool timeout enforcement. Shell 300s, reads 30s, default 60s.                                                                                                                  |
+| 16 vulnerability classes fixed in v1.18  | Path traversal (memory/session/scaffold), API key overlay isolation, NaN cost poisoning, LSP timer leak, model routing mismatch, web URL routing, stale-cache fallback, and more. |
 
 ## Why this exists
 

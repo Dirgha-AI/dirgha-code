@@ -60,15 +60,19 @@ Contributors who report valid issues are credited in `THANKS.md` and in the GitH
 
 The following vulnerability classes were identified and fixed during the v1.18.0 audit cycle (May 2026):
 
-| Class                                                | Fix                                                           | File                             |
-| ---------------------------------------------------- | ------------------------------------------------------------- | -------------------------------- |
-| Shell injection via `shell: true` in hooks           | Replaced with argv-split `spawn(bin, args, { shell: false })` | `src/hooks/config-bridge.ts`     |
-| Path traversal bypass via unvalidated relative paths | Relative paths now resolved against cwd before bounds check   | `src/safety/policy.ts`           |
-| Seatbelt profile injection via `)` metacharacters    | Unsafe characters rejected before escaping                    | `src/safety/sandbox/seatbelt.ts` |
-| PowerShell command injection in `/paste`             | Base64-encoded script path in `-EncodedCommand`               | `src/cli/slash/paste.ts`         |
-| Null object spread crash via malformed config        | `value !== null` guard added to merge function                | `src/cli/config.ts`              |
-| Model choice silently discarded in wizard            | `cfg.defaultModel` → `cfg.model` key fixed                    | `src/cli/flows/wizard.ts`        |
-| Stdin hang on approval read                          | Error listener + settled flag prevent hang on TTY close       | `src/tui/approval.ts`            |
+| Class                                                | Fix                                                           | File                               |
+| ---------------------------------------------------- | ------------------------------------------------------------- | ---------------------------------- |
+| Shell injection via `shell: true` in hooks           | Replaced with argv-split `spawn(bin, args, { shell: false })` | `src/hooks/config-bridge.ts`       |
+| Path traversal bypass via unvalidated relative paths | Relative paths now resolved against cwd before bounds check   | `src/safety/policy.ts`             |
+| Seatbelt profile injection via `)` metacharacters    | Unsafe characters rejected before escaping                    | `src/safety/sandbox/seatbelt.ts`   |
+| PowerShell command injection in `/paste`             | Base64-encoded script path in `-EncodedCommand`               | `src/cli/slash/paste.ts`           |
+| Null object spread crash via malformed config        | `value !== null` guard added to merge function                | `src/cli/config.ts`                |
+| Model choice silently discarded in wizard            | `cfg.defaultModel` → `cfg.model` key fixed                    | `src/cli/flows/wizard.ts`          |
+| Stdin hang on approval read                          | Error listener + settled flag prevent hang on TTY close       | `src/tui/approval.ts`              |
+| Path traversal in `/memory` commands                 | `assertValidKey()` enforced in `get`, `upsert`, `remove`      | `src/context/memory.ts`            |
+| Path traversal in `/session rename`                  | `basename()` validation on session id before path construction| `src/cli/slash/session.ts`         |
+| Path traversal in `scaffold --name`                  | `basename()` guard rejects names with path separators         | `src/cli/subcommands/scaffold.ts`  |
+| API key leak via overlay focus collision             | `inputFocus=false` when `KeySetOverlay` or `ApprovalPrompt` active | `src/tui/ink/App.tsx`         |
 
 ## PGP
 

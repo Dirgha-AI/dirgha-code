@@ -2,7 +2,7 @@
 
 All notable changes are tracked here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); we use [Semantic Versioning](https://semver.org/).
 
-## [1.18.0] — Kernel hardening + long-term architecture
+## [1.18.0] — Kernel hardening, supply-chain hardening, security audit
 
 ### Stability
 
@@ -66,20 +66,41 @@ All notable changes are tracked here. Format loosely follows [Keep a Changelog](
 - `withLock` timeout recovery with atomic write fallback.
 - `ledger-hook` empty array guard.
 
+### Security (second pass — depth audit)
+
+- Path traversal in `/memory` — `assertValidKey()` now enforced in `get`, `upsert`, `remove` (previously only in the adapter's `save`).
+- Path traversal in `/session rename` — `sessionPath()` validates id via `basename()` before building the file path.
+- Path traversal in `scaffold --name` — `deriveName()` rejects names containing path separators.
+- API key leak in TUI — `inputFocus` is now `false` when `KeySetOverlay` or `ApprovalPrompt` is active; keystrokes no longer bleed into the chat input box.
+- `meta/llama-3.3-70b-instruct` was misattributed to `provider: "nvidia"` in `prices.ts` while dispatch routes it via OpenRouter — cost tracking now matches actual routing.
+
+### Reliability (second pass)
+
+- `cost.ts` NaN guard — malformed token counts from providers no longer poison session totals; `safeInt()` sanitizes before accumulation.
+- `lsp/client.ts` timer leak — `setTimeout` handle now `clearTimeout`-ed when response resolves first; accumulation across long sessions prevented.
+- `models-dev-sync.ts` — `getCatalogue()` falls back to stale cache on network failure instead of throwing.
+- `web/server.ts` URL routing — route matching now uses `URL.pathname` so query-string requests (e.g. `?foo=bar`) are handled correctly.
+
+### TUI
+
+- `ThinkingBlock` — `isActive: false` on `useInput` was silently dead; expand/collapse via Enter now works.
+
+### CI / Supply-chain
+
+- `npm audit --audit-level=high --omit=dev` is now a CI gate (blocks PRs with high+ CVEs).
+- SBOM emitted on every release in CycloneDX + SPDX formats; cosign-signed and attached to GitHub Releases.
+- Bundle-size budget updated to 6 MB (vendor/rtk binary included since v1.17).
+- Dependabot weekly PRs (grouped: eslint, ink, types, vitest stack).
+- OpenSSF Scorecard runs weekly + on push to main; result published to scorecard.dev.
+- TypeScript upgraded to `^5.9.3` (required by `@tobilu/qmd` peer dep); Buffer type strictness fixes across 7 files.
+- `react` pinned to `^18.3.1` to satisfy `react-reconciler@0.29.2` peer dep.
+
 ### Tests
 
 - 104 tests passing (97 → 104: +4 fleet DAG, +3 TUI render).
 - TypeScript 0 errors, ESLint 0 warnings.
 - All 30+ CLI subcommands smoke-tested.
-
-## Unreleased — CI-5 supply-chain hardening
-
-- `npm audit --audit-level=high --omit=dev` is now a CI gate (blocks PRs with high+ CVEs).
-- SBOM emitted on every release in CycloneDX + SPDX formats; both attached to GitHub Releases.
-- Bundle-size budget enforced at 600 KB tarball.
-- Dependabot weekly PRs (grouped: eslint, ink, types, vitest stack).
-- OpenSSF Scorecard runs weekly + on push to main; result published to scorecard.dev.
-- This CHANGELOG.md committed.
+- Full codebase depth audit: 14 parallel agents × all subsystems, 25+ bugs identified and fixed.
 
 ## [1.13.1](https://github.com/Dirgha-AI/dirgha-code/compare/v1.13.0...v1.13.1) (2026-04-30)
 
