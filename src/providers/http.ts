@@ -122,12 +122,11 @@ export async function* streamSSE(req: SseRequest): AsyncIterable<string> {
     });
   } catch (err) {
     cancel();
-    throw new ProviderError(
-      `Network error: ${String((err as Error)?.message ?? err)}`,
-      req.providerName,
-      undefined,
-      true,
-    );
+    const msg = (err as Error)?.message ?? String(err);
+    const hint = /fetch failed|ENOTFOUND|ECONNREFUSED/i.test(msg)
+      ? ` — check your internet connection (target: ${req.url})`
+      : '';
+    throw new ProviderError(`Network error: ${msg}${hint}`, req.providerName, undefined, true);
   }
 
   if (!response.ok) {
@@ -229,12 +228,11 @@ export async function postJSON<T>(req: JsonRequest): Promise<T> {
     });
   } catch (err) {
     cancel();
-    throw new ProviderError(
-      `Network error: ${String((err as Error)?.message ?? err)}`,
-      req.providerName,
-      undefined,
-      true,
-    );
+    const msg = (err as Error)?.message ?? String(err);
+    const hint = /fetch failed|ENOTFOUND|ECONNREFUSED/i.test(msg)
+      ? ` — check your internet connection (target: ${req.url})`
+      : '';
+    throw new ProviderError(`Network error: ${msg}${hint}`, req.providerName, undefined, true);
   }
 
   if (!response.ok) {

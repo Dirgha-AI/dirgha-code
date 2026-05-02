@@ -1,6 +1,6 @@
 {
   "name": "@dirgha/code",
-  "version": "1.18.0",
+  "version": "1.18.1",
   "description": "CLI coding agent for complex agentic workflows and long-horizon development. Local models (llama.cpp / Ollama), BYOK across 17 providers, parallel agents, persistent memory, scanned skills.",
   "type": "module",
   "main": "./dist/index.js",
@@ -35,11 +35,12 @@
     "license-check": "license-checker --production --excludePackages 'argparse@1.0.10' --failOn 'GPL;AGPL;LGPL'"
   },
   "dependencies": {
-    "@tobilu/qmd": "0.9.0",
-    "better-sqlite3": "12.9.0",
     "ink": "5.0.0",
     "ink-text-input": "6.0.0",
     "react": "^18.3.1"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "12.9.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "7.6.13",

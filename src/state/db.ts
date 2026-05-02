@@ -37,7 +37,7 @@ function getDb(): import("better-sqlite3").Database {
     return _db as import("better-sqlite3").Database;
   } catch (err) {
     throw new Error(
-      `SQLite unavailable: ${(err as Error).message}. Install: npm install -g better-sqlite3`,
+      `SQLite unavailable (optional feature) — run "dirgha setup --features" to install.`,
     );
   }
 }
@@ -133,6 +133,15 @@ export function dbSearchChats(query: string, limit = 20): ChatResult[] {
       .all(query, limit) as ChatResult[];
   } catch {
     return [];
+  }
+}
+
+export function isSqliteAvailable(): boolean {
+  try {
+    getDb();
+    return true;
+  } catch {
+    return false;
   }
 }
 

@@ -94,16 +94,27 @@ export class SlashRegistry {
     if (stripped.length === 0) return { handled: false };
     const [rawName, ...args] = stripped.split(/\s+/);
     const name = rawName.toLowerCase();
-    const handler = this.handlers.get(name);
+    let handler = this.handlers.get(name);
     if (!handler) {
-      console.error(
-        `[slash dispatch] no handler for "${name}" (raw="${rawName}", stripped="${stripped}"). Registered:`,
-        [...this.handlers.keys()].sort().join(", "),
-      );
-      return {
-        handled: true,
-        output: `Unknown slash command: /${name}. Try /help.`,
-      };
+      const allNames = [...this.handlers.keys()];
+      const prefixMatches = allNames.filter((n) => n.startsWith(name));
+      if (prefixMatches.length === 1) {
+        handler = this.handlers.get(prefixMatches[0]!);
+      } else if (prefixMatches.length > 1) {
+        return {
+          handled: true,
+          output: `Ambiguous command "/${name}" — matches: ${prefixMatches.sort().map((n) => `/${n}`).join(', ')}. Type more characters.`,
+        };
+      } else {
+        console.error(
+          `[slash dispatch] no handler for "${name}" (raw="${rawName}", stripped="${stripped}"). Registered:`,
+          [...this.handlers.keys()].sort().join(", "),
+        );
+        return {
+          handled: true,
+          output: `Unknown slash command: /${name}. Try /help.`,
+        };
+      }
     }
     try {
       const output = await handler(args, ctx);

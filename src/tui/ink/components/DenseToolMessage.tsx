@@ -18,7 +18,8 @@ import { Box, Text } from "ink";
 import { useTheme } from "../theme-context.js";
 import { iconFor, TOOL_STATUS } from "../icons.js";
 import type { ToolStatus } from "./ToolBox.js";
-import { SpinnerContext, SPINNER_FRAMES as SPINNER } from "../spinner-context.js";
+import { SpinnerContext } from "../spinner-context.js";
+import { SpinnerGlyph } from "./SpinnerGlyph.js";
 
 export interface DenseToolMessageProps {
   name: string;
@@ -45,14 +46,7 @@ export function DenseToolMessage(
   props: DenseToolMessageProps,
 ): React.JSX.Element {
   const palette = useTheme();
-  const frame = React.useContext(SpinnerContext);
-
-  const glyph =
-    props.status === "error"
-      ? TOOL_STATUS.ERROR
-      : props.status === "done"
-        ? TOOL_STATUS.SUCCESS
-        : SPINNER[frame];
+  const { busy } = React.useContext(SpinnerContext);
 
   const glyphColour =
     props.status === "error"
@@ -68,16 +62,12 @@ export function DenseToolMessage(
         ? palette.status.error
         : palette.text.primary;
 
-  const [now, setNow] = React.useState(Date.now());
-  React.useEffect(() => {
-    if (props.status !== "running") return;
-    const t = setInterval(() => setNow(Date.now()), 250);
-    return () => clearInterval(t);
-  }, [props.status]);
-
+  // Elapsed time derived inline — no independent setInterval.
+  // The component re-renders naturally when the parent spinner ticks (via
+  // SpinnerGlyph), so the elapsed display stays live without a separate timer.
   const liveMs =
     props.status === "running" && props.startedAt
-      ? now - props.startedAt
+      ? Date.now() - props.startedAt
       : undefined;
   const elapsed = formatElapsed(liveMs ?? props.durationMs ?? 0);
   const summary = props.outputPreview
@@ -86,12 +76,21 @@ export function DenseToolMessage(
 
   const label = TOOL_LABEL[props.name] ?? props.name.replace(/_/g, " ");
 
+  const isRunning = props.status === "running";
+
   return (
     <Box paddingLeft={2} flexDirection="row">
       <Box minWidth={2}>
-        <Text color={glyphColour} bold={props.status !== "running"}>
-          {glyph}
-        </Text>
+        {isRunning ? (
+          <SpinnerGlyph isActive={busy} color={glyphColour} />
+        ) : (
+          <Text
+            color={glyphColour}
+            bold={!isRunning}
+          >
+            {props.status === "error" ? TOOL_STATUS.ERROR : TOOL_STATUS.SUCCESS}
+          </Text>
+        )}
       </Box>
       <Text color={palette.text.accent}>{iconFor(props.name)}</Text>
       <Text> </Text>

@@ -19,7 +19,8 @@ import { useTheme } from "../theme-context.js";
 import { iconFor, TOOL_STATUS } from "../icons.js";
 import { DenseToolMessage, isDenseTool } from "./DenseToolMessage.js";
 import type { ToolStatus } from "./ToolBox.js";
-import { SpinnerContext, SPINNER_FRAMES as SPINNER } from "../spinner-context.js";
+import { SpinnerContext } from "../spinner-context.js";
+import { SpinnerGlyph } from "./SpinnerGlyph.js";
 
 export interface ToolItem {
   id: string;
@@ -110,14 +111,7 @@ function FullToolRow({
   divider,
   palette,
 }: FullToolRowProps): React.JSX.Element {
-  const frame = React.useContext(SpinnerContext);
-
-  const glyph =
-    tool.status === "error"
-      ? TOOL_STATUS.ERROR
-      : tool.status === "done"
-        ? TOOL_STATUS.SUCCESS
-        : SPINNER[frame];
+  const { busy } = React.useContext(SpinnerContext);
 
   const glyphColour =
     tool.status === "error"
@@ -161,9 +155,13 @@ function FullToolRow({
     <Box flexDirection="column">
       <Box flexDirection="row">
         <Box minWidth={2}>
-          <Text color={glyphColour} bold={tool.status !== "running"}>
-            {glyph}
-          </Text>
+          {tool.status === "running" ? (
+            <SpinnerGlyph isActive={busy} color={glyphColour} />
+          ) : (
+            <Text color={glyphColour} bold>
+              {tool.status === "error" ? TOOL_STATUS.ERROR : TOOL_STATUS.SUCCESS}
+            </Text>
+          )}
         </Box>
         <Text color={palette.text.accent}>{iconFor(tool.name)}</Text>
         <Text> </Text>

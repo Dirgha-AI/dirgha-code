@@ -72,7 +72,7 @@ import { AtFileComplete } from "./components/AtFileComplete.js";
 import { SlashComplete } from "./components/SlashComplete.js";
 import { ThemePicker } from "./components/ThemePicker.js";
 import { ThemeProvider } from "./theme-context.js";
-import { SpinnerContext, SPINNER_FRAMES as GLOBAL_SPINNER_FRAMES } from "./spinner-context.js";
+import { SpinnerContext } from "./spinner-context.js";
 import type { ThemeName } from "../theme.js";
 import { writeFile, mkdir, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -213,18 +213,9 @@ export function App(props: AppProps): React.JSX.Element {
     return unsub;
   }, [props.events]);
 
-  const [globalSpinnerFrame, setGlobalSpinnerFrame] = React.useState(0);
-  React.useEffect(() => {
-    if (!busy) {
-      setGlobalSpinnerFrame(0);
-      return;
-    }
-    const t = setInterval(
-      () => setGlobalSpinnerFrame((f) => (f + 1) % GLOBAL_SPINNER_FRAMES.length),
-      80,
-    );
-    return () => clearInterval(t);
-  }, [busy]);
+  // globalSpinnerFrame removed — spinner interval now lives inside
+  // SpinnerGlyph so only the glyph subtree re-renders at 80ms, not the
+  // entire App tree.
 
   // Tick the duration so the tok/s number updates while streaming.
   React.useEffect(() => {
@@ -797,7 +788,7 @@ export function App(props: AppProps): React.JSX.Element {
   // is upstream in useEventProjection.
   return (
     <ThemeProvider activeTheme={themeName}>
-    <SpinnerContext.Provider value={globalSpinnerFrame}>
+    <SpinnerContext.Provider value={{ busy }}>
       <Box flexDirection="column">
         <Static items={[{ key: "logo" }]}>
           {(_item): React.JSX.Element => <Logo key="logo" version={VERSION} />}
@@ -839,6 +830,7 @@ export function App(props: AppProps): React.JSX.Element {
           onChange={setInput}
           onSubmit={handleSubmit}
           busy={busy}
+          liveDurationMs={liveDurationMs}
           vimMode={props.config.vimMode === true}
           onAtQueryChange={overlays.setAtQuery}
           onSlashQueryChange={overlays.setSlashQuery}
@@ -969,11 +961,12 @@ export function App(props: AppProps): React.JSX.Element {
 function renderTranscript(items: TranscriptItem[]): React.ReactNode[] {
   const out: React.ReactNode[] = [];
   let toolBuf: ToolItem[] = [];
-  let groupKeyCounter = 0;
 
   const flushTools = (): void => {
     if (toolBuf.length === 0) return;
-    out.push(<ToolGroup key={`tg-${groupKeyCounter++}`} tools={toolBuf} />);
+    // Key on the stable ID of the first tool so React never unmounts/remounts
+    // the ToolGroup subtree when the counter resets (which caused flicker).
+    out.push(<ToolGroup key={toolBuf[0]!.id} tools={toolBuf} />);
     toolBuf = [];
   };
 

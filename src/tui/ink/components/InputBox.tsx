@@ -39,6 +39,8 @@ export interface InputBoxProps {
   onChange: (value: string) => void;
   onSubmit: (value: string) => void;
   busy: boolean;
+  /** Live elapsed ms for the current turn — drives BusyHint without a separate timer. */
+  liveDurationMs?: number;
   placeholder?: string;
   vimMode?: boolean;
   /** Parent wants to know when the @-token changes (null = none active). */
@@ -152,7 +154,7 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
         // cursor. Since we can't know the exact cursor position from here,
         // we do the common case: strip one raw char and remove the character
         // immediately before each occurrence.
-        let result = prev;
+        let result = "";
         for (const ch of next) {
           if (ch === "\x7f" || ch === "\x08") {
             // Delete the last character (if any) for each backspace.
@@ -298,7 +300,9 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
               pasted block expanded (Ctrl+E collapse)
             </Text>
           )}
-          {props.busy && <BusyHint palette={palette} />}
+          {props.busy && (
+            <BusyHint palette={palette} liveDurationMs={props.liveDurationMs} />
+          )}
         </Box>
         {ctrlCArmed && (
           <Text color={palette.accent} bold>
@@ -316,22 +320,19 @@ function vimModeLabel(m: VimMode): string {
 
 /**
  * Busy-state hint with a live elapsed-second counter, matching
- * gemini-cli's `(esc to cancel, 12s)` pattern. The timer ticks every
- * 1s while busy; cleans up on unmount.
+ * gemini-cli's `(esc to cancel, 12s)` pattern.
+ *
+ * Elapsed seconds come from the `liveDurationMs` prop that App.tsx already
+ * updates on a 1s interval — no second internal timer needed.
  */
 function BusyHint({
   palette,
+  liveDurationMs,
 }: {
   palette: ReturnType<typeof useTheme>;
+  liveDurationMs?: number;
 }): React.JSX.Element {
-  const [elapsed, setElapsed] = React.useState(0);
-  React.useEffect(() => {
-    const start = Date.now();
-    const t = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - start) / 1000));
-    }, 1000);
-    return (): void => clearInterval(t);
-  }, []);
+  const elapsed = Math.floor((liveDurationMs ?? 0) / 1000);
   const label =
     elapsed < 60
       ? `${elapsed}s`
