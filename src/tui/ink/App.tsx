@@ -23,6 +23,7 @@ import { appendAudit } from "../../audit/writer.js";
 import { maybeCompact } from "../../context/compaction.js";
 import { contextWindowFor } from "../../intelligence/prices.js";
 import { buildAgentHooksFromConfig } from "../../hooks/config-bridge.js";
+import { enforceMode, composeHooks } from "../../context/mode-enforcement.js";
 import {
   loadProjectPrimer,
   composeSystemPrompt,
@@ -518,6 +519,7 @@ export function App(props: AppProps): React.JSX.Element {
         ).messages;
 
       const userHooks = buildAgentHooksFromConfig(props.config);
+      const composedHooks = composeHooks(enforceMode(mode), userHooks);
       const autoApprove = isAutoApprove(mode);
       const result = await runAgentLoop({
         sessionId: sessionIdRef.current,
@@ -533,7 +535,7 @@ export function App(props: AppProps): React.JSX.Element {
         contextTransform: compactionTransform,
         errorClassifier: createErrorClassifier(),
         autoApprove,
-        ...(userHooks !== undefined ? { hooks: userHooks } : {}),
+        ...(composedHooks !== undefined ? { hooks: composedHooks } : {}),
       });
       historyRef.current = result.messages;
     } catch (err) {

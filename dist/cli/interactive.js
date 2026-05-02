@@ -18,6 +18,7 @@ import { maybeCompact } from "../context/compaction.js";
 import { contextWindowFor, findPrice } from "../intelligence/prices.js";
 import { routeModel } from "../providers/dispatch.js";
 import { buildAgentHooksFromConfig } from "../hooks/config-bridge.js";
+import { enforceMode, composeHooks } from "../context/mode-enforcement.js";
 import { createDefaultSlashRegistry, registerBuiltinSlashCommands, } from "./slash.js";
 import { loadToken, migrateLegacyAuth, } from "../integrations/device-auth.js";
 import { resolveMode } from "../context/mode.js";
@@ -251,6 +252,7 @@ export async function runInteractive(opts) {
             const sanitized = opts.registry.sanitize({ descriptionLimit: 200 });
             const provider = opts.providers.forModel(currentModel);
             const userHooks = buildAgentHooksFromConfig(opts.config);
+            const composedHooks = composeHooks(enforceMode(currentMode), userHooks);
             const abortController = new AbortController();
             const sigintHandler = () => {
                 abortController.abort();
@@ -270,7 +272,7 @@ export async function runInteractive(opts) {
                     events,
                     signal: abortController.signal,
                     errorClassifier: createErrorClassifier(),
-                    ...(userHooks !== undefined ? { hooks: userHooks } : {}),
+                    ...(composedHooks !== undefined ? { hooks: composedHooks } : {}),
                     // Per-model compaction trigger: 75 % of the model's actual
                     // context window beats a static 120k cap (which over-compacts
                     // big-window models and under-compacts 32k ones).
