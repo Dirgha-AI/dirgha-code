@@ -114,7 +114,7 @@ export function InputBox(props) {
             // cursor. Since we can't know the exact cursor position from here,
             // we do the common case: strip one raw char and remove the character
             // immediately before each occurrence.
-            let result = prev;
+            let result = "";
             for (const ch of next) {
                 if (ch === "\x7f" || ch === "\x08") {
                     // Delete the last character (if any) for each backspace.
@@ -215,25 +215,20 @@ export function InputBox(props) {
     const borderColour = props.busy ? palette.brand : palette.accent;
     const promptColour = props.busy ? palette.brand : palette.accent;
     const collapsed = pasteSegment !== null && !pasteExpanded;
-    return (_jsxs(Box, { flexDirection: "column", width: cols, children: [_jsx(Box, { borderStyle: "single", borderColor: borderColour, paddingX: 1, children: _jsxs(Box, { gap: 1, flexGrow: 1, children: [_jsx(Text, { color: promptColour, children: "\u276F" }), collapsed && pasteSegment !== null ? (_jsx(PasteCollapseView, { value: props.value, segment: pasteSegment, expanded: false })) : (_jsx(TextInput, { value: props.value, onChange: handleChange, onSubmit: props.onSubmit, placeholder: props.placeholder ?? "Ask dirgha anything…", showCursor: !props.busy && !vimActive, focus: focus && !vimActive }))] }) }), _jsxs(Box, { paddingX: 1, justifyContent: "space-between", children: [_jsxs(Box, { gap: 1, children: [props.vimMode === true && (_jsxs(Text, { color: vimActive ? palette.accent : palette.brand, bold: true, children: ["[", vimModeLabel(vimState.mode), "]"] })), pasteSegment !== null && pasteExpanded && (_jsx(Text, { color: palette.textMuted, dimColor: true, children: "pasted block expanded (Ctrl+E collapse)" })), props.busy && _jsx(BusyHint, { palette: palette })] }), ctrlCArmed && (_jsx(Text, { color: palette.accent, bold: true, children: "Press Ctrl+C again to exit." }))] })] }));
+    return (_jsxs(Box, { flexDirection: "column", width: cols, children: [_jsx(Box, { borderStyle: "single", borderColor: borderColour, paddingX: 1, children: _jsxs(Box, { gap: 1, flexGrow: 1, children: [_jsx(Text, { color: promptColour, children: "\u276F" }), collapsed && pasteSegment !== null ? (_jsx(PasteCollapseView, { value: props.value, segment: pasteSegment, expanded: false })) : (_jsx(TextInput, { value: props.value, onChange: handleChange, onSubmit: props.onSubmit, placeholder: props.placeholder ?? "Ask dirgha anything…", showCursor: !props.busy && !vimActive, focus: focus && !vimActive }))] }) }), _jsxs(Box, { paddingX: 1, justifyContent: "space-between", children: [_jsxs(Box, { gap: 1, children: [props.vimMode === true && (_jsxs(Text, { color: vimActive ? palette.accent : palette.brand, bold: true, children: ["[", vimModeLabel(vimState.mode), "]"] })), pasteSegment !== null && pasteExpanded && (_jsx(Text, { color: palette.textMuted, dimColor: true, children: "pasted block expanded (Ctrl+E collapse)" })), props.busy && (_jsx(BusyHint, { palette: palette, liveDurationMs: props.liveDurationMs }))] }), ctrlCArmed && (_jsx(Text, { color: palette.accent, bold: true, children: "Press Ctrl+C again to exit." }))] })] }));
 }
 function vimModeLabel(m) {
     return m === "NORMAL" ? "NORMAL" : "INSERT";
 }
 /**
  * Busy-state hint with a live elapsed-second counter, matching
- * gemini-cli's `(esc to cancel, 12s)` pattern. The timer ticks every
- * 1s while busy; cleans up on unmount.
+ * gemini-cli's `(esc to cancel, 12s)` pattern.
+ *
+ * Elapsed seconds come from the `liveDurationMs` prop that App.tsx already
+ * updates on a 1s interval — no second internal timer needed.
  */
-function BusyHint({ palette, }) {
-    const [elapsed, setElapsed] = React.useState(0);
-    React.useEffect(() => {
-        const start = Date.now();
-        const t = setInterval(() => {
-            setElapsed(Math.floor((Date.now() - start) / 1000));
-        }, 1000);
-        return () => clearInterval(t);
-    }, []);
+function BusyHint({ palette, liveDurationMs, }) {
+    const elapsed = Math.floor((liveDurationMs ?? 0) / 1000);
     const label = elapsed < 60
         ? `${elapsed}s`
         : elapsed < 3600

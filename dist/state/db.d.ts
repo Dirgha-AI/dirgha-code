@@ -19,6 +19,7 @@ export interface ChatResult {
     ts: number;
 }
 export declare function dbSearchChats(query: string, limit?: number): ChatResult[];
+export declare function isSqliteAvailable(): boolean;
 export declare function dbListSessions(limit?: number): Array<{
     id: string;
     model: string | null;

@@ -16,7 +16,8 @@ import * as React from "react";
 import { Box, Text } from "ink";
 import { iconFor } from "../icons.js";
 import { useTheme } from "../theme-context.js";
-import { SpinnerContext, SPINNER_FRAMES } from "../spinner-context.js";
+import { SpinnerContext } from "../spinner-context.js";
+import { SpinnerGlyph } from "./SpinnerGlyph.js";
 const TOOL_LABEL = {
     fs_read: "Read",
     fs_write: "Write",
@@ -76,13 +77,13 @@ function diffShortPreview(text, maxLen = 80) {
 }
 export function ToolBox(props) {
     const palette = useTheme();
-    const frame = React.useContext(SpinnerContext);
-    const tick = frame;
+    const { busy: _spinnerBusy } = React.useContext(SpinnerContext);
+    const isRunning = props.status !== "done" && props.status !== "error";
     const icon = props.status === "error"
         ? "✗"
         : props.status === "done"
             ? "✓"
-            : SPINNER_FRAMES[frame];
+            : null;
     const iconColour = props.status === "error"
         ? palette.error
         : props.status === "done"
@@ -98,13 +99,12 @@ export function ToolBox(props) {
         : props.durationMs !== undefined
             ? formatElapsed(props.durationMs)
             : "";
-    void tick;
     const diffMode = isDiffOutput(props);
     const preview = !diffMode && props.outputPreview
         ? props.outputPreview.replace(/\s+/g, " ").slice(0, 80)
         : diffMode && props.outputPreview
             ? diffShortPreview(props.outputPreview, 80)
             : "";
-    return (_jsxs(Box, { flexDirection: "column", borderStyle: "round", borderColor: borderColour, paddingX: 1, marginBottom: 1, children: [_jsxs(Box, { gap: 1, children: [_jsx(Text, { color: iconColour, children: icon }), _jsx(Text, { color: palette.accent, bold: true, children: iconFor(props.name) }), _jsx(Text, { color: props.status === "done" ? palette.textMuted : palette.textPrimary, bold: true, children: prettyName(props.name) }), props.argSummary !== undefined && props.argSummary.length > 0 && (_jsxs(Text, { color: palette.textMuted, dimColor: true, children: ["(", props.argSummary, ")"] })), elapsedLabel !== "" && (_jsx(Text, { color: palette.textMuted, dimColor: true, children: elapsedLabel }))] }), preview !== "" && !diffMode && (_jsx(Box, { children: _jsx(Text, { color: palette.textMuted, dimColor: true, children: preview }) })), diffMode && props.outputPreview && (_jsx(Box, { flexDirection: "column", children: renderDiffLines(props.outputPreview, 30) }))] }));
+    return (_jsxs(Box, { flexDirection: "column", borderStyle: "round", borderColor: borderColour, paddingX: 1, marginBottom: 1, children: [_jsxs(Box, { gap: 1, children: [icon !== null ? (_jsx(Text, { color: iconColour, children: icon })) : (_jsx(SpinnerGlyph, { isActive: isRunning })), _jsx(Text, { color: palette.accent, bold: true, children: iconFor(props.name) }), _jsx(Text, { color: props.status === "done" ? palette.textMuted : palette.textPrimary, bold: true, children: prettyName(props.name) }), props.argSummary !== undefined && props.argSummary.length > 0 && (_jsxs(Text, { color: palette.textMuted, dimColor: true, children: ["(", props.argSummary, ")"] })), elapsedLabel !== "" && (_jsx(Text, { color: palette.textMuted, dimColor: true, children: elapsedLabel }))] }), preview !== "" && !diffMode && (_jsx(Box, { children: _jsx(Text, { color: palette.textMuted, dimColor: true, children: preview }) })), diffMode && props.outputPreview && (_jsx(Box, { flexDirection: "column", children: renderDiffLines(props.outputPreview, 30) }))] }));
 }
 //# sourceMappingURL=ToolBox.js.map

@@ -49,7 +49,7 @@ import { AtFileComplete } from "./components/AtFileComplete.js";
 import { SlashComplete } from "./components/SlashComplete.js";
 import { ThemePicker } from "./components/ThemePicker.js";
 import { ThemeProvider } from "./theme-context.js";
-import { SpinnerContext, SPINNER_FRAMES as GLOBAL_SPINNER_FRAMES } from "./spinner-context.js";
+import { SpinnerContext } from "./spinner-context.js";
 import { writeFile, mkdir, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join as pathJoin } from "node:path";
@@ -148,15 +148,9 @@ export function App(props) {
         });
         return unsub;
     }, [props.events]);
-    const [globalSpinnerFrame, setGlobalSpinnerFrame] = React.useState(0);
-    React.useEffect(() => {
-        if (!busy) {
-            setGlobalSpinnerFrame(0);
-            return;
-        }
-        const t = setInterval(() => setGlobalSpinnerFrame((f) => (f + 1) % GLOBAL_SPINNER_FRAMES.length), 80);
-        return () => clearInterval(t);
-    }, [busy]);
+    // globalSpinnerFrame removed — spinner interval now lives inside
+    // SpinnerGlyph so only the glyph subtree re-renders at 80ms, not the
+    // entire App tree.
     // Tick the duration so the tok/s number updates while streaming.
     React.useEffect(() => {
         if (!busy)
@@ -677,7 +671,7 @@ export function App(props) {
     // streaming text appears now, the Static-around-transcript pattern
     // was suppressing the live region updates. If still not, the bug
     // is upstream in useEventProjection.
-    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: globalSpinnerFrame, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: [{ key: "logo" }], children: (_item) => _jsx(Logo, { version: VERSION }, "logo") }), _jsx(Box, { flexDirection: "column", children: renderedTranscript }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
+    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: { busy }, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: [{ key: "logo" }], children: (_item) => _jsx(Logo, { version: VERSION }, "logo") }), _jsx(Box, { flexDirection: "column", children: renderedTranscript }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
                             approvalBusRef.current?.resolve(pendingApproval.id, decision);
                         } })), pendingFailover !== null && (_jsx(ModelSwitchPrompt, { failedModel: pendingFailover.failedModel, failoverModel: pendingFailover.failoverModel, onAccept: (failover) => {
                             const lastPrompt = pendingFailover.lastPrompt;
@@ -690,7 +684,7 @@ export function App(props) {
                         }, onReject: () => setPendingFailover(null), onPicker: () => {
                             setPendingFailover(null);
                             overlays.openOverlay("models");
-                        } })), _jsx(PromptQueueIndicator, { queued: promptQueue }), _jsx(InputBox, { value: input, onChange: setInput, onSubmit: handleSubmit, busy: busy, vimMode: props.config.vimMode === true, onAtQueryChange: overlays.setAtQuery, onSlashQueryChange: overlays.setSlashQuery, onRequestOverlay: overlays.openOverlay, onRequestYoloToggle: () => {
+                        } })), _jsx(PromptQueueIndicator, { queued: promptQueue }), _jsx(InputBox, { value: input, onChange: setInput, onSubmit: handleSubmit, busy: busy, liveDurationMs: liveDurationMs, vimMode: props.config.vimMode === true, onAtQueryChange: overlays.setAtQuery, onSlashQueryChange: overlays.setSlashQuery, onRequestOverlay: overlays.openOverlay, onRequestYoloToggle: () => {
                             const next = mode === "yolo" ? "act" : "yolo";
                             setMode(next);
                             setTranscript((prev) => [
@@ -744,11 +738,12 @@ export function App(props) {
 function renderTranscript(items) {
     const out = [];
     let toolBuf = [];
-    let groupKeyCounter = 0;
     const flushTools = () => {
         if (toolBuf.length === 0)
             return;
-        out.push(_jsx(ToolGroup, { tools: toolBuf }, `tg-${groupKeyCounter++}`));
+        // Key on the stable ID of the first tool so React never unmounts/remounts
+        // the ToolGroup subtree when the counter resets (which caused flicker).
+        out.push(_jsx(ToolGroup, { tools: toolBuf }, toolBuf[0].id));
         toolBuf = [];
     };
     for (const item of items) {

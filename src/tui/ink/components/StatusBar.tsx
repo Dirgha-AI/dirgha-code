@@ -9,7 +9,8 @@
 import * as React from "react";
 import { Box, Text, useStdout } from "ink";
 import { useTheme } from "../theme-context.js";
-import { SpinnerContext, SPINNER_FRAMES } from "../spinner-context.js";
+import { SpinnerContext } from "../spinner-context.js";
+import { SpinnerGlyph } from "./SpinnerGlyph.js";
 
 export interface StatusBarProps {
   model: string;
@@ -78,7 +79,7 @@ export function StatusBar(props: StatusBarProps): React.JSX.Element {
   const { stdout } = useStdout();
   const palette = useTheme();
   const cols = stdout?.columns ?? 80;
-  const frame = React.useContext(SpinnerContext);
+  const { busy: _spinnerBusy } = React.useContext(SpinnerContext);
 
   const totalTokens = props.inputTokens + props.outputTokens;
   const costLabel = props.costUsd > 0 ? `$${props.costUsd.toFixed(3)}` : "";
@@ -136,9 +137,7 @@ export function StatusBar(props: StatusBarProps): React.JSX.Element {
         <Text color={palette.textMuted}>{cwdLabel(props.cwd)}</Text>
       </Box>
       <Box gap={1}>
-        {props.busy && (
-          <Text color={palette.brand}>{SPINNER_FRAMES[frame]}</Text>
-        )}
+        {props.busy && <SpinnerGlyph isActive={true} />}
         {typeof props.turnCount === "number" &&
           typeof props.maxTurns === "number" && (
             <Text

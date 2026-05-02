@@ -64,6 +64,8 @@ dirgha "say ok in one word"
 Or skip the wizard and go straight to a key: `export NVIDIA_API_KEY=nvapi-…` (any of the 17 providers — see below).
 For 100% local: install [Ollama](https://ollama.com) or [llama.cpp](https://github.com/ggerganov/llama.cpp), then run `dirgha setup` and pick **Local**.
 
+**Windows users**: See the [Windows installation guide](docs/windows-installation.md) for setup of optional features.
+
 The interactive TUI is `dirgha` with no args. Resume a session with `dirgha resume <id>`. Fan a parallel sub-agent fleet with `dirgha fleet launch "<goal>"`.
 
 ## What's in the box

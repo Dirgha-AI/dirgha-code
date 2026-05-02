@@ -9,7 +9,8 @@ import { jsxs as _jsxs, jsx as _jsx } from "react/jsx-runtime";
 import * as React from "react";
 import { Box, Text, useStdout } from "ink";
 import { useTheme } from "../theme-context.js";
-import { SpinnerContext, SPINNER_FRAMES } from "../spinner-context.js";
+import { SpinnerContext } from "../spinner-context.js";
+import { SpinnerGlyph } from "./SpinnerGlyph.js";
 function formatTokens(n) {
     if (n < 1000)
         return String(n);
@@ -47,7 +48,7 @@ export function StatusBar(props) {
     const { stdout } = useStdout();
     const palette = useTheme();
     const cols = stdout?.columns ?? 80;
-    const frame = React.useContext(SpinnerContext);
+    const { busy: _spinnerBusy } = React.useContext(SpinnerContext);
     const totalTokens = props.inputTokens + props.outputTokens;
     const costLabel = props.costUsd > 0 ? `$${props.costUsd.toFixed(3)}` : "";
     // Strip provider prefix so the footer reads short and human.
@@ -93,7 +94,7 @@ export function StatusBar(props) {
     // Slim status bar — only what's load-bearing:
     //   left:  ⏵⏵ MODE · cwd
     //   right: spinner (when busy) · short model · context-meter or cost
-    return (_jsxs(Box, { width: cols, paddingX: 1, justifyContent: "space-between", children: [_jsxs(Box, { gap: 1, children: [_jsxs(Text, { color: modeColour, bold: true, children: [ms.symbol, " ", ms.label] }), _jsx(Text, { color: palette.textMuted, dimColor: true, children: "\u00B7" }), _jsx(Text, { color: palette.textMuted, children: cwdLabel(props.cwd) })] }), _jsxs(Box, { gap: 1, children: [props.busy && (_jsx(Text, { color: palette.brand, children: SPINNER_FRAMES[frame] })), typeof props.turnCount === "number" &&
+    return (_jsxs(Box, { width: cols, paddingX: 1, justifyContent: "space-between", children: [_jsxs(Box, { gap: 1, children: [_jsxs(Text, { color: modeColour, bold: true, children: [ms.symbol, " ", ms.label] }), _jsx(Text, { color: palette.textMuted, dimColor: true, children: "\u00B7" }), _jsx(Text, { color: palette.textMuted, children: cwdLabel(props.cwd) })] }), _jsxs(Box, { gap: 1, children: [props.busy && _jsx(SpinnerGlyph, { isActive: true }), typeof props.turnCount === "number" &&
                         typeof props.maxTurns === "number" && (_jsx(Text, { color: palette.textMuted, dimColor: true, children: `Turn ${props.turnCount}/${props.maxTurns}` })), _jsx(Text, { color: palette.brand, children: modelDisplay }), props.busy && (_jsx(Text, { color: palette.textMuted, dimColor: true, children: "\u00B7 Ctrl+C to stop" })), tokRateLabel !== "" && (_jsx(Text, { color: palette.textMuted, dimColor: true, children: tokRateLabel })), contextMeter !== "" && (_jsx(Text, { color: palette.textMuted, dimColor: true, children: contextMeter })), costLabel !== "" && (_jsx(Text, { color: palette.textMuted, dimColor: true, children: costLabel }))] })] }));
 }
 //# sourceMappingURL=StatusBar.js.map

@@ -92,7 +92,11 @@ export async function* streamSSE(req) {
     }
     catch (err) {
         cancel();
-        throw new ProviderError(`Network error: ${String(err?.message ?? err)}`, req.providerName, undefined, true);
+        const msg = err?.message ?? String(err);
+        const hint = /fetch failed|ENOTFOUND|ECONNREFUSED/i.test(msg)
+            ? ` — check your internet connection (target: ${req.url})`
+            : '';
+        throw new ProviderError(`Network error: ${msg}${hint}`, req.providerName, undefined, true);
     }
     if (!response.ok) {
         const text = await safeReadText(response);
@@ -183,7 +187,11 @@ export async function postJSON(req) {
     }
     catch (err) {
         cancel();
-        throw new ProviderError(`Network error: ${String(err?.message ?? err)}`, req.providerName, undefined, true);
+        const msg = err?.message ?? String(err);
+        const hint = /fetch failed|ENOTFOUND|ECONNREFUSED/i.test(msg)
+            ? ` — check your internet connection (target: ${req.url})`
+            : '';
+        throw new ProviderError(`Network error: ${msg}${hint}`, req.providerName, undefined, true);
     }
     if (!response.ok) {
         const text = await safeReadText(response);

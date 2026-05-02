@@ -117,7 +117,7 @@ export class SlashRegistry {
       }
     }
     try {
-      const output = await handler(args, ctx);
+      const output = await handler!(args, ctx);
       return { handled: true, output };
     } catch (err) {
       console.error(

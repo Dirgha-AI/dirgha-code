@@ -16,7 +16,8 @@ import * as React from "react";
 import { Box, Text } from "ink";
 import { iconFor } from "../icons.js";
 import { useTheme } from "../theme-context.js";
-import { SpinnerContext, SPINNER_FRAMES } from "../spinner-context.js";
+import { SpinnerContext } from "../spinner-context.js";
+import { SpinnerGlyph } from "./SpinnerGlyph.js";
 
 export type ToolStatus = "pending" | "running" | "done" | "error";
 
@@ -97,15 +98,15 @@ function diffShortPreview(text: string, maxLen = 80): string {
 
 export function ToolBox(props: ToolBoxProps): React.JSX.Element {
   const palette = useTheme();
-  const frame = React.useContext(SpinnerContext);
-  const tick = frame;
+  const { busy: _spinnerBusy } = React.useContext(SpinnerContext);
+  const isRunning = props.status !== "done" && props.status !== "error";
 
   const icon =
     props.status === "error"
       ? "✗"
       : props.status === "done"
         ? "✓"
-        : SPINNER_FRAMES[frame];
+        : null;
   const iconColour =
     props.status === "error"
       ? palette.error
@@ -125,8 +126,6 @@ export function ToolBox(props: ToolBoxProps): React.JSX.Element {
       : props.durationMs !== undefined
         ? formatElapsed(props.durationMs)
         : "";
-  void tick;
-
   const diffMode = isDiffOutput(props);
 
   const preview =
@@ -145,7 +144,11 @@ export function ToolBox(props: ToolBoxProps): React.JSX.Element {
       marginBottom={1}
     >
       <Box gap={1}>
-        <Text color={iconColour}>{icon}</Text>
+        {icon !== null ? (
+          <Text color={iconColour}>{icon}</Text>
+        ) : (
+          <SpinnerGlyph isActive={isRunning} />
+        )}
         <Text color={palette.accent} bold>
           {iconFor(props.name)}
         </Text>

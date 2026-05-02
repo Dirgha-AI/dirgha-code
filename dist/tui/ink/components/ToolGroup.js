@@ -18,7 +18,8 @@ import { Box, Text } from "ink";
 import { useTheme } from "../theme-context.js";
 import { iconFor, TOOL_STATUS } from "../icons.js";
 import { DenseToolMessage, isDenseTool } from "./DenseToolMessage.js";
-import { SpinnerContext, SPINNER_FRAMES as SPINNER } from "../spinner-context.js";
+import { SpinnerContext } from "../spinner-context.js";
+import { SpinnerGlyph } from "./SpinnerGlyph.js";
 const TOOL_LABEL = {
     fs_read: "Read",
     fs_write: "Write",
@@ -49,12 +50,7 @@ export function ToolGroup(props) {
             }) }) }));
 }
 function FullToolRow({ tool, divider, palette, }) {
-    const frame = React.useContext(SpinnerContext);
-    const glyph = tool.status === "error"
-        ? TOOL_STATUS.ERROR
-        : tool.status === "done"
-            ? TOOL_STATUS.SUCCESS
-            : SPINNER[frame];
+    const { busy } = React.useContext(SpinnerContext);
     const glyphColour = tool.status === "error"
         ? palette.status.error
         : tool.status === "done"
@@ -80,7 +76,7 @@ function FullToolRow({ tool, divider, palette, }) {
     const diffLines = diffMode && tool.outputPreview
         ? tool.outputPreview.split("\n").slice(0, 30)
         : [];
-    return (_jsxs(Box, { flexDirection: "column", children: [_jsxs(Box, { flexDirection: "row", children: [_jsx(Box, { minWidth: 2, children: _jsx(Text, { color: glyphColour, bold: tool.status !== "running", children: glyph }) }), _jsx(Text, { color: palette.text.accent, children: iconFor(tool.name) }), _jsx(Text, { children: " " }), _jsx(Text, { bold: true, color: nameColour, children: label }), tool.argSummary && tool.argSummary.length > 0 && (_jsxs(_Fragment, { children: [_jsx(Text, { children: " " }), _jsx(Text, { color: palette.text.secondary, children: tool.argSummary })] })), elapsed && (_jsxs(_Fragment, { children: [_jsx(Text, { children: "  " }), _jsx(Text, { color: palette.text.secondary, dimColor: true, children: elapsed })] }))] }), preview && (_jsx(Box, { paddingLeft: 4, children: _jsxs(Text, { color: palette.text.secondary, dimColor: true, children: ["\u23BF ", preview] }) })), diffLines.length > 0 && (_jsx(Box, { paddingLeft: 4, flexDirection: "column", children: diffLines.map((line, i) => {
+    return (_jsxs(Box, { flexDirection: "column", children: [_jsxs(Box, { flexDirection: "row", children: [_jsx(Box, { minWidth: 2, children: tool.status === "running" ? (_jsx(SpinnerGlyph, { isActive: busy, color: glyphColour })) : (_jsx(Text, { color: glyphColour, bold: true, children: tool.status === "error" ? TOOL_STATUS.ERROR : TOOL_STATUS.SUCCESS })) }), _jsx(Text, { color: palette.text.accent, children: iconFor(tool.name) }), _jsx(Text, { children: " " }), _jsx(Text, { bold: true, color: nameColour, children: label }), tool.argSummary && tool.argSummary.length > 0 && (_jsxs(_Fragment, { children: [_jsx(Text, { children: " " }), _jsx(Text, { color: palette.text.secondary, children: tool.argSummary })] })), elapsed && (_jsxs(_Fragment, { children: [_jsx(Text, { children: "  " }), _jsx(Text, { color: palette.text.secondary, dimColor: true, children: elapsed })] }))] }), preview && (_jsx(Box, { paddingLeft: 4, children: _jsxs(Text, { color: palette.text.secondary, dimColor: true, children: ["\u23BF ", preview] }) })), diffLines.length > 0 && (_jsx(Box, { paddingLeft: 4, flexDirection: "column", children: diffLines.map((line, i) => {
                     let colour;
                     if (line.startsWith("+") && !line.startsWith("+++"))
                         colour = DIFF_ADD_COLOUR;

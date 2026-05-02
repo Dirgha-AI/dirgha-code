@@ -134,8 +134,11 @@ async function main() {
         const tail = verbIdx >= 0 ? rawArgs.slice(verbIdx + 1) : positionals.slice(1);
         exit(await runLogout(tail));
     }
-    if (positionals[0] === "setup")
-        exit(await runSetup(positionals.slice(1)));
+    if (positionals[0] === "setup") {
+        const verbIdx = rawArgs.indexOf("setup");
+        const tail = verbIdx >= 0 ? rawArgs.slice(verbIdx + 1) : positionals.slice(1);
+        exit(await runSetup(tail));
+    }
     if (positionals[0] === "fleet") {
         // `dirgha fleet <launch|list|merge|discard|triple|cleanup>` —
         // parallel-agent orchestration in git worktrees. We pass the

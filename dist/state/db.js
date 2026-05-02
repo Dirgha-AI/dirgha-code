@@ -28,7 +28,7 @@ function getDb() {
         return _db;
     }
     catch (err) {
-        throw new Error(`SQLite unavailable: ${err.message}. Install: npm install -g better-sqlite3`);
+        throw new Error(`SQLite unavailable (optional feature) — run "dirgha setup --features" to install.`);
     }
 }
 function initSchema(db) {
@@ -105,6 +105,15 @@ export function dbSearchChats(query, limit = 20) {
     }
     catch {
         return [];
+    }
+}
+export function isSqliteAvailable() {
+    try {
+        getDb();
+        return true;
+    }
+    catch {
+        return false;
     }
 }
 export function dbListSessions(limit = 20) {
