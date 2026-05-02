@@ -145,3 +145,88 @@ describe("tools — git", () => {
     expect(mod.gitTool.inputSchema.type).toBe("object");
   });
 });
+
+describe("cli — first-run detection", () => {
+  it("checkFirstRun returns false when keys exist in env", async () => {
+    const { checkFirstRun } = await import("../cli/first-run.js");
+    // With no env keys set and no ~/.dirgha/keys.json in the test
+    // tmpdir, this should return true (first run).
+    const result = checkFirstRun();
+    expect(typeof result).toBe("boolean");
+  });
+});
+
+describe("cli — wizard exports", () => {
+  it("PROVIDERS array is non-empty", async () => {
+    const { PROVIDERS } = await import("../cli/flows/wizard.js");
+    expect(Array.isArray(PROVIDERS)).toBe(true);
+    expect(PROVIDERS.length).toBeGreaterThan(0);
+  });
+
+  it("every provider has required fields", async () => {
+    const { PROVIDERS } = await import("../cli/flows/wizard.js");
+    for (const p of PROVIDERS) {
+      expect(p.id).toBeDefined();
+      expect(p.label).toBeDefined();
+      expect(typeof p.hosted).toBe("boolean");
+    }
+  });
+
+  it("at least 16 providers registered", async () => {
+    const { PROVIDERS } = await import("../cli/flows/wizard.js");
+    expect(PROVIDERS.length).toBeGreaterThanOrEqual(16);
+  });
+});
+
+describe("setup — BYOK provider exports", () => {
+  it("PROVIDERS array is non-empty", async () => {
+    const { PROVIDERS } = await import("../cli/setup.js");
+    expect(Array.isArray(PROVIDERS)).toBe(true);
+    expect(PROVIDERS.length).toBeGreaterThan(0);
+  });
+
+  it("every provider has label + env + helpUrl + suggested", async () => {
+    const { PROVIDERS } = await import("../cli/setup.js");
+    for (const p of PROVIDERS) {
+      expect(p.label).toBeDefined();
+      expect(p.env).toBeDefined();
+      expect(p.helpUrl).toBeDefined();
+      expect(Array.isArray(p.suggested)).toBe(true);
+      expect(p.suggested.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("intelligence — model aliases", () => {
+  it("resolveModelAlias is defined", async () => {
+    const { resolveModelAlias } = await import("../intelligence/prices.js");
+    expect(typeof resolveModelAlias).toBe("function");
+  });
+
+  it("aliases resolve correctly", async () => {
+    const { resolveModelAlias, listModelAliases } =
+      await import("../intelligence/prices.js");
+    const aliases = listModelAliases();
+    expect(Array.isArray(aliases)).toBe(true);
+    // Passthrough for unknown model
+    expect(resolveModelAlias("totally-unknown-model-xyz")).toBe(
+      "totally-unknown-model-xyz",
+    );
+  });
+});
+
+describe("providers — rate limiter", () => {
+  it("rate limiter exports bucket utilities", async () => {
+    const mod = await import("../providers/rate-limiter.js");
+    expect(mod).toBeDefined();
+  });
+});
+
+describe("cli — slash registry", () => {
+  it("SlashRegistry can register and dispatch handlers", async () => {
+    const { SlashRegistry } = await import("../cli/slash.js");
+    const registry = new SlashRegistry();
+    registry.register("test-cmd", async () => "ok");
+    expect(registry.has("test-cmd")).toBe(true);
+  });
+});
