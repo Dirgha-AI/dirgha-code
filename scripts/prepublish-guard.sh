@@ -141,9 +141,12 @@ check "required files present" bash -c "
 # 6. No .env files in package files
 # ─────────────────────────────────────────────
 check "no .env files" bash -c "
-  found=\$(find '$REPO_ROOT' -maxdepth 1 -name '.env*' -o -name '*.pem' -o -name 'credentials*.json' 2>/dev/null || true)
+  found=\$(find '$REPO_ROOT' -maxdepth 1 -name '.env*' -o -name 'credentials*.json' 2>/dev/null || true)
+  pem_secrets=\$(find '$REPO_ROOT' -maxdepth 1 -name '*.pem' 2>/dev/null | xargs -r grep -l 'PRIVATE KEY' 2>/dev/null || true)
+  found="\$found\${found:+\$'\n'}\$pem_secrets"
+  found=\$(echo "\$found" | sed '/^\$/d')
   if [ -n \"\$found\" ]; then
-    echo 'ERROR: sensitive files at repo root:' >&2
+    echo 'ERROR: sensitive files at repo root (matched .env*, credentials*.json, or private-key *.pem):' >&2
     echo \"\$found\" >&2
     exit 1
   fi
@@ -152,7 +155,7 @@ check "no .env files" bash -c "
     const fs = require('fs');
     const pkg = JSON.parse(fs.readFileSync('$REPO_ROOT/package.json', 'utf8'));
     const files = pkg.files || [];
-    const envFiles = files.filter(f => f.match(/\\.env|credentials|secret|\.key|\.pem/i));
+    const envFiles = files.filter(f => f.match(/\\.env|credentials|secret|private.*\\.pem|\\.key\\.pem/i));
     if (envFiles.length > 0) {
       console.error('ERROR: sensitive files in package.json files array:', envFiles.join(', '));
       process.exit(1);

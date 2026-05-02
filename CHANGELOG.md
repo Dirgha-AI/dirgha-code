@@ -2,6 +2,14 @@
 
 All notable changes are tracked here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); we use [Semantic Versioning](https://semver.org/).
 
+## [1.20.1] — 2026-05-02
+
+### Fixed
+
+- CI: Windows runner now uses `npm install` to resolve platform-specific rolldown native binding (`@rolldown/binding-win32-x64-msvc`) omitted from Linux-generated lockfile.
+- CI: Browser tool offline test now skips gracefully when Playwright Chromium executable is not installed (instead of failing the suite).
+- Publish: prepublish-guard no longer flags cosign SBOM certificate `.pem` files as secrets; only PEM files containing `PRIVATE KEY` are blocked.
+
 ## [1.20.0] — 2026-05-02
 
 ### Added

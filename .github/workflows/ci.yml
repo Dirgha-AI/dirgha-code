@@ -37,7 +37,13 @@ jobs:
           cache: npm
 
       - name: Install
-        run: npm ci --no-audit --no-fund
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            npm install --no-audit --no-fund
+          else
+            npm ci --no-audit --no-fund
+          fi
 
       - name: Lint
         run: npm run lint

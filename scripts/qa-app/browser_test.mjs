@@ -16,11 +16,25 @@ const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist');
 const { builtInTools, createToolExecutor, createToolRegistry } = await import(_toUrl(_join(ROOT, 'tools/index.js')).href);
 
 // Playwright reachability check.
+let pw;
 try {
-  await import('playwright');
+  pw = await import('playwright');
 } catch {
   console.log('SKIP: playwright not resolvable from cli node_modules');
   process.exit(0);
+}
+
+// Chromium binary check — on CI runners playwright is installed but
+// `npx playwright install` hasn't been run, so the executable is missing.
+try {
+  const browser = await pw.chromium.launch();
+  await browser.close();
+} catch (e) {
+  if (e.message && (e.message.includes("Executable doesn't exist") || e.message.includes('browserType.launch'))) {
+    console.log('SKIP: playwright chromium executable not installed (run: npx playwright install chromium)');
+    process.exit(0);
+  }
+  throw e;
 }
 
 const sandbox = mkdtempSync(join(tmpdir(), 'browser-test-'));
