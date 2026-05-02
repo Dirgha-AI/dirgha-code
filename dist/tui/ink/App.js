@@ -671,7 +671,7 @@ export function App(props) {
     // streaming text appears now, the Static-around-transcript pattern
     // was suppressing the live region updates. If still not, the bug
     // is upstream in useEventProjection.
-    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: { busy }, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: [{ key: "logo" }], children: (_item) => _jsx(Logo, { version: VERSION }, "logo") }), _jsx(Box, { flexDirection: "column", children: renderedTranscript }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
+    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: { busy }, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: [{ key: "logo" }], children: (_item) => (_jsx(Logo, { version: VERSION }, "logo")) }), _jsx(Box, { flexDirection: "column", children: renderedTranscript }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
                             approvalBusRef.current?.resolve(pendingApproval.id, decision);
                         } })), pendingFailover !== null && (_jsx(ModelSwitchPrompt, { failedModel: pendingFailover.failedModel, failoverModel: pendingFailover.failoverModel, onAccept: (failover) => {
                             const lastPrompt = pendingFailover.lastPrompt;
@@ -813,6 +813,8 @@ function providerIdForModel(model) {
         return "openai";
     if (model.includes("gemini"))
         return "gemini";
+    if (model.includes("deepseek"))
+        return "deepseek";
     if (model.includes("kimi") || model.includes("moonshot"))
         return "nvidia";
     if (model.includes("llama") ||

@@ -788,165 +788,165 @@ export function App(props: AppProps): React.JSX.Element {
   // is upstream in useEventProjection.
   return (
     <ThemeProvider activeTheme={themeName}>
-    <SpinnerContext.Provider value={{ busy }}>
-      <Box flexDirection="column">
-        <Static items={[{ key: "logo" }]}>
-          {(_item): React.JSX.Element => <Logo key="logo" version={VERSION} />}
-        </Static>
+      <SpinnerContext.Provider value={{ busy }}>
         <Box flexDirection="column">
-          {renderedTranscript}
-        </Box>
-        {pendingApproval !== null && approvalBusRef.current && (
-          <ApprovalPrompt
-            request={pendingApproval}
-            onResolve={(decision): void => {
-              approvalBusRef.current?.resolve(pendingApproval.id, decision);
+          <Static items={[{ key: "logo" }]}>
+            {(_item): React.JSX.Element => (
+              <Logo key="logo" version={VERSION} />
+            )}
+          </Static>
+          <Box flexDirection="column">{renderedTranscript}</Box>
+          {pendingApproval !== null && approvalBusRef.current && (
+            <ApprovalPrompt
+              request={pendingApproval}
+              onResolve={(decision): void => {
+                approvalBusRef.current?.resolve(pendingApproval.id, decision);
+              }}
+            />
+          )}
+          {pendingFailover !== null && (
+            <ModelSwitchPrompt
+              failedModel={pendingFailover.failedModel}
+              failoverModel={pendingFailover.failoverModel}
+              onAccept={(failover): void => {
+                const lastPrompt = pendingFailover.lastPrompt;
+                setCurrentModel(failover);
+                setPendingFailover(null);
+                // Re-submit the failed prompt against the new model.
+                if (lastPrompt) {
+                  setTimeout(() => handleSubmit(lastPrompt), 0);
+                }
+              }}
+              onReject={(): void => setPendingFailover(null)}
+              onPicker={(): void => {
+                setPendingFailover(null);
+                overlays.openOverlay("models");
+              }}
+            />
+          )}
+          <PromptQueueIndicator queued={promptQueue} />
+          <InputBox
+            value={input}
+            onChange={setInput}
+            onSubmit={handleSubmit}
+            busy={busy}
+            liveDurationMs={liveDurationMs}
+            vimMode={props.config.vimMode === true}
+            onAtQueryChange={overlays.setAtQuery}
+            onSlashQueryChange={overlays.setSlashQuery}
+            onRequestOverlay={overlays.openOverlay}
+            onRequestYoloToggle={(): void => {
+              const next: Mode = mode === "yolo" ? "act" : "yolo";
+              setMode(next);
+              setTranscript((prev) => [
+                ...prev,
+                {
+                  kind: "notice",
+                  id: randomUUID(),
+                  text:
+                    next === "yolo"
+                      ? "YOLO mode ON — every tool call is auto-approved. Ctrl+Y to exit."
+                      : "YOLO mode OFF — back to standard confirmation.",
+                },
+              ]);
             }}
+            inputFocus={inputFocus}
           />
-        )}
-        {pendingFailover !== null && (
-          <ModelSwitchPrompt
-            failedModel={pendingFailover.failedModel}
-            failoverModel={pendingFailover.failoverModel}
-            onAccept={(failover): void => {
-              const lastPrompt = pendingFailover.lastPrompt;
-              setCurrentModel(failover);
-              setPendingFailover(null);
-              // Re-submit the failed prompt against the new model.
-              if (lastPrompt) {
-                setTimeout(() => handleSubmit(lastPrompt), 0);
+          {overlays.active === "atfile" && overlays.atQuery !== null && (
+            <AtFileComplete
+              cwd={props.cwd}
+              query={overlays.atQuery}
+              onPick={handleAtPick}
+              onCancel={(): void => {
+                overlays.setAtQuery(null);
+                overlays.setActive(null);
+              }}
+            />
+          )}
+          {overlays.active === "slash" && overlays.slashQuery !== null && (
+            <SlashComplete
+              commands={slashCommands}
+              query={overlays.slashQuery}
+              onPick={handleSlashPick}
+              onCancel={(): void => {
+                overlays.setSlashQuery(null);
+                overlays.setActive(null);
+              }}
+            />
+          )}
+          {overlays.active === "models" &&
+            pickerStage === "provider" &&
+            (() => {
+              if (providerEntries.length === 0) {
+                // Fall through to flat ModelPicker if no providers (catalogue empty).
+                return null;
               }
-            }}
-            onReject={(): void => setPendingFailover(null)}
-            onPicker={(): void => {
-              setPendingFailover(null);
-              overlays.openOverlay("models");
-            }}
-          />
-        )}
-        <PromptQueueIndicator queued={promptQueue} />
-        <InputBox
-          value={input}
-          onChange={setInput}
-          onSubmit={handleSubmit}
-          busy={busy}
-          liveDurationMs={liveDurationMs}
-          vimMode={props.config.vimMode === true}
-          onAtQueryChange={overlays.setAtQuery}
-          onSlashQueryChange={overlays.setSlashQuery}
-          onRequestOverlay={overlays.openOverlay}
-          onRequestYoloToggle={(): void => {
-            const next: Mode = mode === "yolo" ? "act" : "yolo";
-            setMode(next);
-            setTranscript((prev) => [
-              ...prev,
-              {
-                kind: "notice",
-                id: randomUUID(),
-                text:
-                  next === "yolo"
-                    ? "YOLO mode ON — every tool call is auto-approved. Ctrl+Y to exit."
-                    : "YOLO mode OFF — back to standard confirmation.",
-              },
-            ]);
-          }}
-          inputFocus={inputFocus}
-        />
-        {overlays.active === "atfile" && overlays.atQuery !== null && (
-          <AtFileComplete
+              return (
+                <ProviderPicker
+                  providers={providerEntries}
+                  onPick={(providerId): void => {
+                    setPickerProvider(providerId);
+                    setPickerStage("model");
+                  }}
+                  onCancel={(): void => {
+                    setPickerStage("provider");
+                    setPickerProvider(null);
+                    overlays.closeOverlay();
+                  }}
+                />
+              );
+            })()}
+          {overlays.active === "models" && pickerStage === "model" && (
+            <ModelPicker
+              models={models.filter((m) => m.provider === pickerProvider)}
+              current={currentModel}
+              onPick={(id): void => {
+                handleModelPick(id);
+                setPickerStage("provider");
+                setPickerProvider(null);
+              }}
+              onCancel={(): void => {
+                // Esc inside ModelPicker → back to ProviderPicker (NOT close).
+                setPickerStage("provider");
+                setPickerProvider(null);
+              }}
+            />
+          )}
+          {overlays.active === "help" && (
+            <HelpOverlay
+              slashCommands={slashCommands}
+              onClose={overlays.closeOverlay}
+            />
+          )}
+          {overlays.active === "theme" && (
+            <ThemePicker
+              current={themeName}
+              onPick={handleThemePick}
+              onCancel={overlays.closeOverlay}
+            />
+          )}
+          {pendingKey && (
+            <KeySetOverlay
+              keyName={pendingKey.keyName}
+              onSave={handleKeySetSave}
+              onCancel={() => setPendingKey(null)}
+            />
+          )}
+          <StatusBar
+            model={currentModel}
+            provider={providerIdForModel(currentModel)}
+            inputTokens={projection.totals.inputTokens}
+            outputTokens={projection.totals.outputTokens}
+            costUsd={projection.totals.costUsd}
             cwd={props.cwd}
-            query={overlays.atQuery}
-            onPick={handleAtPick}
-            onCancel={(): void => {
-              overlays.setAtQuery(null);
-              overlays.setActive(null);
-            }}
+            busy={busy}
+            mode={mode}
+            contextWindow={contextWindowFor(currentModel)}
+            liveOutputTokens={liveOutputTokens}
+            liveDurationMs={liveDurationMs}
           />
-        )}
-        {overlays.active === "slash" && overlays.slashQuery !== null && (
-          <SlashComplete
-            commands={slashCommands}
-            query={overlays.slashQuery}
-            onPick={handleSlashPick}
-            onCancel={(): void => {
-              overlays.setSlashQuery(null);
-              overlays.setActive(null);
-            }}
-          />
-        )}
-        {overlays.active === "models" &&
-          pickerStage === "provider" &&
-          (() => {
-            if (providerEntries.length === 0) {
-              // Fall through to flat ModelPicker if no providers (catalogue empty).
-              return null;
-            }
-            return (
-              <ProviderPicker
-                providers={providerEntries}
-                onPick={(providerId): void => {
-                  setPickerProvider(providerId);
-                  setPickerStage("model");
-                }}
-                onCancel={(): void => {
-                  setPickerStage("provider");
-                  setPickerProvider(null);
-                  overlays.closeOverlay();
-                }}
-              />
-            );
-          })()}
-        {overlays.active === "models" && pickerStage === "model" && (
-          <ModelPicker
-            models={models.filter((m) => m.provider === pickerProvider)}
-            current={currentModel}
-            onPick={(id): void => {
-              handleModelPick(id);
-              setPickerStage("provider");
-              setPickerProvider(null);
-            }}
-            onCancel={(): void => {
-              // Esc inside ModelPicker → back to ProviderPicker (NOT close).
-              setPickerStage("provider");
-              setPickerProvider(null);
-            }}
-          />
-        )}
-        {overlays.active === "help" && (
-          <HelpOverlay
-            slashCommands={slashCommands}
-            onClose={overlays.closeOverlay}
-          />
-        )}
-        {overlays.active === "theme" && (
-          <ThemePicker
-            current={themeName}
-            onPick={handleThemePick}
-            onCancel={overlays.closeOverlay}
-          />
-        )}
-        {pendingKey && (
-          <KeySetOverlay
-            keyName={pendingKey.keyName}
-            onSave={handleKeySetSave}
-            onCancel={() => setPendingKey(null)}
-          />
-        )}
-        <StatusBar
-          model={currentModel}
-          provider={providerIdForModel(currentModel)}
-          inputTokens={projection.totals.inputTokens}
-          outputTokens={projection.totals.outputTokens}
-          costUsd={projection.totals.costUsd}
-          cwd={props.cwd}
-          busy={busy}
-          mode={mode}
-          contextWindow={contextWindowFor(currentModel)}
-          liveOutputTokens={liveOutputTokens}
-          liveDurationMs={liveDurationMs}
-        />
-      </Box>
-    </SpinnerContext.Provider>
+        </Box>
+      </SpinnerContext.Provider>
     </ThemeProvider>
   );
 }
@@ -1072,6 +1072,7 @@ function providerIdForModel(model: string): string {
   if (model.includes("gpt") || model.startsWith("o1") || model.startsWith("o3"))
     return "openai";
   if (model.includes("gemini")) return "gemini";
+  if (model.includes("deepseek")) return "deepseek";
   if (model.includes("kimi") || model.includes("moonshot")) return "nvidia";
   if (
     model.includes("llama") ||

@@ -6,7 +6,7 @@
  */
 
 import { spawn } from "node:child_process";
-import { resolve } from "node:path";
+import { resolve, sep } from "node:path";
 import type { Tool } from "./registry.js";
 import type { ToolResult } from "../kernel/types.js";
 
@@ -45,8 +45,6 @@ export const gitTool: Tool = {
       };
     }
     const full = [...base, ...(input.args ?? [])];
-    // Sanitize model-supplied cwd to prevent running git in arbitrary paths.
-    const sep = require("node:path").sep;
     const requestedCwd = input.cwd ? resolve(ctx.cwd, input.cwd) : ctx.cwd;
     const cwd =
       requestedCwd.startsWith(ctx.cwd + sep) || requestedCwd === ctx.cwd

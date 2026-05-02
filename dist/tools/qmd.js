@@ -26,9 +26,11 @@ async function resolveQmd() {
         await access(_vendoredQmdBin, constants.X_OK);
         return _vendoredQmdBin;
     }
-    catch { /* not vendored for this platform */ }
+    catch {
+        /* not vendored for this platform */
+    }
     try {
-        await execFileAsync("which", ["qmd"], { timeout: 2000 });
+        await execFileAsync(process.platform === "win32" ? "where" : "which", ["qmd"], { timeout: 2000 });
         return "qmd";
     }
     catch {

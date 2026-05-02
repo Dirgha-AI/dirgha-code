@@ -42,10 +42,16 @@ async function resolveRtk(): Promise<string | null> {
   try {
     await access(_vendoredBin, constants.X_OK);
     return _vendoredBin;
-  } catch { /* not present for this platform */ }
+  } catch {
+    /* not present for this platform */
+  }
   // 2. Fall back to whatever rtk is on PATH.
   try {
-    await execFileAsync("which", ["rtk"], { timeout: 2000 });
+    await execFileAsync(
+      process.platform === "win32" ? "where" : "which",
+      ["rtk"],
+      { timeout: 2000 },
+    );
     return "rtk";
   } catch {
     return null;

@@ -37,9 +37,15 @@ async function resolveQmd(): Promise<string | null> {
   try {
     await access(_vendoredQmdBin, constants.X_OK);
     return _vendoredQmdBin;
-  } catch { /* not vendored for this platform */ }
+  } catch {
+    /* not vendored for this platform */
+  }
   try {
-    await execFileAsync("which", ["qmd"], { timeout: 2000 });
+    await execFileAsync(
+      process.platform === "win32" ? "where" : "which",
+      ["qmd"],
+      { timeout: 2000 },
+    );
     return "qmd";
   } catch {
     return null;
@@ -72,7 +78,8 @@ export const qmdTool: Tool = {
       },
       json: {
         type: "boolean",
-        description: "Return raw JSON results instead of formatted text. Defaults to false.",
+        description:
+          "Return raw JSON results instead of formatted text. Defaults to false.",
       },
     },
     required: ["query"],
@@ -85,7 +92,8 @@ export const qmdTool: Tool = {
       json?: boolean;
     };
     const n = input.n ?? 5;
-    const collection = input.collection ?? (ctx as { cwd?: string })?.cwd ?? process.cwd();
+    const collection =
+      input.collection ?? (ctx as { cwd?: string })?.cwd ?? process.cwd();
 
     const qmdBin = await resolveQmd();
     if (!qmdBin) {
@@ -114,9 +122,15 @@ export const qmdTool: Tool = {
       }
       return { content: out || "No results.", isError: false };
     } catch (err: unknown) {
-      const e = err as NodeJS.ErrnoException & { stdout?: string; stderr?: string; code?: number };
+      const e = err as NodeJS.ErrnoException & {
+        stdout?: string;
+        stderr?: string;
+        code?: number;
+      };
       if (e.stdout !== undefined || e.stderr !== undefined) {
-        const out = ((e.stdout ?? "") + (e.stderr ? `\n[stderr]\n${e.stderr}` : "")).trim();
+        const out = (
+          (e.stdout ?? "") + (e.stderr ? `\n[stderr]\n${e.stderr}` : "")
+        ).trim();
         return { content: `exit ${e.code ?? 1}\n${out}`, isError: false };
       }
       return { content: `qmd search failed: ${e.message}`, isError: true };

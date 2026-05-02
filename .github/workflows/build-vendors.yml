@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - 'vendor/rtk/VERSION'
-      - 'vendor/qmd/VERSION'
+      - "vendor/rtk/VERSION"
+      - "vendor/qmd/VERSION"
 
 permissions:
   contents: write
@@ -57,7 +57,7 @@ jobs:
           cp _rtk_src/target/${{ matrix.cargo_target }}/release/rtk ${{ matrix.out }}
           chmod +x ${{ matrix.out }}
           sha256sum ${{ matrix.out }} > ${{ matrix.out }}.sha256
-      - uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f2 # v4.3.1
+      - uses: actions/upload-artifact@v4
         with:
           name: rtk-${{ matrix.target }}
           path: ${{ matrix.out }}*
@@ -93,7 +93,7 @@ jobs:
           repository: Dirgha-AI/qmd
           ref: ${{ steps.ver.outputs.sha }}
           path: _qmd_src
-      - uses: oven-sh/setup-bun@d3603274aca5625baad52ec06108517a089db4c5 # v1.2.0
+      - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
       - name: Install deps (no postinstall — node-llama-cpp removed in fork)
@@ -109,7 +109,7 @@ jobs:
           cp _qmd_src/dist/qmd ${{ matrix.out }}
           chmod +x ${{ matrix.out }}
           sha256sum ${{ matrix.out }} > ${{ matrix.out }}.sha256
-      - uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f2 # v4.3.1
+      - uses: actions/upload-artifact@v4
         with:
           name: qmd-${{ matrix.target }}
           path: ${{ matrix.out }}*
@@ -120,7 +120,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
-      - uses: actions/download-artifact@87c55149d96e628cc2ef7e6fc2aab372015aec85 # v4.1.3
+      - uses: actions/download-artifact@v4
         with:
           path: _artifacts
           merge-multiple: true

@@ -4,10 +4,10 @@
  * spending tokens on noisy metadata.
  */
 
-import { readdir, stat } from 'node:fs/promises';
-import { resolve, sep } from 'node:path';
-import type { Tool } from './registry.js';
-import type { ToolResult } from '../kernel/types.js';
+import { readdir, stat } from "node:fs/promises";
+import { resolve, sep } from "node:path";
+import type { Tool } from "./registry.js";
+import type { ToolResult } from "../kernel/types.js";
 
 interface Input {
   path?: string;
@@ -17,23 +17,42 @@ interface Input {
 // Paths where a blind fs_ls is almost never what the user actually
 // wanted. Typing `fs_ls .` at / or /root spills 100+ unrelated entries
 // into the model's context for no gain. Force a narrower ask.
-const HUGE_ROOTS = new Set(['/', '/root', '/home', '/tmp', '/Users', '/var']);
+const HUGE_ROOTS = new Set([
+  "/",
+  "/root",
+  "/home",
+  "/tmp",
+  "/Users",
+  "/var",
+  "C:\\",
+  "C:\\Users",
+  "C:\\Windows",
+]);
 
 export const fsLsTool: Tool = {
-  name: 'fs_ls',
-  description: 'List the entries of a directory, one level deep.',
+  name: "fs_ls",
+  description: "List the entries of a directory, one level deep.",
   inputSchema: {
-    type: 'object',
+    type: "object",
     properties: {
-      path: { type: 'string', description: 'Directory to list. Defaults to cwd.' },
-      includeHidden: { type: 'boolean', description: 'Include dotfiles.' },
+      path: {
+        type: "string",
+        description: "Directory to list. Defaults to cwd.",
+      },
+      includeHidden: { type: "boolean", description: "Include dotfiles." },
     },
   },
-  async execute(rawInput: unknown, ctx): Promise<ToolResult<{ entries: number }>> {
+  async execute(
+    rawInput: unknown,
+    ctx,
+  ): Promise<ToolResult<{ entries: number }>> {
     const input = rawInput as Input;
-    const target = resolve(ctx.cwd, input.path ?? '.');
+    const target = resolve(ctx.cwd, input.path ?? ".");
     if (!target.startsWith(ctx.cwd + sep) && target !== ctx.cwd) {
-      return { content: `Path escapes working directory: ${input.path ?? '.'}`, isError: true };
+      return {
+        content: `Path escapes working directory: ${input.path ?? "."}`,
+        isError: true,
+      };
     }
     if (HUGE_ROOTS.has(target)) {
       return {
@@ -42,10 +61,16 @@ export const fsLsTool: Tool = {
       };
     }
     const info = await stat(target).catch(() => undefined);
-    if (!info || !info.isDirectory()) return { content: `Not a directory: ${input.path ?? '.'}`, isError: true };
+    if (!info || !info.isDirectory())
+      return {
+        content: `Not a directory: ${input.path ?? "."}`,
+        isError: true,
+      };
 
     const names = await readdir(target);
-    const visible = input.includeHidden ? names : names.filter(n => !n.startsWith('.'));
+    const visible = input.includeHidden
+      ? names
+      : names.filter((n) => !n.startsWith("."));
     visible.sort();
 
     const rows: string[] = [];
@@ -59,7 +84,7 @@ export const fsLsTool: Tool = {
     }
 
     return {
-      content: rows.length > 0 ? rows.join('\n') : '(empty directory)',
+      content: rows.length > 0 ? rows.join("\n") : "(empty directory)",
       data: { entries: rows.length },
       isError: false,
     };

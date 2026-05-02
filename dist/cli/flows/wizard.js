@@ -15,6 +15,7 @@
 import { stdin, stdout } from "node:process";
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { createInterface } from "node:readline/promises";
+import { emitKeypressEvents } from "node:readline";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { defaultTheme, style } from "../../tui/theme.js";
@@ -80,6 +81,14 @@ const PROVIDERS = [
         env: "FIREWORKS_API_KEY",
         helpUrl: "https://fireworks.ai/account/api-keys",
         blurb: "Fast hosted open models",
+    },
+    {
+        id: "deepseek",
+        label: "DeepSeek",
+        hosted: false,
+        env: "DEEPSEEK_API_KEY",
+        helpUrl: "https://platform.deepseek.com/api_keys",
+        blurb: "DeepSeek V4, R1, Chat — native API",
     },
     // ─── 1.10.1: extra providers ───────────────────────────────────────
     {
@@ -155,6 +164,7 @@ const DEFAULT_MODEL_PER_PROVIDER = {
     openrouter: "tencent/hy3-preview:free",
     fireworks: "accounts/fireworks/models/deepseek-v3",
     dirgha: "deepseek",
+    deepseek: "deepseek-chat",
     mistral: "mistral/mistral-large-latest",
     cohere: "cohere/command-a-03-2025",
     cerebras: "cerebras/llama-3.3-70b",
@@ -164,6 +174,18 @@ const DEFAULT_MODEL_PER_PROVIDER = {
     groq: "groq/llama-3.3-70b-versatile",
     zai: "zai/glm-4.6",
 };
+let escWasPressed = false;
+function armEsc() {
+    escWasPressed = false;
+    const handler = (_str, key) => {
+        if (key.name === "escape")
+            escWasPressed = true;
+    };
+    stdin.on("keypress", handler);
+    return () => {
+        stdin.off("keypress", handler);
+    };
+}
 function dirghaHome() {
     return join(homedir(), ".dirgha");
 }
@@ -228,7 +250,8 @@ function printHeader() {
     stdout.write(`${style(defaultTheme.muted, "  Three-step provider · auth · model wizard.")}\n\n`);
 }
 function printStep(n, label) {
-    stdout.write(`\n${style(defaultTheme.accent, `Step ${n} of 3`)} · ${label}\n\n`);
+    const hint = n > 1 ? "Esc to go back" : "Esc to cancel";
+    stdout.write(`\n${style(defaultTheme.accent, `Step ${n} of 3`)} · ${label}  ${style(defaultTheme.muted, `(${hint})`)}\n\n`);
 }
 async function pickProvider(rl) {
     printStep(1, "Pick a provider");
@@ -294,7 +317,7 @@ async function authenticate(provider, rl) {
     if (!provider.env)
         return false;
     stdout.write(`  Get a key:  ${style(defaultTheme.accent, provider.helpUrl ?? "")}\n`);
-    stdout.write(`  Paste it below (input hidden — press enter when done).\n\n`);
+    stdout.write(`  Paste it below (input hidden — Esc→back, enter when done).\n\n`);
     const key = await promptHidden(rl, `  ${provider.env}: `);
     stdout.write("\n");
     if (!key || key.length < 6) {
@@ -521,26 +544,61 @@ export async function runWizard(argv) {
         return 0;
     }
     printHeader();
+    emitKeypressEvents(stdin);
     const rl = createInterface({ input: stdin, output: stdout });
     try {
-        const provider = await pickProvider(rl);
-        if (!provider) {
-            stdout.write(style(defaultTheme.danger, "\n  ✗ No provider selected. Re-run `dirgha setup` to try again.\n"));
-            return 1;
+        let step = 1;
+        let provider = null;
+        let model = null;
+        while (true) {
+            switch (step) {
+                case 1: {
+                    const disarm = armEsc();
+                    provider = await pickProvider(rl);
+                    disarm();
+                    if (escWasPressed) {
+                        stdout.write(style(defaultTheme.muted, "\n  ← setup cancelled.\n\n"));
+                        return 0;
+                    }
+                    if (!provider) {
+                        stdout.write(style(defaultTheme.danger, "  ✗ Invalid selection — try again.\n"));
+                        continue;
+                    }
+                    step = 2;
+                    break;
+                }
+                case 2: {
+                    const disarm = armEsc();
+                    const ok = await authenticate(provider, rl);
+                    disarm();
+                    if (escWasPressed) {
+                        stdout.write(style(defaultTheme.muted, "  ← back\n"));
+                        step = 1;
+                        break;
+                    }
+                    if (!ok)
+                        return 1;
+                    step = 3;
+                    break;
+                }
+                case 3: {
+                    const disarm = armEsc();
+                    model = await pickModel(provider, rl);
+                    disarm();
+                    if (escWasPressed) {
+                        stdout.write(style(defaultTheme.muted, "  ← back\n"));
+                        step = 2;
+                        break;
+                    }
+                    if (!model)
+                        return 1;
+                    await persistDefaultModel(model);
+                    await askTelemetryConsent(rl);
+                    printCompletion(provider, model);
+                    return 0;
+                }
+            }
         }
-        const ok = await authenticate(provider, rl);
-        if (!ok)
-            return 1;
-        const model = await pickModel(provider, rl);
-        if (!model)
-            return 1;
-        await persistDefaultModel(model);
-        // CI-7 — one-time telemetry consent prompt. Default OFF; user
-        // must type 'y' to opt in. Choice persists so this never asks
-        // again. Privacy doc shown on 'r'.
-        await askTelemetryConsent(rl);
-        printCompletion(provider, model);
-        return 0;
     }
     finally {
         rl.close();

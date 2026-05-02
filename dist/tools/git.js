@@ -5,7 +5,7 @@
  * a single "exec this command?" prompt per operation.
  */
 import { spawn } from "node:child_process";
-import { resolve } from "node:path";
+import { resolve, sep } from "node:path";
 export const gitTool = {
     name: "git",
     description: "Run read-mostly git operations: status, diff, log, branch, show. Destructive git operations should go through the shell tool.",
@@ -29,8 +29,6 @@ export const gitTool = {
             };
         }
         const full = [...base, ...(input.args ?? [])];
-        // Sanitize model-supplied cwd to prevent running git in arbitrary paths.
-        const sep = require("node:path").sep;
         const requestedCwd = input.cwd ? resolve(ctx.cwd, input.cwd) : ctx.cwd;
         const cwd = requestedCwd.startsWith(ctx.cwd + sep) || requestedCwd === ctx.cwd
             ? requestedCwd

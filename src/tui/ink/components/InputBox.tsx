@@ -94,6 +94,7 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
     null,
   );
   const [pasteExpanded, setPasteExpanded] = React.useState(false);
+  const [textInputResetKey, setTextInputResetKey] = React.useState(0);
   const prevValueRef = React.useRef<string>(props.value);
 
   const focus = props.inputFocus ?? !props.busy;
@@ -126,6 +127,16 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
       props.onSlashQueryChange(active ? token : null);
     }
   }, [props.value, props.onSlashQueryChange]);
+
+  // Force remount TextInput when value is externally cleared to "",
+  // resetting ink-text-input's internal cursorOffset so subsequent
+  // characters insert at the end instead of position 0.
+  React.useEffect(() => {
+    if (props.value === "") {
+      prevValueRef.current = "";
+      setTextInputResetKey((k) => k + 1);
+    }
+  }, [props.value]);
 
   // Invalidate paste-collapse if the buffer shrinks past the pasted region.
   React.useEffect(() => {
@@ -278,6 +289,7 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
             />
           ) : (
             <TextInput
+              key={textInputResetKey}
               value={props.value}
               onChange={handleChange}
               onSubmit={props.onSubmit}
