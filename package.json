@@ -32,7 +32,9 @@
     "prepublishOnly": "npm run prepublish-guard && npm run build && npm run verify-install",
     "lint": "eslint src --max-warnings 0",
     "lint:fix": "eslint src --fix --max-warnings 0",
-    "license-check": "license-checker --production --excludePackages 'argparse@1.0.10' --failOn 'GPL;AGPL;LGPL'"
+    "license-check": "license-checker --production --excludePackages 'argparse@1.0.10' --failOn 'GPL;AGPL;LGPL'",
+    "gate": "bash scripts/gate.sh",
+    "changelog:update": "node scripts/changelog-bump.mjs"
   },
   "dependencies": {
     "ink": "5.0.0",
