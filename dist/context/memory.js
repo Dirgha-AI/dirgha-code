@@ -61,6 +61,7 @@ export class FileMemoryStore {
         return entries;
     }
     async get(id) {
+        assertValidKey(id);
         const abs = this.pathFor(id);
         const text = await readFile(abs, "utf8").catch(() => undefined);
         if (!text)
@@ -68,6 +69,7 @@ export class FileMemoryStore {
         return parseEntry(id, text);
     }
     async upsert(entry) {
+        assertValidKey(entry.id);
         await this.ensure();
         const now = new Date().toISOString();
         const complete = {
@@ -80,6 +82,7 @@ export class FileMemoryStore {
         await this.reindex(complete);
     }
     async remove(id) {
+        assertValidKey(id);
         await unlink(this.pathFor(id)).catch(() => undefined);
         await this.writeIndex();
         const fts = await this.fts();

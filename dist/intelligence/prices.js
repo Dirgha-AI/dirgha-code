@@ -131,7 +131,7 @@ export const PRICES = [
         outputPerM: 0.3,
     },
     {
-        provider: "nvidia",
+        provider: "openrouter",
         model: "meta/llama-3.3-70b-instruct",
         inputPerM: 0.2,
         outputPerM: 0.8,

@@ -635,9 +635,11 @@ export function App(props) {
             setTimeout(() => handleSubmit(spliced || `/${name}`), 0);
         }
     }, [overlays, ARGLESS_SLASH, handleSubmit]);
-    const inputFocus = overlays.active === null ||
-        overlays.active === "atfile" ||
-        overlays.active === "slash";
+    const inputFocus = pendingKey === null &&
+        pendingApproval === null &&
+        (overlays.active === null ||
+            overlays.active === "atfile" ||
+            overlays.active === "slash");
     // Active theme name — driven by local state so the picker can flip it
     // live. Initial value comes from config; subsequent changes are
     // persisted to ~/.dirgha/config.json so future sessions pick it up.

@@ -25,7 +25,7 @@
 
 import { mkdir, copyFile, readdir, stat, writeFile, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { join, dirname, resolve } from 'node:path';
+import { join, dirname, resolve, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { stdout, stderr } from 'node:process';
@@ -119,7 +119,12 @@ function pickTemplate(prompt: string, override?: string): Template | undefined {
 
 /** Derive a project name from the prompt — kebab-case, ≤ 30 chars. */
 function deriveName(prompt: string, override?: string): string {
-  if (override) return override;
+  if (override) {
+    if (basename(override) !== override) {
+      throw new Error(`Invalid project name "${override}": must not contain path separators.`);
+    }
+    return override;
+  }
   const slug = prompt
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, '')

@@ -24,7 +24,7 @@ export function ThinkingBlock({
     if (key.return) {
       setExpanded((prev) => !prev);
     }
-  }, { isActive: false });
+  }, { isActive: true });
 
   if (content.length === 0) return null;
 

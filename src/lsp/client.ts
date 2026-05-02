@@ -219,12 +219,19 @@ export function createLspConnection(proc: ChildProcess): LspConnection {
     sendRequest<T>(method: string, params?: unknown): Promise<T> {
       const id = nextId++;
       const request = JSON.stringify({ jsonrpc: "2.0", id, method, params });
+      let timerId: ReturnType<typeof setTimeout> | undefined;
       const promise = new Promise<T>((resolve, reject) => {
-        pending.set(id, { resolve: resolve as (v: unknown) => void, reject });
+        pending.set(id, {
+          resolve: (v: unknown): void => {
+            clearTimeout(timerId);
+            (resolve as (v: unknown) => void)(v);
+          },
+          reject,
+        });
         sendRaw(request);
       });
-      const timeout = new Promise<T>((_, reject) =>
-        setTimeout(() => {
+      const timeout = new Promise<T>((_, reject) => {
+        timerId = setTimeout(() => {
           if (pending.has(id)) {
             pending.delete(id);
             reject(
@@ -233,8 +240,8 @@ export function createLspConnection(proc: ChildProcess): LspConnection {
               ),
             );
           }
-        }, LSP_REQUEST_TIMEOUT_MS),
-      );
+        }, LSP_REQUEST_TIMEOUT_MS);
+      });
       return Promise.race([promise, timeout]);
     },
 

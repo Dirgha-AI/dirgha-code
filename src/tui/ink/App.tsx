@@ -735,9 +735,11 @@ export function App(props: AppProps): React.JSX.Element {
   );
 
   const inputFocus =
-    overlays.active === null ||
-    overlays.active === "atfile" ||
-    overlays.active === "slash";
+    pendingKey === null &&
+    pendingApproval === null &&
+    (overlays.active === null ||
+      overlays.active === "atfile" ||
+      overlays.active === "slash");
 
   // Active theme name — driven by local state so the picker can flip it
   // live. Initial value comes from config; subsequent changes are

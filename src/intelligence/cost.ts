@@ -31,20 +31,27 @@ export function createCostTracker(): CostTracker {
 
   return {
     record(provider, model, usage, sessionId) {
+      const safeInt = (n: number): number =>
+        Number.isFinite(n) && n >= 0 ? Math.round(n) : 0;
+      const safeTokens = {
+        inputTokens: safeInt(usage.inputTokens),
+        outputTokens: safeInt(usage.outputTokens),
+        cachedTokens: safeInt(usage.cachedTokens),
+      };
       const price = findPrice(provider, model);
       const costUsd = price
-        ? (usage.inputTokens / 1_000_000) * price.inputPerM
-        + (usage.outputTokens / 1_000_000) * price.outputPerM
-        + (usage.cachedTokens / 1_000_000) * (price.cachedInputPerM ?? 0)
+        ? (safeTokens.inputTokens / 1_000_000) * price.inputPerM
+        + (safeTokens.outputTokens / 1_000_000) * price.outputPerM
+        + (safeTokens.cachedTokens / 1_000_000) * (price.cachedInputPerM ?? 0)
         : 0;
       const rec: CostRecord = {
         sessionId,
         provider,
         model,
-        inputTokens: usage.inputTokens,
-        outputTokens: usage.outputTokens,
-        cachedTokens: usage.cachedTokens,
-        costUsd,
+        inputTokens: safeTokens.inputTokens,
+        outputTokens: safeTokens.outputTokens,
+        cachedTokens: safeTokens.cachedTokens,
+        costUsd: Number.isFinite(costUsd) ? costUsd : 0,
         ts: new Date().toISOString(),
       };
       records.push(rec);

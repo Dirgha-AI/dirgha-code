@@ -130,6 +130,7 @@ export class FileMemoryStore implements MemoryStore {
   }
 
   async get(id: string): Promise<MemoryEntry | undefined> {
+    assertValidKey(id);
     const abs = this.pathFor(id);
     const text = await readFile(abs, "utf8").catch(() => undefined);
     if (!text) return undefined;
@@ -137,6 +138,7 @@ export class FileMemoryStore implements MemoryStore {
   }
 
   async upsert(entry: MemoryEntry): Promise<void> {
+    assertValidKey(entry.id);
     await this.ensure();
     const now = new Date().toISOString();
     const complete: MemoryEntry = {
@@ -150,6 +152,7 @@ export class FileMemoryStore implements MemoryStore {
   }
 
   async remove(id: string): Promise<void> {
+    assertValidKey(id);
     await unlink(this.pathFor(id)).catch(() => undefined);
     await this.writeIndex();
     const fts = await this.fts();

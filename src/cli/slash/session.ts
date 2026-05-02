@@ -7,11 +7,14 @@
 
 import { rename, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { join, basename } from 'node:path';
 import type { SlashCommand } from './types.js';
 import { branchSession } from '../../context/branch.js';
 
 function sessionPath(id: string): string {
+  if (!id || basename(id) !== id || id.includes('\0')) {
+    throw new Error(`Invalid session id: "${id}"`);
+  }
   return join(homedir(), '.dirgha', 'sessions', `${id}.jsonl`);
 }
 

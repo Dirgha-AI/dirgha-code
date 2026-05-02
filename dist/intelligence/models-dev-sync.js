@@ -96,8 +96,15 @@ export async function getCatalogue(ttlMs = 86400000) {
         if (age < ttlMs)
             return cached;
     }
-    const fresh = await fetchModelsDev();
-    await writeCache(fresh);
-    return fresh;
+    try {
+        const fresh = await fetchModelsDev();
+        await writeCache(fresh);
+        return fresh;
+    }
+    catch {
+        if (cached)
+            return cached;
+        throw new Error("Failed to fetch model catalogue and no local cache available.");
+    }
 }
 //# sourceMappingURL=models-dev-sync.js.map

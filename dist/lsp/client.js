@@ -113,16 +113,25 @@ export function createLspConnection(proc) {
         sendRequest(method, params) {
             const id = nextId++;
             const request = JSON.stringify({ jsonrpc: "2.0", id, method, params });
+            let timerId;
             const promise = new Promise((resolve, reject) => {
-                pending.set(id, { resolve: resolve, reject });
+                pending.set(id, {
+                    resolve: (v) => {
+                        clearTimeout(timerId);
+                        resolve(v);
+                    },
+                    reject,
+                });
                 sendRaw(request);
             });
-            const timeout = new Promise((_, reject) => setTimeout(() => {
-                if (pending.has(id)) {
-                    pending.delete(id);
-                    reject(new Error(`LSP request ${method} timed out after ${LSP_REQUEST_TIMEOUT_MS}ms`));
-                }
-            }, LSP_REQUEST_TIMEOUT_MS));
+            const timeout = new Promise((_, reject) => {
+                timerId = setTimeout(() => {
+                    if (pending.has(id)) {
+                        pending.delete(id);
+                        reject(new Error(`LSP request ${method} timed out after ${LSP_REQUEST_TIMEOUT_MS}ms`));
+                    }
+                }, LSP_REQUEST_TIMEOUT_MS);
+            });
             return Promise.race([promise, timeout]);
         },
         sendNotification(method, params) {

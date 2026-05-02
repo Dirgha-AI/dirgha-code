@@ -181,13 +181,14 @@ export async function startWebServer(opts?: StartWebServerOptions): Promise<Runn
       return;
     }
     try {
-      if (req.url === '/') {
+      const pathname = new URL(req.url ?? '/', `http://localhost`).pathname;
+      if (pathname === '/') {
         const entries = await readAuditEntries(auditFile, 100);
         res.writeHead(200, HTML_HEADERS);
         res.end(renderAuditPage(entries));
         return;
       }
-      if (req.url === '/cost') {
+      if (pathname === '/cost') {
         const entries = await readAuditEntries(auditFile);
         // CostAuditEntry is structurally compatible — just retype.
         const summary = aggregateCost(entries as CostAuditEntry[]);
@@ -195,7 +196,7 @@ export async function startWebServer(opts?: StartWebServerOptions): Promise<Runn
         res.end(renderCostPage(summary));
         return;
       }
-      if (req.url === '/ledger') {
+      if (pathname === '/ledger') {
         const summary = await collectLedger();
         res.writeHead(200, HTML_HEADERS);
         res.end(renderLedgerPage(summary));
