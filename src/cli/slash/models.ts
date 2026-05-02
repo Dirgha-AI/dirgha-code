@@ -23,9 +23,8 @@ function priceText(value: number): string {
 }
 
 function configured(provider: string): boolean {
-  const env = ENV_FOR_PROVIDER[provider];
-  if (!env) return true;
-  return Boolean(process.env[env] && process.env[env].length > 0);
+  const env = ENV_FOR_PROVIDER[provider] ?? "";
+  return !env || Boolean(process.env[env]?.length);
 }
 
 export const modelsCommand: SlashCommand = {

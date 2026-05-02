@@ -4,6 +4,7 @@
  * the child process: macOS Seatbelt, Linux Landlock/bwrap, Windows
  * JobObject, or a noop pass-through when no platform support exists.
  */
+/// <reference types="node" resolution-mode="require"/>
 export type SandboxPlatform = 'macos' | 'linux' | 'linux-bwrap' | 'windows' | 'noop';
 export interface SandboxExecOptions {
     command: string[];

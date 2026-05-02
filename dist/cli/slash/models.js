@@ -18,10 +18,8 @@ function priceText(value) {
     return value === 0 ? "free" : `$${value.toFixed(2)}/M`;
 }
 function configured(provider) {
-    const env = ENV_FOR_PROVIDER[provider];
-    if (!env)
-        return true;
-    return Boolean(process.env[env] && process.env[env].length > 0);
+    const env = ENV_FOR_PROVIDER[provider] ?? "";
+    return !env || Boolean(process.env[env]?.length);
 }
 export const modelsCommand = {
     name: "models",

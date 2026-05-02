@@ -12,6 +12,7 @@
  *      rather than `content`. We surface those as thinking events when
  *      the caller opts in.
  */
+/// <reference types="node" resolution-mode="require"/>
 import type { AgentEvent } from '../kernel/types.js';
 import type { Provider, StreamRequest, ProviderConfig, ImageGenRequest, ImageGenResult } from './iface.js';
 export declare class NvidiaProvider implements Provider {

@@ -87,7 +87,7 @@ export declare function createBuckyClient(opts?: BuckyClientOptions): {
             proposalId: string;
             voterId: string;
             balance: number;
-            direction: "yes" | "no";
+            direction: 'yes' | 'no';
         }, token?: string): Promise<{
             ok: boolean;
         }>;

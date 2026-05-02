@@ -14,6 +14,7 @@
  *
  * Initial implementation seeded by a hy3 dogfood run.
  */
+/// <reference types="node" resolution-mode="require"/>
 export interface ResolvedProvider {
     name: string;
     baseUrl: string;

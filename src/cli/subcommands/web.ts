@@ -10,17 +10,17 @@
  * Stops on Ctrl+C (closes the http server cleanly before exit).
  */
 
-import { stdout, stderr } from 'node:process';
-import { startWebServer } from '../../web/server.js';
-import { style, defaultTheme } from '../../tui/theme.js';
-import type { Subcommand } from './index.js';
+import { stdout, stderr } from "node:process";
+import { startWebServer } from "../../web/server.js";
+import { style, defaultTheme } from "../../tui/theme.js";
+import type { Subcommand } from "./index.js";
 
 // scope: S19d
 
 function parsePort(argv: string[]): number | undefined {
   for (const a of argv) {
-    if (a.startsWith('--port=')) {
-      const n = Number(a.slice('--port='.length));
+    if (a.startsWith("--port=")) {
+      const n = Number(a.slice("--port=".length));
       if (Number.isFinite(n) && n >= 0 && n < 65536) return n;
     }
   }
@@ -28,37 +28,48 @@ function parsePort(argv: string[]): number | undefined {
 }
 
 export const webSubcommand: Subcommand = {
-  name: 'web',
-  description: 'Read-only localhost dashboard (audit / cost / ledger)',
+  name: "web",
+  description: "Read-only localhost dashboard (audit / cost / ledger)",
   async run(argv): Promise<number> {
-    const json = argv.includes('--json');
+    const json = argv.includes("--json");
     const port = parsePort(argv);
 
-    let srv;
+    let srv: Awaited<ReturnType<typeof startWebServer>>;
     try {
       srv = await startWebServer(port !== undefined ? { port } : {});
     } catch (err) {
-      stderr.write(`failed to start dashboard: ${err instanceof Error ? err.message : String(err)}\n`);
+      stderr.write(
+        `failed to start dashboard: ${err instanceof Error ? err.message : String(err)}\n`,
+      );
       return 1;
     }
 
     if (json) {
-      stdout.write(JSON.stringify({ url: srv.url, pages: ['/', '/cost', '/ledger'] }) + '\n');
+      stdout.write(
+        JSON.stringify({ url: srv.url, pages: ["/", "/cost", "/ledger"] }) +
+          "\n",
+      );
     } else {
-      stdout.write(`${style(defaultTheme.success, '✓')} Dirgha Web Dashboard at ${style(defaultTheme.accent, srv.url)}\n`);
-      stdout.write(`  Pages: ${srv.url}/  ·  ${srv.url}/cost  ·  ${srv.url}/ledger\n`);
+      stdout.write(
+        `${style(defaultTheme.success, "✓")} Dirgha Web Dashboard at ${style(defaultTheme.accent, srv.url)}\n`,
+      );
+      stdout.write(
+        `  Pages: ${srv.url}/  ·  ${srv.url}/cost  ·  ${srv.url}/ledger\n`,
+      );
       stdout.write(`  Press Ctrl+C to stop.\n`);
     }
 
-    return new Promise<number>(resolve => {
+    return new Promise<number>((resolve) => {
       const stop = async (): Promise<void> => {
         try {
           await srv.close();
-        } catch { /* swallow shutdown errors */ }
+        } catch {
+          /* swallow shutdown errors */
+        }
         resolve(0);
       };
-      process.once('SIGINT', stop);
-      process.once('SIGTERM', stop);
+      process.once("SIGINT", stop);
+      process.once("SIGTERM", stop);
     });
   },
 };

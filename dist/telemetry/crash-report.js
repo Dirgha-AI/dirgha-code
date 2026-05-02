@@ -20,30 +20,30 @@
  * the user sees are exactly the bytes that will leave the machine.
  * Never sends prompts, model responses, file contents, API key values.
  */
-import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, statSync } from 'node:fs';
-import { homedir, platform } from 'node:os';
-import { join } from 'node:path';
-import { stdout, stdin } from 'node:process';
-import { createHash } from 'node:crypto';
-import { spawnSync } from 'node:child_process';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, statSync, } from "node:fs";
+import { homedir, platform } from "node:os";
+import { join } from "node:path";
+import { stdout, stdin } from "node:process";
+import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 const KEY_REGEX = /KEY|TOKEN|SECRET|PASSWORD|AUTH/i;
 function osBucket(plat) {
-    if (plat === 'linux')
-        return 'linux';
-    if (plat === 'darwin')
-        return 'macos';
-    if (plat === 'win32')
-        return 'win';
-    return 'other';
+    if (plat === "linux")
+        return "linux";
+    if (plat === "darwin")
+        return "macos";
+    if (plat === "win32")
+        return "win";
+    return "other";
 }
 function nodeMajor(v) {
     const m = v.match(/^v(\d+)/);
-    return m ? `v${m[1]}` : 'unknown';
+    return m ? `v${m[1]}` : "unknown";
 }
 /** Replace $HOME prefix with '~' so paths don't leak the OS username. */
 function redactHomePath(s) {
     const home = homedir();
-    return s.split(home).join('~');
+    return s.split(home).join("~");
 }
 /** Sanitise an error message: drop anything inside double quotes (often
  *  contains user data), redact paths, mask any captured key shape. */
@@ -52,33 +52,37 @@ function sanitiseMessage(msg) {
     // Mask anything that looks like an API key (sk-..., phc_..., bearer
     // tokens with 16+ alphanumeric chars). Conservative — better to over-
     // redact than leak.
-    out = out.replace(/(sk-[A-Za-z0-9_-]{12,}|phc_[A-Za-z0-9_-]{20,}|[A-Za-z0-9_-]{32,})/g, '[REDACTED]');
+    out = out.replace(/(sk-[A-Za-z0-9_-]{12,}|phc_[A-Za-z0-9_-]{20,}|[A-Za-z0-9_-]{32,})/g, "[REDACTED]");
     // Drop content between double quotes (likely user prompts or paths).
     out = out.replace(/"[^"]*"/g, '"[REDACTED]"');
     return out;
 }
 function readAuditTail(n) {
-    const dir = join(homedir(), '.dirgha', 'audit');
+    const dir = join(homedir(), ".dirgha", "audit");
     if (!existsSync(dir))
         return [];
     try {
-        const files = readdirSync(dir).filter(f => f.endsWith('.jsonl')).map(f => ({ f, m: statSync(join(dir, f)).mtimeMs }));
+        const files = readdirSync(dir)
+            .filter((f) => f.endsWith(".jsonl"))
+            .map((f) => ({ f, m: statSync(join(dir, f)).mtimeMs }));
         files.sort((a, b) => b.m - a.m);
         if (files.length === 0)
             return [];
-        const newest = readFileSync(join(dir, files[0].f), 'utf8').trim().split('\n');
+        const newest = readFileSync(join(dir, files[0].f), "utf8")
+            .trim()
+            .split("\n");
         const tail = newest.slice(-n);
-        return tail.map(line => {
+        return tail.map((line) => {
             try {
                 const obj = JSON.parse(line);
                 return {
-                    ts: String(obj.ts ?? obj.timestamp ?? ''),
-                    event: String(obj.event ?? obj.kind ?? 'event'),
-                    detail: redactHomePath(String(obj.detail ?? obj.summary ?? '')).slice(0, 80),
+                    ts: String(obj.ts ?? obj.timestamp ?? ""),
+                    event: String(obj.event ?? obj.kind ?? "event"),
+                    detail: redactHomePath(String(obj.detail ?? obj.summary ?? "")).slice(0, 80),
                 };
             }
             catch {
-                return { ts: '', event: 'unparseable', detail: '' };
+                return { ts: "", event: "unparseable", detail: "" };
             }
         });
     }
@@ -87,15 +91,17 @@ function readAuditTail(n) {
     }
 }
 function readLastError() {
-    const path = join(homedir(), '.dirgha', 'last-error.json');
+    const path = join(homedir(), ".dirgha", "last-error.json");
     if (!existsSync(path))
         return undefined;
     try {
-        const raw = JSON.parse(readFileSync(path, 'utf8'));
+        const raw = JSON.parse(readFileSync(path, "utf8"));
         return {
-            name: String(raw.name ?? 'Error'),
-            message_redacted: sanitiseMessage(String(raw.message ?? '')),
-            stack: Array.isArray(raw.stack) ? raw.stack.slice(0, 8).map(redactHomePath) : [],
+            name: String(raw.name ?? "Error"),
+            message_redacted: sanitiseMessage(String(raw.message ?? "")),
+            stack: Array.isArray(raw.stack)
+                ? raw.stack.slice(0, 8).map(redactHomePath)
+                : [],
         };
     }
     catch {
@@ -105,10 +111,19 @@ function readLastError() {
 function safeEnvVarNames() {
     // Names only, never values. Filter to the dirgha-relevant prefix list
     // so we don't leak everything in $env.
-    const prefixes = ['DIRGHA_', 'NVIDIA_', 'OPENROUTER_', 'ANTHROPIC_', 'OPENAI_', 'GEMINI_', 'GROQ_', 'NODE_'];
+    const prefixes = [
+        "DIRGHA_",
+        "NVIDIA_",
+        "OPENROUTER_",
+        "ANTHROPIC_",
+        "OPENAI_",
+        "GEMINI_",
+        "GROQ_",
+        "NODE_",
+    ];
     return Object.keys(process.env)
-        .filter(k => prefixes.some(p => k.startsWith(p)))
-        .filter(k => KEY_REGEX.test(k))
+        .filter((k) => prefixes.some((p) => k.startsWith(p)))
+        .filter((k) => KEY_REGEX.test(k))
         .sort();
 }
 function buildBundle(version) {
@@ -124,83 +139,95 @@ function buildBundle(version) {
 }
 function previewBundle(b) {
     const lines = [];
-    lines.push('────────────────────────────────────');
-    lines.push('Crash report bundle preview:');
-    lines.push('────────────────────────────────────');
+    lines.push("────────────────────────────────────");
+    lines.push("Crash report bundle preview:");
+    lines.push("────────────────────────────────────");
     lines.push(`Version:  ${b.version}`);
     lines.push(`OS:       ${b.os}`);
     lines.push(`Node:     ${b.node}`);
     lines.push(`Time:     ${b.ts}`);
-    lines.push('');
+    lines.push("");
     if (b.last_error) {
-        lines.push('Last error (sanitised):');
+        lines.push("Last error (sanitised):");
         lines.push(`  ${b.last_error.name}: ${b.last_error.message_redacted}`);
         for (const frame of b.last_error.stack.slice(0, 5))
             lines.push(`    ${frame}`);
-        lines.push('');
+        lines.push("");
     }
     else {
-        lines.push('Last error: (none recorded — ~/.dirgha/last-error.json not present)');
-        lines.push('');
+        lines.push("Last error: (none recorded — ~/.dirgha/last-error.json not present)");
+        lines.push("");
     }
     if (b.audit_tail.length > 0) {
         lines.push(`Audit log (last ${b.audit_tail.length} entries — paths redacted):`);
         for (const e of b.audit_tail) {
             lines.push(`  ${e.ts} ${e.event.padEnd(14)} ${e.detail}`);
         }
-        lines.push('');
+        lines.push("");
     }
     if (b.env_var_names.length > 0) {
-        lines.push('Env var names (values NEVER sent):');
+        lines.push("Env var names (values NEVER sent):");
         for (const n of b.env_var_names)
             lines.push(`  ${n} = [REDACTED]`);
-        lines.push('');
+        lines.push("");
     }
-    lines.push('────────────────────────────────────');
-    return lines.join('\n');
+    lines.push("────────────────────────────────────");
+    return lines.join("\n");
 }
 async function readChar() {
     return new Promise((resolve) => {
         const onData = (chunk) => {
-            const s = typeof chunk === 'string' ? chunk : chunk.toString('utf8');
-            stdin.removeListener('data', onData);
+            const s = typeof chunk === "string" ? chunk : chunk.toString("utf8");
+            stdin.removeListener("data", onData);
             stdin.pause();
             resolve(s.trim().toLowerCase().slice(0, 1));
         };
         stdin.resume();
-        stdin.on('data', onData);
+        stdin.on("data", onData);
     });
 }
 function copyToClipboard(s) {
     const tools = [
-        ['xclip', ['-selection', 'clipboard']],
-        ['pbcopy', []],
-        ['wl-copy', []],
-        ['clip.exe', []],
+        ["xclip", ["-selection", "clipboard"]],
+        ["pbcopy", []],
+        ["wl-copy", []],
+        ["clip.exe", []],
     ];
     for (const [bin, args] of tools) {
         try {
-            const r = spawnSync(bin, args, { input: s, encoding: 'utf8' });
+            const r = spawnSync(bin, args, { input: s, encoding: "utf8" });
             if (r.status === 0)
                 return true;
         }
-        catch { /* try next */ }
+        catch {
+            /* try next */
+        }
     }
     return false;
 }
 function appendSendRecord(bundle, endpoint, ok) {
-    const dir = join(homedir(), '.dirgha', 'audit');
+    const dir = join(homedir(), ".dirgha", "audit");
     mkdirSync(dir, { recursive: true });
-    const path = join(dir, 'crash-sends.jsonl');
-    const sha256 = createHash('sha256').update(JSON.stringify(bundle)).digest('hex');
-    const record = { ts: new Date().toISOString(), endpoint, bytes_sent: JSON.stringify(bundle).length, preview_sha256: sha256.slice(0, 16), ok };
-    writeFileSync(path, (existsSync(path) ? readFileSync(path, 'utf8') : '') + JSON.stringify(record) + '\n');
+    const path = join(dir, "crash-sends.jsonl");
+    const sha256 = createHash("sha256")
+        .update(JSON.stringify(bundle))
+        .digest("hex");
+    const record = {
+        ts: new Date().toISOString(),
+        endpoint,
+        bytes_sent: JSON.stringify(bundle).length,
+        preview_sha256: sha256.slice(0, 16),
+        ok,
+    };
+    writeFileSync(path, (existsSync(path) ? readFileSync(path, "utf8") : "") +
+        JSON.stringify(record) +
+        "\n");
 }
 async function send(bundle, endpoint) {
     try {
         const r = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify(bundle),
             signal: AbortSignal.timeout(10_000),
         });
@@ -211,51 +238,56 @@ async function send(bundle, endpoint) {
     }
 }
 export async function runCrashReport(opts) {
-    const yes = opts.argv.includes('--yes') || opts.argv.includes('-y');
+    const yes = opts.argv.includes("--yes") || opts.argv.includes("-y");
     // Read the version dynamically so we don't have to import from main.
-    let version = '0.0.0-dev';
+    let version = "0.0.0-dev";
     try {
-        const { createRequire } = await import('node:module');
-        const req = createRequire(import.meta.url);
-        const pkg = req('../../../package.json');
-        version = pkg.version ?? '0.0.0-dev';
+        const raw = readFileSync(join(import.meta.dirname ?? ".", "..", "..", "package.json"), "utf8");
+        const pkg = JSON.parse(raw);
+        version = pkg.version ?? "0.0.0-dev";
     }
-    catch { /* */ }
-    const { readTelemetryConfig } = await import('../cli/subcommands/telemetry.js');
+    catch {
+        /* */
+    }
+    const { readTelemetryConfig } = await import("../cli/subcommands/telemetry.js");
     const cfg = readTelemetryConfig();
     // Crash endpoint = telemetry endpoint + '/crash' if it's the default
     // Posthog one; otherwise the user's configured endpoint as-is.
-    const endpoint = cfg.endpoint.includes('posthog')
+    const endpoint = cfg.endpoint.includes("posthog")
         ? cfg.endpoint // Posthog accepts the same payload shape via /i/v0/e/
         : cfg.endpoint;
     const bundle = buildBundle(version);
-    stdout.write(previewBundle(bundle) + '\n');
+    stdout.write(previewBundle(bundle) + "\n");
     stdout.write(`Send to ${endpoint}? [y/N/c=copy/q=quit] `);
     if (!stdin.isTTY) {
-        stdout.write('(non-TTY: cancelling — pass --yes to send non-interactively)\n');
+        stdout.write("(non-TTY: cancelling — pass --yes to send non-interactively)\n");
         return 0;
     }
     if (yes) {
-        stdout.write('--yes flag set — sending without confirmation.\n');
+        stdout.write("--yes flag set — sending without confirmation.\n");
         const ok = await send(bundle, endpoint);
         appendSendRecord(bundle, endpoint, ok);
-        stdout.write(ok ? `✓ sent (${JSON.stringify(bundle).length} bytes)\n` : `✗ send failed; bundle saved to audit log\n`);
+        stdout.write(ok
+            ? `✓ sent (${JSON.stringify(bundle).length} bytes)\n`
+            : `✗ send failed; bundle saved to audit log\n`);
         return ok ? 0 : 1;
     }
     // Interactive prompt
-    if (typeof stdin.setRawMode === 'function')
+    if (typeof stdin.setRawMode === "function")
         stdin.setRawMode(true);
     const ch = await readChar();
-    if (typeof stdin.setRawMode === 'function')
+    if (typeof stdin.setRawMode === "function")
         stdin.setRawMode(false);
     stdout.write(`\n`);
-    if (ch === 'y') {
+    if (ch === "y") {
         const ok = await send(bundle, endpoint);
         appendSendRecord(bundle, endpoint, ok);
-        stdout.write(ok ? `✓ sent (${JSON.stringify(bundle).length} bytes). audit: ~/.dirgha/audit/crash-sends.jsonl\n` : `✗ send failed; bundle audit-logged anyway\n`);
+        stdout.write(ok
+            ? `✓ sent (${JSON.stringify(bundle).length} bytes). audit: ~/.dirgha/audit/crash-sends.jsonl\n`
+            : `✗ send failed; bundle audit-logged anyway\n`);
         return ok ? 0 : 1;
     }
-    if (ch === 'c') {
+    if (ch === "c") {
         const text = JSON.stringify(bundle, null, 2);
         if (copyToClipboard(text))
             stdout.write(`✓ copied to clipboard (${text.length} chars). Paste into a GitHub issue at https://github.com/Dirgha-AI/dirgha-code/issues\n`);

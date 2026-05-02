@@ -12,6 +12,7 @@
  * Initial implementation seeded by a hy3 dogfood run; ported here so the
  * subcommand surface lives where the rest of `dirgha *` verbs live.
  */
+/// <reference types="node" resolution-mode="require"/>
 import type { Subcommand } from './index.js';
 interface VersionCheck {
     current: string;

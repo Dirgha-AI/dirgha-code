@@ -49,7 +49,7 @@ export declare function createDeployClient(opts?: DeployClientOptions): {
         rollback(projectId: string, deploymentId: string, token: string): Promise<Deployment>;
         logs(deploymentId: string, token: string): AsyncIterable<{
             ts: string;
-            stream: "stdout" | "stderr" | "system";
+            stream: 'stdout' | 'stderr' | 'system';
             line: string;
         }>;
     };

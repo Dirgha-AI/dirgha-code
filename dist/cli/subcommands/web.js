@@ -9,14 +9,14 @@
  *
  * Stops on Ctrl+C (closes the http server cleanly before exit).
  */
-import { stdout, stderr } from 'node:process';
-import { startWebServer } from '../../web/server.js';
-import { style, defaultTheme } from '../../tui/theme.js';
+import { stdout, stderr } from "node:process";
+import { startWebServer } from "../../web/server.js";
+import { style, defaultTheme } from "../../tui/theme.js";
 // scope: S19d
 function parsePort(argv) {
     for (const a of argv) {
-        if (a.startsWith('--port=')) {
-            const n = Number(a.slice('--port='.length));
+        if (a.startsWith("--port=")) {
+            const n = Number(a.slice("--port=".length));
             if (Number.isFinite(n) && n >= 0 && n < 65536)
                 return n;
         }
@@ -24,10 +24,10 @@ function parsePort(argv) {
     return undefined;
 }
 export const webSubcommand = {
-    name: 'web',
-    description: 'Read-only localhost dashboard (audit / cost / ledger)',
+    name: "web",
+    description: "Read-only localhost dashboard (audit / cost / ledger)",
     async run(argv) {
-        const json = argv.includes('--json');
+        const json = argv.includes("--json");
         const port = parsePort(argv);
         let srv;
         try {
@@ -38,23 +38,26 @@ export const webSubcommand = {
             return 1;
         }
         if (json) {
-            stdout.write(JSON.stringify({ url: srv.url, pages: ['/', '/cost', '/ledger'] }) + '\n');
+            stdout.write(JSON.stringify({ url: srv.url, pages: ["/", "/cost", "/ledger"] }) +
+                "\n");
         }
         else {
-            stdout.write(`${style(defaultTheme.success, '✓')} Dirgha Web Dashboard at ${style(defaultTheme.accent, srv.url)}\n`);
+            stdout.write(`${style(defaultTheme.success, "✓")} Dirgha Web Dashboard at ${style(defaultTheme.accent, srv.url)}\n`);
             stdout.write(`  Pages: ${srv.url}/  ·  ${srv.url}/cost  ·  ${srv.url}/ledger\n`);
             stdout.write(`  Press Ctrl+C to stop.\n`);
         }
-        return new Promise(resolve => {
+        return new Promise((resolve) => {
             const stop = async () => {
                 try {
                     await srv.close();
                 }
-                catch { /* swallow shutdown errors */ }
+                catch {
+                    /* swallow shutdown errors */
+                }
                 resolve(0);
             };
-            process.once('SIGINT', stop);
-            process.once('SIGTERM', stop);
+            process.once("SIGINT", stop);
+            process.once("SIGTERM", stop);
         });
     },
 };

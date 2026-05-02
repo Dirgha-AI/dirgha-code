@@ -9,5 +9,5 @@
  *
  * Stops on Ctrl+C (closes the http server cleanly before exit).
  */
-import type { Subcommand } from './index.js';
+import type { Subcommand } from "./index.js";
 export declare const webSubcommand: Subcommand;

@@ -12,6 +12,7 @@
  *   - subtask   — one independent stream inside a fleet
  *   - shot      — a single stylistic variant in a tripleshot
  */
+/// <reference types="node" resolution-mode="require"/>
 import type { AgentEvent, UsageTotal, Message, StopReason } from '../kernel/types.js';
 import type { EventStream } from '../kernel/event-stream.js';
 export type FleetAgentStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';

@@ -16,6 +16,7 @@
  * sets Accept or Content-Type directly; extraHeaders is for custom
  * provider-specific keys (e.g., organisation id) only.
  */
+/// <reference types="node" resolution-mode="require"/>
 export interface SseRequest {
     url: string;
     apiKey: string;

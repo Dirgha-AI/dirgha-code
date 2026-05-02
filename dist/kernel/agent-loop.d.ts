@@ -11,6 +11,7 @@
  *   4. Context transform (compaction, skill injection) is invoked once per
  *      turn before the provider call, never mid-stream.
  */
+/// <reference types="node" resolution-mode="require"/>
 import type { Message, AgentResult, ToolDefinition, Provider, ToolExecutor, ApprovalBus, ErrorClassifier, AgentHooks } from "./types.js";
 import type { EventStream } from "./event-stream.js";
 export interface AgentLoopConfig {
