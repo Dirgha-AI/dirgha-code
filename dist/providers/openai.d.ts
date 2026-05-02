@@ -2,7 +2,6 @@
  * OpenAI provider (native /chat/completions over the api.openai.com host).
  * Thin wrapper; most logic lives in the shared openai-compat adapter.
  */
-/// <reference types="node" resolution-mode="require"/>
 import type { AgentEvent } from '../kernel/types.js';
 import type { Provider, StreamRequest, ProviderConfig, ImageGenRequest, ImageGenResult } from './iface.js';
 export declare class OpenAIProvider implements Provider {

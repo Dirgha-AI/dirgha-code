@@ -178,8 +178,12 @@ export const shellTool: Tool = {
     clearTimeout(timer);
     ctx.signal?.removeEventListener("abort", onAbort);
 
-    const stdout = Buffer.concat(stdoutChunks).toString("utf8");
-    const stderr = Buffer.concat(stderrChunks).toString("utf8");
+    const stdout = Buffer.concat(
+      stdoutChunks as unknown as readonly Uint8Array[],
+    ).toString("utf8");
+    const stderr = Buffer.concat(
+      stderrChunks as unknown as readonly Uint8Array[],
+    ).toString("utf8");
     const banner = `exit=${exitCode}${truncated ? " [output truncated]" : ""}`;
     const body = [
       banner,

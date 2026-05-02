@@ -1,12 +1,12 @@
 // scope: S19c
-import { readdir, readFile, stat, open } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { join, basename, extname } from 'node:path';
+import { readdir, readFile, stat, open } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join, basename, extname } from "node:path";
 function emptySummary() {
     return { scopes: [], totalEntries: 0, scopeCount: 0 };
 }
 export async function collectLedger(opts) {
-    const ledgerDir = opts?.ledgerDir ?? join(homedir(), '.dirgha', 'ledger');
+    const ledgerDir = opts?.ledgerDir ?? join(homedir(), ".dirgha", "ledger");
     try {
         const st = await stat(ledgerDir);
         if (!st.isDirectory())
@@ -22,28 +22,33 @@ export async function collectLedger(opts) {
     catch {
         return emptySummary();
     }
-    const jsonlFiles = files.filter(f => extname(f) === '.jsonl');
+    const jsonlFiles = files.filter((f) => extname(f) === ".jsonl");
     const scopeSummaries = [];
     for (const file of jsonlFiles) {
-        const scope = basename(file, '.jsonl');
+        const scope = basename(file, ".jsonl");
         const filePath = join(ledgerDir, file);
         let content;
         try {
-            content = await readFile(filePath, 'utf8');
+            content = await readFile(filePath, "utf8");
         }
         catch {
             continue;
         }
-        const lines = content.split('\n').filter(l => l.trim());
+        const lines = content.split("\n").filter((l) => l.trim());
         const entries = [];
         for (const line of lines) {
             try {
                 const entry = JSON.parse(line);
-                if (entry && typeof entry.ts === 'string' && typeof entry.kind === 'string' && typeof entry.text === 'string') {
+                if (entry &&
+                    typeof entry.ts === "string" &&
+                    typeof entry.kind === "string" &&
+                    typeof entry.text === "string") {
                     entries.push(entry);
                 }
             }
-            catch { /* ignore */ }
+            catch {
+                /* ignore */
+            }
         }
         if (entries.length === 0)
             continue;
@@ -63,25 +68,35 @@ export async function collectLedger(opts) {
             if (mdStat.isFile()) {
                 let mdContent;
                 if (mdStat.size < 8192) {
-                    mdContent = await readFile(mdPath, 'utf8');
+                    mdContent = await readFile(mdPath, "utf8");
                 }
                 else {
-                    const fd = await open(mdPath, 'r');
+                    const fd = await open(mdPath, "r");
                     const buf = Buffer.alloc(500);
                     const { bytesRead } = await fd.read(buf, 0, 500, 0);
                     await fd.close();
-                    mdContent = buf.slice(0, bytesRead).toString('utf8');
+                    mdContent = buf.slice(0, bytesRead).toString("utf8");
                 }
                 if (mdContent.length > 500) {
-                    digestExcerpt = mdContent.slice(0, 500) + '…';
+                    digestExcerpt = mdContent.slice(0, 500) + "…";
                 }
                 else {
                     digestExcerpt = mdContent;
                 }
             }
         }
-        catch { /* no md */ }
-        scopeSummaries.push({ scope, entryCount, byKind, earliestTs, latestTs, recent, digestExcerpt });
+        catch {
+            /* no md */
+        }
+        scopeSummaries.push({
+            scope,
+            entryCount,
+            byKind,
+            earliestTs,
+            latestTs,
+            recent,
+            digestExcerpt,
+        });
     }
     scopeSummaries.sort((a, b) => {
         if (a.latestTs && b.latestTs)
@@ -89,10 +104,19 @@ export async function collectLedger(opts) {
         return 0;
     });
     const totalEntries = scopeSummaries.reduce((sum, s) => sum + s.entryCount, 0);
-    return { scopes: scopeSummaries, totalEntries, scopeCount: scopeSummaries.length };
+    return {
+        scopes: scopeSummaries,
+        totalEntries,
+        scopeCount: scopeSummaries.length,
+    };
 }
 function escapeHtml(text) {
-    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 }
 export function renderLedgerPage(summary) {
     const { scopes, totalEntries, scopeCount } = summary;
@@ -106,7 +130,7 @@ export function renderLedgerPage(summary) {
     else {
         for (const scope of scopes) {
             const kindParts = Object.entries(scope.byKind).map(([kind, count]) => `${kind}×${count}`);
-            const kindSummary = kindParts.join(', ');
+            const kindSummary = kindParts.join(", ");
             const h2 = `${scope.scope} — ${scope.entryCount} entries (${kindSummary})`;
             body += `<section><h2>${escapeHtml(h2)}</h2>`;
             if (scope.digestExcerpt) {
@@ -119,7 +143,7 @@ export function renderLedgerPage(summary) {
                     const kind = escapeHtml(entry.kind);
                     let text = entry.text;
                     if (text.length > 160)
-                        text = text.slice(0, 160) + '…';
+                        text = text.slice(0, 160) + "…";
                     const textEscaped = escapeHtml(text);
                     body += `<tr><td>${ts}</td><td>${kind}</td><td>${textEscaped}</td></tr>`;
                 }

@@ -23,7 +23,6 @@
  * `~/.dirgha/keypool.json.lock`. Stale locks (older than 30 s) are
  * stolen so a crashed CLI can't wedge the file forever.
  */
-/// <reference types="node" resolution-mode="require"/>
 export interface PoolEntry {
     id: string;
     value: string;

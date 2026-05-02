@@ -8,7 +8,6 @@
  * OpenAI-compatible dialect use this helper; they differ only in base
  * URL, model roster, and per-model request shaping.
  */
-/// <reference types="node" resolution-mode="require"/>
 import type { AgentEvent, Message, ToolDefinition } from "../kernel/types.js";
 export interface OpenAICompatCallOptions {
     providerName: string;

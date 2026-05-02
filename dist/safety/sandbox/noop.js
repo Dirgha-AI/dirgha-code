@@ -3,45 +3,53 @@
  * isolation. Used when no platform adapter is available; clearly
  * reports platform 'noop' so callers can warn.
  */
-import { spawn } from 'node:child_process';
+import { spawn } from "node:child_process";
 export class NoopSandbox {
-    platform = 'noop';
+    platform = "noop";
     async available() {
         return true;
     }
     async exec(opts) {
-        return runDirect(opts, 'noop');
+        return runDirect(opts, "noop");
     }
 }
 export async function runDirect(opts, platform) {
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
         const child = spawn(opts.command[0], opts.command.slice(1), {
             cwd: opts.cwd,
             env: opts.env,
-            stdio: ['ignore', 'pipe', 'pipe'],
+            stdio: ["ignore", "pipe", "pipe"],
         });
         const stdout = [];
         const stderr = [];
         let timedOut = false;
         const timer = setTimeout(() => {
             timedOut = true;
-            child.kill('SIGKILL');
+            child.kill("SIGKILL");
         }, opts.timeoutMs);
         if (opts.signal) {
-            const onAbort = () => { child.kill('SIGKILL'); };
-            opts.signal.addEventListener('abort', onAbort, { once: true });
+            const onAbort = () => {
+                child.kill("SIGKILL");
+            };
+            opts.signal.addEventListener("abort", onAbort, { once: true });
         }
-        child.stdout.on('data', buf => stdout.push(buf));
-        child.stderr.on('data', buf => stderr.push(buf));
-        child.on('error', () => {
-            clearTimeout(timer);
-            resolve({ stdout: Buffer.concat(stdout).toString('utf8'), stderr: Buffer.concat(stderr).toString('utf8'), exitCode: -1, timedOut, platform });
-        });
-        child.on('exit', code => {
+        child.stdout.on("data", (buf) => stdout.push(buf));
+        child.stderr.on("data", (buf) => stderr.push(buf));
+        child.on("error", () => {
             clearTimeout(timer);
             resolve({
-                stdout: Buffer.concat(stdout).toString('utf8'),
-                stderr: Buffer.concat(stderr).toString('utf8'),
+                stdout: Buffer.concat(stdout).toString("utf8"),
+                stderr: Buffer.concat(stderr).toString("utf8"),
+                exitCode: -1,
+                timedOut,
+                platform,
+            });
+        });
+        child.on("exit", (code) => {
+            clearTimeout(timer);
+            resolve({
+                stdout: Buffer.concat(stdout).toString("utf8"),
+                stderr: Buffer.concat(stderr).toString("utf8"),
                 exitCode: code ?? -1,
                 timedOut,
                 platform,

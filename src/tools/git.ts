@@ -101,8 +101,12 @@ async function run(
     // read the buffers — large diffs can still be in flight when 'exit' fires.
     child.on("close", (code) =>
       resolveAll({
-        stdout: Buffer.concat(stdout).toString("utf8"),
-        stderr: Buffer.concat(stderr).toString("utf8"),
+        stdout: Buffer.concat(
+          stdout as unknown as readonly Uint8Array[],
+        ).toString("utf8"),
+        stderr: Buffer.concat(
+          stderr as unknown as readonly Uint8Array[],
+        ).toString("utf8"),
         code: code ?? -1,
       }),
     );

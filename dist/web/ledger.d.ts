@@ -1,4 +1,4 @@
-export type LedgerEntryKind = 'goal' | 'decision' | 'observation' | 'experiment' | 'metric' | 'note' | 'compaction';
+export type LedgerEntryKind = "goal" | "decision" | "observation" | "experiment" | "metric" | "note" | "compaction";
 export interface LedgerEntry {
     ts: string;
     kind: LedgerEntryKind;

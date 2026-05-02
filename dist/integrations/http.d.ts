@@ -2,11 +2,10 @@
  * Shared HTTP helper for integration clients. Adds Bearer auth, typed
  * JSON parsing, and consistent error surfaces.
  */
-/// <reference types="node" resolution-mode="require"/>
 export declare class IntegrationError extends Error {
     readonly status?: number | undefined;
-    readonly body?: unknown;
-    constructor(message: string, status?: number | undefined, body?: unknown);
+    readonly body?: unknown | undefined;
+    constructor(message: string, status?: number | undefined, body?: unknown | undefined);
 }
 export interface RequestOptions {
     baseUrl: string;

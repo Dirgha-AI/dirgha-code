@@ -5,7 +5,6 @@
  * tools consume tool-use parts and emit tool-result parts, surfaces render
  * events, the daemon streams events over RPC. One shape, everywhere.
  */
-/// <reference types="node" resolution-mode="require"/>
 export type Role = "system" | "user" | "assistant" | "tool";
 export interface TextPart {
     type: "text";

@@ -95,7 +95,7 @@ function readClipboardImage(): ClipboardResult {
       Buffer.isBuffer(xc.stdout) &&
       xc.stdout.length > 100
     ) {
-      writeFileSync(tmp, xc.stdout);
+      writeFileSync(tmp, xc.stdout as Uint8Array);
       return {
         ok: true,
         path: tmp,

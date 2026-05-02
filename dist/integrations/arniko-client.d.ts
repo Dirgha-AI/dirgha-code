@@ -6,7 +6,7 @@
  */
 export interface Finding {
     id: string;
-    severity: 'critical' | 'high' | 'medium' | 'low';
+    severity: "critical" | "high" | "medium" | "low";
     title: string;
     file?: string;
     line?: number;

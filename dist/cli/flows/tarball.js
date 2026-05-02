@@ -3,38 +3,43 @@
  * the cwd while honouring .gitignore + .dirghaignore and skipping
  * heavy-weight build artifacts. Caps total size at 500 MB.
  */
-import { spawn } from 'node:child_process';
-import { mkdir, stat } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { spawn } from "node:child_process";
+import { mkdir, stat } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { randomUUID } from "node:crypto";
 const DEFAULT_EXCLUDES = [
-    'node_modules',
-    '.git',
-    '.next',
-    'dist',
-    'build',
-    'coverage',
-    '.turbo',
-    '.cache',
-    '.pnpm-store',
+    "node_modules",
+    ".git",
+    ".next",
+    "dist",
+    "build",
+    "coverage",
+    ".turbo",
+    ".cache",
+    ".pnpm-store",
 ];
 const MAX_SIZE_BYTES = 500 * 1024 * 1024;
 export async function buildTarball(cwd, extraExcludes = []) {
-    const dir = join(tmpdir(), 'dirgha-deploy');
+    const dir = join(tmpdir(), "dirgha-deploy");
     await mkdir(dir, { recursive: true });
     const out = join(dir, `${randomUUID()}.tar.gz`);
-    const excludes = [...DEFAULT_EXCLUDES, ...extraExcludes].flatMap(ex => ['--exclude', ex]);
+    const excludes = [...DEFAULT_EXCLUDES, ...extraExcludes].flatMap((ex) => [
+        "--exclude",
+        ex,
+    ]);
     await new Promise((resolveTar, rejectTar) => {
-        const child = spawn('tar', ['-czf', out, ...excludes, '-C', cwd, '.'], { stdio: ['ignore', 'ignore', 'pipe'] });
+        const child = spawn("tar", ["-czf", out, ...excludes, "-C", cwd, "."], {
+            stdio: ["ignore", "ignore", "pipe"],
+        });
         const errChunks = [];
-        child.stderr.on('data', (b) => errChunks.push(b));
-        child.on('error', err => rejectTar(err));
-        child.on('exit', code => {
+        child.stderr.on("data", (b) => errChunks.push(b));
+        child.on("error", (err) => rejectTar(err));
+        child.on("exit", (code) => {
             if (code === 0)
                 resolveTar();
             else
-                rejectTar(new Error(`tar exited ${code}: ${Buffer.concat(errChunks).toString('utf8')}`));
+                rejectTar(new Error(`tar exited ${code}: ${Buffer.concat(errChunks).toString("utf8")}`));
         });
     });
     const info = await stat(out);

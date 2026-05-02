@@ -1,4 +1,3 @@
-/// <reference types="node" resolution-mode="require"/>
 import { type ChildProcess } from "node:child_process";
 export interface Position {
     line: number;

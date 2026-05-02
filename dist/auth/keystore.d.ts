@@ -7,7 +7,6 @@
  * Real env vars take precedence over the file — letting users override
  * a stored key for one invocation by exporting in the shell.
  */
-/// <reference types="node" resolution-mode="require"/>
 export interface KeyStore {
     [envVar: string]: string;
 }

@@ -336,7 +336,7 @@ async function generateImage(a) {
     const outputPath = resolveOutputPath(a.input.outputPath, a.ctx.cwd);
     try {
         await mkdir(dirname(outputPath), { recursive: true });
-        await writeFile(outputPath, Buffer.from(result.base64, "base64"));
+        await writeFile(outputPath, new Uint8Array(Buffer.from(result.base64, "base64")));
     }
     catch (err) {
         return {

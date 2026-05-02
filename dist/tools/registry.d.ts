@@ -8,7 +8,6 @@
  *       reject very long descriptions or lack tool-use capability
  *       entirely.
  */
-/// <reference types="node" resolution-mode="require"/>
 import type { JsonSchema, ToolDefinition, ToolResult } from "../kernel/types.js";
 import type { SandboxAdapter } from "../safety/sandbox/iface.js";
 export interface ToolContext {
