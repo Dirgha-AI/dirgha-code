@@ -18,6 +18,7 @@ import { iconFor } from "../icons.js";
 import { useTheme } from "../theme-context.js";
 import { SpinnerContext } from "../spinner-context.js";
 import { SpinnerGlyph } from "./SpinnerGlyph.js";
+import { useElapsed } from "../use-elapsed.js";
 const TOOL_LABEL = {
     fs_read: "Read",
     fs_write: "Write",
@@ -100,10 +101,11 @@ export const ToolBox = React.memo(function ToolBox(props) {
             : props.status === "done"
                 ? palette.border.default
                 : palette.ui.focus;
+    const liveElapsed = useElapsed(props.startedAt);
     const elapsedLabel = props.status === "blocked"
         ? ""
         : props.status === "running"
-            ? formatElapsed(Date.now() - props.startedAt)
+            ? liveElapsed
             : props.durationMs !== undefined
                 ? formatElapsed(props.durationMs)
                 : "";

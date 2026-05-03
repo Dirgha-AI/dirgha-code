@@ -19,6 +19,7 @@ import { useTheme } from "../theme-context.js";
 import { iconFor, TOOL_STATUS } from "../icons.js";
 import { SpinnerContext } from "../spinner-context.js";
 import { SpinnerGlyph } from "./SpinnerGlyph.js";
+import { useElapsed } from "../use-elapsed.js";
 const TOOL_LABEL = {
     fs_read: "Read",
     fs_write: "Write",
@@ -43,13 +44,10 @@ export const DenseToolMessage = React.memo(function DenseToolMessage(props) {
         : props.status === "error"
             ? palette.status.error
             : palette.text.primary;
-    // Elapsed time derived inline — no independent setInterval.
-    // The component re-renders naturally when the parent spinner ticks (via
-    // SpinnerGlyph), so the elapsed display stays live without a separate timer.
-    const liveMs = props.status === "running" && props.startedAt
-        ? Date.now() - props.startedAt
-        : undefined;
-    const elapsed = formatElapsed(liveMs ?? props.durationMs ?? 0);
+    const liveElapsed = useElapsed(props.startedAt ?? 0);
+    const elapsed = props.status === "running" && props.startedAt
+        ? liveElapsed
+        : formatElapsed(props.durationMs ?? 0);
     const summary = props.outputPreview
         ? props.outputPreview.replace(/\s+/g, " ").slice(0, 60)
         : "";

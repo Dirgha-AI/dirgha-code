@@ -17,6 +17,7 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import * as React from "react";
 import { Box, Static, Text, useApp, useInput } from "ink";
 import { randomUUID } from "node:crypto";
+import { VirtualTranscript } from "./components/VirtualTranscript.js";
 import { appendAudit } from "../../audit/writer.js";
 import { maybeCompact } from "../../context/compaction.js";
 import { contextWindowFor } from "../../intelligence/prices.js";
@@ -61,6 +62,8 @@ import { useEventProjection, } from "./use-event-projection.js";
 import { useOverlays } from "./use-overlays.js";
 import { useDeclinedVersions } from "./use-declined-versions.js";
 import { useStartupHealth } from "./use-startup-health.js";
+import { useFlickerDetector } from "./use-flicker-detector.js";
+import { useRenderMetrics, } from "./use-render-metrics.js";
 import { getRemoteConfig, isVersionBelowMin, } from "../../intelligence/remote-config.js";
 import { createRequire } from "node:module";
 // Pulled from the installed package.json so the TUI title matches the
@@ -186,6 +189,18 @@ export function App(props) {
     }, [declined]);
     // Startup health check — non-blocking, cached for 24h.
     const healthResult = useStartupHealth();
+    // Flicker detector — compares estimated tree height to terminal rows.
+    const estimatedLineCount = (transcript.length + projection.liveItems.length) * 2 + 15;
+    const flicker = useFlickerDetector(estimatedLineCount);
+    // Render performance metrics — track frame timing, expose for StatusBar.
+    const renderMetrics = useRenderMetrics();
+    const [showRenderMetrics, setShowRenderMetrics] = React.useState(false);
+    // Alt+M toggles the render-metrics display in the StatusBar.
+    useInput((ch, key) => {
+        if (key.meta && ch === "m") {
+            setShowRenderMetrics((v) => !v);
+        }
+    });
     // Remote config: fetch once on mount, set model default, show MOTD.
     const [remoteConfig, setRemoteConfig] = React.useState(null);
     const [motdShown, setMotdShown] = React.useState(false);
@@ -940,19 +955,10 @@ export function App(props) {
             }
         })();
     }, [overlays]);
-    const committedJsx = React.useMemo(() => renderTranscript(transcript), [transcript]);
-    // Gemini CLI approach: freeze committed history inside <Static>
-    // so Ink caches the output and never re-renders it. Without this,
-    // every streaming flush tick re-conciles the entire transcript
-    // against the terminal — causing visible flicker/jitter.
-    const committedStaticItems = React.useMemo(() => committedJsx.map((el, i) => ({
-        key: el?.key ?? `c-${i}`,
-        el,
-    })), [committedJsx]);
     const liveJsx = React.useMemo(() => renderTranscript(projection.liveItems), [projection.liveItems]);
     const providerEntries = React.useMemo(() => buildProviderEntries(models, currentModel), [models, currentModel]);
     const LOGO_ITEMS = React.useMemo(() => [{ key: "logo" }], []);
-    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: { busy, frame: 0 }, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: LOGO_ITEMS, children: () => _jsx(Logo, { version: VERSION }, "logo") }), _jsx(Static, { items: committedStaticItems, children: ({ el }) => el }), _jsx(Box, { flexDirection: "column", children: liveJsx }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
+    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: { busy, frame: 0 }, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: LOGO_ITEMS, children: () => _jsx(Logo, { version: VERSION }, "logo") }), _jsx(VirtualTranscript, { items: transcript, renderItem: (item) => _jsx(TranscriptRow, { item: item }, item.id), autoScroll: true, inputFocus: inputFocus }), _jsx(Box, { flexDirection: "column", children: liveJsx }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
                             approvalBusRef.current?.resolve(pendingApproval.id, decision);
                         } })), pendingFailover !== null && (_jsx(ModelSwitchPrompt, { failedModel: pendingFailover.failedModel, failoverModel: pendingFailover.failoverModel, onAccept: (failover) => {
                             const lastPrompt = pendingFailover.lastPrompt;
@@ -1007,7 +1013,7 @@ export function App(props) {
                             // Esc inside ModelPicker → back to ProviderPicker (NOT close).
                             setPickerStage("provider");
                             setPickerProvider(null);
-                        } })), overlays.active === "help" && (_jsx(HelpOverlay, { slashCommands: slashCommands, onClose: overlays.closeOverlay })), overlays.active === "theme" && (_jsx(ThemePicker, { current: themeName, onPick: handleThemePick, onCancel: overlays.closeOverlay })), pendingKey && (_jsx(KeySetOverlay, { keyName: pendingKey.keyName, onSave: handleKeySetSave, onCancel: () => setPendingKey(null) })), updateVersion !== null && (_jsx(Box, { paddingX: 1, children: _jsxs(Text, { color: "yellow", children: ["[v", updateVersion, " available \u2014 press Ctrl+U or /upgrade to upgrade]"] }) })), _jsx(StatusBar, { model: currentModel, provider: providerIdForModel(currentModel), inputTokens: projection.totals.inputTokens, outputTokens: projection.totals.outputTokens, costUsd: projection.totals.costUsd, cwd: props.cwd, busy: busy, mode: mode, contextWindow: contextWindowFor(currentModel), liveOutputTokens: liveOutputTokens, liveDurationMs: liveDurationMs })] }) }) }));
+                        } })), overlays.active === "help" && (_jsx(HelpOverlay, { slashCommands: slashCommands, onClose: overlays.closeOverlay })), overlays.active === "theme" && (_jsx(ThemePicker, { current: themeName, onPick: handleThemePick, onCancel: overlays.closeOverlay })), pendingKey && (_jsx(KeySetOverlay, { keyName: pendingKey.keyName, onSave: handleKeySetSave, onCancel: () => setPendingKey(null) })), updateVersion !== null && (_jsx(Box, { paddingX: 1, children: _jsxs(Text, { color: "yellow", children: ["[v", updateVersion, " available \u2014 press Ctrl+U or /upgrade to upgrade]"] }) })), _jsx(StatusBar, { model: currentModel, provider: providerIdForModel(currentModel), inputTokens: projection.totals.inputTokens, outputTokens: projection.totals.outputTokens, costUsd: projection.totals.costUsd, cwd: props.cwd, busy: busy, mode: mode, contextWindow: contextWindowFor(currentModel), liveOutputTokens: liveOutputTokens, liveDurationMs: liveDurationMs, overflowDetected: flicker.overflowDetected, showMetrics: showRenderMetrics, renderMetrics: renderMetrics })] }) }) }));
 }
 /**
  * Walk the transcript and fold consecutive `tool` items into a single

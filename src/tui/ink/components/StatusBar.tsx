@@ -11,6 +11,7 @@ import { Box, Text, useStdout } from "ink";
 import { useTheme } from "../theme-context.js";
 import { SpinnerContext } from "../spinner-context.js";
 import { SpinnerGlyph } from "./SpinnerGlyph.js";
+import type { RenderMetricsGetters } from "../use-render-metrics.js";
 
 export interface StatusBarProps {
   model: string;
@@ -31,6 +32,12 @@ export interface StatusBarProps {
   /** Current turn index (1-based) and maximum turns for this loop. */
   turnCount?: number;
   maxTurns?: number;
+  /** Flicker detector: true when frame overflow is detected. */
+  overflowDetected?: boolean;
+  /** Toggle for render-metrics display (Alt+M). */
+  showMetrics?: boolean;
+  /** Render-metrics getters — populated when showMetrics is true. */
+  renderMetrics?: RenderMetricsGetters;
 }
 
 function formatTokens(n: number): string {
@@ -124,8 +131,16 @@ export const StatusBar = React.memo(function StatusBar(
             ? palette.error
             : palette.textMuted;
 
+  const metricsLabel = (() => {
+    if (!props.showMetrics || !props.renderMetrics) return "";
+    const avg = props.renderMetrics.avgFrameTimeMs();
+    const p99 = props.renderMetrics.p99FrameTimeMs();
+    const fps = avg > 0 ? (1000 / avg).toFixed(1) : "0";
+    return `FPS: ${fps} | avg: ${avg}ms | p99: ${p99}ms`;
+  })();
+
   // Slim status bar — only what's load-bearing:
-  //   left:  ⏵⏵ MODE · cwd
+  //   left:  ⏵⏵ MODE · cwd  [overflow]
   //   right: spinner (when busy) · short model · context-meter or cost
   return (
     <Box width={cols} paddingX={1} justifyContent="space-between">
@@ -137,6 +152,9 @@ export const StatusBar = React.memo(function StatusBar(
           ·
         </Text>
         <Text color={palette.textMuted}>{cwdLabel(props.cwd)}</Text>
+        {props.overflowDetected && (
+          <Text color={palette.status.warning}>[!]</Text>
+        )}
       </Box>
       <Box gap={1}>
         {props.busy && <SpinnerGlyph isActive={true} />}
@@ -151,6 +169,11 @@ export const StatusBar = React.memo(function StatusBar(
         {props.busy && (
           <Text color={palette.textMuted} dimColor>
             · Ctrl+C to stop
+          </Text>
+        )}
+        {metricsLabel !== "" && (
+          <Text color={palette.textMuted} dimColor>
+            {metricsLabel}
           </Text>
         )}
         {tokRateLabel !== "" && (

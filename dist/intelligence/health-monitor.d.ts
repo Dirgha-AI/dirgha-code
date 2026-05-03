@@ -1,14 +1,13 @@
 /**
- * Provider health monitor.
+ * Provider health monitor — smart exponential-backoff cooldown.
  *
- * Tracks per-provider health stats across sessions.
- * Stored in ~/.dirgha/health.json.
+ * Tracks per-provider health across sessions. Stored in ~/.dirgha/health.json.
  *
- * Blacklisting logic:
- *   - After 5 consecutive failures within 5 minutes, blacklist for 30 minutes.
- *   - After blacklist expires, allow one probe request.
- *   - After 10 probe failures, blacklist for 24 hours.
- *   - Recovery: after 3 consecutive successes, clear the blacklist.
+ * Design principles:
+ *   1. Don't punish transient blips. A few failures in a window → short cooldown.
+ *   2. Escalate only for persistent failures. Cooldown grows exponentially.
+ *   3. Success decays the failure window aggressively. 2 successes = fresh start.
+ *   4. Cooldown level decays over 24h of good behavior.
  */
 export interface ProviderHealth {
     provider: string;
@@ -18,6 +17,7 @@ export interface ProviderHealth {
     lastSuccess: number;
     avgLatencyMs: number;
     blacklistedUntil: number | null;
+    cooldownLevel: number;
 }
 export declare function recordSuccess(provider: string, latencyMs: number): void;
 export declare function recordFailure(provider: string, _error: string): void;

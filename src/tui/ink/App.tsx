@@ -17,6 +17,7 @@
 import * as React from "react";
 import { Box, Static, Text, useApp, useInput } from "ink";
 import { randomUUID } from "node:crypto";
+import { VirtualTranscript } from "./components/VirtualTranscript.js";
 import type { Message } from "../../kernel/types.js";
 import type { EventStream } from "../../kernel/event-stream.js";
 import { appendAudit } from "../../audit/writer.js";
@@ -92,6 +93,11 @@ import {
 import { useOverlays } from "./use-overlays.js";
 import { useDeclinedVersions } from "./use-declined-versions.js";
 import { useStartupHealth, type HealthResult } from "./use-startup-health.js";
+import { useFlickerDetector } from "./use-flicker-detector.js";
+import {
+  useRenderMetrics,
+  type RenderMetricsGetters,
+} from "./use-render-metrics.js";
 import {
   getRemoteConfig,
   isVersionBelowMin,
@@ -260,6 +266,22 @@ export function App(props: AppProps): React.JSX.Element {
 
   // Startup health check — non-blocking, cached for 24h.
   const healthResult: HealthResult | null = useStartupHealth();
+
+  // Flicker detector — compares estimated tree height to terminal rows.
+  const estimatedLineCount =
+    (transcript.length + projection.liveItems.length) * 2 + 15;
+  const flicker = useFlickerDetector(estimatedLineCount);
+
+  // Render performance metrics — track frame timing, expose for StatusBar.
+  const renderMetrics: RenderMetricsGetters = useRenderMetrics();
+  const [showRenderMetrics, setShowRenderMetrics] = React.useState(false);
+
+  // Alt+M toggles the render-metrics display in the StatusBar.
+  useInput((ch, key) => {
+    if (key.meta && ch === "m") {
+      setShowRenderMetrics((v) => !v);
+    }
+  });
 
   // Remote config: fetch once on mount, set model default, show MOTD.
   const [remoteConfig, setRemoteConfig] = React.useState<RemoteConfig | null>(
@@ -1066,22 +1088,6 @@ export function App(props: AppProps): React.JSX.Element {
     [overlays],
   );
 
-  const committedJsx = React.useMemo(
-    () => renderTranscript(transcript),
-    [transcript],
-  );
-  // Gemini CLI approach: freeze committed history inside <Static>
-  // so Ink caches the output and never re-renders it. Without this,
-  // every streaming flush tick re-conciles the entire transcript
-  // against the terminal — causing visible flicker/jitter.
-  const committedStaticItems = React.useMemo(
-    () =>
-      committedJsx.map((el: any, i: number) => ({
-        key: el?.key ?? `c-${i}`,
-        el,
-      })),
-    [committedJsx],
-  );
   const liveJsx = React.useMemo(
     () => renderTranscript(projection.liveItems),
     [projection.liveItems],
@@ -1101,7 +1107,12 @@ export function App(props: AppProps): React.JSX.Element {
           <Static items={LOGO_ITEMS}>
             {(): React.JSX.Element => <Logo key="logo" version={VERSION} />}
           </Static>
-          <Static items={committedStaticItems}>{({ el }: any) => el}</Static>
+          <VirtualTranscript
+            items={transcript}
+            renderItem={(item) => <TranscriptRow key={item.id} item={item} />}
+            autoScroll
+            inputFocus={inputFocus}
+          />
           <Box flexDirection="column">{liveJsx}</Box>
           {pendingApproval !== null && approvalBusRef.current && (
             <ApprovalPrompt
@@ -1270,6 +1281,9 @@ export function App(props: AppProps): React.JSX.Element {
             contextWindow={contextWindowFor(currentModel)}
             liveOutputTokens={liveOutputTokens}
             liveDurationMs={liveDurationMs}
+            overflowDetected={flicker.overflowDetected}
+            showMetrics={showRenderMetrics}
+            renderMetrics={renderMetrics}
           />
         </Box>
       </SpinnerContext.Provider>

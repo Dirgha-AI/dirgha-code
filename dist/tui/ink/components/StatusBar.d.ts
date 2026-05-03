@@ -6,6 +6,7 @@
  * When busy, a subtle spinner frame appears on the right.
  */
 import * as React from "react";
+import type { RenderMetricsGetters } from "../use-render-metrics.js";
 export interface StatusBarProps {
     model: string;
     provider: string;
@@ -25,5 +26,11 @@ export interface StatusBarProps {
     /** Current turn index (1-based) and maximum turns for this loop. */
     turnCount?: number;
     maxTurns?: number;
+    /** Flicker detector: true when frame overflow is detected. */
+    overflowDetected?: boolean;
+    /** Toggle for render-metrics display (Alt+M). */
+    showMetrics?: boolean;
+    /** Render-metrics getters — populated when showMetrics is true. */
+    renderMetrics?: RenderMetricsGetters;
 }
 export declare const StatusBar: React.NamedExoticComponent<StatusBarProps>;

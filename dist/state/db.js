@@ -11,6 +11,7 @@
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { mkdirSync } from "node:fs";
+import { recordDbError, recordDbSuccess } from "./db-telemetry.js";
 const DB_DIR = join(homedir(), ".dirgha");
 const DB_PATH = join(DB_DIR, "dirgha.db");
 // Lazy singleton — only opened when first needed.
@@ -72,9 +73,10 @@ export function dbCloseSession(id) {
     try {
         const db = getDb();
         db.prepare("UPDATE sessions SET ended_at = ? WHERE id = ?").run(Date.now(), id);
+        recordDbSuccess();
     }
-    catch {
-        /* never block the CLI */
+    catch (err) {
+        recordDbError(err);
     }
 }
 export function dbAppendMessage(sessionId, message) {
@@ -84,9 +86,10 @@ export function dbAppendMessage(sessionId, message) {
             ? message.content
             : JSON.stringify(message.content);
         db.prepare("INSERT INTO messages(session_id, role, content, ts) VALUES (?, ?, ?, ?)").run(sessionId, message.role, content, Date.now());
+        recordDbSuccess();
     }
-    catch {
-        /* never block the CLI */
+    catch (err) {
+        recordDbError(err);
     }
 }
 export function dbSearchChats(query, limit = 20) {

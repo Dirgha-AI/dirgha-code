@@ -62,7 +62,7 @@ const COOLDOWN_BACKOFF_MS = [
 ];
 
 // Number of probe attempts before escalating to the next cooldown level.
-const MAX_PROBES_BEFORE_ESCALATE = 3;
+const _MAX_PROBES_BEFORE_ESCALATE = 3;
 
 // Consecutive successes required to reset the cooldown entirely.
 const RECOVERY_SUCCESSES = 2;
@@ -141,7 +141,7 @@ function loadPersisted(): void {
       providers?: Record<string, Record<string, unknown>>;
     };
     if (!store?.providers) return;
-    for (const [provider, entry] of Object.entries(store.providers)) {
+    for (const [_provider, entry] of Object.entries(store.providers)) {
       if (!entry || typeof entry.provider !== "string") continue;
       const s = ensureState(entry.provider);
       s.totalRequests = (entry.totalRequests as number) ?? 0;

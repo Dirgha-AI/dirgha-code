@@ -88,7 +88,7 @@ async function summarise(cfg, historical) {
     const prompt = [
         {
             role: "system",
-            content: "You summarise a coding agent conversation. Keep the summary terse, information-dense, ordered by topic. Retain every decision, file path, tool outcome, and open question. Omit greetings and pleasantries. Do not invent facts.",
+            content: "You summarise a coding agent conversation. Keep the summary terse, information-dense, ordered by topic. Retain every decision, file path, tool outcome, and open question. Preserve assistant reasoning context (marked as [Previous assistant reasoning]) — do not discard it. Omit greetings and pleasantries. Do not invent facts.",
         },
         {
             role: "user",
@@ -119,7 +119,7 @@ function renderForSummary(msg) {
             case "text":
                 return p.text;
             case "thinking":
-                return `(thinking) ${p.text}`;
+                return `[Previous assistant reasoning: ${p.text.slice(0, 300)}${p.text.length > 300 ? "..." : ""}]`;
             case "tool_use":
                 return `(tool_use ${p.name}: ${truncate(JSON.stringify(p.input), 240)})`;
             case "tool_result":

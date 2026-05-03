@@ -18,6 +18,7 @@ import { iconFor } from "../icons.js";
 import { useTheme } from "../theme-context.js";
 import { SpinnerContext } from "../spinner-context.js";
 import { SpinnerGlyph } from "./SpinnerGlyph.js";
+import { useElapsed } from "../use-elapsed.js";
 
 export type ToolStatus = "pending" | "running" | "done" | "error" | "blocked";
 
@@ -129,11 +130,12 @@ export const ToolBox = React.memo(function ToolBox(
           ? palette.border.default
           : palette.ui.focus;
 
+  const liveElapsed = useElapsed(props.startedAt);
   const elapsedLabel =
     props.status === "blocked"
       ? ""
       : props.status === "running"
-        ? formatElapsed(Date.now() - props.startedAt)
+        ? liveElapsed
         : props.durationMs !== undefined
           ? formatElapsed(props.durationMs)
           : "";

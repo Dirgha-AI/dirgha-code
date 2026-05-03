@@ -59,7 +59,6 @@ export function InputBox(props) {
     const [vimState, setVimState] = React.useState(() => createVimState());
     const [pasteSegment, setPasteSegment] = React.useState(null);
     const [pasteExpanded, setPasteExpanded] = React.useState(false);
-    const [textInputResetKey, setTextInputResetKey] = React.useState(0);
     const prevValueRef = React.useRef(props.value);
     // Prompt history recall: up/down arrow navigates submitted prompts.
     const [historyIdx, setHistoryIdx] = React.useState(null);
@@ -93,15 +92,6 @@ export function InputBox(props) {
             props.onSlashQueryChange(active ? token : null);
         }
     }, [props.value, props.onSlashQueryChange]);
-    // Force remount TextInput when value is externally cleared to "",
-    // resetting ink-text-input's internal cursorOffset so subsequent
-    // characters insert at the end instead of position 0.
-    React.useEffect(() => {
-        if (props.value === "") {
-            prevValueRef.current = "";
-            setTextInputResetKey((k) => k + 1);
-        }
-    }, [props.value]);
     // Invalidate paste-collapse if the buffer shrinks past the pasted region.
     React.useEffect(() => {
         if (pasteSegment === null)
@@ -265,7 +255,7 @@ export function InputBox(props) {
     const borderColour = props.busy ? palette.brand : palette.accent;
     const promptColour = props.busy ? palette.brand : palette.accent;
     const collapsed = pasteSegment !== null && !pasteExpanded;
-    return (_jsxs(Box, { flexDirection: "column", width: cols, children: [_jsx(Box, { borderStyle: "single", borderColor: borderColour, paddingX: 1, children: _jsxs(Box, { gap: 1, flexGrow: 1, children: [_jsx(Text, { color: promptColour, children: "\u276F" }), collapsed && pasteSegment !== null ? (_jsx(PasteCollapseView, { value: props.value, segment: pasteSegment, expanded: false })) : (_jsx(TextInput, { value: props.value, onChange: handleChange, onSubmit: props.onSubmit, placeholder: props.placeholder ?? "Ask dirgha anything…", showCursor: !props.busy && !vimActive, focus: focus && !vimActive }, textInputResetKey))] }) }), _jsxs(Box, { paddingX: 1, justifyContent: "space-between", children: [_jsxs(Box, { gap: 1, children: [props.vimMode === true && (_jsxs(Text, { color: vimActive ? palette.accent : palette.brand, bold: true, children: ["[", vimModeLabel(vimState.mode), "]"] })), pasteSegment !== null && pasteExpanded && (_jsx(Text, { color: palette.textMuted, dimColor: true, children: "pasted block expanded (Ctrl+E collapse)" })), props.busy && (_jsx(BusyHint, { palette: palette, liveDurationMs: props.liveDurationMs }))] }), ctrlCArmed && (_jsx(Text, { color: palette.accent, bold: true, children: "Press Ctrl+C again to exit." }))] })] }));
+    return (_jsxs(Box, { flexDirection: "column", width: cols, children: [_jsx(Box, { borderStyle: "single", borderColor: borderColour, paddingX: 1, children: _jsxs(Box, { gap: 1, flexGrow: 1, children: [_jsx(Text, { color: promptColour, children: "\u276F" }), collapsed && pasteSegment !== null ? (_jsx(PasteCollapseView, { value: props.value, segment: pasteSegment, expanded: false })) : (_jsx(TextInput, { value: props.value, onChange: handleChange, onSubmit: props.onSubmit, placeholder: props.placeholder ?? "Ask dirgha anything…", showCursor: !props.busy && !vimActive, focus: focus && !vimActive }))] }) }), _jsxs(Box, { paddingX: 1, justifyContent: "space-between", children: [_jsxs(Box, { gap: 1, children: [props.vimMode === true && (_jsxs(Text, { color: vimActive ? palette.accent : palette.brand, bold: true, children: ["[", vimModeLabel(vimState.mode), "]"] })), pasteSegment !== null && pasteExpanded && (_jsx(Text, { color: palette.textMuted, dimColor: true, children: "pasted block expanded (Ctrl+E collapse)" })), props.busy && (_jsx(BusyHint, { palette: palette, liveDurationMs: props.liveDurationMs }))] }), ctrlCArmed && (_jsx(Text, { color: palette.accent, bold: true, children: "Press Ctrl+C again to exit." }))] })] }));
 }
 function vimModeLabel(m) {
     return m === "NORMAL" ? "NORMAL" : "INSERT";

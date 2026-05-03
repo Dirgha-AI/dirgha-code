@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { mkdirSync } from "node:fs";
 import type { Message } from "../kernel/types.js";
+import { recordDbError, recordDbSuccess } from "./db-telemetry.js";
 
 const DB_DIR = join(homedir(), ".dirgha");
 const DB_PATH = join(DB_DIR, "dirgha.db");
@@ -89,8 +90,9 @@ export function dbCloseSession(id: string): void {
       Date.now(),
       id,
     );
-  } catch {
-    /* never block the CLI */
+    recordDbSuccess();
+  } catch (err) {
+    recordDbError(err);
   }
 }
 
@@ -104,8 +106,9 @@ export function dbAppendMessage(sessionId: string, message: Message): void {
     db.prepare(
       "INSERT INTO messages(session_id, role, content, ts) VALUES (?, ?, ?, ?)",
     ).run(sessionId, message.role, content, Date.now());
-  } catch {
-    /* never block the CLI */
+    recordDbSuccess();
+  } catch (err) {
+    recordDbError(err);
   }
 }
 
@@ -145,9 +148,7 @@ export function isSqliteAvailable(): boolean {
   }
 }
 
-export function dbListSessions(
-  limit = 20,
-): Array<{
+export function dbListSessions(limit = 20): Array<{
   id: string;
   model: string | null;
   started_at: number;

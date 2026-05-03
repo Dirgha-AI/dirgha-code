@@ -15,6 +15,7 @@ import { stdout } from "node:process";
 import { constants } from "node:fs";
 import { style, defaultTheme } from "../../tui/theme.js";
 import type { Subcommand } from "./index.js";
+import { getDbTelemetry } from "../../state/db-telemetry.js";
 
 const DIRGHA_DIR = join(homedir(), ".dirgha");
 
@@ -267,6 +268,36 @@ async function checkNetworkConnectivity(): Promise<CheckResult> {
   }
 }
 
+async function checkDbTelemetry(): Promise<CheckResult> {
+  try {
+    const data = getDbTelemetry();
+    if (data.failedWrites === 0) {
+      return {
+        name: "db-errors",
+        status: "pass",
+        detail: `${data.totalWrites} write(s), 0 failures`,
+      };
+    }
+    const detail =
+      `${data.failedWrites} / ${data.totalWrites} failures` +
+      (data.lastError
+        ? ` (last: ${data.lastErrorTime}: ${data.lastError.slice(0, 80)})`
+        : "");
+    return {
+      name: "db-errors",
+      status: data.failedWrites >= 10 ? "fail" : "warn",
+      detail,
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return {
+      name: "db-errors",
+      status: "warn",
+      detail: `cannot read: ${msg}`,
+    };
+  }
+}
+
 async function checkSessionStore(): Promise<CheckResult> {
   try {
     const { createSessionStore } = await import("../../context/session.js");
@@ -480,6 +511,7 @@ export const doctorSubcommand: Subcommand = {
     results.push(await checkSessionStore());
     results.push(await checkMemoryStore());
     results.push(await checkNetworkConnectivity());
+    results.push(await checkDbTelemetry());
 
     if (json) printNdjson(results);
     else printTable(results);
