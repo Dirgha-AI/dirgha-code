@@ -53,6 +53,8 @@ export interface InputBoxProps {
   inputFocus?: boolean;
   /** Parent wants to toggle YOLO mode (Ctrl+Y). */
   onRequestYoloToggle?: () => void;
+  /** Prior submitted prompts, newest first (for up/down arrow recall). */
+  promptHistory?: readonly string[];
 }
 
 const CTRL_C_TIMEOUT_MS = 1500;
@@ -96,6 +98,10 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
   const [pasteExpanded, setPasteExpanded] = React.useState(false);
   const [textInputResetKey, setTextInputResetKey] = React.useState(0);
   const prevValueRef = React.useRef<string>(props.value);
+  // Prompt history recall: up/down arrow navigates submitted prompts.
+  const [historyIdx, setHistoryIdx] = React.useState<number | null>(null);
+  const savedInputRef = React.useRef<string>("");
+  const history = props.promptHistory ?? [];
 
   const focus = props.inputFocus ?? !props.busy;
   const vimActive = props.vimMode === true && vimState.mode === "NORMAL";
@@ -189,6 +195,35 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
 
   useInput(
     (inputCh, key) => {
+      // Up/down arrow prompt-history recall (Gemini CLI parity).
+      if (key.upArrow && history.length > 0) {
+        if (historyIdx === null) {
+          savedInputRef.current = props.value;
+          setHistoryIdx(0);
+          props.onChange(history[0]);
+        } else if (historyIdx < history.length - 1) {
+          const next = historyIdx + 1;
+          setHistoryIdx(next);
+          props.onChange(history[next]);
+        }
+        return;
+      }
+      if (key.downArrow && historyIdx !== null) {
+        if (historyIdx === 0) {
+          setHistoryIdx(null);
+          props.onChange(savedInputRef.current);
+        } else {
+          const prev = historyIdx - 1;
+          setHistoryIdx(prev);
+          props.onChange(history[prev]);
+        }
+        return;
+      }
+      // Any other input resets history navigation.
+      if (historyIdx !== null && !key.upArrow && !key.downArrow && inputCh) {
+        setHistoryIdx(null);
+      }
+
       // Ctrl+C handling — highest priority.
       //   1. If the buffer has text → clear it (don't arm exit).
       //   2. If the buffer is empty → arm exit; second press within 1.5s exits.

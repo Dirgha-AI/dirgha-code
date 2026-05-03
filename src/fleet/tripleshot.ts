@@ -318,5 +318,5 @@ function handleFor(
 }
 
 function defaultModel(): string {
-  return process.env["DIRGHA_MODEL"] ?? "nvidia/minimaxai/minimax-m2.7";
+  return process.env["DIRGHA_MODEL"] ?? "minimaxai/minimax-m2.7";
 }

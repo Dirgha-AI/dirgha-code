@@ -23,7 +23,7 @@ const KNOWN_PROVIDERS = [
     "XAI_API_KEY",
     "GROQ_API_KEY",
     "ZAI_API_KEY",
-    "SEAMLESS_KEY",
+    // SEAMLESS_KEY is reserved for future Seamless provider integration
 ];
 function keyPath() {
     return join(homedir(), ".dirgha", "keys.json");

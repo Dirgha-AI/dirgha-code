@@ -40,6 +40,9 @@ export const loginCommand = {
             `  1. Open: ${start.verifyUri}`,
             `  2. Enter code: ${start.userCode}`,
             "",
+            `If the page is blank, try: ${start.verifyUri}?code=${start.userCode}`,
+            `No account yet? Sign up at: ${start.verifyUri.replace(/\/device$/, "/signup")}`,
+            "",
             `Expires in ~${Math.round(start.expiresIn / 60_000)} minutes. The REPL stays usable; a status line will appear when authorization completes.`,
         ].join("\n");
     },

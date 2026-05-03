@@ -37,5 +37,7 @@ export interface InputBoxProps {
     inputFocus?: boolean;
     /** Parent wants to toggle YOLO mode (Ctrl+Y). */
     onRequestYoloToggle?: () => void;
+    /** Prior submitted prompts, newest first (for up/down arrow recall). */
+    promptHistory?: readonly string[];
 }
 export declare function InputBox(props: InputBoxProps): React.JSX.Element;

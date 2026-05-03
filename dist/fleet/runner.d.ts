@@ -13,8 +13,8 @@
  *   5. Gather results, compute totals, return FleetResult.
  *   6. Optional cleanup of worktrees.
  */
-import { ProviderRegistry } from '../providers/index.js';
-import { type FleetConfig, type FleetResult, type FleetSubtask } from './types.js';
+import { ProviderRegistry } from "../providers/index.js";
+import { type FleetConfig, type FleetResult, type FleetSubtask } from "./types.js";
 /**
  * Run a fleet. Accepts either explicit `subtasks` or a bare `goal` that
  * will be decomposed via the planner model.

@@ -1,11 +1,12 @@
 /**
- * Fireworks provider. Kept for back-compat routing only — the upstream
- * plan that fronted this provider is wound down and the default router
- * no longer uses it. The adapter still exists so existing session
- * transcripts that reference fireworks/* model ids remain decodable.
+ * Fireworks provider — https://fireworks.ai
+ *
+ * OpenAI-compatible endpoint. Supports tool calling. Thinking (reasoning)
+ * is not currently exposed by Fireworks' API for chat completions but
+ * may be added in a future update.
  */
-import type { AgentEvent } from '../kernel/types.js';
-import type { Provider, StreamRequest, ProviderConfig } from './iface.js';
+import type { AgentEvent } from "../kernel/types.js";
+import type { Provider, StreamRequest, ProviderConfig } from "./iface.js";
 export declare class FireworksProvider implements Provider {
     readonly id = "fireworks";
     private readonly apiKey;

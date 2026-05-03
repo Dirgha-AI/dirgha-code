@@ -47,6 +47,7 @@ import { ProviderPicker, } from "./components/ProviderPicker.js";
 import { HelpOverlay, } from "./components/HelpOverlay.js";
 import { KeySetOverlay } from "./components/KeySetOverlay.js";
 import { saveKey } from "../../auth/keystore.js";
+import { loadToken, migrateLegacyAuth, } from "../../integrations/device-auth.js";
 import { AtFileComplete } from "./components/AtFileComplete.js";
 import { SlashComplete } from "./components/SlashComplete.js";
 import { ThemePicker } from "./components/ThemePicker.js";
@@ -99,6 +100,19 @@ export function App(props) {
     // the input box; submitting any other prompt also clears it.
     const [pendingFailover, setPendingFailover] = React.useState(null);
     const lastUserPromptRef = React.useRef("");
+    const [promptHistory, setPromptHistory] = React.useState([]);
+    // Dirgha Gateway token loaded from ~/.dirgha/credentials.json.
+    // Required for billing, entitlements, deploy, and /account.
+    const tokenRef = React.useRef(null);
+    React.useEffect(() => {
+        migrateLegacyAuth()
+            .then(() => loadToken())
+            .then((t) => {
+            if (t)
+                tokenRef.current = t;
+        })
+            .catch(() => { });
+    }, []);
     // Approval bus — single instance per App so subscriptions persist across
     // turns. Replaces the legacy `createTuiApprovalBus` that wrote prompts
     // direct to stdout (overdrawn by Ink) and read stdin raw (hung on
@@ -237,6 +251,11 @@ export function App(props) {
         // Remember the last user prompt so we can re-submit it after a
         // failover model swap (D2 — auto-prompt model switch on failure).
         lastUserPromptRef.current = value;
+        // Up/down arrow prompt history (keep last 100 prompts, newest first).
+        setPromptHistory((prev) => {
+            const deduped = prev.filter((p) => p !== value);
+            return [value, ...deduped].slice(0, 100);
+        });
         // A new submission supersedes any pending failover prompt.
         setPendingFailover(null);
         if (value === "/exit" || value === "/quit") {
@@ -349,8 +368,10 @@ export function App(props) {
                     exit();
                     process.exit(code);
                 },
-                getToken: () => null,
-                setToken: () => undefined,
+                getToken: () => tokenRef.current,
+                setToken: (newToken) => {
+                    tokenRef.current = newToken;
+                },
                 apiBase: () => process.env["DIRGHA_API_BASE"] ??
                     process.env["DIRGHA_GATEWAY_URL"] ??
                     "https://api.dirgha.ai",
@@ -793,7 +814,7 @@ export function App(props) {
                         }, onReject: () => setPendingFailover(null), onPicker: () => {
                             setPendingFailover(null);
                             overlays.openOverlay("models");
-                        } })), _jsx(PromptQueueIndicator, { queued: promptQueue }), _jsx(InputBox, { value: input, onChange: setInput, onSubmit: handleSubmit, busy: busy, liveDurationMs: liveDurationMs, vimMode: props.config.vimMode === true, onAtQueryChange: overlays.setAtQuery, onSlashQueryChange: overlays.setSlashQuery, onRequestOverlay: overlays.openOverlay, onRequestYoloToggle: () => {
+                        } })), _jsx(PromptQueueIndicator, { queued: promptQueue }), _jsx(InputBox, { value: input, onChange: setInput, onSubmit: handleSubmit, busy: busy, liveDurationMs: liveDurationMs, vimMode: props.config.vimMode === true, onAtQueryChange: overlays.setAtQuery, onSlashQueryChange: overlays.setSlashQuery, onRequestOverlay: overlays.openOverlay, promptHistory: promptHistory, onRequestYoloToggle: () => {
                             const next = mode === "yolo" ? "act" : "yolo";
                             setMode(next);
                             setTranscript((prev) => [

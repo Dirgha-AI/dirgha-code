@@ -13,21 +13,21 @@
  *   5. Gather results, compute totals, return FleetResult.
  *   6. Optional cleanup of worktrees.
  */
-import { randomUUID } from 'node:crypto';
-import { runAgentLoop } from '../kernel/agent-loop.js';
-import { createEventStream } from '../kernel/event-stream.js';
-import { extractText } from '../kernel/message.js';
-import { ProviderRegistry } from '../providers/index.js';
-import { builtInTools } from '../tools/index.js';
-import { createToolRegistry } from '../tools/registry.js';
-import { createToolExecutor } from '../tools/exec.js';
-import { repairJSON } from '../utils/json-repair.js';
-import { createWorktree, destroyWorktree, getRepoRoot, slug } from './worktree.js';
-import { openScratchpad } from './scratchpad.js';
-import { createScratchpadTools } from './scratchpad-tools.js';
-import { createLedgerHook, fleetLedgerScope } from './ledger-hook.js';
-import { writeFleetState } from './state.js';
-import { AGENT_TYPE_TOOLS, } from './types.js';
+import { randomUUID } from "node:crypto";
+import { runAgentLoop } from "../kernel/agent-loop.js";
+import { createEventStream } from "../kernel/event-stream.js";
+import { extractText } from "../kernel/message.js";
+import { ProviderRegistry } from "../providers/index.js";
+import { builtInTools } from "../tools/index.js";
+import { createToolRegistry } from "../tools/registry.js";
+import { createToolExecutor } from "../tools/exec.js";
+import { repairJSON } from "../utils/json-repair.js";
+import { createWorktree, destroyWorktree, getRepoRoot, slug, } from "./worktree.js";
+import { openScratchpad } from "./scratchpad.js";
+import { createScratchpadTools } from "./scratchpad-tools.js";
+import { createLedgerHook, fleetLedgerScope } from "./ledger-hook.js";
+import { writeFleetState } from "./state.js";
+import { AGENT_TYPE_TOOLS, } from "./types.js";
 const DECOMPOSE_SYSTEM = `You are a task decomposer. Given a user goal, split it into 2-5 INDEPENDENT subtasks that can run in PARALLEL without conflicting with each other (no shared-file edits).
 
 For each subtask, pick ONE agent type:
@@ -83,18 +83,22 @@ export async function runFleet(config) {
         agents.push({
             id: sub.id,
             subtask: sub,
-            status: 'pending',
+            status: "pending",
             worktreePath: handle.path,
             branchName: handle.branch,
             startedAt: 0,
-            output: '',
+            output: "",
             bytesWritten: 0,
             usage: { inputTokens: 0, outputTokens: 0, cachedTokens: 0, costUsd: 0 },
         });
     }
     // Initial checkpoint before any agent runs.
     void writeFleetState(runId, goalSlug, config, agents).catch(() => { });
-    emitFleetEvent(events, { type: 'fleet_start', goal: config.goal, agents: [...agents] });
+    emitFleetEvent(events, {
+        type: "fleet_start",
+        goal: config.goal,
+        agents: [...agents],
+    });
     for (const a of agents)
         config.onAgent?.(a);
     await runWithConcurrency(agents, {
@@ -114,8 +118,8 @@ export async function runFleet(config) {
         fleetConfig: config,
         allAgents: agents,
     });
-    const successCount = agents.filter(a => a.status === 'completed').length;
-    const failCount = agents.filter(a => a.status === 'failed' || a.status === 'cancelled').length;
+    const successCount = agents.filter((a) => a.status === "completed").length;
+    const failCount = agents.filter((a) => a.status === "failed" || a.status === "cancelled").length;
     const durationMs = Date.now() - started;
     const totalTokens = agents.reduce((acc, a) => ({
         inputTokens: acc.inputTokens + a.usage.inputTokens,
@@ -123,9 +127,15 @@ export async function runFleet(config) {
         cachedTokens: acc.cachedTokens + a.usage.cachedTokens,
         costUsd: acc.costUsd + a.usage.costUsd,
     }), { inputTokens: 0, outputTokens: 0, cachedTokens: 0, costUsd: 0 });
-    emitFleetEvent(events, { type: 'fleet_end', goal: config.goal, successCount, failCount, durationMs });
+    emitFleetEvent(events, {
+        type: "fleet_end",
+        goal: config.goal,
+        successCount,
+        failCount,
+        durationMs,
+    });
     if (config.autoCleanup) {
-        await Promise.allSettled(worktrees.map(wt => destroyWorktree(wt)));
+        await Promise.allSettled(worktrees.map((wt) => destroyWorktree(wt)));
     }
     return {
         goal: config.goal,
@@ -135,7 +145,7 @@ export async function runFleet(config) {
         failCount,
         durationMs,
         totalTokens,
-        failed: agents.filter(a => a.status === 'failed' || a.status === 'cancelled'),
+        failed: agents.filter((a) => a.status === "failed" || a.status === "cancelled"),
     };
 }
 async function runWithConcurrency(agents, opts) {
@@ -146,7 +156,9 @@ async function runWithConcurrency(agents, opts) {
             if (opts.signal?.aborted)
                 break; // don't start new agents after fleet cancel
             const agent = queue.shift();
-            const p = runOneAgent(agent, opts).finally(() => { inflight.delete(p); });
+            const p = runOneAgent(agent, opts).finally(() => {
+                inflight.delete(p);
+            });
             inflight.add(p);
         }
         if (inflight.size > 0)
@@ -154,43 +166,51 @@ async function runWithConcurrency(agents, opts) {
     }
 }
 async function runOneAgent(agent, opts) {
-    agent.status = 'running';
+    agent.status = "running";
     agent.startedAt = Date.now();
     opts.onAgent?.(agent);
     const sessionId = `fleet-${agent.id}-${Date.now().toString(36)}`;
     agent.sessionId = sessionId;
     emitFleetEvent(opts.events, {
-        type: 'fleet_agent_start',
+        type: "fleet_agent_start",
         agentId: agent.id,
         subtask: agent.subtask,
         worktreePath: agent.worktreePath,
         branch: agent.branchName,
     });
     const controller = new AbortController();
-    const parentListener = () => { controller.abort(); };
-    opts.signal?.addEventListener('abort', parentListener, { once: true });
-    const timer = setTimeout(() => { controller.abort(); }, opts.timeoutMs);
+    const parentListener = () => {
+        controller.abort();
+    };
+    opts.signal?.addEventListener("abort", parentListener, { once: true });
+    const timer = setTimeout(() => {
+        controller.abort();
+    }, opts.timeoutMs);
     const registry = agentRegistry(agent.subtask, opts.scratchpad, agent.id);
     const sanitized = registry.sanitize({ descriptionLimit: 200 });
-    const executor = createToolExecutor({ registry, cwd: agent.worktreePath, sessionId });
+    const executor = createToolExecutor({
+        registry,
+        cwd: agent.worktreePath,
+        sessionId,
+    });
     // Ledger hook: auto-persists key findings after each turn.
     const ledgerHookRaw = createLedgerHook(agent.id, opts.ledgerScope);
     const ledgerHook = ledgerHookRaw;
     // Per-agent local event stream — we relay into parent + collect usage.
     const localEvents = createEventStream();
-    const unsubscribe = localEvents.subscribe(ev => {
+    const unsubscribe = localEvents.subscribe((ev) => {
         opts.events.emit(ev);
         onLocalEvent(agent, ev, opts);
         // Feed last assistant text into the ledger hook.
-        if (ev.type === 'text_delta')
+        if (ev.type === "text_delta")
             ledgerHook._state.lastText += ev.delta;
-        if (ev.type === 'turn_end') {
+        if (ev.type === "turn_end") {
             void writeFleetState(opts.runId, opts.goalSlug, opts.fleetConfig, opts.allAgents).catch(() => { });
         }
     });
     const messages = [
-        { role: 'system', content: agentSystemPrompt(agent.subtask) },
-        { role: 'user', content: agent.subtask.task },
+        { role: "system", content: agentSystemPrompt(agent.subtask) },
+        { role: "user", content: agent.subtask.task },
     ];
     try {
         const result = await runAgentLoop({
@@ -208,36 +228,39 @@ async function runOneAgent(agent, opts) {
         agent.transcript = result.messages;
         agent.stopReason = result.stopReason;
         agent.usage = result.usage;
-        const lastAssistant = [...result.messages].reverse().find(m => m.role === 'assistant');
-        agent.output = lastAssistant ? extractText(lastAssistant) : '';
-        if (result.stopReason === 'aborted') {
-            agent.status = 'cancelled';
-            agent.error = controller.signal.aborted && !opts.signal?.aborted
-                ? `timeout after ${opts.timeoutMs}ms`
-                : 'cancelled';
+        const lastAssistant = [...result.messages]
+            .reverse()
+            .find((m) => m.role === "assistant");
+        agent.output = lastAssistant ? extractText(lastAssistant) : "";
+        if (result.stopReason === "aborted") {
+            agent.status = "cancelled";
+            agent.error =
+                controller.signal.aborted && !opts.signal?.aborted
+                    ? `timeout after ${opts.timeoutMs}ms`
+                    : "cancelled";
         }
-        else if (result.stopReason === 'error') {
-            agent.status = 'failed';
-            agent.error = agent.error ?? 'agent-loop reported error';
+        else if (result.stopReason === "error") {
+            agent.status = "failed";
+            agent.error = agent.error ?? "agent-loop reported error";
         }
         else {
-            agent.status = 'completed';
+            agent.status = "completed";
         }
     }
     catch (err) {
-        agent.status = 'failed';
+        agent.status = "failed";
         agent.error = err instanceof Error ? err.message : String(err);
     }
     finally {
         clearTimeout(timer);
-        opts.signal?.removeEventListener('abort', parentListener);
+        opts.signal?.removeEventListener("abort", parentListener);
         unsubscribe();
         localEvents.close();
     }
     agent.completedAt = Date.now();
     opts.onAgent?.(agent);
     emitFleetEvent(opts.events, {
-        type: 'fleet_agent_end',
+        type: "fleet_agent_end",
         agentId: agent.id,
         status: agent.status,
         error: agent.error,
@@ -246,27 +269,27 @@ async function runOneAgent(agent, opts) {
 }
 /* Per-event side effects: text accumulation + verbose mirroring. */
 function onLocalEvent(agent, ev, opts) {
-    if (ev.type === 'text_delta') {
+    if (ev.type === "text_delta") {
         agent.output += ev.delta;
         agent.bytesWritten += ev.delta.length;
         if (opts.verbose)
             process.stderr.write(`[${agent.id}] ${ev.delta}`);
         emitFleetEvent(opts.events, {
-            type: 'fleet_agent_progress',
+            type: "fleet_agent_progress",
             agentId: agent.id,
             status: agent.status,
             bytes: agent.bytesWritten,
         });
     }
-    else if (ev.type === 'error') {
+    else if (ev.type === "error") {
         agent.error = ev.message;
     }
-    else if (ev.type === 'usage') {
+    else if (ev.type === "usage") {
         agent.usage.inputTokens += ev.inputTokens;
         agent.usage.outputTokens += ev.outputTokens;
         agent.usage.cachedTokens += ev.cachedTokens ?? 0;
     }
-    else if (ev.type === 'tool_exec_end') {
+    else if (ev.type === "tool_exec_end") {
         // Counting tool executions lets us distinguish "agent did real work"
         // from "agent emitted text claiming completion without calling
         // anything" — a common LLM failure mode that previously inflated
@@ -275,20 +298,20 @@ function onLocalEvent(agent, ev, opts) {
     }
 }
 function agentRegistry(subtask, scratchpad, agentId) {
-    const type = subtask.type ?? 'code';
+    const type = subtask.type ?? "code";
     const allow = subtask.toolAllowlist ?? AGENT_TYPE_TOOLS[type];
     const allowSet = new Set(allow);
-    const scoped = builtInTools.filter(t => allowSet.size === 0 ? true : allowSet.has(t.name));
+    const scoped = builtInTools.filter((t) => allowSet.size === 0 ? true : allowSet.has(t.name));
     // Always inject scratchpad tools — they're safe for all agent types.
     const [fleetNote, fleetRead] = createScratchpadTools(scratchpad, agentId);
     return createToolRegistry([...scoped, fleetNote, fleetRead]);
 }
 function agentSystemPrompt(subtask) {
-    const type = subtask.type ?? 'code';
-    const isCodeOrVerify = type === 'code' || type === 'verify';
+    const type = subtask.type ?? "code";
+    const isCodeOrVerify = type === "code" || type === "verify";
     const toolMandate = isCodeOrVerify
         ? 'You MUST use the available tools (fs_write, fs_edit, shell, etc.) to make changes. Do NOT respond with text claiming you completed work — you have no effect on the filesystem unless you invoke a tool. After your tool calls, commit any new files with the git tool (`git add <file> && git commit -m "<msg>"`) so the work shows up on your branch.'
-        : 'Use tools (fs_read, search_grep, etc.) to inspect the workspace. Respond with a short summary of what you found.';
+        : "Use tools (fs_read, search_grep, etc.) to inspect the workspace. Respond with a short summary of what you found.";
     return `You are a fleet subagent focused on a single subtask.
 Subtask: ${subtask.title}
 Type: ${type}
@@ -308,14 +331,14 @@ function emitFleetEvent(events, ev) {
     events.emit(ev);
 }
 function defaultModel() {
-    return process.env['DIRGHA_MODEL'] ?? 'nvidia/minimaxai/minimax-m2.7';
+    return process.env["DIRGHA_MODEL"] ?? "minimaxai/minimax-m2.7";
 }
 function normalizeSubtask(s) {
     return {
         id: slug(s.id),
         title: s.title.slice(0, 80),
         task: s.task,
-        type: s.type ?? 'code',
+        type: s.type ?? "code",
         model: s.model,
         toolAllowlist: s.toolAllowlist,
     };
@@ -332,8 +355,11 @@ export async function decomposeGoal(goal, model, providers) {
     const stream = provider.stream({
         model,
         messages: [
-            { role: 'system', content: DECOMPOSE_SYSTEM },
-            { role: 'user', content: `Goal: ${goal}\n\nDecompose into parallel subtasks as JSON.` },
+            { role: "system", content: DECOMPOSE_SYSTEM },
+            {
+                role: "user",
+                content: `Goal: ${goal}\n\nDecompose into parallel subtasks as JSON.`,
+            },
         ],
     });
     try {
@@ -344,9 +370,9 @@ export async function decomposeGoal(goal, model, providers) {
         return fallbackSubtask(goal);
     }
     const text = events
-        .filter((e) => e.type === 'text_delta')
-        .map(e => e.delta)
-        .join('');
+        .filter((e) => e.type === "text_delta")
+        .map((e) => e.delta)
+        .join("");
     return parseSubtasks(text, goal);
 }
 function parseSubtasks(raw, goal) {
@@ -354,7 +380,7 @@ function parseSubtasks(raw, goal) {
     if (!match)
         return fallbackSubtask(goal);
     const parsed = repairJSON(match[0]);
-    if (!parsed || typeof parsed !== 'object')
+    if (!parsed || typeof parsed !== "object")
         return fallbackSubtask(goal);
     const raw2 = parsed.subtasks;
     if (!Array.isArray(raw2) || raw2.length === 0)
@@ -362,33 +388,45 @@ function parseSubtasks(raw, goal) {
     const out = [];
     const seenIds = new Set();
     for (const item of raw2.slice(0, 5)) {
-        if (!item || typeof item !== 'object')
+        if (!item || typeof item !== "object")
             continue;
         const o = item;
-        const baseId = typeof o.id === 'string' ? o.id : `task-${out.length + 1}`;
+        const baseId = typeof o.id === "string" ? o.id : `task-${out.length + 1}`;
         let id = slug(baseId, 30);
         while (seenIds.has(id))
             id = `${id}-${out.length + 1}`;
         seenIds.add(id);
-        const title = typeof o.title === 'string'
+        const title = typeof o.title === "string"
             ? o.title.slice(0, 80)
-            : (typeof o.task === 'string' ? o.task.slice(0, 80) : `Subtask ${out.length + 1}`);
-        const task = typeof o.task === 'string' ? o.task : (typeof o.title === 'string' ? o.title : goal);
-        const type = isAgentType(o.type) ? o.type : 'code';
+            : typeof o.task === "string"
+                ? o.task.slice(0, 80)
+                : `Subtask ${out.length + 1}`;
+        const task = typeof o.task === "string"
+            ? o.task
+            : typeof o.title === "string"
+                ? o.title
+                : goal;
+        const type = isAgentType(o.type) ? o.type : "code";
         out.push({ id, title, task, type });
     }
     return out.length > 0 ? out : fallbackSubtask(goal);
 }
 function isAgentType(v) {
-    return v === 'explore' || v === 'plan' || v === 'verify'
-        || v === 'code' || v === 'research' || v === 'custom';
+    return (v === "explore" ||
+        v === "plan" ||
+        v === "verify" ||
+        v === "code" ||
+        v === "research" ||
+        v === "custom");
 }
 function fallbackSubtask(goal) {
-    return [{
-            id: slug(goal) || 'main',
+    return [
+        {
+            id: slug(goal) || "main",
             title: goal.slice(0, 80),
             task: goal,
-            type: 'code',
-        }];
+            type: "code",
+        },
+    ];
 }
 //# sourceMappingURL=runner.js.map

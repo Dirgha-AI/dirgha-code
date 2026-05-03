@@ -230,6 +230,6 @@ function handleFor(worktrees, path) {
     return wt;
 }
 function defaultModel() {
-    return process.env["DIRGHA_MODEL"] ?? "nvidia/minimaxai/minimax-m2.7";
+    return process.env["DIRGHA_MODEL"] ?? "minimaxai/minimax-m2.7";
 }
 //# sourceMappingURL=tripleshot.js.map
