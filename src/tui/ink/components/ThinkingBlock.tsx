@@ -104,9 +104,7 @@ export const ThinkingBlockGroup = React.memo(function ThinkingBlockGroup({
                 borderRight={false}
                 borderTop={false}
                 borderBottom={false}
-                borderColor={
-                  palette.colors.border ?? palette.border.default ?? "#444"
-                }
+                borderColor={palette.border.default}
                 paddingLeft={1}
                 marginLeft={2}
                 marginBottom={i < blocks.length - 1 ? 1 : 0}
