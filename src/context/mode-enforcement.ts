@@ -27,6 +27,7 @@ export const WRITE_TOOLS = new Set<string>([
   "fs_write",
   "fs_edit",
   "shell",
+  "git",
   "checkpoint",
   "cron",
 ]);
@@ -39,10 +40,10 @@ export function enforceMode(mode: Mode): AgentHooks | undefined {
     beforeToolCall: async (call: ToolCall) => {
       if (call.name === "browser") {
         const action = (call.input as { action?: string })?.action;
-        if (action && !READ_ONLY_BROWSER_ACTIONS.has(action)) {
+        if (!action || !READ_ONLY_BROWSER_ACTIONS.has(action)) {
           return {
             block: true,
-            reason: `Mode is ${mode.toUpperCase()} — browser '${action}' is blocked. content and close are allowed (read-only).`,
+            reason: `Mode is ${mode.toUpperCase()} — browser '${action ?? "(no action)"}' is blocked. content and close are allowed (read-only).`,
           };
         }
         return undefined;

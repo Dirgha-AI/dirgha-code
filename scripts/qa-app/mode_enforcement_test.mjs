@@ -27,7 +27,7 @@ check('act mode returns undefined hooks', actHooks === undefined);
 const planHooks = enforceMode('plan');
 check('plan mode produces hooks', planHooks?.beforeToolCall !== undefined);
 
-for (const writer of ['fs_write', 'fs_edit', 'shell']) {
+for (const writer of ['fs_write', 'fs_edit', 'shell', 'git']) {
   const r = await planHooks.beforeToolCall(fakeCall(writer));
   check(`plan blocks ${writer}`, r?.block === true && /PLAN/.test(r.reason ?? ''));
 }
@@ -50,12 +50,15 @@ const askWrite = await askHooks.beforeToolCall(fakeCall('fs_write'));
 check('ask blocks fs_write with ASK message', askWrite?.block === true && /ASK/.test(askWrite.reason ?? ''));
 const askShell = await askHooks.beforeToolCall(fakeCall('shell'));
 check('ask blocks shell',                   askShell?.block === true);
+const askBrowser = await askHooks.beforeToolCall(fakeCall('browser'));
+check('ask blocks browser',                 askBrowser?.block === true);
 const askRead = await askHooks.beforeToolCall(fakeCall('fs_read'));
 check('ask allows fs_read',                  askRead === undefined);
 
 // 5. WRITE_TOOLS exports the canonical set.
 check('WRITE_TOOLS includes fs_write', WRITE_TOOLS.has('fs_write'));
 check('WRITE_TOOLS includes shell',    WRITE_TOOLS.has('shell'));
+check('WRITE_TOOLS includes git',      WRITE_TOOLS.has('git'));
 check('WRITE_TOOLS excludes fs_read',  !WRITE_TOOLS.has('fs_read'));
 
 console.log('\n=== composeHooks ===');
