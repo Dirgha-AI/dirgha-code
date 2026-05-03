@@ -66,6 +66,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Mode enforcement unit test
+        run: node scripts/test-enforce.mjs
+
       - name: Smoke-test bundle (cross-OS)
         # Confirms the built CLI loads + reports its own version on every
         # OS × Node combination. Regressions like "fs.realpath case sensitivity
