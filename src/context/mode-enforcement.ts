@@ -12,8 +12,8 @@
  * (e.g. the agent itself, audit displays) can reason about it.
  */
 
-import type { AgentHooks, ToolCall } from '../kernel/types.js';
-import type { Mode } from './mode.js';
+import type { AgentHooks, ToolCall } from "../kernel/types.js";
+import type { Mode } from "./mode.js";
 
 /**
  * Tools that mutate the filesystem, run shells, or otherwise produce
@@ -24,11 +24,17 @@ import type { Mode } from './mode.js';
  * in plan/verify so the user gets a clean read-only run.
  */
 export const WRITE_TOOLS = new Set<string>([
-  'fs_write', 'fs_edit', 'shell', 'git', 'browser', 'checkpoint', 'cron',
+  "fs_write",
+  "fs_edit",
+  "shell",
+  "git",
+  "browser",
+  "checkpoint",
+  "cron",
 ]);
 
 export function enforceMode(mode: Mode): AgentHooks | undefined {
-  if (mode === 'act') return undefined;
+  if (mode === "act" || mode === "yolo") return undefined;
   return {
     beforeToolCall: async (call: ToolCall) => {
       if (WRITE_TOOLS.has(call.name)) {
@@ -48,15 +54,21 @@ export function enforceMode(mode: Mode): AgentHooks | undefined {
  * `a.beforeToolCall` blocks, `b` is skipped for that event. After-
  * hooks always run both. Either side may be undefined.
  */
-export function composeHooks(a: AgentHooks | undefined, b: AgentHooks | undefined): AgentHooks | undefined {
+export function composeHooks(
+  a: AgentHooks | undefined,
+  b: AgentHooks | undefined,
+): AgentHooks | undefined {
   if (!a) return b;
   if (!b) return a;
   const out: AgentHooks = {};
   if (a.beforeTurn || b.beforeTurn) {
     out.beforeTurn = async (turnIndex, messages) => {
-      if (a.beforeTurn) { const r = await a.beforeTurn(turnIndex, messages); if (r === 'abort') return 'abort'; }
+      if (a.beforeTurn) {
+        const r = await a.beforeTurn(turnIndex, messages);
+        if (r === "abort") return "abort";
+      }
       if (b.beforeTurn) return b.beforeTurn(turnIndex, messages);
-      return 'continue';
+      return "continue";
     };
   }
   if (a.afterTurn || b.afterTurn) {
@@ -66,13 +78,14 @@ export function composeHooks(a: AgentHooks | undefined, b: AgentHooks | undefine
     };
   }
   if (a.beforeToolCall || b.beforeToolCall) {
-    out.beforeToolCall = async call => {
+    out.beforeToolCall = async (call) => {
       let current = call;
       if (a.beforeToolCall) {
         const r = await a.beforeToolCall(current);
-        if (r && 'block' in r && r.block === true) return r;
+        if (r && "block" in r && r.block === true) return r;
         // Propagate input replacement so b sees the updated input.
-        if (r?.replaceInput !== undefined) current = { ...current, input: r.replaceInput };
+        if (r?.replaceInput !== undefined)
+          current = { ...current, input: r.replaceInput };
       }
       if (b.beforeToolCall) return b.beforeToolCall(current);
       return undefined;

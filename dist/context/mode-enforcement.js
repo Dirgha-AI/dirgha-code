@@ -20,10 +20,16 @@
  * in plan/verify so the user gets a clean read-only run.
  */
 export const WRITE_TOOLS = new Set([
-    'fs_write', 'fs_edit', 'shell', 'git', 'browser', 'checkpoint', 'cron',
+    "fs_write",
+    "fs_edit",
+    "shell",
+    "git",
+    "browser",
+    "checkpoint",
+    "cron",
 ]);
 export function enforceMode(mode) {
-    if (mode === 'act')
+    if (mode === "act" || mode === "yolo")
         return undefined;
     return {
         beforeToolCall: async (call) => {
@@ -53,12 +59,12 @@ export function composeHooks(a, b) {
         out.beforeTurn = async (turnIndex, messages) => {
             if (a.beforeTurn) {
                 const r = await a.beforeTurn(turnIndex, messages);
-                if (r === 'abort')
-                    return 'abort';
+                if (r === "abort")
+                    return "abort";
             }
             if (b.beforeTurn)
                 return b.beforeTurn(turnIndex, messages);
-            return 'continue';
+            return "continue";
         };
     }
     if (a.afterTurn || b.afterTurn) {
@@ -74,7 +80,7 @@ export function composeHooks(a, b) {
             let current = call;
             if (a.beforeToolCall) {
                 const r = await a.beforeToolCall(current);
-                if (r && 'block' in r && r.block === true)
+                if (r && "block" in r && r.block === true)
                     return r;
                 // Propagate input replacement so b sees the updated input.
                 if (r?.replaceInput !== undefined)

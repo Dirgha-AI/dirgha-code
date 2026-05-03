@@ -11,8 +11,8 @@
  * also exports the canonical write-tool set so downstream consumers
  * (e.g. the agent itself, audit displays) can reason about it.
  */
-import type { AgentHooks } from '../kernel/types.js';
-import type { Mode } from './mode.js';
+import type { AgentHooks } from "../kernel/types.js";
+import type { Mode } from "./mode.js";
 /**
  * Tools that mutate the filesystem, run shells, or otherwise produce
  * side effects beyond reading. Names match `tools/index.ts` exactly.

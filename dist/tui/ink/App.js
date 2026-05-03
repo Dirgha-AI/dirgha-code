@@ -307,11 +307,11 @@ export function App(props) {
                 listSessions: async () => {
                     const ids = await props.sessions.list();
                     if (ids.length === 0)
-                        return '(no saved sessions)';
-                    const { stat: fstat } = await import('node:fs/promises');
-                    const { join: pjoin } = await import('node:path');
-                    const { homedir: hd } = await import('node:os');
-                    const sessDir = pjoin(hd(), '.dirgha', 'sessions');
+                        return "(no saved sessions)";
+                    const { stat: fstat } = await import("node:fs/promises");
+                    const { join: pjoin } = await import("node:path");
+                    const { homedir: hd } = await import("node:os");
+                    const sessDir = pjoin(hd(), ".dirgha", "sessions");
                     const withMtime = await Promise.all(ids.map(async (id) => {
                         try {
                             const s = await fstat(pjoin(sessDir, `${id}.jsonl`));
@@ -324,13 +324,13 @@ export function App(props) {
                     withMtime.sort((x, y) => y.mtime.getTime() - x.mtime.getTime());
                     const shown = withMtime.slice(0, 20);
                     const lines = shown.map(({ id, mtime }) => {
-                        const d = mtime.toISOString().slice(0, 16).replace('T', ' ');
+                        const d = mtime.toISOString().slice(0, 16).replace("T", " ");
                         return `  ${d}  ${id.slice(0, 8)}…`;
                     });
                     if (ids.length > 20) {
                         lines.push(`  (showing 20 of ${ids.length} — use /session load <full-id> to restore)`);
                     }
-                    return lines.join('\n');
+                    return lines.join("\n");
                 },
                 loadSession: async (id) => {
                     const s = await props.sessions.open(id);
@@ -764,7 +764,8 @@ export function App(props) {
     const committedJsx = React.useMemo(() => renderTranscript(transcript), [transcript]);
     const liveJsx = React.useMemo(() => renderTranscript(projection.liveItems), [projection.liveItems]);
     const providerEntries = React.useMemo(() => buildProviderEntries(models, currentModel), [models, currentModel]);
-    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: { busy }, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: [{ key: "logo" }], children: () => _jsx(Logo, { version: VERSION }, "logo") }), _jsx(Box, { flexDirection: "column", children: committedJsx }), _jsx(Box, { flexDirection: "column", children: liveJsx }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
+    const LOGO_ITEMS = React.useMemo(() => [{ key: "logo" }], []);
+    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: { busy }, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: LOGO_ITEMS, children: () => _jsx(Logo, { version: VERSION }, "logo") }), _jsx(Box, { flexDirection: "column", children: committedJsx }), _jsx(Box, { flexDirection: "column", children: liveJsx }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
                             approvalBusRef.current?.resolve(pendingApproval.id, decision);
                         } })), pendingFailover !== null && (_jsx(ModelSwitchPrompt, { failedModel: pendingFailover.failedModel, failoverModel: pendingFailover.failoverModel, onAccept: (failover) => {
                             const lastPrompt = pendingFailover.lastPrompt;

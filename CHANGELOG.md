@@ -2,6 +2,13 @@
 
 All notable changes are tracked here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); we use [Semantic Versioning](https://semver.org/).
 
+## [1.20.10] — 2026-05-03
+
+### Fixed
+
+- YOLO mode tool blocking: `enforceMode()` was only exempting `act` mode from write-tool blocking; YOLO mode incorrectly blocked `shell`, `fs_write`, `git`, etc. with "[MODE BLOCK]" errors. Added `yolo` to the exemption.
+- Logo jitter in TUI: `<Static items={[{ key: "logo" }]}>` created new array/object references on every render, causing Ink's Static component to re-evaluate the Logo output each frame. Memoized with `useMemo`.
+
 ## [1.20.9] — 2026-05-03
 
 ### Fixed

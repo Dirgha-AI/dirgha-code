@@ -377,36 +377,38 @@ export function App(props: AppProps): React.JSX.Element {
           },
           listSessions: async () => {
             const ids = await props.sessions.list();
-            if (ids.length === 0) return '(no saved sessions)';
+            if (ids.length === 0) return "(no saved sessions)";
 
-            const { stat: fstat } = await import('node:fs/promises');
-            const { join: pjoin } = await import('node:path');
-            const { homedir: hd } = await import('node:os');
+            const { stat: fstat } = await import("node:fs/promises");
+            const { join: pjoin } = await import("node:path");
+            const { homedir: hd } = await import("node:os");
 
-            const sessDir = pjoin(hd(), '.dirgha', 'sessions');
+            const sessDir = pjoin(hd(), ".dirgha", "sessions");
             const withMtime = await Promise.all(
-              ids.map(async id => {
+              ids.map(async (id) => {
                 try {
                   const s = await fstat(pjoin(sessDir, `${id}.jsonl`));
                   return { id, mtime: s.mtime };
                 } catch {
                   return { id, mtime: new Date(0) };
                 }
-              })
+              }),
             );
 
             withMtime.sort((x, y) => y.mtime.getTime() - x.mtime.getTime());
             const shown = withMtime.slice(0, 20);
 
             const lines = shown.map(({ id, mtime }) => {
-              const d = mtime.toISOString().slice(0, 16).replace('T', ' ');
+              const d = mtime.toISOString().slice(0, 16).replace("T", " ");
               return `  ${d}  ${id.slice(0, 8)}…`;
             });
 
             if (ids.length > 20) {
-              lines.push(`  (showing 20 of ${ids.length} — use /session load <full-id> to restore)`);
+              lines.push(
+                `  (showing 20 of ${ids.length} — use /session load <full-id> to restore)`,
+              );
             }
-            return lines.join('\n');
+            return lines.join("\n");
           },
           loadSession: async (id: string) => {
             const s = await props.sessions.open(id);
@@ -883,11 +885,13 @@ export function App(props: AppProps): React.JSX.Element {
     [models, currentModel],
   );
 
+  const LOGO_ITEMS = React.useMemo(() => [{ key: "logo" }], []);
+
   return (
     <ThemeProvider activeTheme={themeName}>
       <SpinnerContext.Provider value={{ busy }}>
         <Box flexDirection="column">
-          <Static items={[{ key: "logo" }]}>
+          <Static items={LOGO_ITEMS}>
             {(): React.JSX.Element => <Logo key="logo" version={VERSION} />}
           </Static>
           <Box flexDirection="column">{committedJsx}</Box>
