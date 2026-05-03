@@ -12,7 +12,7 @@ import { jsxs as _jsxs, jsx as _jsx } from "react/jsx-runtime";
 import * as React from "react";
 import { Box, Text, useStdout } from "ink";
 import { useTranscriptScroll } from "../use-transcript-scroll.js";
-export function VirtualTranscript(props) {
+export const VirtualTranscript = React.memo(function VirtualTranscript(props) {
     const { items, renderItem, autoScroll, inputFocus } = props;
     const { stdout } = useStdout();
     const rows = stdout?.rows ?? 24;
@@ -27,5 +27,5 @@ export function VirtualTranscript(props) {
     const visibleItems = items.slice(paddedStart, endIdx);
     const aboveCount = paddedStart;
     return (_jsxs(Box, { flexDirection: "column", children: [aboveCount > 0 && (_jsx(Box, { children: _jsxs(Text, { dimColor: true, children: ["[", aboveCount, " item", aboveCount !== 1 ? "s" : "", " above]"] }) })), visibleItems.map((item) => (_jsx(React.Fragment, { children: renderItem(item) }, item.id))), !isAtBottom && scrollOffset > 0 && (_jsx(Box, { children: _jsxs(Text, { dimColor: true, children: ["[", scrollOffset, " item", scrollOffset !== 1 ? "s" : "", " below]"] }) }))] }));
-}
+});
 //# sourceMappingURL=VirtualTranscript.js.map

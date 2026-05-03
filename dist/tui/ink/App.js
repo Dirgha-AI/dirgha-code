@@ -91,6 +91,10 @@ export function App(props) {
     const sessionIdRef = React.useRef(randomUUID());
     const historyRef = React.useRef(initialHistory(props));
     const abortRef = React.useRef(null);
+    // Stores the user-facing cancellation message so the finally block can
+    // inject it via appendLiveSync (avoids the React state-updater race
+    // where appendLive doesn't update liveItemsRef before commitLive reads it).
+    const interruptMsgRef = React.useRef(null);
     const pendingModelRef = React.useRef(null);
     const sessionRef = React.useRef(null);
     React.useEffect(() => {
@@ -763,6 +767,19 @@ export function App(props) {
             }
         }
         finally {
+            // If the turn was cancelled via ESC / Ctrl-C, inject the notice
+            // synchronously into liveItemsRef before commitLive reads it — this
+            // avoids the React-state race where appendLive's functional updater
+            // hasn't flushed to the ref yet when commitLive runs.
+            const interruptMsg = interruptMsgRef.current;
+            interruptMsgRef.current = null;
+            if (abort.signal.aborted && interruptMsg !== null) {
+                projection.appendLiveSync({
+                    kind: "notice",
+                    id: randomUUID(),
+                    text: interruptMsg,
+                });
+            }
             const committed = projection.commitLive();
             if (committed.length > 0)
                 setTranscript((prev) => [...prev, ...committed]);
@@ -808,12 +825,8 @@ export function App(props) {
             return;
         }
         if (busy && abortRef.current !== null) {
+            interruptMsgRef.current = "Cancelled.";
             abortRef.current.abort();
-            projection.appendLive({
-                kind: "notice",
-                id: randomUUID(),
-                text: "Cancelled.",
-            });
             return;
         }
         if (input.length > 0 && props.config.vimMode !== true)
@@ -827,12 +840,8 @@ export function App(props) {
         if (!(key.ctrl && ch === "c"))
             return;
         if (busy && abortRef.current !== null) {
+            interruptMsgRef.current = "[Interrupted]";
             abortRef.current.abort();
-            projection.appendLive({
-                kind: "notice",
-                id: randomUUID(),
-                text: "[Interrupted]",
-            });
         }
     });
     const handleModelPick = React.useCallback((id) => {
@@ -1001,7 +1010,9 @@ export function App(props) {
     const liveJsx = React.useMemo(() => renderTranscript(projection.liveItems, thinkingStreaming), [projection.liveItems, thinkingStreaming]);
     const providerEntries = React.useMemo(() => buildProviderEntries(models, currentModel), [models, currentModel]);
     const LOGO_ITEMS = React.useMemo(() => [{ key: "logo" }], []);
-    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: { busy, frame: 0 }, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: LOGO_ITEMS, children: () => _jsx(Logo, { version: VERSION }, "logo") }), _jsx(VirtualTranscript, { items: transcript, renderItem: (item) => _jsx(TranscriptRow, { item: item }, item.id), autoScroll: true, inputFocus: inputFocus }), _jsx(Box, { flexDirection: "column", children: liveJsx }), busy && projection.liveItems.length === 0 && _jsx(GeneratingIndicator, {}), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
+    const spinnerCtx = React.useMemo(() => ({ busy, frame: 0 }), [busy]);
+    const renderTranscriptItem = React.useCallback((item) => _jsx(TranscriptRow, { item: item }, item.id), []);
+    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: spinnerCtx, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: LOGO_ITEMS, children: () => _jsx(Logo, { version: VERSION }, "logo") }), _jsx(VirtualTranscript, { items: transcript, renderItem: renderTranscriptItem, autoScroll: true, inputFocus: inputFocus }), _jsx(Box, { flexDirection: "column", children: liveJsx }), busy && projection.liveItems.length === 0 && _jsx(GeneratingIndicator, {}), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
                             approvalBusRef.current?.resolve(pendingApproval.id, decision);
                         } })), pendingFailover !== null && (_jsx(ModelSwitchPrompt, { failedModel: pendingFailover.failedModel, failoverModel: pendingFailover.failoverModel, onAccept: (failover) => {
                             const lastPrompt = pendingFailover.lastPrompt;

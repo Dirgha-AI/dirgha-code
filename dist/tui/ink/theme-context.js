@@ -4,14 +4,17 @@ import { jsx as _jsx } from "react/jsx-runtime";
  * components.  The provider resolves a Palette from the theme name
  * supplied by the caller (usually the application root).
  */
-import { createContext, useContext } from 'react';
+import React, { createContext, useContext } from 'react';
 import { paletteFor } from '../theme.js';
 const ThemeContext = createContext({
     palette: paletteFor('readable'),
 });
 export function ThemeProvider({ activeTheme, children }) {
-    const palette = paletteFor(activeTheme);
-    return (_jsx(ThemeContext.Provider, { value: { palette }, children: children }));
+    // Stable object references — avoids re-rendering every useTheme() consumer
+    // (including Logo inside <Static>) on each App re-render.
+    const palette = React.useMemo(() => paletteFor(activeTheme), [activeTheme]);
+    const value = React.useMemo(() => ({ palette }), [palette]);
+    return (_jsx(ThemeContext.Provider, { value: value, children: children }));
 }
 export function useTheme() {
     const ctx = useContext(ThemeContext);

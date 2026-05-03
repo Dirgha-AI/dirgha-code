@@ -271,7 +271,7 @@ export function useEventProjection(events, opts = {}) {
                                 it.status === "running"
                                 ? { ...it, outputPreview: accumulated }
                                 : it));
-                        }, 50));
+                        }, 150));
                     }
                     return;
                 }
@@ -403,6 +403,13 @@ export function useEventProjection(events, opts = {}) {
     const appendLive = React.useCallback((item) => {
         setLive((prev) => [...prev, item]);
     }, [setLive]);
+    const appendLiveSync = React.useCallback((item) => {
+        // Directly update the ref so commitLive() sees this item synchronously,
+        // even when called from an async finally block before the React render.
+        const next = [...liveItemsRef.current, item];
+        liveItemsRef.current = next;
+        setLiveItems(next);
+    }, []);
     const clear = React.useCallback(() => {
         liveItemsRef.current = [];
         lastFlushedTextRef.current = "";
@@ -410,7 +417,7 @@ export function useEventProjection(events, opts = {}) {
         setLiveItems([]);
         setTotals({ inputTokens: 0, outputTokens: 0, cachedTokens: 0, costUsd: 0 });
     }, []);
-    return React.useMemo(() => ({ liveItems, totals, commitLive, appendLive, clear }), [liveItems, totals, commitLive, appendLive, clear]);
+    return React.useMemo(() => ({ liveItems, totals, commitLive, appendLive, appendLiveSync, clear }), [liveItems, totals, commitLive, appendLive, appendLiveSync, clear]);
 }
 function summariseInput(input, max = 60) {
     if (input === undefined || input === null)

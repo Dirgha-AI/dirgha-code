@@ -50,6 +50,8 @@ export interface EventProjection {
     totals: UsageTotal;
     commitLive: () => TranscriptItem[];
     appendLive: (item: TranscriptItem) => void;
+    /** Synchronously updates liveItemsRef so commitLive() sees the item. */
+    appendLiveSync: (item: TranscriptItem) => void;
     clear: () => void;
 }
 export interface EventProjectionOptions {

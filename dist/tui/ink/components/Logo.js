@@ -1,4 +1,15 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+/**
+ * Logo: single-item banner shown once at startup.
+ *
+ * Width-adaptive: wide ASCII block on terminals >= 60 cols, compact
+ * one-liner otherwise. Default colour scheme is the violet-storm
+ * gradient from the v2 origin commit (28f2bc3) — kept fixed across
+ * themes because the brand wordmark should read the same regardless
+ * of which palette the user prefers for chrome. Themes that ship
+ * their own logo gradient (cosmic, ember, sakura, …) override below.
+ */
+import * as React from 'react';
 import { Box, Text, useStdout } from 'ink';
 import { useTheme } from '../theme-context.js';
 const WIDE_ROWS = [
@@ -37,7 +48,10 @@ function skinFor(themeName) {
 export function Logo({ version }) {
     const { stdout } = useStdout();
     const palette = useTheme();
-    const cols = stdout?.columns ?? 80;
+    // Snapshot terminal width at mount — Logo lives inside Ink's <Static> and
+    // must not re-render. A ref avoids creating a reactive resize subscription.
+    const colsRef = React.useRef(stdout?.columns ?? 80);
+    const cols = colsRef.current;
     // The palette doesn't carry its own name, so we infer the skin from
     // a stable fingerprint: themes with a unique brand colour map to
     // their named skin. Anything we don't recognise gets violet-storm.

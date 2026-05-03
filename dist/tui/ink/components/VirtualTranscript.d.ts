@@ -16,4 +16,4 @@ export interface VirtualTranscriptProps {
     autoScroll: boolean;
     inputFocus: boolean;
 }
-export declare function VirtualTranscript(props: VirtualTranscriptProps): React.JSX.Element;
+export declare const VirtualTranscript: React.NamedExoticComponent<VirtualTranscriptProps>;
