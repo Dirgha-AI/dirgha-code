@@ -12,6 +12,12 @@
  *           fall back to cmd if PowerShell isn't on PATH. PowerShell
  *           handles quoting + UTF-8 + multi-line scripts more cleanly
  *           than cmd.exe's relic Windows-95 parser.
+ *
+ * Streaming mode (1.14.0):
+ *   When `streamOutput: true` is passed, each stdout/stderr chunk is
+ *   forwarded to `ctx.onProgress` as it arrives so the TUI can display
+ *   live output. Accumulated output is still returned in the final
+ *   ToolResult for the model. Backwards-compatible: default is false.
  */
 
 import { spawn, execFile } from "node:child_process";
@@ -27,6 +33,8 @@ interface Input {
   command: string;
   cwd?: string;
   timeoutMs?: number;
+  /** Stream output chunks via onProgress as they arrive (default: false). */
+  streamOutput?: boolean;
 }
 
 /** Cached PowerShell executable detection (probed async at first use). */
@@ -97,7 +105,21 @@ export const shellTool: Tool = {
     properties: {
       command: { type: "string" },
       cwd: { type: "string" },
-      timeoutMs: { type: "integer", minimum: 1000 },
+      timeoutMs: {
+        type: "integer",
+        minimum: 1000,
+        description:
+          "Hard timeout in milliseconds (default 120 000). On expiry the child " +
+          "receives SIGTERM then SIGKILL after 2 s.",
+      },
+      streamOutput: {
+        type: "boolean",
+        description:
+          "When true, forward each output chunk to the progress bus so the " +
+          "TUI can display live output while the command runs. " +
+          "Accumulated output is still returned in the final result. " +
+          "Default: false.",
+      },
     },
     required: ["command"],
   },
@@ -107,6 +129,7 @@ export const shellTool: Tool = {
     const input = rawInput as Input;
     const cwd = input.cwd ?? ctx.cwd;
     const timeoutMs = input.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const streamOutput = input.streamOutput ?? false;
 
     if (cwd !== ctx.cwd) {
       const resolved = resolve(cwd);
@@ -154,6 +177,7 @@ export const shellTool: Tool = {
         chunks: Buffer[],
         decoder: StringDecoder,
         trackBytes: (n: number) => void,
+        label: "STDOUT" | "STDERR",
       ) =>
       (buf: Buffer) => {
         const remaining = MAX_OUTPUT_BYTES - totalBytes;
@@ -168,36 +192,50 @@ export const shellTool: Tool = {
         trackBytes(slice.length);
         if (buf.length > remaining) truncated = true;
         const text = decoder.write(slice);
-        if (text.trim().length > 0) ctx.onProgress?.(text.trimEnd());
+        if (text.trim().length > 0) {
+          // In streaming mode forward every non-empty chunk immediately;
+          // in non-streaming mode the existing behaviour is preserved
+          // (progress is still emitted so the TUI spinner stays alive,
+          // but callers that don't pass onProgress see no difference).
+          if (streamOutput) {
+            ctx.onProgress?.(
+              label === "STDERR" ? `[stderr] ${text.trimEnd()}` : text.trimEnd(),
+            );
+          } else {
+            ctx.onProgress?.(text.trimEnd());
+          }
+        }
       };
 
     childProcess.stdout.on(
       "data",
       onData(stdoutChunks, stdoutDecoder, (n) => {
         stdoutBytes += n;
-      }),
+      }, "STDOUT"),
     );
     childProcess.stderr.on(
       "data",
       onData(stderrChunks, stderrDecoder, (n) => {
         stderrBytes += n;
-      }),
+      }, "STDERR"),
     );
 
-    const timer = setTimeout(() => {
-      if (process.platform === "win32") {
-        childProcess.kill("SIGTERM");
-      } else {
-        childProcess.kill("SIGKILL");
-      }
-    }, timeoutMs);
+    /** Gracefully terminate: SIGTERM, then SIGKILL after 2 s. */
+    const killChild = (): void => {
+      childProcess.kill("SIGTERM");
+      setTimeout(() => {
+        try {
+          childProcess.kill("SIGKILL");
+        } catch {
+          /* already gone */
+        }
+      }, 2_000);
+    };
+
+    const timer = setTimeout(killChild, timeoutMs);
 
     const onAbort = (): void => {
-      if (process.platform === "win32") {
-        childProcess.kill("SIGTERM");
-      } else {
-        childProcess.kill("SIGKILL");
-      }
+      killChild();
     };
     if (ctx.signal) {
       ctx.signal.addEventListener("abort", onAbort, { once: true });

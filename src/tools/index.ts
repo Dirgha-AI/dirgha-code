@@ -22,6 +22,7 @@ import { lspHoverTool } from "./lsp-hover.js";
 import { lspDocumentSymbolsTool } from "./lsp-symbols.js";
 import { rtkTool } from "./rtk.js";
 import { qmdTool } from "./qmd.js";
+import { githubTool } from "./github.js";
 export { createMultimodalTool } from "./multimodal.js";
 
 export { createCronTool } from "./cron.js";
@@ -50,6 +51,7 @@ export const builtInTools: Tool[] = [
   searchGrepTool,
   searchGlobTool,
   gitTool,
+  githubTool,
   browserTool,
   checkpointTool,
   cronTool,
@@ -70,6 +72,7 @@ export {
   searchGrepTool,
   searchGlobTool,
   gitTool,
+  githubTool,
   browserTool,
   checkpointTool,
   cronTool,
