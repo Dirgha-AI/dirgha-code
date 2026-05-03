@@ -49,6 +49,8 @@ export interface EventProjection {
   totals: UsageTotal;
   commitLive: () => TranscriptItem[];
   appendLive: (item: TranscriptItem) => void;
+  /** Synchronously updates liveItemsRef so commitLive() sees the item. */
+  appendLiveSync: (item: TranscriptItem) => void;
   clear: () => void;
 }
 
@@ -387,7 +389,7 @@ export function useEventProjection(
                       : it,
                   ),
                 );
-              }, 50),
+              }, 150),
             );
           }
           return;
@@ -537,6 +539,17 @@ export function useEventProjection(
     [setLive],
   );
 
+  const appendLiveSync = React.useCallback(
+    (item: TranscriptItem): void => {
+      // Directly update the ref so commitLive() sees this item synchronously,
+      // even when called from an async finally block before the React render.
+      const next = [...liveItemsRef.current, item];
+      liveItemsRef.current = next;
+      setLiveItems(next);
+    },
+    [],
+  );
+
   const clear = React.useCallback((): void => {
     liveItemsRef.current = [];
     lastFlushedTextRef.current = "";
@@ -546,8 +559,8 @@ export function useEventProjection(
   }, []);
 
   return React.useMemo(
-    () => ({ liveItems, totals, commitLive, appendLive, clear }),
-    [liveItems, totals, commitLive, appendLive, clear],
+    () => ({ liveItems, totals, commitLive, appendLive, appendLiveSync, clear }),
+    [liveItems, totals, commitLive, appendLive, appendLiveSync, clear],
   );
 }
 

@@ -156,6 +156,10 @@ export function App(props: AppProps): React.JSX.Element {
   const sessionIdRef = React.useRef<string>(randomUUID());
   const historyRef = React.useRef<Message[]>(initialHistory(props));
   const abortRef = React.useRef<AbortController | null>(null);
+  // Stores the user-facing cancellation message so the finally block can
+  // inject it via appendLiveSync (avoids the React state-updater race
+  // where appendLive doesn't update liveItemsRef before commitLive reads it).
+  const interruptMsgRef = React.useRef<string | null>(null);
   const pendingModelRef = React.useRef<string | null>(null);
   const sessionRef = React.useRef<Session | null>(null);
 
@@ -874,6 +878,19 @@ export function App(props: AppProps): React.JSX.Element {
         });
       }
     } finally {
+      // If the turn was cancelled via ESC / Ctrl-C, inject the notice
+      // synchronously into liveItemsRef before commitLive reads it — this
+      // avoids the React-state race where appendLive's functional updater
+      // hasn't flushed to the ref yet when commitLive runs.
+      const interruptMsg = interruptMsgRef.current;
+      interruptMsgRef.current = null;
+      if (abort.signal.aborted && interruptMsg !== null) {
+        projection.appendLiveSync({
+          kind: "notice",
+          id: randomUUID(),
+          text: interruptMsg,
+        });
+      }
       const committed = projection.commitLive();
       if (committed.length > 0)
         setTranscript((prev) => [...prev, ...committed]);
@@ -917,12 +934,8 @@ export function App(props: AppProps): React.JSX.Element {
       return;
     }
     if (busy && abortRef.current !== null) {
+      interruptMsgRef.current = "Cancelled.";
       abortRef.current.abort();
-      projection.appendLive({
-        kind: "notice",
-        id: randomUUID(),
-        text: "Cancelled.",
-      });
       return;
     }
     if (input.length > 0 && props.config.vimMode !== true) setInput("");
@@ -935,12 +948,8 @@ export function App(props: AppProps): React.JSX.Element {
   useInput((ch, key) => {
     if (!(key.ctrl && ch === "c")) return;
     if (busy && abortRef.current !== null) {
+      interruptMsgRef.current = "[Interrupted]";
       abortRef.current.abort();
-      projection.appendLive({
-        kind: "notice",
-        id: randomUUID(),
-        text: "[Interrupted]",
-      });
     }
   });
 
