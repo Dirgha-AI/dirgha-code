@@ -446,14 +446,14 @@ const modeEnforcementCases = [
   ["plan", "fs_write", true],
   ["plan", "fs_edit", true],
   ["plan", "shell", true],
-  ["plan", "git", false],
+  ["plan", "git", true],
   ["plan", "read_file", false],
   ["plan", "search_grep", false],
   ["act", "fs_write", false],
   ["verify", "fs_write", true],
   ["verify", "shell", true],
   ["ask", "fs_write", true],
-  ["ask", "browser", false],
+  ["ask", "browser", true],
   ["ask", "read_file", false],
 ] as const;
 
