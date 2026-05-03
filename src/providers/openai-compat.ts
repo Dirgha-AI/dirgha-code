@@ -179,6 +179,9 @@ class StreamState {
     /<(?:think|thinking|reasoning|thought|REASONING_SCRATCHPAD)>/i;
   private static readonly THINK_CLOSE_RE =
     /<\/(?:think|thinking|reasoning|thought|REASONING_SCRATCHPAD)>/i;
+  // includeThinking is accepted but no longer used internally — reasoning
+  // content is always captured for multi-turn echo-back compliance.
+  constructor(_includeThinking: boolean) {}
 
   /** Split a content delta into text + thinking pieces, honoring open <think> blocks across chunks. */
   private routeContent(input: string): { text: string; thinking: string } {
@@ -211,8 +214,6 @@ class StreamState {
     return { text, thinking };
   }
 
-  constructor(private includeThinking: boolean) {}
-
   *ingest(chunk: ChatCompletionChunk): Generator<AgentEvent> {
     const choice = chunk.choices?.[0];
     if (!choice) {
@@ -225,7 +226,13 @@ class StreamState {
     // NVIDIA NIM's hosted DeepSeek-V4 uses `reasoning`. Accept both.
     // Without this fallback, NIM's flash variant emits all its output on
     // the `reasoning` channel and dirgha sees zero text → empty reply.
-    if (this.includeThinking) {
+    //
+    // Always capture reasoning content regardless of the includeThinking
+    // display flag. The API requires reasoning_content to be echoed back
+    // verbatim on every subsequent turn — omitting it causes HTTP 400
+    // ("reasoning_content must be passed back to the API"). The display
+    // preference only gates whether these deltas are rendered in the TUI.
+    {
       const d = delta as { reasoning_content?: string; reasoning?: string };
       const r =
         (typeof d.reasoning_content === "string" && d.reasoning_content) ||

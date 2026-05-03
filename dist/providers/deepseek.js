@@ -30,8 +30,8 @@ export const DEEPSEEK_MODELS = [
     { id: "deepseek-prover-v2", label: "DeepSeek Prover V2 (math)" },
 ];
 // Models that surface a reasoning/thinking channel.
-// deepseek-v4-flash is intentionally excluded — it does not support
-// the reasoning_content field and is not confirmed on api.deepseek.com.
+// deepseek-v4-flash is excluded from explicit thinking mode but reasoning
+// content is always captured for multi-turn echo-back compliance regardless.
 const THINKING_MODELS = new Set([
     "deepseek-reasoner",
     "deepseek-v4-pro",

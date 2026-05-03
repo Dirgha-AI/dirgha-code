@@ -2,6 +2,12 @@
 
 All notable changes are tracked here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); we use [Semantic Versioning](https://semver.org/).
 
+## [1.20.9] — 2026-05-03
+
+### Fixed
+
+- DeepSeek multi-turn 400: `reasoning_content` echo-back. The reasoning channel capture was gated behind `includeThinking` which was `false` for `deepseek-v4-flash` (excluded from `THINKING_MODELS`). The API returns `reasoning_content` regardless — dropping it caused HTTP 400 on every subsequent turn. Removed the gate; reasoning content is now always captured and echoed back for multi-turn compliance.
+
 ## [1.20.3] — 2026-05-02
 
 ### Fixed
