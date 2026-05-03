@@ -96,6 +96,7 @@ export const keysCommand = {
             }
             store[envVar] = value;
             await write(store);
+            process.env[envVar] = value;
             return `Stored ${envVar} (${mask(value)}).`;
         }
         if (op === "clear") {

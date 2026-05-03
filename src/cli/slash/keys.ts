@@ -106,6 +106,7 @@ export const keysCommand: SlashCommand = {
       }
       store[envVar] = value;
       await write(store);
+      process.env[envVar] = value;
       return `Stored ${envVar} (${mask(value)}).`;
     }
 
