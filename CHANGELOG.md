@@ -2,6 +2,13 @@
 
 All notable changes are tracked here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); we use [Semantic Versioning](https://semver.org/).
 
+## [1.20.31](https://github.com/Dirgha-AI/dirgha-code/compare/v1.20.30...v1.20.31) (2026-05-03)
+
+
+### Bug Fixes
+
+* **ci:** remove vite override to eliminate rolldown native binding failure ([8b7713f](https://github.com/Dirgha-AI/dirgha-code/commit/8b7713f8abe0bd8cb9208a9bccbd243fda1bf425))
+
 ## [1.20.10] — 2026-05-03
 
 ### Fixed
