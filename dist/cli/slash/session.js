@@ -17,7 +17,7 @@ function sessionPath(id) {
 function usage() {
     return [
         'Usage:',
-        '  /session list                  List saved sessions',
+        '  /session list                  List saved sessions (20 most recent)',
         '  /session load <id>             Resume a session',
         '  /session rename <old> <new>    Rename a session file',
         '  /session branch <name>         Branch the current session with a summary',

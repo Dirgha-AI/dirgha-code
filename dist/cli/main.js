@@ -242,17 +242,50 @@ async function main() {
     // registry. Failures spawning one server don't break the others;
     // they just surface as warnings on stderr. `mcp.shutdown()` runs at
     // process exit to terminate child processes cleanly.
+    //
+    // Persistent servers from ~/.dirgha/mcp.json are merged in first so
+    // connections made via `/mcp connect` survive session restarts.
+    // config.mcpServers (from ~/.dirgha/config.json or project config)
+    // takes precedence over the persistent registry for the same name.
     const allTools = [...builtInTools];
     let mcpShutdown = async () => { };
-    if (config.mcpServers && Object.keys(config.mcpServers).length > 0) {
-        const { loadMcpServers } = await import("../mcp/loader.js");
-        const mcp = await loadMcpServers(config.mcpServers, {
-            onWarn: (msg) => {
-                process.stderr.write(`warning: ${msg}\n`);
-            },
-        });
-        allTools.push(...mcp.tools);
-        mcpShutdown = mcp.shutdown;
+    {
+        const { loadMcpConfig } = await import("../mcp/mcp-config.js");
+        const persistedEntries = await loadMcpConfig();
+        // Convert McpServerEntry → McpServerSpec shape.
+        const persistedSpecs = {};
+        for (const [n, entry] of Object.entries(persistedEntries)) {
+            if (entry.type === "stdio" && entry.command) {
+                persistedSpecs[n] = {
+                    command: entry.command,
+                    ...(entry.args !== undefined ? { args: entry.args } : {}),
+                    ...(entry.env !== undefined ? { env: entry.env } : {}),
+                };
+            }
+            else if (entry.type === "http" && entry.url) {
+                persistedSpecs[n] = {
+                    url: entry.url,
+                    ...(entry.bearerToken !== undefined
+                        ? { bearerToken: entry.bearerToken }
+                        : {}),
+                };
+            }
+        }
+        // Merge: persisted first, then config overrides for same name.
+        const merged = {
+            ...persistedSpecs,
+            ...(config.mcpServers ?? {}),
+        };
+        if (Object.keys(merged).length > 0) {
+            const { loadMcpServers } = await import("../mcp/loader.js");
+            const mcp = await loadMcpServers(merged, {
+                onWarn: (msg) => {
+                    process.stderr.write(`warning: ${msg}\n`);
+                },
+            });
+            allTools.push(...mcp.tools);
+            mcpShutdown = mcp.shutdown;
+        }
     }
     const registry = createToolRegistry(allTools);
     process.once("exit", () => {

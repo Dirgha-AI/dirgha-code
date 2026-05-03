@@ -31,10 +31,43 @@ import { runAgentLoop } from "../../kernel/agent-loop.js";
 import { renderStreamingEvents } from "../../tui/renderer.js";
 import { enforceMode } from "../../context/mode-enforcement.js";
 import type { Message } from "../../kernel/types.js";
-import type { Mode } from "../../context/mode.js";
+import { modePreamble, type Mode } from "../../context/mode.js";
 import type { Subcommand } from "./index.js";
+import { loadSoul } from "../../context/soul.js";
+import { loadProjectPrimer, composeSystemPrompt } from "../../context/primer.js";
+import { ledgerScope, renderLedgerContext } from "../../context/ledger.js";
+import { queryKb } from "../../context/kb-query.js";
+import { probeGitState, renderGitState } from "../../context/git-state.js";
 
 const DEFAULT_ASK_MAX_TURNS = 30;
+
+async function buildAskSystem(opts: {
+  cwd: string;
+  mode: Mode;
+  userSystem?: string;
+  firstTurn?: string;
+}): Promise<string> {
+  const [soulLoaded, primerLoaded, ledgerCtx] = await Promise.all([
+    Promise.resolve(loadSoul()),
+    Promise.resolve(loadProjectPrimer(opts.cwd)),
+    renderLedgerContext(ledgerScope("default")).catch(() => ""),
+  ]);
+
+  let kbCtx: string | undefined;
+  if (opts.firstTurn) {
+    kbCtx = await queryKb(opts.firstTurn, 5).catch(() => undefined);
+  }
+
+  return composeSystemPrompt({
+    soul: soulLoaded.text,
+    modePreamble: modePreamble(opts.mode),
+    primer: primerLoaded.primer,
+    ledgerContext: ledgerCtx,
+    kbContext: kbCtx,
+    gitState: renderGitState(probeGitState(opts.cwd)),
+    userSystem: opts.userSystem,
+  });
+}
 
 export const askSubcommand: Subcommand = {
   name: "ask",
@@ -66,7 +99,7 @@ export const askSubcommand: Subcommand = {
           ? flags.m
           : config.model;
     const model = resolveModelAlias(rawModel);
-    const system =
+    const userSystem =
       typeof flags.system === "string"
         ? flags.system
         : typeof flags.s === "string"
@@ -77,8 +110,14 @@ export const askSubcommand: Subcommand = {
         ? Number.parseInt(flags["max-turns"], 10)
         : DEFAULT_ASK_MAX_TURNS;
     const json = flags.json === true;
-    const mode = (typeof flags.mode === "string" ? flags.mode : "act") as Mode;
-    const modeHooks = enforceMode(mode);
+    const resolvedMode = (typeof flags.mode === "string" ? flags.mode : "act") as Mode;
+    const modeHooks = enforceMode(resolvedMode);
+    const system = await buildAskSystem({
+      cwd,
+      mode: resolvedMode,
+      userSystem,
+      firstTurn: prompt,
+    });
 
     const providers = new ProviderRegistry();
     const registry = createToolRegistry(builtInTools);

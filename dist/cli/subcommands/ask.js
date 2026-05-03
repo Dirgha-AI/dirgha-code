@@ -25,7 +25,33 @@ import { createEventStream } from "../../kernel/event-stream.js";
 import { runAgentLoop } from "../../kernel/agent-loop.js";
 import { renderStreamingEvents } from "../../tui/renderer.js";
 import { enforceMode } from "../../context/mode-enforcement.js";
+import { modePreamble } from "../../context/mode.js";
+import { loadSoul } from "../../context/soul.js";
+import { loadProjectPrimer, composeSystemPrompt } from "../../context/primer.js";
+import { ledgerScope, renderLedgerContext } from "../../context/ledger.js";
+import { queryKb } from "../../context/kb-query.js";
+import { probeGitState, renderGitState } from "../../context/git-state.js";
 const DEFAULT_ASK_MAX_TURNS = 30;
+async function buildAskSystem(opts) {
+    const [soulLoaded, primerLoaded, ledgerCtx] = await Promise.all([
+        Promise.resolve(loadSoul()),
+        Promise.resolve(loadProjectPrimer(opts.cwd)),
+        renderLedgerContext(ledgerScope("default")).catch(() => ""),
+    ]);
+    let kbCtx;
+    if (opts.firstTurn) {
+        kbCtx = await queryKb(opts.firstTurn, 5).catch(() => undefined);
+    }
+    return composeSystemPrompt({
+        soul: soulLoaded.text,
+        modePreamble: modePreamble(opts.mode),
+        primer: primerLoaded.primer,
+        ledgerContext: ledgerCtx,
+        kbContext: kbCtx,
+        gitState: renderGitState(probeGitState(opts.cwd)),
+        userSystem: opts.userSystem,
+    });
+}
 export const askSubcommand = {
     name: "ask",
     description: "Headless one-shot agent (with tools, --max-turns 30 default)",
@@ -53,7 +79,7 @@ export const askSubcommand = {
                 ? flags.m
                 : config.model;
         const model = resolveModelAlias(rawModel);
-        const system = typeof flags.system === "string"
+        const userSystem = typeof flags.system === "string"
             ? flags.system
             : typeof flags.s === "string"
                 ? flags.s
@@ -62,8 +88,14 @@ export const askSubcommand = {
             ? Number.parseInt(flags["max-turns"], 10)
             : DEFAULT_ASK_MAX_TURNS;
         const json = flags.json === true;
-        const mode = (typeof flags.mode === "string" ? flags.mode : "act");
-        const modeHooks = enforceMode(mode);
+        const resolvedMode = (typeof flags.mode === "string" ? flags.mode : "act");
+        const modeHooks = enforceMode(resolvedMode);
+        const system = await buildAskSystem({
+            cwd,
+            mode: resolvedMode,
+            userSystem,
+            firstTurn: prompt,
+        });
         const providers = new ProviderRegistry();
         const registry = createToolRegistry(builtInTools);
         // Register `task` tool for sub-agent delegation (same pattern as main.ts).

@@ -359,9 +359,31 @@ function buildSlashCtx(a) {
         },
         async listSessions() {
             const ids = await a.opts.sessions.list();
-            return ids.length === 0
-                ? "(no saved sessions)"
-                : ids.map((id) => `- ${id}`).join("\n");
+            if (ids.length === 0)
+                return '(no saved sessions)';
+            const { stat: fstat } = await import('node:fs/promises');
+            const { join: pjoin } = await import('node:path');
+            const { homedir: hd } = await import('node:os');
+            const sessDir = pjoin(hd(), '.dirgha', 'sessions');
+            const withMtime = await Promise.all(ids.map(async (id) => {
+                try {
+                    const s = await fstat(pjoin(sessDir, `${id}.jsonl`));
+                    return { id, mtime: s.mtime };
+                }
+                catch {
+                    return { id, mtime: new Date(0) };
+                }
+            }));
+            withMtime.sort((x, y) => y.mtime.getTime() - x.mtime.getTime());
+            const shown = withMtime.slice(0, 20);
+            const lines = shown.map(({ id, mtime }) => {
+                const d = mtime.toISOString().slice(0, 16).replace('T', ' ');
+                return `  ${d}  ${id.slice(0, 8)}…`;
+            });
+            if (ids.length > 20) {
+                lines.push(`  (showing 20 of ${ids.length} — use /session load <full-id> to restore)`);
+            }
+            return lines.join('\n');
         },
         async loadSession(id) {
             const next = await a.opts.sessions.open(id);

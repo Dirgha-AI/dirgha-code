@@ -10,6 +10,19 @@
 import { readFile, stat, writeFile } from "node:fs/promises";
 import { resolve, sep } from "node:path";
 import { summariseDiff, unifiedDiff } from "./diff.js";
+/** Decode literal \uXXXX escape sequences a model may have emitted as text. */
+function decodeLiteralUnicodeEscapes(s) {
+    return s.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => {
+        const cp = parseInt(hex, 16);
+        // Only decode printable ASCII range (0x20–0x7E) plus common whitespace.
+        // Leave high-codepoint escapes (e.g. CJK, emoji) as-is to avoid
+        // corrupting intentional unicode-escape strings in JS source.
+        if ((cp >= 0x20 && cp <= 0x7e) || cp === 0x0a || cp === 0x0d || cp === 0x09) {
+            return String.fromCodePoint(cp);
+        }
+        return _;
+    });
+}
 export const fsEditTool = {
     name: "fs_edit",
     description: "Replace an exact substring in a file. Fails on ambiguity (multiple matches) unless replaceAll is set. Use larger context around oldString to disambiguate.",
@@ -34,13 +47,15 @@ export const fsEditTool = {
         if (!info || !info.isFile())
             return { content: `No such file: ${input.path}`, isError: true };
         const before = await readFile(abs, "utf8");
-        if (input.oldString === input.newString) {
+        const oldString = decodeLiteralUnicodeEscapes(input.oldString);
+        const newString = decodeLiteralUnicodeEscapes(input.newString);
+        if (oldString === newString) {
             return {
                 content: "oldString and newString are identical; nothing to do.",
                 isError: true,
             };
         }
-        const exactCount = countOccurrences(before, input.oldString);
+        const exactCount = countOccurrences(before, oldString);
         if (exactCount === 0) {
             return {
                 content: `oldString not found in ${input.path}. Provide more surrounding context or verify the file.`,
@@ -54,8 +69,8 @@ export const fsEditTool = {
             };
         }
         const after = input.replaceAll
-            ? splitJoin(before, input.oldString, input.newString)
-            : before.replace(input.oldString, input.newString);
+            ? splitJoin(before, oldString, newString)
+            : before.replace(oldString, newString);
         const diff = unifiedDiff(before, after, {
             fromLabel: input.path,
             toLabel: input.path,
