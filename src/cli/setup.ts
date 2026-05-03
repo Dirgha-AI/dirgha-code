@@ -29,9 +29,11 @@ export const PROVIDERS: ProviderEntry[] = [
     env: "NVIDIA_API_KEY",
     helpUrl: "https://build.nvidia.com/settings/api-keys",
     suggested: [
-      "moonshotai/kimi-k2-instruct",
-      "qwen/qwen3-next-80b-a3b-instruct",
+      // llama-3.3-70b and deepseek-v4-pro are reliably available on all NIM tiers.
+      // kimi-k2-instruct / minimax-m2.7 require NIM Pro entitlement (hang without it).
       "meta/llama-3.3-70b-instruct",
+      "deepseek-ai/deepseek-v4-pro",
+      "qwen/qwen3-next-80b-a3b-instruct",
     ],
   },
   {

@@ -24,38 +24,39 @@ import type {
 import { ProviderError } from './iface.js';
 import { postJSON } from './http.js';
 import { streamChatCompletions } from './openai-compat.js';
+import { NIM_BY_ID, NIM_DEPRECATED, NIM_CATALOGUE } from './nim-catalogue.js';
 
 const DEFAULT_BASE = 'https://integrate.api.nvidia.com/v1';
 const IMAGE_GEN_BASE = 'https://ai.api.nvidia.com/v1/genai';
 const DEFAULT_IMAGE_MODEL = 'black-forest-labs/flux.1-schnell';
 const IMAGE_GEN_TIMEOUT_MS = 30_000;
 
+// Tools-supported set derived from the NIM catalogue + extra NIM-hosted models
+// that pre-date the catalogue but still accept tools.
 const TOOLS_SUPPORTED = new Set<string>([
-  'moonshotai/kimi-k2-instruct',
-  'moonshotai/kimi-k2.5-turbo',
-  'minimaxai/minimax-m2.7',
-  'minimaxai/minimax-m2',
+  // All catalogue models that support tools
+  ...NIM_CATALOGUE.filter((m) => m.tools).map((m) => m.id),
+  // Extra NIM-hosted models not in the catalogue
+  'nvidia/llama-3.1-nemotron-70b-instruct',
   'meta/llama-3.3-70b-instruct',
   'meta/llama-3.1-70b-instruct',
   'meta/llama-3.1-8b-instruct',
   'meta/llama-3.1-405b-instruct',
-  'meta/llama-4-maverick-17b-instruct',
   'meta/llama-4-scout-17b-instruct',
-  'nvidia/llama-3.1-nemotron-70b-instruct',
-  'nvidia/llama-3.1-nemotron-ultra-253b-v1',
   'z-ai/glm-5.1',
   'deepseek-ai/deepseek-v3.1',
   'deepseek-ai/deepseek-r1',
   'qwen/qwen3-coder',
   'qwen/qwen3-235b-a22b',
-  'qwen/qwen3-next-80b-a3b-instruct',
 ]);
 
+// Thinking-supported set derived from the catalogue (any mode other than "none").
 const THINKING_SUPPORTED = new Set<string>([
+  ...NIM_CATALOGUE.filter((m) => m.thinkingMode !== 'none').map((m) => m.id),
+  // Extra legacy NIM models with reasoning channels
   'z-ai/glm-5.1',
   'deepseek-ai/deepseek-v3.1',
   'deepseek-ai/deepseek-r1',
-  'nvidia/llama-3.1-nemotron-ultra-253b-v1',
 ]);
 
 export class NvidiaProvider implements Provider {
@@ -85,11 +86,38 @@ export class NvidiaProvider implements Provider {
   }
 
   stream(req: StreamRequest): AsyncIterable<AgentEvent> {
+    // Reject deprecated model IDs before hitting the wire.
+    if (NIM_DEPRECATED.has(req.model)) {
+      throw new ProviderError(
+        `Model ${req.model} has been removed from NVIDIA NIM. Use a current model.`,
+        this.id,
+      );
+    }
+
     const supportsTools = this.supportsTools(req.model);
     const supportsThinking = this.supportsThinking(req.model);
+    const catalogueEntry = NIM_BY_ID.get(req.model);
 
     const extraBody: Record<string, unknown> = {};
-    if (supportsThinking && req.thinking && req.thinking !== 'off') {
+
+    if (catalogueEntry) {
+      if (catalogueEntry.thinkingMode === 'default-on' && catalogueEntry.thinkingParam) {
+        // Disable thinking by default to avoid infinite-loop bugs (kimi-k2.6, qwen3.5)
+        Object.assign(extraBody, catalogueEntry.thinkingParam);
+      } else if (
+        catalogueEntry.thinkingMode === 'opt-in' &&
+        catalogueEntry.thinkingParam &&
+        req.thinking && req.thinking !== 'off'
+      ) {
+        // Enable thinking when caller opts in
+        Object.assign(extraBody, catalogueEntry.thinkingParam);
+      }
+      // Cap max_tokens to catalogue limit if caller went higher
+      if (req.maxTokens && req.maxTokens > catalogueEntry.maxOutputTokens) {
+        req = { ...req, maxTokens: catalogueEntry.maxOutputTokens };
+      }
+    } else if (supportsThinking && req.thinking && req.thinking !== 'off') {
+      // Legacy fallback for non-catalogue models
       extraBody.chat_template_kwargs = { enable_thinking: true };
     }
 

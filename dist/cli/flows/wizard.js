@@ -40,7 +40,7 @@ export const PROVIDERS = [
         hosted: false,
         env: "NVIDIA_API_KEY",
         helpUrl: "https://build.nvidia.com/settings/api-keys",
-        blurb: "Free NIM tier · Kimi, DeepSeek, Qwen, Llama",
+        blurb: "Free NIM tier · Llama 3.3, DeepSeek V4, Qwen 3 (Kimi/MiniMax require NIM Pro)",
     },
     {
         id: "openrouter",

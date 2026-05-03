@@ -44,6 +44,36 @@ function mask(value) {
         return '***';
     return `${value.slice(0, 4)}…${value.slice(-4)}`;
 }
+/**
+ * Probe the NVIDIA NIM API with a cheap, reliably-available model.
+ * Uses meta/llama-3.3-70b-instruct — NOT kimi or minimax, which hang
+ * with HTTP 000 on standard-tier NIM accounts (entitlement required).
+ */
+async function verifyNvidiaKey(key) {
+    try {
+        const res = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+            signal: AbortSignal.timeout(10_000),
+            body: JSON.stringify({
+                model: 'meta/llama-3.3-70b-instruct',
+                messages: [{ role: 'user', content: 'hi' }],
+                max_tokens: 3,
+                stream: false,
+            }),
+        });
+        if (res.ok)
+            return true;
+        const errText = await res.text().catch(() => '');
+        return `HTTP ${res.status}${errText ? `: ${errText.slice(0, 80)}` : ''}`;
+    }
+    catch (err) {
+        const e = err;
+        if (e?.name === 'TimeoutError' || e?.message?.includes('abort'))
+            return 'timeout';
+        return e?.message ?? 'unknown error';
+    }
+}
 function usage() {
     return [
         'usage:',
@@ -184,6 +214,20 @@ export const keysSubcommand = {
             store[envVar] = value;
             await write(store);
             stdout.write(`${style(defaultTheme.success, '✓')} stored ${envVar} (${mask(value)})\n`);
+            // NVIDIA key: probe with llama-3.3-70b (not kimi/minimax — they hang on standard NIM tier)
+            if (envVar === 'NVIDIA_API_KEY' || envVar === 'NVIDIA_API_KEY_2') {
+                stdout.write(style(defaultTheme.muted, '  verifying key against NVIDIA NIM…\n'));
+                const verified = await verifyNvidiaKey(value);
+                if (verified === true) {
+                    stdout.write(`${style(defaultTheme.success, '  ✓ NIM reachable — key is valid')}\n`);
+                }
+                else if (verified === 'timeout') {
+                    stdout.write(`${style(defaultTheme.muted, '  key saved (could not verify — NVIDIA NIM timeout)')}\n`);
+                }
+                else {
+                    stdout.write(`${style(defaultTheme.muted, `  warning: key check failed (${verified}) — key saved anyway`)}\n`);
+                }
+            }
             return 0;
         }
         if (op === 'get') {

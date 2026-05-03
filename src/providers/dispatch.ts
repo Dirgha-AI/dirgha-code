@@ -8,6 +8,7 @@
  */
 
 import { migrateDeprecatedModel } from "../intelligence/prices.js";
+import { NIM_CATALOGUE } from "./nim-catalogue.js";
 
 export type ProviderId =
   | "anthropic"
@@ -33,26 +34,18 @@ interface RoutingRule {
   provider: ProviderId;
 }
 
-// Specific model IDs that NVIDIA NIM serves. The vendor-prefix on these
-// IDs (e.g. `moonshotai/`, `qwen/`, `meta/`) is shared with OpenRouter,
-// so we route by exact ID rather than prefix to avoid sending OR-only
-// variants like `moonshotai/kimi-k2.5` to NIM (which 404s).
+// Specific model IDs that NVIDIA NIM serves — derived from the NIM_CATALOGUE
+// so there is a single source of truth. Also include NIM-hosted models that
+// are not in the main catalogue (legacy / provider-prefixed nvidia/* models).
 const NVIDIA_NIM_MODELS = new Set<string>([
-  "moonshotai/kimi-k2-instruct",
-  "moonshotai/kimi-k2-instruct-0905",
-  "moonshotai/kimi-k2-thinking",
-  "qwen/qwen3-next-80b-a3b-instruct",
-  "qwen/qwen3.5-122b-a10b",
-  "qwen/qwen3-coder-480b-a35b-instruct",
-  "meta/llama-3.1-70b-instruct",
-  "minimaxai/minimax-m2.5",
-  "minimaxai/minimax-m2.7",
-  "deepseek-ai/deepseek-v3.2",
-  "mistralai/mistral-nemotron",
-  "mistralai/devstral-2-123b-instruct-2512",
+  // Catalogue models (primary list)
+  ...NIM_CATALOGUE.map((m) => m.id),
+  // Additional NIM-hosted models not in the NIM_CATALOGUE
   "nvidia/llama-3.1-nemotron-70b-instruct",
   "nvidia/nemotron-3-nano-30b-a3b",
   "nvidia/nemotron-3-super-120b-a12b",
+  "mistralai/mistral-nemotron",
+  "mistralai/devstral-2-123b-instruct-2512",
 ]);
 
 const RULES: RoutingRule[] = [

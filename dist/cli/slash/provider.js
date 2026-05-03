@@ -30,7 +30,7 @@ const PROVIDER_LABELS = {
     openai: { label: 'OpenAI', env: 'OPENAI_API_KEY', blurb: 'GPT-5.5 family · o1 / o3 reasoning models' },
     gemini: { label: 'Google AI', env: 'GEMINI_API_KEY', blurb: 'Gemini Pro / Flash · long context' },
     openrouter: { label: 'OpenRouter', env: 'OPENROUTER_API_KEY', blurb: '370+ models · free tier (hy3, ling, gemma, nemotron)' },
-    nvidia: { label: 'NVIDIA NIM', env: 'NVIDIA_API_KEY', blurb: 'Free tier · Kimi K2.5, DeepSeek V4, Qwen 3, Llama' },
+    nvidia: { label: 'NVIDIA NIM', env: 'NVIDIA_API_KEY', blurb: 'Free tier · Llama 3.3, DeepSeek V4, Qwen 3 (Kimi/MiniMax require NIM Pro)' },
     ollama: { label: 'Ollama (local)', env: null, blurb: 'Privacy-first · zero cost · zero data leaves · ollama.ai' },
     llamacpp: { label: 'llama.cpp (local)', env: null, blurb: 'Privacy-first · zero cost · zero data leaves · direct binary' },
     fireworks: { label: 'Fireworks', env: 'FIREWORKS_API_KEY', blurb: 'Hosted open models · fast' },

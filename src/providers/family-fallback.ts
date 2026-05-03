@@ -34,9 +34,9 @@ const FAMILIES: Record<
     { provider: "openrouter", model: "deepseek/deepseek-v4-pro" },
   ],
   kimi: [
-    { provider: "nvidia", model: "moonshotai/kimi-k2-instruct" },
+    { provider: "nvidia", model: "moonshotai/kimi-k2.6" },
+    { provider: "nvidia", model: "moonshotai/kimi-k2-thinking" },
     { provider: "openrouter", model: "moonshotai/kimi-k2.6" },
-    { provider: "openrouter", model: "moonshotai/kimi-k2.5" },
   ],
   qwen: [
     { provider: "nvidia", model: "qwen/qwen3-coder-480b-a35b-instruct" },
@@ -46,7 +46,7 @@ const FAMILIES: Record<
   minimax: [
     { provider: "nvidia", model: "minimaxai/minimax-m2.7" },
     { provider: "openrouter", model: "minimax/minimax-m2.7" },
-    { provider: "openrouter", model: "minimax/minimax-m2.5" },
+    { provider: "openrouter", model: "minimax/minimax-m2.5:free" },
   ],
   mistral: [
     { provider: "mistral", model: "mistral-large-2" },

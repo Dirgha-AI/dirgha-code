@@ -78,18 +78,110 @@ export const PRICES: PricePoint[] = [
     outputPerM: 0.3,
   },
 
-  // NVIDIA NIM — verified live on the integrate.api.nvidia.com endpoint
+  // NVIDIA NIM — NIM_CATALOGUE (free tier, 0 cost). Verified live on integrate.api.nvidia.com.
+  // Source of truth: src/providers/nim-catalogue.ts
   {
     provider: "nvidia",
     model: "deepseek-ai/deepseek-v4-pro",
     inputPerM: 0,
     outputPerM: 0,
+    contextWindow: 1_000_000,
+    maxOutput: 16_384,
+    supportsTools: true,
+    family: "deepseek",
   },
   {
     provider: "nvidia",
     model: "deepseek-ai/deepseek-v4-flash",
     inputPerM: 0,
     outputPerM: 0,
+    contextWindow: 1_000_000,
+    maxOutput: 16_384,
+    supportsTools: true,
+    family: "deepseek",
+  },
+  {
+    provider: "nvidia",
+    model: "moonshotai/kimi-k2.6",
+    inputPerM: 0,
+    outputPerM: 0,
+    contextWindow: 256_000,
+    maxOutput: 32_768,
+    supportsTools: true,
+    family: "kimi",
+  },
+  {
+    provider: "nvidia",
+    model: "moonshotai/kimi-k2-thinking",
+    inputPerM: 0,
+    outputPerM: 0,
+    contextWindow: 256_000,
+    maxOutput: 32_768,
+    supportsTools: true,
+    supportsThinking: true,
+    family: "kimi",
+  },
+  {
+    provider: "nvidia",
+    model: "qwen/qwen3.5-397b-a17b",
+    inputPerM: 0,
+    outputPerM: 0,
+    contextWindow: 256_000,
+    maxOutput: 32_768,
+    supportsTools: true,
+    supportsThinking: true,
+    family: "qwen",
+  },
+  {
+    provider: "nvidia",
+    model: "qwen/qwen3-coder-480b-a35b-instruct",
+    inputPerM: 0,
+    outputPerM: 0,
+    contextWindow: 256_000,
+    maxOutput: 32_768,
+    supportsTools: true,
+    family: "qwen",
+  },
+  {
+    provider: "nvidia",
+    model: "mistralai/mistral-large-3-675b-instruct-2512",
+    inputPerM: 0,
+    outputPerM: 0,
+    contextWindow: 256_000,
+    maxOutput: 32_768,
+    supportsTools: true,
+    family: "mistral",
+  },
+  {
+    provider: "nvidia",
+    model: "minimaxai/minimax-m2.7",
+    inputPerM: 0,
+    outputPerM: 0,
+    contextWindow: 200_000,
+    maxOutput: 32_768,
+    supportsTools: true,
+    family: "minimax",
+  },
+  {
+    provider: "nvidia",
+    model: "meta/llama-4-maverick-17b-128e-instruct",
+    inputPerM: 0,
+    outputPerM: 0,
+    contextWindow: 1_000_000,
+    maxOutput: 32_768,
+    supportsTools: true,
+    family: "llama",
+  },
+  {
+    provider: "nvidia",
+    model: "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+    inputPerM: 0,
+    outputPerM: 0,
+    contextWindow: 128_000,
+    maxOutput: 32_768,
+    supportsTools: true,
+    supportsThinking: true,
+    family: "nemotron",
   },
 
   // DeepSeek native API (api.deepseek.com) — own quota, no shared 429s.
@@ -141,17 +233,14 @@ export const PRICES: PricePoint[] = [
     supportsThinking: true,
     family: "deepseek",
   },
-  {
-    provider: "nvidia",
-    model: "moonshotai/kimi-k2-instruct",
-    inputPerM: 0.15,
-    outputPerM: 0.6,
-  },
+  // qwen3-next-80b: unlisted NIM model, kept for users with existing configs
   {
     provider: "nvidia",
     model: "qwen/qwen3-next-80b-a3b-instruct",
-    inputPerM: 0.08,
-    outputPerM: 0.3,
+    inputPerM: 0,
+    outputPerM: 0,
+    contextWindow: 128_000,
+    family: "qwen",
   },
   {
     provider: "openrouter",
@@ -880,10 +969,18 @@ const CONTEXT_WINDOWS: Record<string, number> = {
   // Gemini
   "gemini-2.5-pro": 2_000_000,
   "gemini-2.5-flash": 1_000_000,
-  // NVIDIA NIM (verified live)
-  "deepseek-ai/deepseek-v4-pro": 128_000,
-  "deepseek-ai/deepseek-v4-flash": 128_000,
-  "moonshotai/kimi-k2-instruct": 128_000,
+  // NVIDIA NIM — NIM_CATALOGUE models (source of truth)
+  "deepseek-ai/deepseek-v4-pro": 1_000_000,
+  "deepseek-ai/deepseek-v4-flash": 1_000_000,
+  "moonshotai/kimi-k2.6": 256_000,
+  "moonshotai/kimi-k2-thinking": 256_000,
+  "qwen/qwen3.5-397b-a17b": 256_000,
+  "qwen/qwen3-coder-480b-a35b-instruct": 256_000,
+  "mistralai/mistral-large-3-675b-instruct-2512": 256_000,
+  "minimaxai/minimax-m2.7": 200_000,
+  "meta/llama-4-maverick-17b-128e-instruct": 1_000_000,
+  "nvidia/llama-3.1-nemotron-ultra-253b-v1": 128_000,
+  // Unlisted NIM-hosted models (kept for backward compat)
   "qwen/qwen3-next-80b-a3b-instruct": 128_000,
   "meta/llama-3.3-70b-instruct": 128_000,
   // OpenRouter — frontier
@@ -892,9 +989,7 @@ const CONTEXT_WINDOWS: Record<string, number> = {
   "google/gemini-3.1-pro-preview": 2_000_000,
   "google/gemini-3-flash-preview": 1_000_000,
   // OpenRouter — Moonshot/Kimi
-  "moonshotai/kimi-k2.6": 128_000,
   "moonshotai/kimi-k2.5": 128_000,
-  "moonshotai/kimi-k2-thinking": 128_000,
   // OpenRouter — MiniMax
   "minimax/minimax-m2.7": 200_000,
   "minimax/minimax-m2": 200_000,
@@ -944,8 +1039,13 @@ export function contextWindowFor(modelId: string): number {
  * known — caller surfaces the original error instead of retrying.
  */
 const MODEL_FAILOVERS: Record<string, string> = {
-  // NIM → OpenRouter mirror
-  "moonshotai/kimi-k2-instruct": "moonshotai/kimi-k2.5",
+  // NIM deprecated → current NIM replacement
+  "moonshotai/kimi-k2-instruct": "moonshotai/kimi-k2.6",
+  "moonshotai/kimi-k2-instruct-0905": "moonshotai/kimi-k2.6",
+  "minimaxai/minimax-m2": "minimaxai/minimax-m2.7",
+  "deepseek-ai/deepseek-v3.1-terminus": "deepseek-ai/deepseek-v4-pro",
+  "deepseek-ai/deepseek-v3.2": "deepseek-ai/deepseek-v4-flash",
+  // NIM → OpenRouter mirror (transient failure fallback)
   "qwen/qwen3-next-80b-a3b-instruct": "qwen/qwen3-235b-a22b-thinking-2507",
   "meta/llama-3.3-70b-instruct": "qwen/qwen3-coder:free",
   "deepseek-ai/deepseek-v4-pro": "deepseek/deepseek-v3.2-exp",
@@ -978,7 +1078,12 @@ export function findFailover(modelId: string): string | undefined {
  * permanent rewrites.
  */
 const DEPRECATED_MODELS = new Set<string>([
-  // intentionally empty — remove entries only when provider confirms permanent removal
+  // NVIDIA NIM deprecated IDs — provider has permanently removed these
+  "moonshotai/kimi-k2-instruct",
+  "moonshotai/kimi-k2-instruct-0905",
+  "minimaxai/minimax-m2",
+  "deepseek-ai/deepseek-v3.1-terminus",
+  "deepseek-ai/deepseek-v3.2",
 ]);
 
 export function migrateDeprecatedModel(modelId: string): string {
@@ -1009,9 +1114,13 @@ const MODEL_ALIASES: Record<string, string> = {
   gemini: "gemini-2.5-pro",
   flash: "gemini-2.5-flash",
   // NVIDIA NIM
-  kimi: "moonshotai/kimi-k2-instruct",
-  qwen: "qwen/qwen3-next-80b-a3b-instruct",
-  llama: "meta/llama-3.3-70b-instruct",
+  kimi: "moonshotai/kimi-k2.6",
+  "kimi-thinking": "moonshotai/kimi-k2-thinking",
+  qwen: "qwen/qwen3.5-397b-a17b",
+  "qwen-coder": "qwen/qwen3-coder-480b-a35b-instruct",
+  llama: "meta/llama-4-maverick-17b-128e-instruct",
+  minimax: "minimaxai/minimax-m2.7",
+  nemotron: "nvidia/llama-3.1-nemotron-ultra-253b-v1",
   deepseek: "deepseek-ai/deepseek-v4-pro",
   "deepseek-pro": "deepseek-ai/deepseek-v4-pro",
   "deepseek-flash": "deepseek-ai/deepseek-v4-flash",

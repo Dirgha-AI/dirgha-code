@@ -63,6 +63,43 @@ function mask(value: string): string {
   return `${value.slice(0, 4)}…${value.slice(-4)}`;
 }
 
+/**
+ * Probe the NVIDIA NIM API with a cheap, reliably-available model.
+ * Uses meta/llama-3.3-70b-instruct — NOT kimi or minimax, which hang
+ * with HTTP 000 on standard-tier NIM accounts (entitlement required).
+ * Returns true on 200, "timeout" on AbortError, or an error string.
+ */
+async function verifyNvidiaKey(key: string): Promise<true | "timeout" | string> {
+  try {
+    const res = await fetch(
+      "https://integrate.api.nvidia.com/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${key}`,
+        },
+        signal: AbortSignal.timeout(10_000),
+        body: JSON.stringify({
+          model: "meta/llama-3.3-70b-instruct",
+          messages: [{ role: "user", content: "hi" }],
+          max_tokens: 3,
+          stream: false,
+        }),
+      },
+    );
+    if (res.ok) return true;
+    const errText = await res.text().catch(() => "");
+    return `HTTP ${res.status}${errText ? `: ${errText.slice(0, 80)}` : ""}`;
+  } catch (err: unknown) {
+    const e = err as { name?: string; message?: string };
+    if (e?.name === "TimeoutError" || e?.message?.includes("abort")) {
+      return "timeout";
+    }
+    return e?.message ?? "unknown error";
+  }
+}
+
 function usage(): string {
   return [
     "Usage:",
@@ -107,6 +144,20 @@ export const keysCommand: SlashCommand = {
       store[envVar] = value;
       await write(store);
       process.env[envVar] = value;
+
+      // For NVIDIA keys, probe with a reliably-available model.
+      // kimi-k2-instruct hangs (HTTP 000) on standard-tier NIM accounts.
+      if (envVar === "NVIDIA_API_KEY" || envVar === "NVIDIA_API_KEY_2") {
+        const verified = await verifyNvidiaKey(value);
+        if (verified === true) {
+          return `Stored ${envVar} (${mask(value)}). Key verified — NIM is reachable.`;
+        } else if (verified === "timeout") {
+          return `Stored ${envVar} (${mask(value)}). Key saved (could not verify — NVIDIA NIM timeout).`;
+        } else {
+          return `Stored ${envVar} (${mask(value)}). Warning: key check failed (${verified}). Key saved anyway.`;
+        }
+      }
+
       return `Stored ${envVar} (${mask(value)}).`;
     }
 
