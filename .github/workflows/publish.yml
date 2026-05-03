@@ -191,13 +191,9 @@ jobs:
           echo "Signed SBOMs:"
           ls -la sbom.*.{sig,pem} 2>/dev/null || true
 
-      # Publish with a pinned npm CLI ≥ 11.5.1 — required for Trusted
-      # Publisher OIDC auth. Node 22 ships npm 10.x; rather than break
-      # the bundled npm via `npm install -g npm@latest` (which has a
-      # known issue where the install pulls a broken tarball missing
-      # promise-retry), shell out via npx for the publish step only.
-      # No NODE_AUTH_TOKEN — the OIDC id-token authenticates the session.
       - name: Publish (via pinned npm 11)
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npx -y npm@11.5.1 publish --access public --provenance
 
       - name: Attach tarball + SBOMs + signatures to GitHub Release (CI-5)
