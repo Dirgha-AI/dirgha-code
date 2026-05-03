@@ -40,6 +40,9 @@ import {
   recordSuccess as recordHealthSuccess,
   recordFailure as recordHealthFailure,
 } from "../intelligence/health-monitor.js";
+import { drainPending } from "../safety/audit-log.js";
+import { pushAuditEntries } from "../telemetry/gateway-push.js";
+import { loadToken } from "../integrations/device-auth.js";
 
 export interface AgentLoopConfig {
   sessionId: string;
@@ -284,6 +287,7 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
         try {
           await cfg.hooks?.afterTurn?.(turnIndex, totals);
         } catch {}
+        void flushAuditEntries(cfg.sessionId);
         break;
       }
 
@@ -303,6 +307,7 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
       try {
         await cfg.hooks?.afterTurn?.(turnIndex, totals);
       } catch {}
+      void flushAuditEntries(cfg.sessionId);
     }
   } finally {
     loopController.abort();
@@ -456,6 +461,23 @@ async function executeToolCalls(
   const out: Array<{ call: ToolCall; result: ToolResult }> = [];
   for (const u of toolUses) out.push(await run(u));
   return out;
+}
+
+/**
+ * Drain pending audit entries and push them to the gateway.
+ * Fully fire-and-forget — never throws, never blocks the hot path.
+ * Token is loaded lazily per flush so we don't cache a stale JWT.
+ */
+async function flushAuditEntries(sessionId: string): Promise<void> {
+  try {
+    const entries = await drainPending();
+    if (entries.length === 0) return;
+    const tok = await loadToken();
+    if (!tok) return; // not logged in — skip silently
+    await pushAuditEntries(sessionId, entries, tok.token);
+  } catch {
+    // Telemetry must never crash the CLI.
+  }
 }
 
 function truncateForSummary(input: unknown, max = 160): string {

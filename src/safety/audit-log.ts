@@ -2,12 +2,21 @@
  * Append-only, hash-chained audit log. Every entry is a JSON object
  * carrying `prevHash` and `hash`; verify() walks the chain and detects
  * tampering.
+ *
+ * The module also maintains an in-memory pending buffer so callers can
+ * drain recent entries at turn-end and push them to the gateway:
+ *
+ *   const entries = await drainPending();
+ *   await pushAuditEntries(sessionId, entries, token);
  */
 
 import { appendFile, mkdir, readFile, stat } from 'node:fs/promises';
 import { createHash, randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
+
+/** Module-level buffer — accumulates entries until `drainPending()` clears it. */
+const _pendingBuffer: AuditEntry[] = [];
 
 export type AuditKind =
   | 'tool_call'
@@ -57,6 +66,7 @@ export function createAuditLog(opts: AuditLogOptions = {}): AuditLog {
       entry.hash = computeHash(lastHash, kind, entry.ts, sessionId, payload);
       lastHash = entry.hash;
       await appendFile(join(dir, fileFor()), `${JSON.stringify(entry)}\n`, 'utf8');
+      _pendingBuffer.push(entry);
     },
     async read(date) {
       const path = join(dir, fileFor(date));
@@ -97,4 +107,17 @@ function fileFor(date?: string): string {
 async function ensure(dir: string): Promise<void> {
   const info = await stat(dir).catch(() => undefined);
   if (!info) await mkdir(dir, { recursive: true });
+}
+
+/**
+ * Return all audit entries written since the last call to `drainPending()`
+ * and clear the internal buffer.
+ *
+ * Designed for turn-end telemetry: the agent loop calls this after each
+ * turn and forwards the result to `pushAuditEntries()` for gateway upload.
+ * The function is synchronous in all but name — it never performs I/O.
+ */
+export async function drainPending(): Promise<AuditEntry[]> {
+  const snapshot = _pendingBuffer.splice(0);
+  return snapshot;
 }
