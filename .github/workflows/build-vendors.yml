@@ -37,27 +37,38 @@ jobs:
         run: |
           sha=$(grep '^github.com' vendor/rtk/VERSION | sed 's/.*@//')
           echo "sha=$sha" >> $GITHUB_OUTPUT
+          if [ "$sha" = "PENDING" ]; then
+            echo "pending=true" >> $GITHUB_OUTPUT
+          fi
+      - name: Skip if PENDING
+        if: steps.ver.outputs.pending == 'true'
+        run: echo "rtk fork SHA is PENDING — skipping build until fork is ready." && exit 0
       - name: Checkout rtk fork
+        if: steps.ver.outputs.pending != 'true'
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
         with:
           repository: Dirgha-AI/rtk
           ref: ${{ steps.ver.outputs.sha }}
           path: _rtk_src
       - name: Install musl tools (linux)
-        if: matrix.target == 'linux-x64'
+        if: steps.ver.outputs.pending != 'true' && matrix.target == 'linux-x64'
         run: sudo apt-get install -y musl-tools
       - name: Add cargo target
+        if: steps.ver.outputs.pending != 'true'
         run: rustup target add ${{ matrix.cargo_target }}
       - name: Build rtk (telemetry disabled at source)
+        if: steps.ver.outputs.pending != 'true'
         run: cargo build --release --target ${{ matrix.cargo_target }} --no-default-features
         working-directory: _rtk_src
       - name: Copy binary
+        if: steps.ver.outputs.pending != 'true'
         run: |
           mkdir -p $(dirname ${{ matrix.out }})
           cp _rtk_src/target/${{ matrix.cargo_target }}/release/rtk ${{ matrix.out }}
           chmod +x ${{ matrix.out }}
           sha256sum ${{ matrix.out }} > ${{ matrix.out }}.sha256
       - uses: actions/upload-artifact@v4
+        if: steps.ver.outputs.pending != 'true'
         with:
           name: rtk-${{ matrix.target }}
           path: ${{ matrix.out }}*
@@ -87,29 +98,41 @@ jobs:
         run: |
           sha=$(grep '^github.com' vendor/qmd/VERSION | sed 's/.*@//')
           echo "sha=$sha" >> $GITHUB_OUTPUT
+          if [ "$sha" = "PENDING" ]; then
+            echo "pending=true" >> $GITHUB_OUTPUT
+          fi
+      - name: Skip if PENDING
+        if: steps.ver.outputs.pending == 'true'
+        run: echo "qmd fork SHA is PENDING — skipping build until fork is ready." && exit 0
       - name: Checkout qmd fork
+        if: steps.ver.outputs.pending != 'true'
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
         with:
           repository: Dirgha-AI/qmd
           ref: ${{ steps.ver.outputs.sha }}
           path: _qmd_src
       - uses: oven-sh/setup-bun@v2
+        if: steps.ver.outputs.pending != 'true'
         with:
           bun-version: latest
       - name: Install deps (no postinstall — node-llama-cpp removed in fork)
+        if: steps.ver.outputs.pending != 'true'
         run: bun install --frozen-lockfile
         working-directory: _qmd_src
       - name: Compile qmd binary
+        if: steps.ver.outputs.pending != 'true'
         run: |
           bun build --compile --minify --target=${{ matrix.bun_target }} ./src/cli.ts --outfile=dist/qmd
         working-directory: _qmd_src
       - name: Copy binary
+        if: steps.ver.outputs.pending != 'true'
         run: |
           mkdir -p $(dirname ${{ matrix.out }})
           cp _qmd_src/dist/qmd ${{ matrix.out }}
           chmod +x ${{ matrix.out }}
           sha256sum ${{ matrix.out }} > ${{ matrix.out }}.sha256
       - uses: actions/upload-artifact@v4
+        if: steps.ver.outputs.pending != 'true'
         with:
           name: qmd-${{ matrix.target }}
           path: ${{ matrix.out }}*
