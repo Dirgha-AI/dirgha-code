@@ -5,7 +5,7 @@
  * The user types their key, presses Enter → key is saved to
  * ~/.dirgha/keys.json (mode 0600) and the original request is retried.
  */
-import * as React from 'react';
+import * as React from "react";
 export interface KeySetOverlayProps {
     /** e.g. "DEEPSEEK_API_KEY" */
     keyName: string;

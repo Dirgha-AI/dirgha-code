@@ -19,6 +19,11 @@ import { useTheme } from "../theme-context.js";
 import { SpinnerContext } from "../spinner-context.js";
 import { SpinnerGlyph } from "./SpinnerGlyph.js";
 import { useElapsed } from "../use-elapsed.js";
+import {
+  highlightContent,
+  colorForKind,
+  isCodeFile,
+} from "../markdown/syntax-highlight.js";
 
 export type ToolStatus = "pending" | "running" | "done" | "error" | "blocked";
 
@@ -162,14 +167,23 @@ export const ToolBox = React.memo(function ToolBox(
         ) : (
           <SpinnerGlyph isActive={isRunning} />
         )}
-        <Text color={palette.text.accent} bold>
+        <Text
+          color={
+            props.status === "error"
+              ? palette.status.error
+              : palette.text.accent
+          }
+          bold
+        >
           {iconFor(props.name)}
         </Text>
         <Text
           color={
-            props.status === "done" || props.status === "blocked"
-              ? palette.text.secondary
-              : palette.text.primary
+            props.status === "error"
+              ? palette.status.error
+              : props.status === "done" || props.status === "blocked"
+                ? palette.text.secondary
+                : palette.text.primary
           }
           bold={props.status !== "blocked"}
           dimColor={props.status === "blocked"}
@@ -192,9 +206,24 @@ export const ToolBox = React.memo(function ToolBox(
       </Box>
       {preview !== "" && !diffMode && (
         <Box>
-          <Text color={palette.text.secondary} dimColor>
-            {preview}
-          </Text>
+          {props.name === "fs_read" &&
+          props.argSummary &&
+          isCodeFile(props.argSummary) &&
+          props.outputPreview ? (
+            <Text>
+              {highlightContent(props.outputPreview, props.argSummary).map(
+                (tok, i) => (
+                  <Text key={i} color={colorForKind(tok.kind, palette)}>
+                    {tok.value}
+                  </Text>
+                ),
+              )}
+            </Text>
+          ) : (
+            <Text color={palette.text.secondary} dimColor>
+              {preview}
+            </Text>
+          )}
         </Box>
       )}
       {diffMode && props.outputPreview && (

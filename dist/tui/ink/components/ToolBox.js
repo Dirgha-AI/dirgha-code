@@ -19,6 +19,7 @@ import { useTheme } from "../theme-context.js";
 import { SpinnerContext } from "../spinner-context.js";
 import { SpinnerGlyph } from "./SpinnerGlyph.js";
 import { useElapsed } from "../use-elapsed.js";
+import { highlightContent, colorForKind, isCodeFile, } from "../markdown/syntax-highlight.js";
 const TOOL_LABEL = {
     fs_read: "Read",
     fs_write: "Write",
@@ -115,8 +116,15 @@ export const ToolBox = React.memo(function ToolBox(props) {
         : diffMode && props.outputPreview
             ? diffShortPreview(props.outputPreview, 80)
             : "";
-    return (_jsxs(Box, { flexDirection: "column", borderStyle: "round", borderColor: borderColour, paddingX: 1, marginBottom: 1, children: [_jsxs(Box, { gap: 1, children: [icon !== null ? (_jsx(Text, { color: iconColour, children: icon })) : (_jsx(SpinnerGlyph, { isActive: isRunning })), _jsx(Text, { color: palette.text.accent, bold: true, children: iconFor(props.name) }), _jsx(Text, { color: props.status === "done" || props.status === "blocked"
-                            ? palette.text.secondary
-                            : palette.text.primary, bold: props.status !== "blocked", dimColor: props.status === "blocked", children: prettyName(props.name) }), props.argSummary !== undefined && props.argSummary.length > 0 && (_jsxs(Text, { color: palette.text.secondary, dimColor: true, children: ["(", props.argSummary, ")"] })), elapsedLabel !== "" && (_jsx(Text, { color: palette.text.secondary, dimColor: true, children: elapsedLabel })), props.status === "blocked" && (_jsx(Text, { color: palette.status.warning, children: "(blocked)" }))] }), preview !== "" && !diffMode && (_jsx(Box, { children: _jsx(Text, { color: palette.text.secondary, dimColor: true, children: preview }) })), diffMode && props.outputPreview && (_jsx(Box, { flexDirection: "column", children: renderDiffLines(props.outputPreview, 30) }))] }));
+    return (_jsxs(Box, { flexDirection: "column", borderStyle: "round", borderColor: borderColour, paddingX: 1, marginBottom: 1, children: [_jsxs(Box, { gap: 1, children: [icon !== null ? (_jsx(Text, { color: iconColour, children: icon })) : (_jsx(SpinnerGlyph, { isActive: isRunning })), _jsx(Text, { color: props.status === "error"
+                            ? palette.status.error
+                            : palette.text.accent, bold: true, children: iconFor(props.name) }), _jsx(Text, { color: props.status === "error"
+                            ? palette.status.error
+                            : props.status === "done" || props.status === "blocked"
+                                ? palette.text.secondary
+                                : palette.text.primary, bold: props.status !== "blocked", dimColor: props.status === "blocked", children: prettyName(props.name) }), props.argSummary !== undefined && props.argSummary.length > 0 && (_jsxs(Text, { color: palette.text.secondary, dimColor: true, children: ["(", props.argSummary, ")"] })), elapsedLabel !== "" && (_jsx(Text, { color: palette.text.secondary, dimColor: true, children: elapsedLabel })), props.status === "blocked" && (_jsx(Text, { color: palette.status.warning, children: "(blocked)" }))] }), preview !== "" && !diffMode && (_jsx(Box, { children: props.name === "fs_read" &&
+                    props.argSummary &&
+                    isCodeFile(props.argSummary) &&
+                    props.outputPreview ? (_jsx(Text, { children: highlightContent(props.outputPreview, props.argSummary).map((tok, i) => (_jsx(Text, { color: colorForKind(tok.kind, palette), children: tok.value }, i))) })) : (_jsx(Text, { color: palette.text.secondary, dimColor: true, children: preview })) })), diffMode && props.outputPreview && (_jsx(Box, { flexDirection: "column", children: renderDiffLines(props.outputPreview, 30) }))] }));
 });
 //# sourceMappingURL=ToolBox.js.map

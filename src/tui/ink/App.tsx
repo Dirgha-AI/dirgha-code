@@ -54,7 +54,10 @@ import { PRICES } from "../../intelligence/prices.js";
 import { Logo } from "./components/Logo.js";
 import { StatusBar } from "./components/StatusBar.js";
 import { StreamingText } from "./components/StreamingText.js";
-import { ThinkingBlock } from "./components/ThinkingBlock.js";
+import {
+  ThinkingBlock,
+  ThinkingBlockGroup,
+} from "./components/ThinkingBlock.js";
 import { ToolBox } from "./components/ToolBox.js";
 import { ToolGroup, type ToolItem } from "./components/ToolGroup.js";
 import { InputBox } from "./components/InputBox.js";
@@ -80,8 +83,9 @@ import { getUpdateBannerVersion } from "../../cli/update-check.js";
 import { AtFileComplete } from "./components/AtFileComplete.js";
 import { SlashComplete } from "./components/SlashComplete.js";
 import { ThemePicker } from "./components/ThemePicker.js";
-import { ThemeProvider } from "./theme-context.js";
+import { ThemeProvider, useTheme } from "./theme-context.js";
 import { SpinnerContext } from "./spinner-context.js";
+import { SpinnerGlyph } from "./components/SpinnerGlyph.js";
 import type { ThemeName } from "../theme.js";
 import { writeFile, mkdir, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -169,6 +173,7 @@ export function App(props: AppProps): React.JSX.Element {
   const [transcript, setTranscript] = React.useState<TranscriptItem[]>([]);
   const [input, setInput] = React.useState("");
   const [busy, setBusy] = React.useState(false);
+  const [thinkingStreaming, setThinkingStreaming] = React.useState(false);
   // Prompt queue: while a turn is streaming the user can still type and
   // press Enter. Submissions land here instead of being dropped, then
   // drain FIFO when the turn finishes (see useEffect below).
@@ -379,6 +384,11 @@ export function App(props: AppProps): React.JSX.Element {
         liveOutputTokensAccRef.current = 0;
         setLiveOutputTokens(0);
         setLiveDurationMs(0);
+        setThinkingStreaming(false);
+      } else if (ev.type === "thinking_start") {
+        setThinkingStreaming(true);
+      } else if (ev.type === "thinking_end") {
+        setThinkingStreaming(false);
       } else if (ev.type === "text_delta" || ev.type === "thinking_delta") {
         liveOutputTokensAccRef.current += (ev.delta?.length ?? 0) / 4;
       } else if (ev.type === "usage") {
@@ -1089,8 +1099,8 @@ export function App(props: AppProps): React.JSX.Element {
   );
 
   const liveJsx = React.useMemo(
-    () => renderTranscript(projection.liveItems),
-    [projection.liveItems],
+    () => renderTranscript(projection.liveItems, thinkingStreaming),
+    [projection.liveItems, thinkingStreaming],
   );
 
   const providerEntries = React.useMemo(
@@ -1114,6 +1124,7 @@ export function App(props: AppProps): React.JSX.Element {
             inputFocus={inputFocus}
           />
           <Box flexDirection="column">{liveJsx}</Box>
+          {busy && projection.liveItems.length === 0 && <GeneratingIndicator />}
           {pendingApproval !== null && approvalBusRef.current && (
             <ApprovalPrompt
               request={pendingApproval}
@@ -1293,25 +1304,45 @@ export function App(props: AppProps): React.JSX.Element {
 
 /**
  * Walk the transcript and fold consecutive `tool` items into a single
- * <ToolGroup>. Non-tool items render via <TranscriptRow>. The grouping
- * is intentionally simple — we look at adjacency, not assistant-turn
- * boundaries, because the projection emits tools contiguously between
- * `text` spans of the same turn.
+ * <ToolGroup>. Fold 3+ consecutive `thinking` items into a single
+ * <ThinkingBlockGroup>. Non-tool / non-thinking items render via
+ * <TranscriptRow>.
  */
-function renderTranscript(items: TranscriptItem[]): React.ReactNode[] {
+function renderTranscript(
+  items: TranscriptItem[],
+  thinkingStreaming?: boolean,
+): React.ReactNode[] {
   const out: React.ReactNode[] = [];
   let toolBuf: ToolItem[] = [];
+  let thinkBuf: { id: string; content: string }[] = [];
 
   const flushTools = (): void => {
     if (toolBuf.length === 0) return;
-    // Key on the stable ID of the first tool so React never unmounts/remounts
-    // the ToolGroup subtree when the counter resets (which caused flicker).
     out.push(<ToolGroup key={toolBuf[0]!.id} tools={toolBuf} />);
     toolBuf = [];
   };
 
+  const flushThinking = (): void => {
+    if (thinkBuf.length === 0) return;
+    if (thinkBuf.length >= 3) {
+      out.push(<ThinkingBlockGroup key={thinkBuf[0]!.id} blocks={thinkBuf} />);
+    } else {
+      for (const tb of thinkBuf) {
+        out.push(
+          <TranscriptRow
+            key={tb.id}
+            item={{ kind: "thinking", id: tb.id, content: tb.content }}
+            isStreaming={thinkingStreaming}
+          />,
+        );
+      }
+    }
+    thinkBuf = [];
+  };
+
   for (const item of items) {
     if (item.kind === "tool") {
+      flushThinking();
       toolBuf.push({
         id: item.id,
         name: item.name,
@@ -1324,17 +1355,32 @@ function renderTranscript(items: TranscriptItem[]): React.ReactNode[] {
       });
       continue;
     }
+    if (item.kind === "thinking") {
+      flushTools();
+      thinkBuf.push({ id: item.id, content: item.content });
+      continue;
+    }
     flushTools();
-    out.push(<TranscriptRow key={item.id} item={item} />);
+    flushThinking();
+    out.push(
+      <TranscriptRow
+        key={item.id}
+        item={item}
+        isStreaming={thinkingStreaming}
+      />,
+    );
   }
   flushTools();
+  flushThinking();
   return out;
 }
 
 function TranscriptRow({
   item,
+  isStreaming = false,
 }: {
   item: TranscriptItem;
+  isStreaming?: boolean;
 }): React.JSX.Element | null {
   switch (item.kind) {
     case "user":
@@ -1347,7 +1393,7 @@ function TranscriptRow({
     case "text":
       return <StreamingText content={item.content} />;
     case "thinking":
-      return <ThinkingBlock content={item.content} />;
+      return <ThinkingBlock content={item.content} isStreaming={isStreaming} />;
     case "tool":
       // Should not be reached — tools are folded by renderTranscript() into
       // <ToolGroup>. Kept as a safety net so an unexpected tool item still
@@ -1383,6 +1429,18 @@ function TranscriptRow({
         </Box>
       );
   }
+}
+
+function GeneratingIndicator(): React.JSX.Element {
+  const palette = useTheme();
+  return (
+    <Box gap={1} marginBottom={1}>
+      <SpinnerGlyph isActive={true} color={palette.text.secondary} />
+      <Text color={palette.text.secondary} dimColor>
+        generating…
+      </Text>
+    </Box>
+  );
 }
 
 function initialHistory(props: AppProps): Message[] {

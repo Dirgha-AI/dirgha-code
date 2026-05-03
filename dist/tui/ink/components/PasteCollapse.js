@@ -1,5 +1,5 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import { Box, Text } from 'ink';
+import { Box, Text } from "ink";
 export const PASTE_LINE_THRESHOLD = 4;
 export const PASTE_CHAR_THRESHOLD = 200;
 /**
@@ -14,11 +14,13 @@ export function detectPaste(prev, next) {
     }
     // Locate the insertion point by finding the longest common prefix + suffix.
     let prefix = 0;
-    while (prefix < prev.length && prefix < next.length && prev[prefix] === next[prefix])
+    while (prefix < prev.length &&
+        prefix < next.length &&
+        prev[prefix] === next[prefix])
         prefix += 1;
     let suffix = 0;
-    while (suffix < (prev.length - prefix) &&
-        suffix < (next.length - prefix) &&
+    while (suffix < prev.length - prefix &&
+        suffix < next.length - prefix &&
         prev[prev.length - 1 - suffix] === next[next.length - 1 - suffix])
         suffix += 1;
     const start = prefix;
@@ -34,11 +36,11 @@ export function detectPaste(prev, next) {
     };
 }
 function countLines(s) {
-    if (s === '')
+    if (s === "")
         return 0;
     let n = 1;
     for (let i = 0; i < s.length; i += 1)
-        if (s[i] === '\n')
+        if (s[i] === "\n")
             n += 1;
     return n;
 }
@@ -48,12 +50,12 @@ function countLines(s) {
  * hint so the user knows Ctrl+E toggles it.
  */
 export function PasteCollapseView(props) {
-    const { value, segment, expanded } = props;
+    const { value, segment, expanded, palette } = props;
     if (expanded) {
-        return (_jsxs(Box, { flexDirection: "column", children: [_jsx(Text, { children: value }), _jsxs(Text, { color: "gray", dimColor: true, children: ["[", segment.lines, " line", segment.lines === 1 ? '' : 's', ", ", segment.chars, " chars expanded \u00B7 Ctrl+E to collapse]"] })] }));
+        return (_jsxs(Box, { flexDirection: "column", children: [_jsx(Text, { children: value }), _jsxs(Text, { color: palette.text.secondary, dimColor: true, children: ["[", segment.lines, " line", segment.lines === 1 ? "" : "s", ", ", segment.chars, " ", "chars expanded \u00B7 Ctrl+E to collapse]"] })] }));
     }
     const before = value.slice(0, segment.start);
     const after = value.slice(segment.end);
-    return (_jsxs(Box, { flexDirection: "row", flexWrap: "wrap", children: [_jsx(Text, { children: before }), _jsxs(Text, { color: "yellow", children: ["[", segment.lines, " line", segment.lines === 1 ? '' : 's', " pasted, ", segment.chars, " chars]"] }), _jsx(Text, { children: after }), _jsx(Text, { color: "gray", dimColor: true, children: " \u00B7 Ctrl+E expand" })] }));
+    return (_jsxs(Box, { flexDirection: "row", flexWrap: "wrap", children: [_jsx(Text, { children: before }), _jsxs(Text, { color: palette.status.warning, children: ["[", segment.lines, " line", segment.lines === 1 ? "" : "s", " pasted,", " ", segment.chars, " chars]"] }), _jsx(Text, { children: after }), _jsxs(Text, { color: palette.text.secondary, dimColor: true, children: [" ", "\u00B7 Ctrl+E expand"] })] }));
 }
 //# sourceMappingURL=PasteCollapse.js.map

@@ -20,6 +20,7 @@ import { iconFor, TOOL_STATUS } from "../icons.js";
 import { SpinnerContext } from "../spinner-context.js";
 import { SpinnerGlyph } from "./SpinnerGlyph.js";
 import { useElapsed } from "../use-elapsed.js";
+import { highlightContent, colorForKind, isCodeFile, } from "../markdown/syntax-highlight.js";
 const TOOL_LABEL = {
     fs_read: "Read",
     fs_write: "Write",
@@ -51,9 +52,21 @@ export const DenseToolMessage = React.memo(function DenseToolMessage(props) {
     const summary = props.outputPreview
         ? props.outputPreview.replace(/\s+/g, " ").slice(0, 60)
         : "";
+    const summaryNode = React.useMemo(() => {
+        if (!props.outputPreview ||
+            props.name !== "fs_read" ||
+            !props.argSummary ||
+            !isCodeFile(props.argSummary)) {
+            if (!summary)
+                return null;
+            return (_jsx(Text, { color: palette.text.secondary, dimColor: true, children: summary }));
+        }
+        const tokens = highlightContent(props.outputPreview, props.argSummary);
+        return (_jsx(Text, { children: tokens.map((tok, i) => (_jsx(Text, { color: colorForKind(tok.kind, palette), children: tok.value }, i))) }));
+    }, [props.outputPreview, props.name, props.argSummary, summary, palette]);
     const label = TOOL_LABEL[props.name] ?? props.name.replace(/_/g, " ");
     const isRunning = props.status === "running";
-    return (_jsxs(Box, { paddingLeft: 2, flexDirection: "row", children: [_jsx(Box, { minWidth: 2, children: isRunning ? (_jsx(SpinnerGlyph, { isActive: busy, color: glyphColour })) : (_jsx(Text, { color: glyphColour, bold: !isRunning, children: props.status === "error" ? TOOL_STATUS.ERROR : TOOL_STATUS.SUCCESS })) }), _jsx(Text, { color: palette.text.accent, children: iconFor(props.name) }), _jsx(Text, { children: " " }), _jsx(Text, { bold: true, color: nameColour, children: label }), props.argSummary && props.argSummary.length > 0 && (_jsxs(_Fragment, { children: [_jsx(Text, { children: " " }), _jsx(Text, { color: palette.text.secondary, children: props.argSummary })] })), props.durationMs !== undefined && (_jsxs(_Fragment, { children: [_jsx(Text, { children: "  " }), _jsx(Text, { color: palette.text.secondary, dimColor: true, children: elapsed })] })), summary && (_jsxs(_Fragment, { children: [_jsx(Text, { children: "  " }), _jsx(Text, { color: palette.text.secondary, dimColor: true, children: summary })] }))] }));
+    return (_jsxs(Box, { paddingLeft: 2, flexDirection: "row", children: [_jsx(Box, { minWidth: 2, children: isRunning ? (_jsx(SpinnerGlyph, { isActive: busy, color: glyphColour })) : (_jsx(Text, { color: glyphColour, bold: !isRunning, children: props.status === "error" ? TOOL_STATUS.ERROR : TOOL_STATUS.SUCCESS })) }), _jsx(Text, { color: palette.text.accent, children: iconFor(props.name) }), _jsx(Text, { children: " " }), _jsx(Text, { bold: true, color: nameColour, children: label }), props.argSummary && props.argSummary.length > 0 && (_jsxs(_Fragment, { children: [_jsx(Text, { children: " " }), _jsx(Text, { color: palette.text.secondary, children: props.argSummary })] })), props.durationMs !== undefined && (_jsxs(_Fragment, { children: [_jsx(Text, { children: "  " }), _jsx(Text, { color: palette.text.secondary, dimColor: true, children: elapsed })] })), summaryNode && (_jsxs(_Fragment, { children: [_jsx(Text, { children: "  " }), summaryNode] }))] }));
 });
 function formatElapsed(ms) {
     if (ms < 1000)

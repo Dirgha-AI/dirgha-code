@@ -8,7 +8,8 @@
  * The real content lives in the backing buffer passed to `onSubmit`, so
  * Enter still submits the full text — only the rendering is collapsed.
  */
-import * as React from 'react';
+import * as React from "react";
+import type { Palette } from "../../theme.js";
 export declare const PASTE_LINE_THRESHOLD = 4;
 export declare const PASTE_CHAR_THRESHOLD = 200;
 export interface PasteSegment {
@@ -27,6 +28,7 @@ export interface PasteCollapseViewProps {
     value: string;
     segment: PasteSegment;
     expanded: boolean;
+    palette: Palette;
 }
 /**
  * Renders the buffer with the pasted region collapsed behind a

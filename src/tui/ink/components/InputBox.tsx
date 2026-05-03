@@ -318,6 +318,7 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
               value={props.value}
               segment={pasteSegment}
               expanded={false}
+              palette={palette}
             />
           ) : (
             <TextInput

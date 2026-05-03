@@ -9,8 +9,9 @@
  * Enter still submits the full text — only the rendering is collapsed.
  */
 
-import * as React from 'react';
-import { Box, Text } from 'ink';
+import * as React from "react";
+import { Box, Text } from "ink";
+import type { Palette } from "../../theme.js";
 
 export const PASTE_LINE_THRESHOLD = 4;
 export const PASTE_CHAR_THRESHOLD = 200;
@@ -28,19 +29,27 @@ export interface PasteSegment {
  * change looks like ordinary typing.
  */
 export function detectPaste(prev: string, next: string): PasteSegment | null {
-  if (next.length - prev.length < PASTE_CHAR_THRESHOLD &&
-      countLines(next) - countLines(prev) < PASTE_LINE_THRESHOLD) {
+  if (
+    next.length - prev.length < PASTE_CHAR_THRESHOLD &&
+    countLines(next) - countLines(prev) < PASTE_LINE_THRESHOLD
+  ) {
     return null;
   }
   // Locate the insertion point by finding the longest common prefix + suffix.
   let prefix = 0;
-  while (prefix < prev.length && prefix < next.length && prev[prefix] === next[prefix]) prefix += 1;
+  while (
+    prefix < prev.length &&
+    prefix < next.length &&
+    prev[prefix] === next[prefix]
+  )
+    prefix += 1;
   let suffix = 0;
   while (
-    suffix < (prev.length - prefix) &&
-    suffix < (next.length - prefix) &&
+    suffix < prev.length - prefix &&
+    suffix < next.length - prefix &&
     prev[prev.length - 1 - suffix] === next[next.length - 1 - suffix]
-  ) suffix += 1;
+  )
+    suffix += 1;
   const start = prefix;
   const end = next.length - suffix;
   if (end <= start) return null;
@@ -54,9 +63,9 @@ export function detectPaste(prev: string, next: string): PasteSegment | null {
 }
 
 function countLines(s: string): number {
-  if (s === '') return 0;
+  if (s === "") return 0;
   let n = 1;
-  for (let i = 0; i < s.length; i += 1) if (s[i] === '\n') n += 1;
+  for (let i = 0; i < s.length; i += 1) if (s[i] === "\n") n += 1;
   return n;
 }
 
@@ -64,6 +73,7 @@ export interface PasteCollapseViewProps {
   value: string;
   segment: PasteSegment;
   expanded: boolean;
+  palette: Palette;
 }
 
 /**
@@ -71,14 +81,17 @@ export interface PasteCollapseViewProps {
  * placeholder when `expanded` is false. Always renders a small
  * hint so the user knows Ctrl+E toggles it.
  */
-export function PasteCollapseView(props: PasteCollapseViewProps): React.JSX.Element {
-  const { value, segment, expanded } = props;
+export function PasteCollapseView(
+  props: PasteCollapseViewProps,
+): React.JSX.Element {
+  const { value, segment, expanded, palette } = props;
   if (expanded) {
     return (
       <Box flexDirection="column">
         <Text>{value}</Text>
-        <Text color="gray" dimColor>
-          [{segment.lines} line{segment.lines === 1 ? '' : 's'}, {segment.chars} chars expanded · Ctrl+E to collapse]
+        <Text color={palette.text.secondary} dimColor>
+          [{segment.lines} line{segment.lines === 1 ? "" : "s"}, {segment.chars}{" "}
+          chars expanded · Ctrl+E to collapse]
         </Text>
       </Box>
     );
@@ -88,11 +101,15 @@ export function PasteCollapseView(props: PasteCollapseViewProps): React.JSX.Elem
   return (
     <Box flexDirection="row" flexWrap="wrap">
       <Text>{before}</Text>
-      <Text color="yellow">
-        [{segment.lines} line{segment.lines === 1 ? '' : 's'} pasted, {segment.chars} chars]
+      <Text color={palette.status.warning}>
+        [{segment.lines} line{segment.lines === 1 ? "" : "s"} pasted,{" "}
+        {segment.chars} chars]
       </Text>
       <Text>{after}</Text>
-      <Text color="gray" dimColor> · Ctrl+E expand</Text>
+      <Text color={palette.text.secondary} dimColor>
+        {" "}
+        · Ctrl+E expand
+      </Text>
     </Box>
   );
 }

@@ -37,7 +37,7 @@ import { PRICES } from "../../intelligence/prices.js";
 import { Logo } from "./components/Logo.js";
 import { StatusBar } from "./components/StatusBar.js";
 import { StreamingText } from "./components/StreamingText.js";
-import { ThinkingBlock } from "./components/ThinkingBlock.js";
+import { ThinkingBlock, ThinkingBlockGroup, } from "./components/ThinkingBlock.js";
 import { ToolBox } from "./components/ToolBox.js";
 import { ToolGroup } from "./components/ToolGroup.js";
 import { InputBox } from "./components/InputBox.js";
@@ -53,8 +53,9 @@ import { getUpdateBannerVersion } from "../../cli/update-check.js";
 import { AtFileComplete } from "./components/AtFileComplete.js";
 import { SlashComplete } from "./components/SlashComplete.js";
 import { ThemePicker } from "./components/ThemePicker.js";
-import { ThemeProvider } from "./theme-context.js";
+import { ThemeProvider, useTheme } from "./theme-context.js";
 import { SpinnerContext } from "./spinner-context.js";
+import { SpinnerGlyph } from "./components/SpinnerGlyph.js";
 import { writeFile, mkdir, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join as pathJoin } from "node:path";
@@ -109,6 +110,7 @@ export function App(props) {
     const [transcript, setTranscript] = React.useState([]);
     const [input, setInput] = React.useState("");
     const [busy, setBusy] = React.useState(false);
+    const [thinkingStreaming, setThinkingStreaming] = React.useState(false);
     // Prompt queue: while a turn is streaming the user can still type and
     // press Enter. Submissions land here instead of being dropped, then
     // drain FIFO when the turn finishes (see useEffect below).
@@ -292,6 +294,13 @@ export function App(props) {
                 liveOutputTokensAccRef.current = 0;
                 setLiveOutputTokens(0);
                 setLiveDurationMs(0);
+                setThinkingStreaming(false);
+            }
+            else if (ev.type === "thinking_start") {
+                setThinkingStreaming(true);
+            }
+            else if (ev.type === "thinking_end") {
+                setThinkingStreaming(false);
             }
             else if (ev.type === "text_delta" || ev.type === "thinking_delta") {
                 liveOutputTokensAccRef.current += (ev.delta?.length ?? 0) / 4;
@@ -955,10 +964,10 @@ export function App(props) {
             }
         })();
     }, [overlays]);
-    const liveJsx = React.useMemo(() => renderTranscript(projection.liveItems), [projection.liveItems]);
+    const liveJsx = React.useMemo(() => renderTranscript(projection.liveItems, thinkingStreaming), [projection.liveItems, thinkingStreaming]);
     const providerEntries = React.useMemo(() => buildProviderEntries(models, currentModel), [models, currentModel]);
     const LOGO_ITEMS = React.useMemo(() => [{ key: "logo" }], []);
-    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: { busy, frame: 0 }, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: LOGO_ITEMS, children: () => _jsx(Logo, { version: VERSION }, "logo") }), _jsx(VirtualTranscript, { items: transcript, renderItem: (item) => _jsx(TranscriptRow, { item: item }, item.id), autoScroll: true, inputFocus: inputFocus }), _jsx(Box, { flexDirection: "column", children: liveJsx }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
+    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: { busy, frame: 0 }, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: LOGO_ITEMS, children: () => _jsx(Logo, { version: VERSION }, "logo") }), _jsx(VirtualTranscript, { items: transcript, renderItem: (item) => _jsx(TranscriptRow, { item: item }, item.id), autoScroll: true, inputFocus: inputFocus }), _jsx(Box, { flexDirection: "column", children: liveJsx }), busy && projection.liveItems.length === 0 && _jsx(GeneratingIndicator, {}), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
                             approvalBusRef.current?.resolve(pendingApproval.id, decision);
                         } })), pendingFailover !== null && (_jsx(ModelSwitchPrompt, { failedModel: pendingFailover.failedModel, failoverModel: pendingFailover.failoverModel, onAccept: (failover) => {
                             const lastPrompt = pendingFailover.lastPrompt;
@@ -1017,24 +1026,36 @@ export function App(props) {
 }
 /**
  * Walk the transcript and fold consecutive `tool` items into a single
- * <ToolGroup>. Non-tool items render via <TranscriptRow>. The grouping
- * is intentionally simple — we look at adjacency, not assistant-turn
- * boundaries, because the projection emits tools contiguously between
- * `text` spans of the same turn.
+ * <ToolGroup>. Fold 3+ consecutive `thinking` items into a single
+ * <ThinkingBlockGroup>. Non-tool / non-thinking items render via
+ * <TranscriptRow>.
  */
-function renderTranscript(items) {
+function renderTranscript(items, thinkingStreaming) {
     const out = [];
     let toolBuf = [];
+    let thinkBuf = [];
     const flushTools = () => {
         if (toolBuf.length === 0)
             return;
-        // Key on the stable ID of the first tool so React never unmounts/remounts
-        // the ToolGroup subtree when the counter resets (which caused flicker).
         out.push(_jsx(ToolGroup, { tools: toolBuf }, toolBuf[0].id));
         toolBuf = [];
     };
+    const flushThinking = () => {
+        if (thinkBuf.length === 0)
+            return;
+        if (thinkBuf.length >= 3) {
+            out.push(_jsx(ThinkingBlockGroup, { blocks: thinkBuf }, thinkBuf[0].id));
+        }
+        else {
+            for (const tb of thinkBuf) {
+                out.push(_jsx(TranscriptRow, { item: { kind: "thinking", id: tb.id, content: tb.content }, isStreaming: thinkingStreaming }, tb.id));
+            }
+        }
+        thinkBuf = [];
+    };
     for (const item of items) {
         if (item.kind === "tool") {
+            flushThinking();
             toolBuf.push({
                 id: item.id,
                 name: item.name,
@@ -1047,20 +1068,27 @@ function renderTranscript(items) {
             });
             continue;
         }
+        if (item.kind === "thinking") {
+            flushTools();
+            thinkBuf.push({ id: item.id, content: item.content });
+            continue;
+        }
         flushTools();
-        out.push(_jsx(TranscriptRow, { item: item }, item.id));
+        flushThinking();
+        out.push(_jsx(TranscriptRow, { item: item, isStreaming: thinkingStreaming }, item.id));
     }
     flushTools();
+    flushThinking();
     return out;
 }
-function TranscriptRow({ item, }) {
+function TranscriptRow({ item, isStreaming = false, }) {
     switch (item.kind) {
         case "user":
             return (_jsxs(Box, { gap: 2, marginBottom: 1, children: [_jsx(Text, { color: "magenta", children: "\u276F" }), _jsx(Text, { color: "white", children: item.text })] }));
         case "text":
             return _jsx(StreamingText, { content: item.content });
         case "thinking":
-            return _jsx(ThinkingBlock, { content: item.content });
+            return _jsx(ThinkingBlock, { content: item.content, isStreaming: isStreaming });
         case "tool":
             // Should not be reached — tools are folded by renderTranscript() into
             // <ToolGroup>. Kept as a safety net so an unexpected tool item still
@@ -1071,6 +1099,10 @@ function TranscriptRow({ item, }) {
         case "notice":
             return (_jsx(Box, { marginBottom: 1, children: _jsx(Text, { color: "yellow", children: item.text }) }));
     }
+}
+function GeneratingIndicator() {
+    const palette = useTheme();
+    return (_jsxs(Box, { gap: 1, marginBottom: 1, children: [_jsx(SpinnerGlyph, { isActive: true, color: palette.text.secondary }), _jsx(Text, { color: palette.text.secondary, dimColor: true, children: "generating\u2026" })] }));
 }
 function initialHistory(props) {
     const base = props.initialMessages ? [...props.initialMessages] : [];

@@ -21,6 +21,11 @@ import type { ToolStatus } from "./ToolBox.js";
 import { SpinnerContext } from "../spinner-context.js";
 import { SpinnerGlyph } from "./SpinnerGlyph.js";
 import { useElapsed } from "../use-elapsed.js";
+import {
+  highlightContent,
+  colorForKind,
+  isCodeFile,
+} from "../markdown/syntax-highlight.js";
 
 export interface DenseToolMessageProps {
   name: string;
@@ -72,6 +77,32 @@ export const DenseToolMessage = React.memo(function DenseToolMessage(
     ? props.outputPreview.replace(/\s+/g, " ").slice(0, 60)
     : "";
 
+  const summaryNode = React.useMemo((): React.ReactNode => {
+    if (
+      !props.outputPreview ||
+      props.name !== "fs_read" ||
+      !props.argSummary ||
+      !isCodeFile(props.argSummary)
+    ) {
+      if (!summary) return null;
+      return (
+        <Text color={palette.text.secondary} dimColor>
+          {summary}
+        </Text>
+      );
+    }
+    const tokens = highlightContent(props.outputPreview, props.argSummary);
+    return (
+      <Text>
+        {tokens.map((tok, i) => (
+          <Text key={i} color={colorForKind(tok.kind, palette)}>
+            {tok.value}
+          </Text>
+        ))}
+      </Text>
+    );
+  }, [props.outputPreview, props.name, props.argSummary, summary, palette]);
+
   const label = TOOL_LABEL[props.name] ?? props.name.replace(/_/g, " ");
 
   const isRunning = props.status === "running";
@@ -106,12 +137,10 @@ export const DenseToolMessage = React.memo(function DenseToolMessage(
           </Text>
         </>
       )}
-      {summary && (
+      {summaryNode && (
         <>
           <Text>{"  "}</Text>
-          <Text color={palette.text.secondary} dimColor>
-            {summary}
-          </Text>
+          {summaryNode}
         </>
       )}
     </Box>
