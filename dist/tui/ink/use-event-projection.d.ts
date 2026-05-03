@@ -52,4 +52,10 @@ export interface EventProjection {
     appendLive: (item: TranscriptItem) => void;
     clear: () => void;
 }
-export declare function useEventProjection(events: EventStream): EventProjection;
+export interface EventProjectionOptions {
+    /** Called when the streamed text exceeds MAX_LIVE_CHUNK_CHARS and is
+     *  split at a safe markdown boundary. The older portion is committed
+     *  to static history; the caller should append it to the transcript. */
+    onCommitSplit?: (item: TranscriptItem) => void;
+}
+export declare function useEventProjection(events: EventStream, opts?: EventProjectionOptions): EventProjection;

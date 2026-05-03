@@ -10,7 +10,8 @@
  */
 import * as React from "react";
 import { randomUUID } from "node:crypto";
-export function useEventProjection(events) {
+import { findLastSafeSplitPoint, MAX_LIVE_CHUNK_CHARS, } from "./markdown/split-point.js";
+export function useEventProjection(events, opts = {}) {
     const [liveItems, setLiveItems] = React.useState([]);
     const [totals, setTotals] = React.useState({
         inputTokens: 0,
@@ -122,6 +123,33 @@ export function useEventProjection(events) {
                                 return;
                             if (p.content === lastFlushedTextRef.current)
                                 return;
+                            // Gemini CLI message splitting: when accumulated text
+                            // grows beyond MAX_LIVE_CHUNK_CHARS, find a safe split
+                            // point and push the older portion to committed (Static)
+                            // history, keeping only the trailing chunk dynamic.
+                            if (p.content.length > MAX_LIVE_CHUNK_CHARS &&
+                                opts.onCommitSplit) {
+                                const splitAt = findLastSafeSplitPoint(p.content);
+                                if (splitAt < p.content.length) {
+                                    const committed = p.content.slice(0, splitAt).trimEnd();
+                                    const pending = p.content.slice(splitAt);
+                                    if (committed.length > 0) {
+                                        opts.onCommitSplit({
+                                            kind: "text",
+                                            id: randomUUID(),
+                                            content: committed,
+                                        });
+                                    }
+                                    pendingTextRef.current = { id: p.id, content: pending };
+                                    lastFlushedTextRef.current = pending;
+                                    setLive((prev) => Array.isArray(prev)
+                                        ? prev.map((it) => it.kind === "text" && it.id === p.id
+                                            ? { ...it, content: pending }
+                                            : it)
+                                        : prev);
+                                    return;
+                                }
+                            }
                             lastFlushedTextRef.current = p.content;
                             setLive((prev) => Array.isArray(prev)
                                 ? prev.map((it) => it.kind === "text" && it.id === p.id

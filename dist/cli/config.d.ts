@@ -41,6 +41,14 @@ export interface DirghaConfig {
      */
     theme?: "readable" | "dark" | "light" | "none" | "midnight" | "ocean" | "solarized" | "warm" | "violet-storm" | "cosmic" | "nord" | "ember" | "sakura" | "obsidian-gold" | "crimson" | "dracula" | "github-dark" | "tokyonight" | "atom-one-dark" | "ayu-dark";
     /**
+     * When true (default), the Ink TUI enters the terminal alternate buffer
+     * (`\\x1b[?1049h`) on startup and exits (`\\x1b[?1049l`) on quit.
+     * This eliminates the "flashing background" effect caused by Ink frames
+     * writing over accumulated scrollback in the main buffer. Set to false
+     * if you need scrollback access during the session.
+     */
+    alternateBuffer?: boolean;
+    /**
      * Persisted execution mode. Defaults to 'act' (normal execution).
      * Changed live via /mode; also honoured by fresh sessions.
      */

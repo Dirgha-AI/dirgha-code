@@ -22,5 +22,5 @@ export interface DenseToolMessageProps {
     durationMs?: number;
     startedAt?: number;
 }
-export declare function DenseToolMessage(props: DenseToolMessageProps): React.JSX.Element;
+export declare const DenseToolMessage: React.NamedExoticComponent<DenseToolMessageProps>;
 export declare function isDenseTool(name: string): boolean;

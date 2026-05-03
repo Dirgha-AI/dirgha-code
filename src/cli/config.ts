@@ -57,6 +57,14 @@ export interface DirghaConfig {
     | "atom-one-dark"
     | "ayu-dark";
   /**
+   * When true (default), the Ink TUI enters the terminal alternate buffer
+   * (`\\x1b[?1049h`) on startup and exits (`\\x1b[?1049l`) on quit.
+   * This eliminates the "flashing background" effect caused by Ink frames
+   * writing over accumulated scrollback in the main buffer. Set to false
+   * if you need scrollback access during the session.
+   */
+  alternateBuffer?: boolean;
+  /**
    * Persisted execution mode. Defaults to 'act' (normal execution).
    * Changed live via /mode; also honoured by fresh sessions.
    */
@@ -129,6 +137,7 @@ export const DEFAULT_CONFIG: DirghaConfig = {
   compaction: { triggerTokens: 120_000, preserveLastTurns: 6 },
   telemetry: { enabled: false },
   kbAutoInject: true,
+  alternateBuffer: true,
 };
 
 export async function loadConfig(

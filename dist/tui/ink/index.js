@@ -26,6 +26,26 @@ export async function runInkTUI(opts) {
     const events = createEventStream();
     const slashRegistry = createDefaultSlashRegistry();
     await registerBuiltinSlashCommands(slashRegistry);
+    const useAltBuffer = opts.config.alternateBuffer !== false;
+    if (useAltBuffer) {
+        process.stdout.write("\x1b[?1049h");
+    }
+    // Restore terminal on force-exit (SIGINT, SIGTERM). Without this,
+    // a crash leaves the terminal in raw mode with the alternate buffer
+    // still active — user sees a blank screen and must run `reset`.
+    const restore = () => {
+        if (useAltBuffer) {
+            process.stdout.write("\x1b[?1049l");
+        }
+    };
+    process.once("SIGINT", () => {
+        restore();
+        process.exit(1);
+    });
+    process.once("SIGTERM", () => {
+        restore();
+        process.exit(1);
+    });
     const element = React.createElement(App, {
         events,
         registry: opts.registry,
@@ -53,6 +73,7 @@ export async function runInkTUI(opts) {
     }
     finally {
         events.close();
+        restore();
     }
 }
 //# sourceMappingURL=index.js.map

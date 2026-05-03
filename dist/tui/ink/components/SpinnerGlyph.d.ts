@@ -1,10 +1,10 @@
 /**
  * Self-contained spinner glyph component.
  *
- * Owns its own 80ms interval so it re-renders in isolation — the rest of
- * the App tree (transcript, input, status bar) is NOT re-rendered on each
- * tick. Replaces the old `globalSpinnerFrame` useState + setInterval in
- * App.tsx that caused ~12.5 full-tree renders per second.
+ * Each instance runs its own 80ms interval so the rest of the App tree
+ * is never re-rendered on spinner ticks. All instances share a module-level
+ * start timestamp so they rotate in lockstep — no visual strobing when
+ * multiple tools run simultaneously.
  *
  * Usage:
  *   <SpinnerGlyph isActive={busy} />

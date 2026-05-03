@@ -117,7 +117,14 @@ export function App(props) {
     // Mode state: SlashContext.setMode flips it live so /mode plan|act|verify|ask
     // takes effect on the next turn (system-prompt rebuild downstream picks it up).
     const [mode, setMode] = React.useState(props.config.mode ?? "act");
-    const projection = useEventProjection(props.events);
+    const projection = useEventProjection(props.events, {
+        // Gemini CLI parity: when streamed text exceeds 5000 chars, split it
+        // at a safe markdown boundary and push the older portion to committed
+        // history (in <Static>), keeping the trailing chunk dynamic.
+        onCommitSplit: React.useCallback((item) => {
+            setTranscript((prev) => [...prev, item]);
+        }, []),
+    });
     const overlays = useOverlays();
     // Live counters for the in-progress turn — drive the StatusBar
     // tok/s readout. Reset at agent_start, accumulate output deltas,
@@ -773,7 +780,7 @@ export function App(props) {
     const liveJsx = React.useMemo(() => renderTranscript(projection.liveItems), [projection.liveItems]);
     const providerEntries = React.useMemo(() => buildProviderEntries(models, currentModel), [models, currentModel]);
     const LOGO_ITEMS = React.useMemo(() => [{ key: "logo" }], []);
-    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: { busy }, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: LOGO_ITEMS, children: () => _jsx(Logo, { version: VERSION }, "logo") }), _jsx(Static, { items: committedStaticItems, children: ({ el }) => el }), _jsx(Box, { flexDirection: "column", children: liveJsx }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
+    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: { busy, frame: 0 }, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: LOGO_ITEMS, children: () => _jsx(Logo, { version: VERSION }, "logo") }), _jsx(Static, { items: committedStaticItems, children: ({ el }) => el }), _jsx(Box, { flexDirection: "column", children: liveJsx }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
                             approvalBusRef.current?.resolve(pendingApproval.id, decision);
                         } })), pendingFailover !== null && (_jsx(ModelSwitchPrompt, { failedModel: pendingFailover.failedModel, failoverModel: pendingFailover.failoverModel, onAccept: (failover) => {
                             const lastPrompt = pendingFailover.lastPrompt;

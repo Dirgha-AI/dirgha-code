@@ -10,19 +10,21 @@
  * of text_delta between either thinking or tool events).
  */
 
-import * as React from 'react';
-import { Box, Text, useStdout } from 'ink';
-import { useTheme } from '../theme-context.js';
-import { MarkdownDisplay } from '../markdown/index.js';
+import * as React from "react";
+import { Box, Text, useStdout } from "ink";
+import { useTheme } from "../theme-context.js";
+import { MarkdownDisplay } from "../markdown/index.js";
 
 export interface StreamingTextProps {
   content: string;
 }
 
-const PREFIX = '✦';
+const PREFIX = "✦";
 const PREFIX_WIDTH = 2;
 
-export function StreamingText({ content }: StreamingTextProps): React.JSX.Element | null {
+export const StreamingText = React.memo(function StreamingText({
+  content,
+}: StreamingTextProps): React.JSX.Element | null {
   const { stdout } = useStdout();
   const palette = useTheme();
   const cols = stdout?.columns ?? 80;
@@ -34,8 +36,12 @@ export function StreamingText({ content }: StreamingTextProps): React.JSX.Elemen
         <Text color={palette.text.accent}>{PREFIX}</Text>
       </Box>
       <Box flexGrow={1} flexDirection="column">
-        <MarkdownDisplay text={content} palette={palette} width={contentWidth} />
+        <MarkdownDisplay
+          text={content}
+          palette={palette}
+          width={contentWidth}
+        />
       </Box>
     </Box>
   );
-}
+});

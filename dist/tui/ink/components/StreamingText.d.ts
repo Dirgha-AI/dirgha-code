@@ -9,8 +9,8 @@
  * Use one instance per text span (a text span is a contiguous run
  * of text_delta between either thinking or tool events).
  */
-import * as React from 'react';
+import * as React from "react";
 export interface StreamingTextProps {
     content: string;
 }
-export declare function StreamingText({ content }: StreamingTextProps): React.JSX.Element | null;
+export declare const StreamingText: React.NamedExoticComponent<StreamingTextProps>;

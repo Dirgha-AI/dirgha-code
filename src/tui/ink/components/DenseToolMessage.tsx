@@ -42,7 +42,7 @@ const TOOL_LABEL: Record<string, string> = {
   task: "Task",
 };
 
-export function DenseToolMessage(
+export const DenseToolMessage = React.memo(function DenseToolMessage(
   props: DenseToolMessageProps,
 ): React.JSX.Element {
   const palette = useTheme();
@@ -84,10 +84,7 @@ export function DenseToolMessage(
         {isRunning ? (
           <SpinnerGlyph isActive={busy} color={glyphColour} />
         ) : (
-          <Text
-            color={glyphColour}
-            bold={!isRunning}
-          >
+          <Text color={glyphColour} bold={!isRunning}>
             {props.status === "error" ? TOOL_STATUS.ERROR : TOOL_STATUS.SUCCESS}
           </Text>
         )}
@@ -121,7 +118,7 @@ export function DenseToolMessage(
       )}
     </Box>
   );
-}
+});
 
 function formatElapsed(ms: number): string {
   if (ms < 1000) return `${ms}ms`;

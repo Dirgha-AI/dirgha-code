@@ -75,7 +75,7 @@ function diffShortPreview(text, maxLen = 80) {
         return text.replace(/\s+/g, " ").slice(0, maxLen);
     return first.replace(/\s+/g, " ").slice(0, maxLen) + "\u2026";
 }
-export function ToolBox(props) {
+export const ToolBox = React.memo(function ToolBox(props) {
     const palette = useTheme();
     const { busy: _spinnerBusy } = React.useContext(SpinnerContext);
     const isRunning = props.status !== "done" &&
@@ -116,5 +116,5 @@ export function ToolBox(props) {
     return (_jsxs(Box, { flexDirection: "column", borderStyle: "round", borderColor: borderColour, paddingX: 1, marginBottom: 1, children: [_jsxs(Box, { gap: 1, children: [icon !== null ? (_jsx(Text, { color: iconColour, children: icon })) : (_jsx(SpinnerGlyph, { isActive: isRunning })), _jsx(Text, { color: palette.text.accent, bold: true, children: iconFor(props.name) }), _jsx(Text, { color: props.status === "done" || props.status === "blocked"
                             ? palette.text.secondary
                             : palette.text.primary, bold: props.status !== "blocked", dimColor: props.status === "blocked", children: prettyName(props.name) }), props.argSummary !== undefined && props.argSummary.length > 0 && (_jsxs(Text, { color: palette.text.secondary, dimColor: true, children: ["(", props.argSummary, ")"] })), elapsedLabel !== "" && (_jsx(Text, { color: palette.text.secondary, dimColor: true, children: elapsedLabel })), props.status === "blocked" && (_jsx(Text, { color: palette.status.warning, children: "(blocked)" }))] }), preview !== "" && !diffMode && (_jsx(Box, { children: _jsx(Text, { color: palette.text.secondary, dimColor: true, children: preview }) })), diffMode && props.outputPreview && (_jsx(Box, { flexDirection: "column", children: renderDiffLines(props.outputPreview, 30) }))] }));
-}
+});
 //# sourceMappingURL=ToolBox.js.map

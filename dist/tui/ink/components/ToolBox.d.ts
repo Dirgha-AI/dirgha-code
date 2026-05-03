@@ -22,4 +22,4 @@ export interface ToolBoxProps {
     durationMs?: number;
     startedAt: number;
 }
-export declare function ToolBox(props: ToolBoxProps): React.JSX.Element;
+export declare const ToolBox: React.NamedExoticComponent<ToolBoxProps>;

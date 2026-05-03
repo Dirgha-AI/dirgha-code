@@ -96,7 +96,9 @@ function diffShortPreview(text: string, maxLen = 80): string {
   return first.replace(/\s+/g, " ").slice(0, maxLen) + "\u2026";
 }
 
-export function ToolBox(props: ToolBoxProps): React.JSX.Element {
+export const ToolBox = React.memo(function ToolBox(
+  props: ToolBoxProps,
+): React.JSX.Element {
   const palette = useTheme();
   const { busy: _spinnerBusy } = React.useContext(SpinnerContext);
   const isRunning =
@@ -200,4 +202,4 @@ export function ToolBox(props: ToolBoxProps): React.JSX.Element {
       )}
     </Box>
   );
-}
+});

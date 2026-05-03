@@ -183,7 +183,14 @@ export function App(props: AppProps): React.JSX.Element {
   const [mode, setMode] = React.useState<Mode>(
     (props.config.mode as Mode | undefined) ?? "act",
   );
-  const projection = useEventProjection(props.events);
+  const projection = useEventProjection(props.events, {
+    // Gemini CLI parity: when streamed text exceeds 5000 chars, split it
+    // at a safe markdown boundary and push the older portion to committed
+    // history (in <Static>), keeping the trailing chunk dynamic.
+    onCommitSplit: React.useCallback((item: TranscriptItem) => {
+      setTranscript((prev) => [...prev, item]);
+    }, []),
+  });
   const overlays = useOverlays();
   // Live counters for the in-progress turn — drive the StatusBar
   // tok/s readout. Reset at agent_start, accumulate output deltas,
@@ -901,7 +908,7 @@ export function App(props: AppProps): React.JSX.Element {
 
   return (
     <ThemeProvider activeTheme={themeName}>
-      <SpinnerContext.Provider value={{ busy }}>
+      <SpinnerContext.Provider value={{ busy, frame: 0 }}>
         <Box flexDirection="column">
           <Static items={LOGO_ITEMS}>
             {(): React.JSX.Element => <Logo key="logo" version={VERSION} />}

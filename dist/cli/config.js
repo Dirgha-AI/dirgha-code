@@ -20,6 +20,7 @@ export const DEFAULT_CONFIG = {
     compaction: { triggerTokens: 120_000, preserveLastTurns: 6 },
     telemetry: { enabled: false },
     kbAutoInject: true,
+    alternateBuffer: true,
 };
 export async function loadConfig(cwd = process.cwd()) {
     const userPath = join(homedir(), ".dirgha", "config.json");

@@ -14,6 +14,10 @@ import { randomUUID } from "node:crypto";
 import type { AgentEvent, UsageTotal } from "../../kernel/types.js";
 import type { EventStream } from "../../kernel/event-stream.js";
 import type { ToolStatus } from "./components/ToolBox.js";
+import {
+  findLastSafeSplitPoint,
+  MAX_LIVE_CHUNK_CHARS,
+} from "./markdown/split-point.js";
 
 export type TranscriptItem =
   | { kind: "user"; id: string; text: string }
@@ -48,7 +52,17 @@ export interface EventProjection {
   clear: () => void;
 }
 
-export function useEventProjection(events: EventStream): EventProjection {
+export interface EventProjectionOptions {
+  /** Called when the streamed text exceeds MAX_LIVE_CHUNK_CHARS and is
+   *  split at a safe markdown boundary. The older portion is committed
+   *  to static history; the caller should append it to the transcript. */
+  onCommitSplit?: (item: TranscriptItem) => void;
+}
+
+export function useEventProjection(
+  events: EventStream,
+  opts: EventProjectionOptions = {},
+): EventProjection {
   const [liveItems, setLiveItems] = React.useState<TranscriptItem[]>([]);
   const [totals, setTotals] = React.useState<UsageTotal>({
     inputTokens: 0,
@@ -187,6 +201,41 @@ export function useEventProjection(events: EventStream): EventProjection {
                 const p = pendingTextRef.current;
                 if (!p) return;
                 if (p.content === lastFlushedTextRef.current) return;
+
+                // Gemini CLI message splitting: when accumulated text
+                // grows beyond MAX_LIVE_CHUNK_CHARS, find a safe split
+                // point and push the older portion to committed (Static)
+                // history, keeping only the trailing chunk dynamic.
+                if (
+                  p.content.length > MAX_LIVE_CHUNK_CHARS &&
+                  opts.onCommitSplit
+                ) {
+                  const splitAt = findLastSafeSplitPoint(p.content);
+                  if (splitAt < p.content.length) {
+                    const committed = p.content.slice(0, splitAt).trimEnd();
+                    const pending = p.content.slice(splitAt);
+                    if (committed.length > 0) {
+                      opts.onCommitSplit({
+                        kind: "text",
+                        id: randomUUID(),
+                        content: committed,
+                      });
+                    }
+                    pendingTextRef.current = { id: p.id, content: pending };
+                    lastFlushedTextRef.current = pending;
+                    setLive((prev) =>
+                      Array.isArray(prev)
+                        ? prev.map((it) =>
+                            it.kind === "text" && it.id === p.id
+                              ? { ...it, content: pending }
+                              : it,
+                          )
+                        : prev,
+                    );
+                    return;
+                  }
+                }
+
                 lastFlushedTextRef.current = p.content;
                 setLive((prev) =>
                   Array.isArray(prev)
