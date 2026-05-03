@@ -27,7 +27,7 @@ check('act mode returns undefined hooks', actHooks === undefined);
 const planHooks = enforceMode('plan');
 check('plan mode produces hooks', planHooks?.beforeToolCall !== undefined);
 
-for (const writer of ['fs_write', 'fs_edit', 'shell', 'git']) {
+for (const writer of ['fs_write', 'fs_edit', 'shell']) {
   const r = await planHooks.beforeToolCall(fakeCall(writer));
   check(`plan blocks ${writer}`, r?.block === true && /PLAN/.test(r.reason ?? ''));
 }

@@ -22,12 +22,12 @@ check('PRICES rows have provider+model', PRICES.every(p => p.provider && p.model
 check('PRICES rows have prices',       PRICES.every(p => typeof p.inputPerM === 'number' && typeof p.outputPerM === 'number'));
 
 console.log('\n=== lookupModel ===');
-const kimi = lookupModel('moonshotai/kimi-k2-instruct');
+const kimi = lookupModel('moonshotai/kimi-k2.6', 'nvidia');
 check('lookupModel hit for kimi',       kimi?.provider === 'nvidia');
 check('lookupModel miss returns undef', lookupModel('not-a-model') === undefined);
 
 console.log('\n=== contextWindowFor ===');
-check('Kimi K2 has 128k context',       contextWindowFor('moonshotai/kimi-k2-instruct') === 128_000);
+check('Kimi K2.6 has 256k context',     contextWindowFor('moonshotai/kimi-k2.6') === 256_000);
 check('Gemini 2.5 Pro has 2M context',  contextWindowFor('gemini-2.5-pro') === 2_000_000);
 check('unknown model gets default',     contextWindowFor('unknown/foo') === 32_000);
 
@@ -38,12 +38,12 @@ check('Anthropic family present',       families.has('claude') && families.get('
 check('OpenAI family includes gpt-5',   families.get('gpt')?.some(p => p.model === 'gpt-5'));
 check('Kimi family non-empty',          (families.get('kimi') ?? []).length > 0);
 check('every model in some family',     [...families.values()].flat().length === PRICES.length);
-check('no model in two families',       new Set([...families.values()].flat().map(p => p.model)).size === PRICES.length);
+check('no entry in two families',       new Set([...families.values()].flat().map(p => `${p.provider}:${p.model}`)).size === PRICES.length);
 
 console.log('\n=== findPrice (provider-scoped) ===');
-const fp = findPrice('nvidia', 'moonshotai/kimi-k2-instruct');
-check('findPrice resolves cheap path',  fp?.inputPerM === 0.15);
-const wrongProvider = findPrice('openai', 'moonshotai/kimi-k2-instruct');
+const fp = findPrice('nvidia', 'moonshotai/kimi-k2.6');
+check('findPrice resolves kimi-k2.6',   fp?.inputPerM === 0);
+const wrongProvider = findPrice('openai', 'moonshotai/kimi-k2.6');
 check('findPrice respects provider',    wrongProvider === undefined);
 
 console.log('\n=== capability flags (when populated) ===');

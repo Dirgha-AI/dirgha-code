@@ -22,7 +22,6 @@ export declare class StdioTransport implements Transport {
     private handlers;
     private closeHandlers;
     private buffer;
-    private contentLength;
     private ready;
     constructor(opts: StdioTransportOptions);
     private start;

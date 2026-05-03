@@ -116,16 +116,18 @@ console.log('\n=== nim: reasoning_content (DeepSeek native key) ===');
   check('content path still works',               text === 'final');
 }
 
-console.log('\n=== nim: includeThinking=false drops reasoning entirely ===');
+console.log('\n=== nim: includeThinking=false — content still reaches user ===');
 {
+  // includeThinking=false is accepted but does NOT suppress thinking events
+  // at the provider layer — reasoning_content must be echoed back on the
+  // next API turn (DeepSeek HTTP 400 if omitted). TUI filters display.
   const events = await drain('deepseek-flash', [
     c({ reasoning: 'private' }),
     c({ content: 'public' }, 'stop'),
   ], /* includeThinking */ false);
-  const thinking = events.filter(e => e.type === 'thinking_delta');
   const text = events.filter(e => e.type === 'text_delta').map(e => e.delta).join('');
-  check('thinking suppressed',                    thinking.length === 0);
-  check('content still emitted',                  text === 'public');
+  check('content still emitted when includeThinking=false', text === 'public');
+  check('reasoning still captured for echo-back',  events.some(e => e.type === 'thinking_delta'));
 }
 
 console.log(`\nsummary: ${pass} pass, ${fail} fail`);

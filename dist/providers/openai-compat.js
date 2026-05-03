@@ -148,8 +148,10 @@ class StreamState {
     inThinkBlock = false;
     static THINK_OPEN_RE = /<(?:think|thinking|reasoning|thought|REASONING_SCRATCHPAD)>/i;
     static THINK_CLOSE_RE = /<\/(?:think|thinking|reasoning|thought|REASONING_SCRATCHPAD)>/i;
-    // includeThinking is accepted but no longer used internally — reasoning
-    // content is always captured for multi-turn echo-back compliance.
+    // includeThinking is accepted but not used to gate event emission —
+    // reasoning content is always yielded so assembleTurn can echo it back
+    // on multi-turn DeepSeek API calls (omitting it causes HTTP 400).
+    // The display preference is handled by the TUI layer (showThinking flag).
     constructor(_includeThinking) { }
     /** Split a content delta into text + thinking pieces, honoring open <think> blocks across chunks. */
     routeContent(input) {

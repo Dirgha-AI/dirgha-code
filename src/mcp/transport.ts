@@ -27,7 +27,6 @@ export class StdioTransport implements Transport {
   private handlers: Array<(message: unknown) => void> = [];
   private closeHandlers: Array<() => void> = [];
   private buffer = "";
-  private contentLength = -1;
   private ready: Promise<void>;
 
   constructor(private opts: StdioTransportOptions) {
@@ -72,30 +71,16 @@ export class StdioTransport implements Transport {
 
   private onData(buf: Buffer): void {
     this.buffer += buf.toString("utf8");
-    while (true) {
-      if (this.contentLength < 0) {
-        const headerEnd = this.buffer.indexOf("\r\n\r\n");
-        if (headerEnd === -1) return;
-        const header = this.buffer.slice(0, headerEnd);
-        this.buffer = this.buffer.slice(headerEnd + 4);
-        const match = header.match(/Content-Length: (\d+)/i);
-        if (!match) {
-          this.contentLength = -1;
-          continue;
-        }
-        this.contentLength = parseInt(match[1], 10);
-      }
-      if (this.contentLength >= 0) {
-        if (this.buffer.length < this.contentLength) return;
-        const body = this.buffer.slice(0, this.contentLength);
-        this.buffer = this.buffer.slice(this.contentLength);
-        this.contentLength = -1;
-        try {
-          const parsed: unknown = JSON.parse(body);
-          for (const h of this.handlers) h(parsed);
-        } catch {
-          /* skip malformed */
-        }
+    let nl: number;
+    while ((nl = this.buffer.indexOf("\n")) >= 0) {
+      const line = this.buffer.slice(0, nl).trimEnd();
+      this.buffer = this.buffer.slice(nl + 1);
+      if (!line) continue;
+      try {
+        const parsed: unknown = JSON.parse(line);
+        for (const h of this.handlers) h(parsed);
+      } catch {
+        /* skip malformed */
       }
     }
   }
@@ -105,10 +90,9 @@ export class StdioTransport implements Transport {
     if (!this.child || !this.child.stdin)
       throw new Error("Transport is closed");
     await new Promise<void>((resolve, reject) => {
-      const json = JSON.stringify(message);
-      const header = `Content-Length: ${Buffer.byteLength(json)}\r\n\r\n`;
-      (this.child as ChildProcess).stdin!.write(header + json, (err) =>
-        err ? reject(err) : resolve(),
+      (this.child as ChildProcess).stdin!.write(
+        JSON.stringify(message) + "\n",
+        (err) => (err ? reject(err) : resolve()),
       );
     });
   }

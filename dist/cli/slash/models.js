@@ -92,14 +92,16 @@ function collectCatalogueModels() {
         for (const m of cat.models) {
             if (m.deprecated)
                 continue;
+            const raw = m;
+            const priceEntry = PRICES.find((p) => p.provider === cat.provider && p.model === m.id);
             out.push({
                 id: m.id,
                 provider: cat.provider,
                 contextWindow: m.contextWindow,
                 tools: m.tools,
                 thinkingMode: m.thinkingMode,
-                inputPerM: m.inputPerM,
-                outputPerM: m.outputPerM,
+                inputPerM: raw.inputPerM ?? priceEntry?.inputPerM ?? 0,
+                outputPerM: raw.outputPerM ?? priceEntry?.outputPerM ?? 0,
                 defaultModel: m.defaultModel,
             });
         }

@@ -252,7 +252,7 @@ async function executeToolCalls(toolUses, cfg, events) {
                         `Tool '${call.name}' is not allowed in current mode.`;
                     const result = {
                         content: `[MODE BLOCK] ${blockReason}`,
-                        isError: false,
+                        isError: true,
                     };
                     // Emit start so the projection has an item to transition to
                     // "blocked" state. Without this, tool_exec_end maps over nothing.
@@ -266,7 +266,7 @@ async function executeToolCalls(toolUses, cfg, events) {
                         type: "tool_exec_end",
                         id: call.id,
                         output: result.content,
-                        isError: false,
+                        isError: true,
                         durationMs: 0,
                     });
                     return { call, result };

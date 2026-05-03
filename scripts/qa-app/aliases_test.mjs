@@ -22,14 +22,14 @@ const check = (label, ok, detail) => {
 
 console.log('\n=== aliases: short names → canonical ids ===');
 const cases = [
-  ['kimi',    'moonshotai/kimi-k2-instruct'],
+  ['kimi',    'moonshotai/kimi-k2.6'],
   ['opus',    'claude-opus-4-7'],
   ['sonnet',  'claude-sonnet-4-6'],
   ['haiku',   'claude-haiku-4-5'],
   ['gemini',  'gemini-2.5-pro'],
   ['flash',   'gemini-2.5-flash'],
   ['deepseek','deepseek-ai/deepseek-v4-pro'],
-  ['llama',   'meta/llama-3.3-70b-instruct'],
+  ['llama',   'meta/llama-4-maverick-17b-128e-instruct'],
   ['ling',    'inclusionai/ling-2.6-1t:free'],
 ];
 for (const [alias, canon] of cases) {
@@ -38,11 +38,11 @@ for (const [alias, canon] of cases) {
 
 console.log('\n=== aliases: case-insensitive + whitespace ===');
 check('OPUS uppercase',                  resolveModelAlias('OPUS') === 'claude-opus-4-7');
-check('Kimi mixed-case',                 resolveModelAlias('Kimi') === 'moonshotai/kimi-k2-instruct');
+check('Kimi mixed-case',                 resolveModelAlias('Kimi') === 'moonshotai/kimi-k2.6');
 check('  opus   trimmed',                resolveModelAlias('  opus   ') === 'claude-opus-4-7');
 
 console.log('\n=== aliases: unknown ⇒ passthrough ===');
-const fullId = 'moonshotai/kimi-k2-instruct';
+const fullId = 'moonshotai/kimi-k2.6';
 check('full id is pass-through',         resolveModelAlias(fullId) === fullId);
 
 const nonsense = 'no-such-model-anywhere';

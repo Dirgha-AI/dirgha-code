@@ -11,7 +11,6 @@ export class StdioTransport {
     handlers = [];
     closeHandlers = [];
     buffer = "";
-    contentLength = -1;
     ready;
     constructor(opts) {
         this.opts = opts;
@@ -52,34 +51,19 @@ export class StdioTransport {
     }
     onData(buf) {
         this.buffer += buf.toString("utf8");
-        while (true) {
-            if (this.contentLength < 0) {
-                const headerEnd = this.buffer.indexOf("\r\n\r\n");
-                if (headerEnd === -1)
-                    return;
-                const header = this.buffer.slice(0, headerEnd);
-                this.buffer = this.buffer.slice(headerEnd + 4);
-                const match = header.match(/Content-Length: (\d+)/i);
-                if (!match) {
-                    this.contentLength = -1;
-                    continue;
-                }
-                this.contentLength = parseInt(match[1], 10);
+        let nl;
+        while ((nl = this.buffer.indexOf("\n")) >= 0) {
+            const line = this.buffer.slice(0, nl).trimEnd();
+            this.buffer = this.buffer.slice(nl + 1);
+            if (!line)
+                continue;
+            try {
+                const parsed = JSON.parse(line);
+                for (const h of this.handlers)
+                    h(parsed);
             }
-            if (this.contentLength >= 0) {
-                if (this.buffer.length < this.contentLength)
-                    return;
-                const body = this.buffer.slice(0, this.contentLength);
-                this.buffer = this.buffer.slice(this.contentLength);
-                this.contentLength = -1;
-                try {
-                    const parsed = JSON.parse(body);
-                    for (const h of this.handlers)
-                        h(parsed);
-                }
-                catch {
-                    /* skip malformed */
-                }
+            catch {
+                /* skip malformed */
             }
         }
     }
@@ -88,9 +72,7 @@ export class StdioTransport {
         if (!this.child || !this.child.stdin)
             throw new Error("Transport is closed");
         await new Promise((resolve, reject) => {
-            const json = JSON.stringify(message);
-            const header = `Content-Length: ${Buffer.byteLength(json)}\r\n\r\n`;
-            this.child.stdin.write(header + json, (err) => err ? reject(err) : resolve());
+            this.child.stdin.write(JSON.stringify(message) + "\n", (err) => (err ? reject(err) : resolve()));
         });
     }
     onMessage(handler) {
