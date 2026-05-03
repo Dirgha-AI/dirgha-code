@@ -762,10 +762,18 @@ export function App(props) {
         })();
     }, [overlays]);
     const committedJsx = React.useMemo(() => renderTranscript(transcript), [transcript]);
+    // Gemini CLI approach: freeze committed history inside <Static>
+    // so Ink caches the output and never re-renders it. Without this,
+    // every streaming flush tick re-conciles the entire transcript
+    // against the terminal — causing visible flicker/jitter.
+    const committedStaticItems = React.useMemo(() => committedJsx.map((el, i) => ({
+        key: el?.key ?? `c-${i}`,
+        el,
+    })), [committedJsx]);
     const liveJsx = React.useMemo(() => renderTranscript(projection.liveItems), [projection.liveItems]);
     const providerEntries = React.useMemo(() => buildProviderEntries(models, currentModel), [models, currentModel]);
     const LOGO_ITEMS = React.useMemo(() => [{ key: "logo" }], []);
-    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: { busy }, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: LOGO_ITEMS, children: () => _jsx(Logo, { version: VERSION }, "logo") }), _jsx(Box, { flexDirection: "column", children: committedJsx }), _jsx(Box, { flexDirection: "column", children: liveJsx }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
+    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: { busy }, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: LOGO_ITEMS, children: () => _jsx(Logo, { version: VERSION }, "logo") }), _jsx(Static, { items: committedStaticItems, children: ({ el }) => el }), _jsx(Box, { flexDirection: "column", children: liveJsx }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
                             approvalBusRef.current?.resolve(pendingApproval.id, decision);
                         } })), pendingFailover !== null && (_jsx(ModelSwitchPrompt, { failedModel: pendingFailover.failedModel, failoverModel: pendingFailover.failoverModel, onAccept: (failover) => {
                             const lastPrompt = pendingFailover.lastPrompt;

@@ -86,11 +86,12 @@ export function useEventProjection(events: EventStream): EventProjection {
   const liveItemsRef = React.useRef<TranscriptItem[]>([]);
 
   // Adaptive flush: longer text → slower flush to keep rendering smooth.
-  // Short responses stay snappy; long responses avoid the 20Hz jitter trap.
+  // Short responses stay snappy; long responses avoid terminal flicker.
+  // Minimum 80ms (12.5 FPS) — 30ms caused screen tearing on most terminals.
   function flushDelay(totalChars: number): number {
-    if (totalChars < 500) return 30;
-    if (totalChars < 2000) return 80;
-    return 150;
+    if (totalChars < 500) return 80;
+    if (totalChars < 2000) return 120;
+    return 200;
   }
 
   const setLive = React.useCallback(

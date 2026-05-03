@@ -875,6 +875,18 @@ export function App(props: AppProps): React.JSX.Element {
     () => renderTranscript(transcript),
     [transcript],
   );
+  // Gemini CLI approach: freeze committed history inside <Static>
+  // so Ink caches the output and never re-renders it. Without this,
+  // every streaming flush tick re-conciles the entire transcript
+  // against the terminal — causing visible flicker/jitter.
+  const committedStaticItems = React.useMemo(
+    () =>
+      committedJsx.map((el: any, i: number) => ({
+        key: el?.key ?? `c-${i}`,
+        el,
+      })),
+    [committedJsx],
+  );
   const liveJsx = React.useMemo(
     () => renderTranscript(projection.liveItems),
     [projection.liveItems],
@@ -894,7 +906,7 @@ export function App(props: AppProps): React.JSX.Element {
           <Static items={LOGO_ITEMS}>
             {(): React.JSX.Element => <Logo key="logo" version={VERSION} />}
           </Static>
-          <Box flexDirection="column">{committedJsx}</Box>
+          <Static items={committedStaticItems}>{({ el }: any) => el}</Static>
           <Box flexDirection="column">{liveJsx}</Box>
           {pendingApproval !== null && approvalBusRef.current && (
             <ApprovalPrompt
