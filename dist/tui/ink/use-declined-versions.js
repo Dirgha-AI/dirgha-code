@@ -39,14 +39,18 @@ export function useDeclinedVersions() {
         return set;
     }, []);
     const isDeclined = React.useCallback((version) => declinedRef.current.has(version), []);
+    const writeGateRef = React.useRef(Promise.resolve());
     const decline = React.useCallback((version) => {
         declinedRef.current.add(version);
-        readState()
+        // Serialize writes: two rapid decline() calls race on readState →
+        // modify → writeState. Chain onto a promise gate so each write
+        // completes before the next read.
+        writeGateRef.current = writeGateRef.current.then(() => readState()
             .then((state) => {
             state.declinedVersions = [...declinedRef.current];
             return writeState(state);
         })
-            .catch(() => { });
+            .catch(() => { }));
     }, []);
     // Pre-load on hook mount.
     React.useEffect(() => {

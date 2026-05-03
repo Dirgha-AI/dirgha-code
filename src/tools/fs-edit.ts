@@ -1,32 +1,16 @@
 /**
- * String-replace edit with exact and fuzzy matching.
+ * String-replace edit with exact matching.
  *
- * Exact match is the fast path. When the exact string is missing, the
- * tool falls back to whitespace-normalised matching and, if still
- * ambiguous, returns an error with the candidate contexts so the agent
- * can retry with more specific anchors. This is deterministic and
+ * When the exact string is missing, returns an error so the agent can
+ * retry with more specific anchors. This is deterministic and
  * auditable — no "nearest fuzzy match" guessing.
  */
 
 import { readFile, stat, writeFile } from "node:fs/promises";
-import { resolve, sep } from "node:path";
 import type { Tool } from "./registry.js";
 import type { ToolResult } from "../kernel/types.js";
 import { summariseDiff, unifiedDiff } from "./diff.js";
-
-/** Decode literal \uXXXX escape sequences a model may have emitted as text. */
-function decodeLiteralUnicodeEscapes(s: string): string {
-  return s.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => {
-    const cp = parseInt(hex, 16);
-    // Only decode printable ASCII range (0x20–0x7E) plus common whitespace.
-    // Leave high-codepoint escapes (e.g. CJK, emoji) as-is to avoid
-    // corrupting intentional unicode-escape strings in JS source.
-    if ((cp >= 0x20 && cp <= 0x7e) || cp === 0x0a || cp === 0x0d || cp === 0x09) {
-      return String.fromCodePoint(cp);
-    }
-    return _;
-  });
-}
+import { decodeLiteralUnicodeEscapes, isValidCwdPath } from "../utils/fs.js";
 
 interface Input {
   path: string;
@@ -57,10 +41,9 @@ export const fsEditTool: Tool = {
     ToolResult<{ replacements: number; added: number; removed: number }>
   > {
     const input = rawInput as Input;
-    const abs = resolve(ctx.cwd, input.path);
-    if (!abs.startsWith(ctx.cwd + sep) && abs !== ctx.cwd) {
-      return { content: `Path escapes working directory: ${input.path}`, isError: true };
-    }
+    const check = isValidCwdPath(ctx.cwd, input.path);
+    if (!check.valid) return { content: check.error, isError: true };
+    const abs = check.resolved;
     const info = await stat(abs).catch(() => undefined);
     if (!info || !info.isFile())
       return { content: `No such file: ${input.path}`, isError: true };

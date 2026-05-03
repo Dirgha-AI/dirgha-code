@@ -12,24 +12,26 @@ export interface LanguageServerInfo {
   findRoot(filePath: string): string | undefined;
 }
 
+const whichCache = new Map<string, string | null>();
+
 function which(cmd: string): string | null {
+  const cached = whichCache.get(cmd);
+  if (cached !== undefined) return cached;
   try {
     const result = execSync(
       process.platform === "win32" ? `where ${cmd}` : `command -v ${cmd}`,
       { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] },
     ).trim();
+    whichCache.set(cmd, result || null);
     return result || null;
   } catch {
+    whichCache.set(cmd, null);
     return null;
   }
 }
 
 function existsSync(p: string): boolean {
-  try {
-    return fs.existsSync(p);
-  } catch {
-    return false;
-  }
+  return fs.existsSync(p);
 }
 
 function findUp(dir: string, targets: string[]): string | undefined {

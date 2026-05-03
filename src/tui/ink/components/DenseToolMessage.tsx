@@ -72,7 +72,11 @@ export const DenseToolMessage = React.memo(function DenseToolMessage(
   const elapsed =
     props.status === "running" && props.startedAt
       ? liveElapsed
-      : formatElapsed(props.durationMs ?? 0);
+      : props.durationMs !== undefined
+        ? formatElapsed(props.durationMs)
+        : props.startedAt
+          ? formatElapsed(Date.now() - props.startedAt)
+          : "";
   const summary = props.outputPreview
     ? props.outputPreview.replace(/\s+/g, " ").slice(0, 60)
     : "";

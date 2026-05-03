@@ -5,6 +5,7 @@
  * are lazy-constructed; missing API keys surface only on first use.
  */
 import type { Provider, ProviderConfig } from "./iface.js";
+import { type ProviderId } from "./dispatch.js";
 import { type RateLimitOptions } from "./rate-limiter.js";
 export * from "./iface.js";
 export * from "./dispatch.js";
@@ -47,7 +48,17 @@ export interface ProviderRegistryConfig {
 export declare class ProviderRegistry {
     private config;
     private cache;
+    /** Timestamp in ms (performance.now) when each provider was cached. */
+    private cacheTime;
+    /** Invalidate cached providers older than this many ms (30 min). */
+    private static readonly CACHE_TTL_MS;
     constructor(config?: ProviderRegistryConfig);
+    /** Force-evict a cached provider so the next call to forModel
+     *  re-constructs it with the latest config. Call this after updating
+     *  API keys or other provider settings mid-session. */
+    invalidate(providerId: ProviderId): void;
+    /** Evict all cached providers (e.g. after bulk config reload). */
+    invalidateAll(): void;
     forModel(modelId: string): Provider;
     private maybeRateLimit;
     private construct;

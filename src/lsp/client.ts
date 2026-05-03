@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import path from "node:path";
+import { safeEnvironment } from "../utils/env.js";
 
 // ── JSON-RPC 2.0 types ─────────────────────────────────────────────────────
 interface RpcRequest {
@@ -319,13 +320,15 @@ export async function createLspClient(
   const proc = spawn(command, args, {
     cwd: cwd || root,
     stdio: ["pipe", "pipe", "pipe"],
-    env: { ...process.env },
+    env: safeEnvironment(),
   });
 
   const connection = createLspConnection(proc);
 
   if (proc.stderr) {
-    proc.stderr.resume();
+    proc.stderr.on("data", (chunk: Buffer) => {
+      process.stderr.write(`[lsp:${serverId}] ${chunk.toString("utf8")}`);
+    });
   }
 
   proc.on("exit", (code, signal) => {
@@ -346,9 +349,16 @@ export async function createLspClient(
     "textDocument/publishDiagnostics",
     (params: unknown) => {
       const p = params as { uri: string; diagnostics: Diagnostic[] };
-      const fpath = p.uri.startsWith("file://")
-        ? new URL(p.uri).pathname
-        : p.uri;
+      let fpath: string;
+      if (p.uri.startsWith("file://")) {
+        try {
+          fpath = new URL(p.uri).pathname;
+        } catch {
+          fpath = p.uri;
+        }
+      } else {
+        fpath = p.uri;
+      }
       diagnostics.set(fpath, p.diagnostics ?? []);
     },
   );
@@ -390,21 +400,22 @@ export async function createLspClient(
   async function openFile(filePath: string) {
     if (openedFiles.has(filePath)) return;
     openedFiles.add(filePath);
+    const languageId = LANGUAGE_MAP[path.extname(filePath)] ?? "plaintext";
+    let text: string;
     try {
       const fs = await import("node:fs/promises");
-      const text = await fs.readFile(filePath, "utf8");
-      const languageId = LANGUAGE_MAP[path.extname(filePath)] ?? "plaintext";
-      await connection.sendNotification("textDocument/didOpen", {
-        textDocument: {
-          uri: pathToFileURL(filePath).href,
-          languageId,
-          version: 0,
-          text,
-        },
-      });
+      text = await fs.readFile(filePath, "utf8");
     } catch {
-      /* file may not exist yet */
+      text = "";
     }
+    await connection.sendNotification("textDocument/didOpen", {
+      textDocument: {
+        uri: pathToFileURL(filePath).href,
+        languageId,
+        version: 0,
+        text,
+      },
+    });
   }
 
   const client: LspClient = {

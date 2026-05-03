@@ -7,14 +7,15 @@
  * Real env vars take precedence over the file — letting users override
  * a stored key for one invocation by exporting in the shell.
  */
-import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { chmod, mkdir, readFile, writeFile, rename } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { randomBytes } from "node:crypto";
 export function keyStorePath() {
-    return join(homedir(), '.dirgha', 'keys.json');
+    return join(homedir(), ".dirgha", "keys.json");
 }
 export async function readKeyStore(path = keyStorePath()) {
-    const text = await readFile(path, 'utf8').catch(() => '');
+    const text = await readFile(path, "utf8").catch(() => "");
     if (!text)
         return {};
     try {
@@ -33,9 +34,9 @@ export async function hydrateEnvFromKeyStore(env = process.env, path = keyStoreP
     const store = await readKeyStore(path);
     const hydrated = [];
     for (const [name, value] of Object.entries(store)) {
-        if (typeof value !== 'string' || value.length === 0)
+        if (typeof value !== "string" || value.length === 0)
             continue;
-        if (env[name] === undefined || env[name] === '') {
+        if (env[name] === undefined || env[name] === "") {
             env[name] = value;
             hydrated.push(name);
         }
@@ -46,12 +47,16 @@ export async function hydrateEnvFromKeyStore(env = process.env, path = keyStoreP
 export async function saveKey(envVar, value, path = keyStorePath()) {
     const store = await readKeyStore(path);
     store[envVar] = value;
-    await mkdir(join(homedir(), '.dirgha'), { recursive: true });
-    await writeFile(path, JSON.stringify(store, null, 2) + '\n', 'utf8');
+    await mkdir(join(homedir(), ".dirgha"), { recursive: true });
+    const tmp = `${path}.tmp-${randomBytes(4).toString("hex")}`;
+    await writeFile(tmp, JSON.stringify(store, null, 2) + "\n", "utf8");
     try {
-        await chmod(path, 0o600);
+        await chmod(tmp, 0o600);
     }
-    catch { /* non-POSIX (Windows) */ }
+    catch {
+        /* non-POSIX (Windows) */
+    }
+    await rename(tmp, path);
     process.env[envVar] = value;
 }
 //# sourceMappingURL=keystore.js.map

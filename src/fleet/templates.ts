@@ -1,6 +1,10 @@
 /**
  * Agent team templates — pre-configured workflows.
  * Ported from monorepo agent/orchestration/templates.ts.
+ *
+ * Pass a template name via FleetConfig.template (or --template <name> on
+ * the CLI) to skip the LLM decomposer and use a fixed agent team instead.
+ * runFleet() calls expandTemplate() → getTemplate() → FleetSubtask[].
  */
 export interface TeamTemplate {
   name: string;

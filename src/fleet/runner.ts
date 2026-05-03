@@ -44,6 +44,7 @@ import {
   type FleetSubtask,
   type WorktreeHandle,
 } from "./types.js";
+import { getTemplate, listTemplateNames } from "./templates.js";
 
 const DECOMPOSE_SYSTEM = `You are a task decomposer. Given a user goal, split it into 2-5 INDEPENDENT subtasks that can run in PARALLEL without conflicting with each other (no shared-file edits).
 
@@ -85,7 +86,9 @@ export async function runFleet(config: FleetConfig): Promise<FleetResult> {
   const subtasks =
     config.subtasks && config.subtasks.length > 0
       ? config.subtasks.map(normalizeSubtask)
-      : await decomposeGoal(config.goal, plannerModel, providers);
+      : config.template
+        ? expandTemplate(config.template, config.goal)
+        : await decomposeGoal(config.goal, plannerModel, providers);
 
   const worktrees: WorktreeHandle[] = [];
   const agents: FleetAgent[] = [];
@@ -224,6 +227,9 @@ async function runWithConcurrency(
   }
 }
 
+// runOneAgent is ~100 lines — consider splitting into smaller helpers
+// (e.g. setupAgentController, runAgentLoopWithHooks) once the event
+// relay and ledger side-effects are stable enough to factor out.
 async function runOneAgent(agent: FleetAgent, opts: RunOptions): Promise<void> {
   agent.status = "running";
   agent.startedAt = Date.now();
@@ -390,7 +396,7 @@ function agentSystemPrompt(subtask: FleetSubtask): string {
   const type = subtask.type ?? "code";
   const isCodeOrVerify = type === "code" || type === "verify";
   const toolMandate = isCodeOrVerify
-    ? 'You MUST use the available tools (fs_write, fs_edit, shell, etc.) to make changes. Do NOT respond with text claiming you completed work — you have no effect on the filesystem unless you invoke a tool. After your tool calls, commit any new files with the git tool (`git add <file> && git commit -m "<msg>"`) so the work shows up on your branch.'
+    ? 'You MUST use the available tools (fs_write, fs_edit, shell, etc.) to make changes. Do NOT respond with text claiming you completed work — you have no effect on the filesystem unless you invoke a tool. After your tool calls, commit any new files with the shell tool (`shell git add <file> && shell git commit -m "<msg>"`) so the work shows up on your branch.'
     : "Use tools (fs_read, search_grep, etc.) to inspect the workspace. Respond with a short summary of what you found.";
   return `You are a fleet subagent focused on a single subtask.
 Subtask: ${subtask.title}
@@ -425,6 +431,37 @@ function normalizeSubtask(s: FleetSubtask): FleetSubtask {
     model: s.model,
     toolAllowlist: s.toolAllowlist,
   };
+}
+
+/* ------------------------- template expansion --------------------- */
+
+/**
+ * Expand a named template into FleetSubtask[]. Each AgentSlot with count N
+ * produces N subtasks titled "<templateName>-<type>-<i>" (1-indexed).
+ * Throws with the list of valid names when the template is not found.
+ */
+function expandTemplate(templateName: string, goal: string): FleetSubtask[] {
+  const tmpl = getTemplate(templateName);
+  if (!tmpl) {
+    throw new Error(
+      `Unknown template "${templateName}". Valid names: ${listTemplateNames().join(", ")}.`,
+    );
+  }
+  const out: FleetSubtask[] = [];
+  for (const slot of tmpl.agents) {
+    for (let i = 1; i <= slot.count; i++) {
+      const suffix = slot.count > 1 ? `-${i}` : "";
+      const id = slug(`${tmpl.name}-${slot.type}${suffix}`, 30);
+      out.push({
+        id,
+        title: `${tmpl.name}-${slot.type}${suffix}`,
+        task: goal,
+        type: slot.type,
+        toolAllowlist: slot.tools,
+      });
+    }
+  }
+  return out;
 }
 
 /* ------------------------- decomposition -------------------------- */

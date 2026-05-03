@@ -38,7 +38,7 @@ export const ThinkingBlockGroup = React.memo(function ThinkingBlockGroup({ block
     }
     return (_jsx(Box, { flexDirection: "column", marginBottom: 1, paddingLeft: 1, children: blocks.map((block, i) => {
             const { summary, body } = splitContent(block.content);
-            return (_jsxs(Box, { flexDirection: "column", children: [summary.length > 0 && (_jsx(Box, { paddingLeft: 2, marginBottom: body.length > 0 ? 0 : 0, children: _jsx(Text, { color: palette.text.primary, bold: true, italic: true, children: summary }) })), body.length > 0 && (_jsx(Box, { borderStyle: "single", borderLeft: true, borderRight: false, borderTop: false, borderBottom: false, borderColor: palette.colors.border ?? palette.border.default ?? "#444", paddingLeft: 1, marginLeft: 2, marginBottom: i < blocks.length - 1 ? 1 : 0, children: _jsx(Text, { color: palette.text.secondary, italic: true, wrap: "wrap", children: body }) }))] }, block.id));
+            return (_jsxs(Box, { flexDirection: "column", children: [summary.length > 0 && (_jsx(Box, { paddingLeft: 2, marginBottom: body.length > 0 ? 0 : 0, children: _jsx(Text, { color: palette.text.primary, bold: true, italic: true, children: summary }) })), body.length > 0 && (_jsx(Box, { borderStyle: "single", borderLeft: true, borderRight: false, borderTop: false, borderBottom: false, borderColor: palette.border.default, paddingLeft: 1, marginLeft: 2, marginBottom: i < blocks.length - 1 ? 1 : 0, children: _jsx(Text, { color: palette.text.secondary, italic: true, wrap: "wrap", children: body }) }))] }, block.id));
         }) }));
 });
 //# sourceMappingURL=ThinkingBlock.js.map

@@ -78,10 +78,12 @@ async function doLaunch(argv, opts) {
         "--planner",
         "--strategy",
         "--timeout-ms",
+        "--template",
     ]);
     const positional = [];
     let single = false;
     let branchOverride;
+    let templateOverride = opts.template;
     for (let i = 0; i < argv.length; i++) {
         const a = argv[i];
         if (a === "--single") {
@@ -94,6 +96,15 @@ async function doLaunch(argv, opts) {
         }
         if (a === "--branch") {
             branchOverride = argv[i + 1];
+            i++;
+            continue;
+        }
+        if (a.startsWith("--template=")) {
+            templateOverride = a.slice("--template=".length);
+            continue;
+        }
+        if (a === "--template") {
+            templateOverride = argv[i + 1];
             i++;
             continue;
         }
@@ -127,6 +138,7 @@ async function doLaunch(argv, opts) {
         timeoutMs: opts.timeoutMs,
         events,
         verbose: opts.verbose,
+        template: templateOverride,
         ...(single
             ? {
                 subtasks: [
@@ -142,7 +154,9 @@ async function doLaunch(argv, opts) {
     };
     process.stderr.write(single
         ? `[fleet] launching single-task agent…\n`
-        : `[fleet] decomposing and launching…\n`);
+        : templateOverride
+            ? `[fleet] using template "${templateOverride}"…\n`
+            : `[fleet] decomposing and launching…\n`);
     const result = await runFleet(config);
     emitResult("launch", result, opts);
     return result.failCount > 0 && result.successCount === 0 ? 1 : 0;

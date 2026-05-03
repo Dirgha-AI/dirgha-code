@@ -16,8 +16,9 @@
  * supersedes.
  */
 
+import { access } from "node:fs/promises";
 import { mkdir } from "node:fs/promises";
-import { homedir, tmpdir } from "node:os";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import type { Tool, ToolContext } from "./registry.js";
 import type { ToolResult } from "../kernel/types.js";
@@ -77,6 +78,22 @@ const SCREENSHOT_DIR = join(homedir(), ".dirgha", "screenshots");
 
 let browser: PwBrowser | undefined;
 let page: PwPage | undefined;
+let playwrightMod:
+  | { launch(opts: { headless: boolean; args?: string[] }): Promise<PwBrowser> }
+  | undefined;
+
+async function loadPlaywright(): Promise<{
+  launch(opts: { headless: boolean; args?: string[] }): Promise<PwBrowser>;
+}> {
+  if (playwrightMod) return playwrightMod;
+  const pwModuleId = "playwright";
+  const mod: any = await import(pwModuleId);
+  playwrightMod = mod.chromium ?? mod.default?.chromium;
+  if (!playwrightMod || typeof playwrightMod.launch !== "function") {
+    throw new Error("playwright module shape unexpected (no chromium.launch)");
+  }
+  return playwrightMod;
+}
 
 async function ensureBrowser(): Promise<PwPage> {
   if (page && browser?.isConnected?.() !== false) return page;
@@ -84,27 +101,26 @@ async function ensureBrowser(): Promise<PwPage> {
     launch(opts: { headless: boolean; args?: string[] }): Promise<PwBrowser>;
   };
   try {
-    // Dynamic import — resolved at runtime. Playwright is intentionally
-    // not in package.json deps (heavy + optional). Hiding the literal
-    // string behind a variable keeps TS's module resolver from looking
-    // for type definitions for an absent package.
-    const pwModuleId = "playwright";
-    const mod: any = await import(pwModuleId);
-    chromium = mod.chromium ?? mod.default?.chromium;
-    if (!chromium || typeof chromium.launch !== "function") {
-      throw new Error(
-        "playwright module shape unexpected (no chromium.launch)",
-      );
-    }
+    chromium = await loadPlaywright();
   } catch (err) {
     throw new Error(
       `playwright is not available. Install with: pnpm add -w playwright && npx playwright install chromium. Underlying: ${(err as Error).message}`,
     );
   }
 
+  const args: string[] = ["--disable-dev-shm-usage"];
+  const sandboxAvailable = await access(
+    "/proc/sys/kernel/unprivileged_userns_clone",
+  )
+    .then(() => true)
+    .catch(() => false);
+  if (!sandboxAvailable) {
+    args.push("--no-sandbox");
+  }
+
   browser = await chromium.launch({
     headless: true,
-    args: ["--no-sandbox", "--disable-dev-shm-usage"],
+    args,
   });
   page = await browser.newPage();
   return page;
@@ -247,8 +263,7 @@ export const browserTool: Tool = {
 
     // Probe playwright availability before attempting any action.
     try {
-      const pwModuleId = "playwright";
-      await import(pwModuleId);
+      await loadPlaywright();
     } catch {
       return fail(
         "Browser tool unavailable: Playwright is not installed. Run: npm install -g playwright && playwright install chromium",
@@ -277,8 +292,5 @@ export const browserTool: Tool = {
     }
   },
 };
-
-// Silence unused-var warnings for the tmp dir import even if unused.
-void tmpdir;
 
 export default browserTool;

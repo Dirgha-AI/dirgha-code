@@ -24,10 +24,18 @@
  * stolen so a crashed CLI can't wedge the file forever.
  */
 
-import { chmod, mkdir, readFile, writeFile, stat, unlink } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
-import { randomBytes } from 'node:crypto';
+import {
+  chmod,
+  mkdir,
+  readFile,
+  writeFile,
+  stat,
+  unlink,
+  rename,
+} from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { randomBytes } from "node:crypto";
 
 export interface PoolEntry {
   id: string;
@@ -44,47 +52,65 @@ export type Pool = Record<string, PoolEntry[]>;
 const LOCK_TIMEOUT_MS = 30_000;
 
 export function poolPath(home: string = homedir()): string {
-  return join(home, '.dirgha', 'keypool.json');
+  return join(home, ".dirgha", "keypool.json");
 }
 
 function lockPath(home: string = homedir()): string {
-  return join(home, '.dirgha', 'keypool.json.lock');
+  return join(home, ".dirgha", "keypool.json.lock");
 }
 
 async function acquireLock(home: string): Promise<() => Promise<void>> {
   const lp = lockPath(home);
-  await mkdir(join(home, '.dirgha'), { recursive: true });
+  await mkdir(join(home, ".dirgha"), { recursive: true });
   for (let attempt = 0; attempt < 30; attempt++) {
     try {
-      await writeFile(lp, String(process.pid), { flag: 'wx' });
-      return async () => { await unlink(lp).catch(() => {}); };
+      await writeFile(lp, String(process.pid), { flag: "wx" });
+      return async () => {
+        await unlink(lp).catch(() => {});
+      };
     } catch {
       const info = await stat(lp).catch(() => undefined);
       if (info && Date.now() - info.mtimeMs > LOCK_TIMEOUT_MS) {
         await unlink(lp).catch(() => {});
         continue;
       }
-      await new Promise(r => setTimeout(r, 100));
+      await new Promise((r) => setTimeout(r, 100));
     }
   }
-  // Fall through — last-resort overwrite to avoid deadlock.
-  await writeFile(lp, String(process.pid));
-  return async () => { await unlink(lp).catch(() => {}); };
+  const info = await stat(lp).catch(() => undefined);
+  if (!info || Date.now() - info.mtimeMs > LOCK_TIMEOUT_MS) {
+    await writeFile(lp, String(process.pid));
+    return async () => {
+      await unlink(lp).catch(() => {});
+    };
+  }
+  throw new Error(
+    `Could not acquire keypool lock after ${LOCK_TIMEOUT_MS}ms — lock held by another process`,
+  );
 }
 
 export async function readPool(home: string = homedir()): Promise<Pool> {
-  const text = await readFile(poolPath(home), 'utf8').catch(() => '');
+  const text = await readFile(poolPath(home), "utf8").catch(() => "");
   if (!text) return {};
   try {
     const parsed = JSON.parse(text) as Pool;
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch { return {}; }
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
 }
 
 async function writePool(pool: Pool, home: string = homedir()): Promise<void> {
-  await mkdir(join(home, '.dirgha'), { recursive: true });
-  await writeFile(poolPath(home), JSON.stringify(pool, null, 2) + '\n', 'utf8');
-  try { await chmod(poolPath(home), 0o600); } catch { /* non-POSIX */ }
+  await mkdir(join(home, ".dirgha"), { recursive: true });
+  const target = poolPath(home);
+  const tmp = `${target}.tmp-${randomBytes(4).toString("hex")}`;
+  await writeFile(tmp, JSON.stringify(pool, null, 2) + "\n", "utf8");
+  try {
+    await chmod(tmp, 0o600);
+  } catch {
+    /* non-POSIX */
+  }
+  await rename(tmp, target);
 }
 
 export async function addEntry(
@@ -98,7 +124,7 @@ export async function addEntry(
     const pool = await readPool(home);
     const list = pool[envName] ?? [];
     const entry: PoolEntry = {
-      id: randomBytes(3).toString('hex'),
+      id: randomBytes(3).toString("hex"),
       value,
       label: opts.label ?? `key-${list.length + 1}`,
       priority: opts.priority ?? 0,
@@ -115,14 +141,19 @@ export async function addEntry(
   }
 }
 
-export async function removeEntry(envName: string, id: string, home: string = homedir()): Promise<boolean> {
+export async function removeEntry(
+  envName: string,
+  id: string,
+  home: string = homedir(),
+): Promise<boolean> {
   const release = await acquireLock(home);
   try {
     const pool = await readPool(home);
     const list = pool[envName] ?? [];
-    const next = list.filter(e => e.id !== id);
+    const next = list.filter((e) => e.id !== id);
     if (next.length === list.length) return false;
-    if (next.length === 0) delete pool[envName]; else pool[envName] = next;
+    if (next.length === 0) delete pool[envName];
+    else pool[envName] = next;
     await writePool(pool, home);
     return true;
   } finally {
@@ -130,7 +161,10 @@ export async function removeEntry(envName: string, id: string, home: string = ho
   }
 }
 
-export async function clearProvider(envName: string, home: string = homedir()): Promise<number> {
+export async function clearProvider(
+  envName: string,
+  home: string = homedir(),
+): Promise<number> {
   const release = await acquireLock(home);
   try {
     const pool = await readPool(home);
@@ -148,10 +182,16 @@ export async function clearProvider(envName: string, home: string = homedir()): 
  * Returns undefined when no entry is usable; caller falls back to
  * process.env or the legacy single-key store.
  */
-export function pickEntry(pool: Pool, envName: string, now: Date = new Date()): PoolEntry | undefined {
+export function pickEntry(
+  pool: Pool,
+  envName: string,
+  now: Date = new Date(),
+): PoolEntry | undefined {
   const list = pool[envName];
   if (!list || list.length === 0) return undefined;
-  const live = list.filter(e => !e.exhaustedUntil || new Date(e.exhaustedUntil) <= now);
+  const live = list.filter(
+    (e) => !e.exhaustedUntil || new Date(e.exhaustedUntil) <= now,
+  );
   if (live.length === 0) return undefined;
   // Highest priority first; tie-break on least-recently-used so we
   // distribute load across same-priority entries.
@@ -165,11 +205,16 @@ export function pickEntry(pool: Pool, envName: string, now: Date = new Date()): 
 }
 
 /** Mark an entry exhausted until a wall-clock time (for 429 rate limits). */
-export async function markExhausted(envName: string, id: string, untilIso: string, home: string = homedir()): Promise<void> {
+export async function markExhausted(
+  envName: string,
+  id: string,
+  untilIso: string,
+  home: string = homedir(),
+): Promise<void> {
   const release = await acquireLock(home);
   try {
     const pool = await readPool(home);
-    const entry = (pool[envName] ?? []).find(e => e.id === id);
+    const entry = (pool[envName] ?? []).find((e) => e.id === id);
     if (!entry) return;
     entry.exhaustedUntil = untilIso;
     await writePool(pool, home);
@@ -179,17 +224,24 @@ export async function markExhausted(envName: string, id: string, untilIso: strin
 }
 
 /** Stamp an entry's lastUsedAt to "now" (best-effort, never throws). */
-export async function touchEntry(envName: string, id: string, home: string = homedir()): Promise<void> {
+export async function touchEntry(
+  envName: string,
+  id: string,
+  home: string = homedir(),
+): Promise<void> {
   const release = await acquireLock(home).catch(() => null);
   if (!release) return;
   try {
     const pool = await readPool(home);
-    const entry = (pool[envName] ?? []).find(e => e.id === id);
+    const entry = (pool[envName] ?? []).find((e) => e.id === id);
     if (!entry) return;
     entry.lastUsedAt = new Date().toISOString();
     await writePool(pool, home);
-  } catch { /* swallow */ }
-  finally { await release(); }
+  } catch {
+    /* swallow */
+  } finally {
+    await release();
+  }
 }
 
 /**
@@ -206,7 +258,7 @@ export async function hydrateEnvFromPool(
   const pool = await readPool(home);
   const hydrated: string[] = [];
   for (const envName of Object.keys(pool)) {
-    if (env[envName] !== undefined && env[envName] !== '') continue;
+    if (env[envName] !== undefined && env[envName] !== "") continue;
     const pick = pickEntry(pool, envName);
     if (!pick) continue;
     env[envName] = pick.value;

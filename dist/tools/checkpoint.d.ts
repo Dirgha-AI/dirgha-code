@@ -20,6 +20,11 @@
  * session log). The kernel decides whether to prune older turns on a
  * subsequent compaction — we don't truncate files here.
  */
-import type { Tool } from './registry.js';
+import type { Tool } from "./registry.js";
+import { SessionStore } from "../context/session.js";
+export interface CheckpointToolOptions {
+    store?: SessionStore;
+}
+export declare function createCheckpointTool(opts?: CheckpointToolOptions): Tool;
 export declare const checkpointTool: Tool;
 export default checkpointTool;

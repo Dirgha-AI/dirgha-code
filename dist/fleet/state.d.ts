@@ -4,6 +4,10 @@
  * State file: ~/.dirgha/fleet-state/<goalSlug>-<runId>.json
  * Written fire-and-forget after each agent turn and status transition.
  * Used by `dirgha fleet resume` to restart incomplete agents.
+ *
+ * Known limitation: all agents share a single JSON state file which causes
+ * write amplification (N agents × T turns = N×T rewrites of the full file).
+ * Consider per-agent files or an append-only log as the agent count grows.
  */
 import type { FleetAgent, FleetConfig, FleetSubtask } from "./types.js";
 import type { UsageTotal } from "../kernel/types.js";

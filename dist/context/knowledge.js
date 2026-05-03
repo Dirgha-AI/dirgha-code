@@ -11,12 +11,12 @@
  * heading, if present, becomes the article's title; the first non-heading
  * paragraph becomes the summary.
  */
-import { readFile, readdir, stat, writeFile, mkdir, unlink } from 'node:fs/promises';
-import { join } from 'node:path';
-import { homedir } from 'node:os';
-import { openFtsIndex, fallbackSearch } from './_fts.js';
+import { readFile, readdir, stat, writeFile, mkdir, unlink, } from "node:fs/promises";
+import { join } from "node:path";
+import { homedir } from "node:os";
+import { openFtsIndex, fallbackSearch } from "./_fts.js";
 export function createKnowledgeStore(opts = {}) {
-    const dir = opts.directory ?? join(homedir(), '.dirgha', 'knowledge');
+    const dir = opts.directory ?? join(homedir(), ".dirgha", "knowledge");
     return new FileKnowledgeStore(dir, opts.useFtsIndex !== false);
 }
 class FileKnowledgeStore {
@@ -31,8 +31,8 @@ class FileKnowledgeStore {
         await this.ensure();
         const names = await readdir(this.dir).catch(() => []);
         return names
-            .filter(n => n.endsWith('.md') && n !== 'INDEX.md')
-            .map(n => n.replace(/\.md$/, ''))
+            .filter((n) => n.endsWith(".md") && n !== "INDEX.md")
+            .map((n) => n.replace(/\.md$/, ""))
             .sort();
     }
     async getArticle(slug) {
@@ -41,7 +41,7 @@ class FileKnowledgeStore {
         const info = await stat(abs).catch(() => undefined);
         if (!info)
             return null;
-        const text = await readFile(abs, 'utf8').catch(() => null);
+        const text = await readFile(abs, "utf8").catch(() => null);
         if (text === null)
             return null;
         return parseArticle(slug, text, info.mtime.toISOString());
@@ -49,7 +49,7 @@ class FileKnowledgeStore {
     async putArticle(slug, body) {
         assertValidSlug(slug);
         await this.ensure();
-        await writeFile(this.pathFor(slug), body, 'utf8');
+        await writeFile(this.pathFor(slug), body, "utf8");
         const article = parseArticle(slug, body, new Date().toISOString());
         await this.rebuildIndex();
         const fts = await this.fts();
@@ -57,7 +57,7 @@ class FileKnowledgeStore {
             id: article.slug,
             title: article.title,
             body: article.body,
-            tags: '',
+            tags: "",
         });
     }
     async deleteArticle(slug) {
@@ -72,7 +72,12 @@ class FileKnowledgeStore {
         if (fts) {
             const hits = fts.search(query, limit);
             if (hits.length > 0) {
-                return hits.map(h => ({ slug: h.id, title: h.title, snippet: h.snippet, score: h.score }));
+                return hits.map((h) => ({
+                    slug: h.id,
+                    title: h.title,
+                    snippet: h.snippet,
+                    score: h.score,
+                }));
             }
         }
         const slugs = await this.listArticles();
@@ -83,8 +88,11 @@ class FileKnowledgeStore {
                 continue;
             docs.push({ id: article.slug, title: article.title, body: article.body });
         }
-        return fallbackSearch(docs, query, limit).map(h => ({
-            slug: h.id, title: h.title, snippet: h.snippet, score: h.score,
+        return fallbackSearch(docs, query, limit).map((h) => ({
+            slug: h.id,
+            title: h.title,
+            snippet: h.snippet,
+            score: h.score,
         }));
     }
     pathFor(slug) {
@@ -97,22 +105,25 @@ class FileKnowledgeStore {
     }
     async rebuildIndex() {
         const slugs = await this.listArticles();
-        const lines = ['# Knowledge Base', ''];
+        const lines = ["# Knowledge Base", ""];
         for (const slug of slugs) {
             const article = await this.getArticle(slug);
             if (!article)
                 continue;
             lines.push(`- [${article.title}](${slug}.md) — ${article.summary.slice(0, 120)}`);
         }
-        await writeFile(join(this.dir, 'INDEX.md'), `${lines.join('\n')}\n`, 'utf8');
+        await writeFile(join(this.dir, "INDEX.md"), `${lines.join("\n")}\n`, "utf8");
     }
     fts() {
         if (!this.ftsEnabled)
             return Promise.resolve(null);
         if (!this.ftsPromise) {
             this.ftsPromise = openFtsIndex({
-                dbPath: join(this.dir, 'index.db'),
-                namespace: 'knowledge',
+                dbPath: join(this.dir, "index.db"),
+                namespace: "knowledge",
+            }).catch((_err) => {
+                this.ftsPromise = null;
+                return null;
             });
         }
         return this.ftsPromise;
@@ -120,7 +131,7 @@ class FileKnowledgeStore {
 }
 function parseArticle(slug, body, updatedAt) {
     const title = firstHeading(body) ?? slug;
-    const summary = firstParagraph(body) ?? '';
+    const summary = firstParagraph(body) ?? "";
     return { slug, title, summary, body, updatedAt };
 }
 function firstHeading(text) {
@@ -132,9 +143,9 @@ function firstParagraph(text) {
         const line = block.trim();
         if (!line)
             continue;
-        if (line.startsWith('#'))
+        if (line.startsWith("#"))
             continue;
-        return line.replace(/\s+/g, ' ');
+        return line.replace(/\s+/g, " ");
     }
     return null;
 }

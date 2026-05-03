@@ -10,7 +10,7 @@ const CURRENT_SCHEMA = 1;
 export const DEFAULT_CONFIG = {
     schemaVersion: CURRENT_SCHEMA,
     model: "moonshotai/kimi-k2.6",
-    cheapModel: "meta/llama-3.1-8b-instruct",
+    cheapModel: "deepseek-ai/deepseek-v4-flash", // widely available via DeepSeek, NIM, and OpenRouter
     summaryModel: "moonshotai/kimi-k2.5",
     maxTurns: 16,
     showThinking: false,
@@ -33,9 +33,21 @@ export async function loadConfig(cwd = process.cwd()) {
     migrateConfigSchema(merged);
     // Migrate any model IDs the upstream provider has dropped, so users
     // with stale `~/.dirgha/config.json` don't 400 on every call.
+    const originalModel = merged.model;
+    const originalCheap = merged.cheapModel;
+    const originalSummary = merged.summaryModel;
     merged.model = migrateDeprecatedModel(merged.model);
     merged.cheapModel = migrateDeprecatedModel(merged.cheapModel);
     merged.summaryModel = migrateDeprecatedModel(merged.summaryModel);
+    if (originalModel !== merged.model) {
+        process.stderr.write(`[dirgha] model "${originalModel}" migrated to "${merged.model}"\n`);
+    }
+    if (originalCheap !== merged.cheapModel) {
+        process.stderr.write(`[dirgha] cheapModel "${originalCheap}" migrated to "${merged.cheapModel}"\n`);
+    }
+    if (originalSummary !== merged.summaryModel) {
+        process.stderr.write(`[dirgha] summaryModel "${originalSummary}" migrated to "${merged.summaryModel}"\n`);
+    }
     return merged;
 }
 async function readJson(path) {
@@ -69,6 +81,7 @@ function readEnvOverrides() {
 }
 function merge(...partials) {
     const out = structuredClone(DEFAULT_CONFIG);
+    const arrayFields = new Set(["autoApproveTools"]);
     for (const p of partials) {
         if (!p)
             continue;
@@ -76,7 +89,15 @@ function merge(...partials) {
             const value = p[key];
             if (value === undefined)
                 continue;
-            if (typeof value === "object" &&
+            if (arrayFields.has(key) &&
+                Array.isArray(value) &&
+                Array.isArray(out[key])) {
+                out[key] = [
+                    ...out[key],
+                    ...value,
+                ];
+            }
+            else if (typeof value === "object" &&
                 value !== null &&
                 !Array.isArray(value)) {
                 out[key] = {

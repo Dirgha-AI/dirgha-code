@@ -45,23 +45,21 @@ export function useOverlays(): OverlayApi {
   const [atQuery, setAtQuery] = React.useState<string | null>(null);
   const [slashQuery, setSlashQuery] = React.useState<string | null>(null);
 
-  // Keep the @-file overlay in sync with the input token.
+  // Single effect for @-file and slash overlays to avoid racing reads/writes
+  // on `active` when both tokens appear simultaneously (e.g. "/command @file").
   React.useEffect(() => {
-    if (atQuery === null) {
-      if (active === "atfile") setActive(null);
-      return;
+    if (atQuery !== null) {
+      // Only activate atfile if no higher-priority overlay is open.
+      if (active === null || active === "slash") setActive("atfile");
+    } else if (active === "atfile") {
+      setActive(null);
     }
-    if (active === null || active === "slash") setActive("atfile");
-  }, [atQuery, active]);
-
-  // Keep the slash overlay in sync with the input token.
-  React.useEffect(() => {
-    if (slashQuery === null) {
-      if (active === "slash") setActive(null);
-      return;
+    if (slashQuery !== null) {
+      if (active === null) setActive("slash");
+    } else if (active === "slash") {
+      setActive(null);
     }
-    if (active === null) setActive("slash");
-  }, [slashQuery, active]);
+  }, [atQuery, slashQuery, active]);
 
   const openOverlay = React.useCallback(
     (k: "models" | "help" | "theme"): void => {

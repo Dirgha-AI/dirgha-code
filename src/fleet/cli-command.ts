@@ -57,6 +57,8 @@ export interface FleetCommandOptions {
   maxTurns?: number;
   concurrency?: number;
   timeoutMs?: number;
+  /** Pre-configured team template (e.g. "bugfix"). Passed through to FleetConfig. */
+  template?: string;
 }
 
 /**
@@ -117,10 +119,12 @@ async function doLaunch(
     "--planner",
     "--strategy",
     "--timeout-ms",
+    "--template",
   ]);
   const positional: string[] = [];
   let single = false;
   let branchOverride: string | undefined;
+  let templateOverride: string | undefined = opts.template;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--single") {
@@ -133,6 +137,15 @@ async function doLaunch(
     }
     if (a === "--branch") {
       branchOverride = argv[i + 1];
+      i++;
+      continue;
+    }
+    if (a.startsWith("--template=")) {
+      templateOverride = a.slice("--template=".length);
+      continue;
+    }
+    if (a === "--template") {
+      templateOverride = argv[i + 1];
       i++;
       continue;
     }
@@ -167,6 +180,7 @@ async function doLaunch(
     timeoutMs: opts.timeoutMs,
     events,
     verbose: opts.verbose,
+    template: templateOverride,
     ...(single
       ? {
           subtasks: [
@@ -183,7 +197,9 @@ async function doLaunch(
   process.stderr.write(
     single
       ? `[fleet] launching single-task agent…\n`
-      : `[fleet] decomposing and launching…\n`,
+      : templateOverride
+        ? `[fleet] using template "${templateOverride}"…\n`
+        : `[fleet] decomposing and launching…\n`,
   );
   const result = await runFleet(config);
   emitResult("launch", result, opts);

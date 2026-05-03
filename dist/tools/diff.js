@@ -6,29 +6,33 @@
  * subsequence walk; it is not minimised for very large files. Callers
  * should cap inputs at ~200 KB to keep latency interactive.
  */
+const MAX_DIFF_LINES = 10_000;
 export function unifiedDiff(before, after, opts = {}) {
     const ctx = opts.context ?? 3;
-    const a = before.split('\n');
-    const b = after.split('\n');
+    const a = before.split("\n");
+    const b = after.split("\n");
+    if (a.length > MAX_DIFF_LINES || b.length > MAX_DIFF_LINES) {
+        return `@@ diff truncated: input too large (${a.length} / ${b.length} lines, max ${MAX_DIFF_LINES}) @@`;
+    }
     const ops = lcsOps(a, b);
     const header = [
-        `--- ${opts.fromLabel ?? 'before'}`,
-        `+++ ${opts.toLabel ?? 'after'}`,
+        `--- ${opts.fromLabel ?? "before"}`,
+        `+++ ${opts.toLabel ?? "after"}`,
     ];
     const hunks = [];
     let i = 0;
     while (i < ops.length) {
-        if (ops[i].kind === 'eq') {
+        if (ops[i].kind === "eq") {
             i++;
             continue;
         }
         let start = i;
-        while (start > 0 && ops[start - 1].kind === 'eq' && i - start < ctx)
+        while (start > 0 && ops[start - 1].kind === "eq" && i - start < ctx)
             start--;
         let end = i;
-        while (end < ops.length && (ops[end].kind !== 'eq' || end - i < ctx))
+        while (end < ops.length && (ops[end].kind !== "eq" || end - i < ctx))
             end++;
-        while (end < ops.length && ops[end].kind === 'eq' && end - i < ctx * 2)
+        while (end < ops.length && ops[end].kind === "eq" && end - i < ctx * 2)
             end++;
         let aCount = 0;
         let bCount = 0;
@@ -41,12 +45,12 @@ export function unifiedDiff(before, after, opts = {}) {
                 aStart = op.aLine;
             if (bStart < 0 && op.bLine !== undefined)
                 bStart = op.bLine;
-            if (op.kind === 'eq') {
+            if (op.kind === "eq") {
                 lines.push(` ${op.text}`);
                 aCount++;
                 bCount++;
             }
-            else if (op.kind === 'del') {
+            else if (op.kind === "del") {
                 lines.push(`-${op.text}`);
                 aCount++;
             }
@@ -55,13 +59,13 @@ export function unifiedDiff(before, after, opts = {}) {
                 bCount++;
             }
         }
-        hunks.push(`@@ -${(aStart < 0 ? 0 : aStart + 1)},${aCount} +${(bStart < 0 ? 0 : bStart + 1)},${bCount} @@`);
+        hunks.push(`@@ -${aStart < 0 ? 0 : aStart + 1},${aCount} +${bStart < 0 ? 0 : bStart + 1},${bCount} @@`);
         hunks.push(...lines);
         i = end;
     }
     if (hunks.length === 0)
-        return '';
-    return [...header, ...hunks].join('\n');
+        return "";
+    return [...header, ...hunks].join("\n");
 }
 function lcsOps(a, b) {
     const m = a.length;
@@ -80,25 +84,25 @@ function lcsOps(a, b) {
     let j = 0;
     while (i < m && j < n) {
         if (a[i] === b[j]) {
-            out.push({ kind: 'eq', text: a[i], aLine: i, bLine: j });
+            out.push({ kind: "eq", text: a[i], aLine: i, bLine: j });
             i++;
             j++;
         }
         else if (dp[i + 1][j] >= dp[i][j + 1]) {
-            out.push({ kind: 'del', text: a[i], aLine: i });
+            out.push({ kind: "del", text: a[i], aLine: i });
             i++;
         }
         else {
-            out.push({ kind: 'add', text: b[j], bLine: j });
+            out.push({ kind: "add", text: b[j], bLine: j });
             j++;
         }
     }
     while (i < m) {
-        out.push({ kind: 'del', text: a[i], aLine: i });
+        out.push({ kind: "del", text: a[i], aLine: i });
         i++;
     }
     while (j < n) {
-        out.push({ kind: 'add', text: b[j], bLine: j });
+        out.push({ kind: "add", text: b[j], bLine: j });
         j++;
     }
     return out;
@@ -106,10 +110,10 @@ function lcsOps(a, b) {
 export function summariseDiff(diff) {
     let added = 0;
     let removed = 0;
-    for (const line of diff.split('\n')) {
-        if (line.startsWith('+') && !line.startsWith('+++'))
+    for (const line of diff.split("\n")) {
+        if (line.startsWith("+") && !line.startsWith("+++"))
             added++;
-        else if (line.startsWith('-') && !line.startsWith('---'))
+        else if (line.startsWith("-") && !line.startsWith("---"))
             removed++;
     }
     return { added, removed };

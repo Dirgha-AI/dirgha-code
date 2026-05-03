@@ -24,7 +24,7 @@
  */
 
 import { readFile, stat, writeFile, mkdir } from "node:fs/promises";
-import { resolve, extname, dirname, sep } from "node:path";
+import { resolve, extname, dirname } from "node:path";
 import type { Tool, ToolContext } from "./registry.js";
 import type {
   ImageGenRequest,
@@ -34,6 +34,7 @@ import type {
   StreamRequest,
   ToolResult,
 } from "../kernel/types.js";
+import { isValidCwdPath } from "../utils/fs.js";
 import { OpenAIProvider } from "../providers/openai.js";
 import { NvidiaProvider } from "../providers/nvidia.js";
 
@@ -318,10 +319,9 @@ async function loadMedia(
   maxBytes: number,
   kind: "image" | "audio",
 ): Promise<MediaOk | MediaErr> {
-  const abs = resolve(cwd, path);
-  if (!abs.startsWith(cwd + sep) && abs !== cwd) {
-    return { error: `Path escapes working directory: ${path}` };
-  }
+  const check = isValidCwdPath(cwd, path);
+  if (!check.valid) return { error: check.error };
+  const abs = check.resolved;
   const info = await stat(abs).catch(() => undefined);
   if (!info || !info.isFile())
     return { error: `No such ${kind} file: ${path}` };
@@ -358,12 +358,10 @@ function multimodalCapabilityNotice(
 }
 
 /**
- * Build a provider-agnostic multimodal message. We stuff the data URL
- * into a tagged text part — providers that natively understand
- * `image_url` style content are expected to adapt via their own
- * serialisation layer; providers that don't will at least see the
- * instruction and a base64 blob and may handle it or return an error
- * the agent loop can surface.
+ * Build a provider-agnostic multimodal message. For image/audio content,
+ * uses a structured content blob so provider serialisation layers can
+ * emit proper `image_url` / `input_audio` blocks. Falls back to a text
+ * annotation when the content type isn't natively handled.
  */
 function multimodalMessage(args: {
   instruction: string;
@@ -378,8 +376,8 @@ function multimodalMessage(args: {
         { type: "text", text: args.instruction },
         {
           type: "text",
-          text: `[${args.mediaKind.toUpperCase()} ATTACHMENT mime=${args.mime}]\n${args.dataUrl}\n[/${args.mediaKind.toUpperCase()} ATTACHMENT]`,
-        },
+          text: `[${args.mediaKind.toUpperCase()} ATTACHMENT]\n${args.dataUrl}\n[/${args.mediaKind.toUpperCase()} ATTACHMENT]`,
+        } as any,
       ],
     },
   ];

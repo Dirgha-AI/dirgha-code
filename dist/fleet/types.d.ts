@@ -105,6 +105,10 @@ export interface FleetConfig {
     runId?: string;
     /** If true, worktrees are checked out from existing branches (resume mode). */
     reuseBranch?: boolean;
+    /** Pre-configured team template name (e.g. "bugfix", "refactor"). When
+     * set, runFleet() expands the template into subtasks instead of calling
+     * the LLM decomposer. */
+    template?: string;
 }
 /** Result of a fleet run. */
 export interface FleetResult {

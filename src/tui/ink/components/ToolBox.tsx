@@ -16,7 +16,6 @@ import * as React from "react";
 import { Box, Text } from "ink";
 import { iconFor } from "../icons.js";
 import { useTheme } from "../theme-context.js";
-import { SpinnerContext } from "../spinner-context.js";
 import { SpinnerGlyph } from "./SpinnerGlyph.js";
 import { useElapsed } from "../use-elapsed.js";
 import {
@@ -111,7 +110,6 @@ export const ToolBox = React.memo(function ToolBox(
   props: ToolBoxProps,
 ): React.JSX.Element {
   const palette = useTheme();
-  const { busy: _spinnerBusy } = React.useContext(SpinnerContext);
   const isRunning =
     props.status !== "done" &&
     props.status !== "error" &&
@@ -170,7 +168,7 @@ export const ToolBox = React.memo(function ToolBox(
         {icon !== null ? (
           <Text color={iconColour}>{icon}</Text>
         ) : (
-          <SpinnerGlyph isActive={isRunning} />
+          <SpinnerGlyph isActive={isRunning} color={palette.ui.focus} />
         )}
         <Text
           color={

@@ -34,6 +34,9 @@ export interface PrimerResult {
  * first match, capped to PRIMER_CAP_BYTES. Returns an empty primer
  * with source=null when nothing is found.
  */
+// NOTE: sync statSync/readFileSync is intentional — this is called during
+// sync system-prompt composition at boot. Consider an async variant for
+// callers that can tolerate a deferred primer load.
 export function loadProjectPrimer(startDir: string): PrimerResult {
   let dir = resolve(startDir);
   for (let i = 0; i < MAX_PARENT_WALK; i++) {
@@ -44,13 +47,18 @@ export function loadProjectPrimer(startDir: string): PrimerResult {
         if (info.isFile()) {
           let content = readFileSync(path, "utf8");
           let truncated = false;
-          if (content.length > PRIMER_CAP_BYTES) {
+          const buf = Buffer.from(content, "utf8");
+          if (buf.length > PRIMER_CAP_BYTES) {
+            let end = PRIMER_CAP_BYTES;
+            while (end > 0 && (buf[end] & 0xc0) === 0x80) end--;
             content =
-              content.slice(0, PRIMER_CAP_BYTES) +
+              buf.slice(0, end).toString("utf8") +
               "\n\n[...primer truncated to 8 KB...]";
             truncated = true;
           }
-          void maybeInitKb(dir).catch(() => {});
+          void maybeInitKb(dir).catch((err) => {
+            console.error("[dirgha] KB init failed:", err);
+          });
           return { primer: content, source: path, truncated };
         }
       } catch {
@@ -86,6 +94,9 @@ export function composeSystemPrompt(parts: {
   gitState?: string;
   userSystem?: string | undefined;
 }): string {
+  if (!parts.modePreamble?.trim()) {
+    throw new Error("modePreamble is required and must be non-empty");
+  }
   const sections: string[] = [];
   if (parts.soul && parts.soul.trim()) {
     sections.push(parts.soul.trim());

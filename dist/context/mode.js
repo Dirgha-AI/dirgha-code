@@ -3,41 +3,41 @@
  * prepended to the system prompt; it doesn't change the tool set or
  * the loop structure. Used by /mode slash and CLI flags.
  */
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
-export const MODES = ['plan', 'act', 'yolo', 'verify', 'ask'];
-export const DEFAULT_MODE = 'act';
+import { mkdir, open, readFile, stat, unlink, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
+export const MODES = ["plan", "act", "yolo", "verify", "ask"];
+export const DEFAULT_MODE = "act";
 /**
  * Modes that auto-approve every tool call. Consumed by the agent loop
  * so the ApprovalBus is short-circuited without modifying its
  * underlying policy table.
  */
-export const AUTO_APPROVE_MODES = new Set(['yolo']);
+export const AUTO_APPROVE_MODES = new Set(["yolo"]);
 export function isAutoApprove(mode) {
     return mode !== undefined && AUTO_APPROVE_MODES.has(mode);
 }
 const MODE_PREAMBLES = {
     plan: [
-        'Mode: PLAN.',
-        'Produce a structured plan before acting. List the files you would read, the changes you would make, and the verification steps — but do NOT write files, run shell commands, or make git commits. Read-only tools (read_file, search_grep, search_glob, fs_ls, git_status) are fine. Ask for confirmation before leaving plan mode.',
-    ].join('\n'),
+        "Mode: PLAN.",
+        "Produce a structured plan before acting. List the files you would read, the changes you would make, and the verification steps — but do NOT write files, run shell commands, or make git commits. Read-only tools (read_file, search_grep, search_glob, fs_ls, git_status) are fine. Ask for confirmation before leaving plan mode.",
+    ].join("\n"),
     act: [
-        'Mode: ACT.',
-        'Execute the task end to end. Use tools as needed, write code, run shells, commit when asked. Confirm with the user before destructive or wide-reaching actions. Report concisely on what you did.',
-    ].join('\n'),
+        "Mode: ACT.",
+        "Execute the task end to end. Use tools as needed, write code, run shells, commit when asked. Confirm with the user before destructive or wide-reaching actions. Report concisely on what you did.",
+    ].join("\n"),
     yolo: [
-        'Mode: YOLO.',
-        'Execute the task end to end with no confirmation gates — every tool call is pre-approved. The user has explicitly opted in; destructive or wide-reaching actions (rm, force-push, bulk edits) will run without asking. Be deliberate; do not optimise for speed at the cost of correctness.',
-    ].join('\n'),
+        "Mode: YOLO.",
+        "Execute the task end to end with no confirmation gates — every tool call is pre-approved. The user has explicitly opted in; destructive or wide-reaching actions (rm, force-push, bulk edits) will run without asking. Be deliberate; do not optimise for speed at the cost of correctness.",
+    ].join("\n"),
     verify: [
-        'Mode: VERIFY.',
-        'Treat the current state as a proposed change to audit. Read code, run tests and type-checkers, inspect git diffs — but do NOT modify files. Surface risks, test failures, and unverified assumptions. Return a pass/fail summary.',
-    ].join('\n'),
+        "Mode: VERIFY.",
+        "Treat the current state as a proposed change to audit. Read code, run tests and type-checkers, inspect git diffs — but do NOT modify files. Surface risks, test failures, and unverified assumptions. Return a pass/fail summary.",
+    ].join("\n"),
     ask: [
-        'Mode: ASK.',
-        'Answer questions about the codebase. You may read files, search, list directories, and inspect git state — but you must NOT modify anything (no fs_write, no fs_edit, no shell, no git, no commits, no checkpoint, no browser). Keep answers terse, cite paths and line numbers, and if the question would require running code, say so explicitly instead of running it.',
-    ].join('\n'),
+        "Mode: ASK.",
+        "Answer questions about the codebase. You may read files, search, list directories, and inspect git state — but you must NOT modify anything (no fs_write, no fs_edit, no shell, no git, no commits, no checkpoint, no browser). Keep answers terse, cite paths and line numbers, and if the question would require running code, say so explicitly instead of running it.",
+    ].join("\n"),
 };
 export function modePreamble(mode) {
     return MODE_PREAMBLES[mode];
@@ -55,25 +55,62 @@ export function applyMode(systemPrompt, mode) {
     return `${preamble}\n\n${systemPrompt}`;
 }
 function configPath() {
-    return join(homedir(), '.dirgha', 'config.json');
+    return join(homedir(), ".dirgha", "config.json");
 }
 async function readStoredConfig() {
-    const text = await readFile(configPath(), 'utf8').catch(() => '');
+    const text = await readFile(configPath(), "utf8").catch(() => "");
     if (!text)
         return {};
     try {
         const parsed = JSON.parse(text);
-        return (parsed && typeof parsed === 'object') ? parsed : {};
+        return parsed && typeof parsed === "object" ? parsed : {};
     }
     catch {
         return {};
     }
 }
+function lockPath() {
+    return join(homedir(), ".dirgha", ".config.lock");
+}
+async function withConfigLock(fn) {
+    const lp = lockPath();
+    const maxRetries = 10;
+    const retryMs = 50;
+    const staleMs = 5000;
+    for (let i = 0; i < maxRetries; i++) {
+        let fd;
+        try {
+            fd = await open(lp, "wx"); // O_EXCL|O_CREAT — atomic
+            await fd.close();
+            // Lock acquired
+            try {
+                return await fn();
+            }
+            finally {
+                await unlink(lp).catch(() => { });
+            }
+        }
+        catch (e) {
+            if (e.code !== "EEXIST")
+                throw e;
+            // Lock held by someone else — check staleness
+            const s = await stat(lp).catch(() => null);
+            if (s && Date.now() - s.mtimeMs > staleMs) {
+                await unlink(lp).catch(() => { });
+                continue; // retry immediately
+            }
+            await new Promise((r) => setTimeout(r, retryMs));
+        }
+    }
+    throw new Error("config lock timeout after 500ms — another session may be stuck");
+}
 async function writeStoredConfig(patch) {
-    const current = await readStoredConfig();
-    const merged = { ...current, ...patch };
-    await mkdir(join(homedir(), '.dirgha'), { recursive: true });
-    await writeFile(configPath(), JSON.stringify(merged, null, 2) + '\n', 'utf8');
+    await mkdir(join(homedir(), ".dirgha"), { recursive: true });
+    await withConfigLock(async () => {
+        const current = await readStoredConfig();
+        const merged = { ...current, ...patch };
+        await writeFile(configPath(), JSON.stringify(merged, null, 2) + "\n", "utf8");
+    });
 }
 /**
  * Resolve the active mode. Precedence:
@@ -82,7 +119,7 @@ async function writeStoredConfig(patch) {
  *   3. DEFAULT_MODE ('act')
  */
 export async function resolveMode() {
-    const fromEnv = process.env['DIRGHA_MODE'];
+    const fromEnv = process.env["DIRGHA_MODE"];
     if (fromEnv && MODES.includes(fromEnv))
         return fromEnv;
     const cfg = await readStoredConfig();
@@ -92,7 +129,7 @@ export async function resolveMode() {
 }
 /** Persist the user's preferred mode. */
 export async function saveMode(mode) {
-    process.env['DIRGHA_MODE'] = mode;
+    process.env["DIRGHA_MODE"] = mode;
     await writeStoredConfig({ mode });
 }
 //# sourceMappingURL=mode.js.map

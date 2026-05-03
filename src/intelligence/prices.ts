@@ -19,6 +19,8 @@ export interface PricePoint {
   supportsThinking?: boolean;
   /** Free-text family for grouping in the picker (`gpt`, `claude`, `kimi`, …). */
   family?: string;
+  /** True when prices are estimates, not confirmed from the provider. */
+  estimated?: boolean;
 }
 
 // Refreshed 2026-04-25 against the live OpenRouter registry. Models that
@@ -54,10 +56,34 @@ export const PRICES: PricePoint[] = [
   // OpenAI — native API
   // gpt-5.5-pro / gpt-5.5 / gpt-5-mini are speculative model IDs — prices
   // are estimates and will be updated when OpenAI confirms availability.
-  { provider: "openai", model: "gpt-5.5-pro", inputPerM: 30, outputPerM: 180 },
-  { provider: "openai", model: "gpt-5.5", inputPerM: 5, outputPerM: 30 },
-  { provider: "openai", model: "gpt-5", inputPerM: 2.50, outputPerM: 10 },
-  { provider: "openai", model: "gpt-5-mini", inputPerM: 0.5, outputPerM: 2 },
+  {
+    provider: "openai",
+    model: "gpt-5.5-pro",
+    inputPerM: 30,
+    outputPerM: 180,
+    estimated: true,
+  },
+  {
+    provider: "openai",
+    model: "gpt-5.5",
+    inputPerM: 5,
+    outputPerM: 30,
+    estimated: true,
+  },
+  {
+    provider: "openai",
+    model: "gpt-5",
+    inputPerM: 2.5,
+    outputPerM: 10,
+    estimated: true,
+  },
+  {
+    provider: "openai",
+    model: "gpt-5-mini",
+    inputPerM: 0.5,
+    outputPerM: 2,
+    estimated: true,
+  },
   {
     provider: "openai",
     model: "gpt-4o-mini",
@@ -295,12 +321,14 @@ export const PRICES: PricePoint[] = [
     model: "openai/gpt-5.5-pro",
     inputPerM: 30,
     outputPerM: 180,
+    estimated: true,
   },
   {
     provider: "openrouter",
     model: "openai/gpt-5.5",
     inputPerM: 5,
     outputPerM: 30,
+    estimated: true,
   },
   {
     provider: "openrouter",
@@ -889,12 +917,19 @@ export function findPrice(
 
 /**
  * Single-source-of-truth lookup. Returns the full PricePoint for a
- * model id (provider-agnostic — model ids are unique across providers
- * in our catalogue). Pair with `contextWindowFor(id)` (which adds
- * a fallback default) when you only need the context limit.
+ * model id. When a model id appears in multiple providers (e.g.
+ * "deepseek-v4-pro" exists under both "deepseek" and "nvidia"), pass
+ * the optional `provider` parameter to disambiguate.
  */
-export function lookupModel(modelId: string): PricePoint | undefined {
-  return PRICES.find((p) => p.model === modelId);
+export function lookupModel(
+  modelId: string,
+  provider?: string,
+): PricePoint | undefined {
+  return PRICES.find(
+    (p) =>
+      p.model === modelId &&
+      (provider === undefined || p.provider === provider),
+  );
 }
 
 /**
@@ -1100,7 +1135,6 @@ const MODEL_ALIASES: Record<string, string> = {
   haiku: "claude-haiku-4-5",
   // OpenAI
   gpt5: "gpt-5",
-  "gpt-5": "gpt-5",
   "gpt5-pro": "gpt-5.5-pro",
   "gpt5-mini": "gpt-5-mini",
   o1: "o1",

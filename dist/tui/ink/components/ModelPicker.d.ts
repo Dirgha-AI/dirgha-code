@@ -16,11 +16,11 @@
  * Shape stays small (≤220 LOC); the catalogue itself is owned
  * upstream so this file is purely presentational.
  */
-import * as React from 'react';
+import * as React from "react";
 export interface ModelEntry {
     id: string;
     provider: string;
-    tier?: 'free' | 'basic' | 'pro' | 'premium';
+    tier?: "free" | "basic" | "pro" | "premium";
     label?: string;
 }
 export interface ModelPickerProps {

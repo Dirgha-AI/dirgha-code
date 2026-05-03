@@ -4,8 +4,8 @@
  * the full parent transcript. Branch metadata is logged to both parent
  * and child.
  */
-import type { Provider } from '../kernel/types.js';
-import type { Session, SessionStore } from './session.js';
+import type { Provider } from "../kernel/types.js";
+import type { Session, SessionStore } from "./session.js";
 export interface BranchOptions {
     name: string;
     summarizer: Provider;

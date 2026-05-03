@@ -3,13 +3,15 @@
  * stdin/stdout) for local servers. Remote HTTP/SSE transport can be
  * added later by implementing the same Transport interface.
  */
-import { spawn } from 'node:child_process';
+import { spawn } from "node:child_process";
+import { safeEnvironment } from "../utils/env.js";
 export class StdioTransport {
     opts;
     child = null;
     handlers = [];
     closeHandlers = [];
-    buffer = '';
+    buffer = "";
+    contentLength = -1;
     ready;
     constructor(opts) {
         this.opts = opts;
@@ -19,26 +21,29 @@ export class StdioTransport {
         return new Promise((resolve, reject) => {
             try {
                 const child = spawn(this.opts.command, this.opts.args ?? [], {
-                    env: { ...process.env, ...this.opts.env },
+                    env: { ...safeEnvironment(), ...this.opts.env },
                     cwd: this.opts.cwd,
-                    stdio: ['pipe', 'pipe', 'pipe'],
+                    stdio: ["pipe", "pipe", "pipe"],
                 });
                 this.child = child;
-                child.stdout.on('data', (buf) => this.onData(buf));
-                child.stderr.on('data', () => { });
-                // EPIPE on stdin is expected if the subprocess crashes early
-                // (e.g. /bin/false exits before we write). Listen so the
-                // unhandled 'error' event doesn't tear down the parent.
-                child.stdin.on('error', () => { });
-                child.on('error', err => reject(err));
-                child.on('exit', () => {
+                if (!child.stdout || !child.stdin) {
+                    reject(new Error(`MCP server ${this.opts.command} stdio is not piped`));
+                    return;
+                }
+                child.stdout.on("data", (buf) => this.onData(buf));
+                child.stderr.on("data", (buf) => {
+                    process.stderr.write(`[mcp:${this.opts.command}] ${buf.toString("utf8")}`);
+                });
+                child.stdin.on("error", () => {
+                    /* swallow EPIPE / ECONNRESET */
+                });
+                child.on("error", (err) => reject(err));
+                child.on("exit", () => {
                     this.child = null;
-                    // Notify upper layers so pending requests can be rejected
-                    // immediately rather than waiting for the request timeout.
                     for (const cb of this.closeHandlers)
                         cb();
                 });
-                child.on('spawn', () => resolve());
+                child.on("spawn", () => resolve());
             }
             catch (err) {
                 reject(err);
@@ -46,30 +51,46 @@ export class StdioTransport {
         });
     }
     onData(buf) {
-        this.buffer += buf.toString('utf8');
-        let idx;
-        while ((idx = this.buffer.indexOf('\n')) >= 0) {
-            const line = this.buffer.slice(0, idx);
-            this.buffer = this.buffer.slice(idx + 1);
-            if (!line.trim())
-                continue;
-            try {
-                const parsed = JSON.parse(line);
-                for (const h of this.handlers)
-                    h(parsed);
+        this.buffer += buf.toString("utf8");
+        while (true) {
+            if (this.contentLength < 0) {
+                const headerEnd = this.buffer.indexOf("\r\n\r\n");
+                if (headerEnd === -1)
+                    return;
+                const header = this.buffer.slice(0, headerEnd);
+                this.buffer = this.buffer.slice(headerEnd + 4);
+                const match = header.match(/Content-Length: (\d+)/i);
+                if (!match) {
+                    this.contentLength = -1;
+                    continue;
+                }
+                this.contentLength = parseInt(match[1], 10);
             }
-            catch {
-                continue;
+            if (this.contentLength >= 0) {
+                if (this.buffer.length < this.contentLength)
+                    return;
+                const body = this.buffer.slice(0, this.contentLength);
+                this.buffer = this.buffer.slice(this.contentLength);
+                this.contentLength = -1;
+                try {
+                    const parsed = JSON.parse(body);
+                    for (const h of this.handlers)
+                        h(parsed);
+                }
+                catch {
+                    /* skip malformed */
+                }
             }
         }
     }
     async send(message) {
         await this.ready;
         if (!this.child || !this.child.stdin)
-            throw new Error('Transport is closed');
+            throw new Error("Transport is closed");
         await new Promise((resolve, reject) => {
-            const data = `${JSON.stringify(message)}\n`;
-            this.child.stdin.write(data, err => err ? reject(err) : resolve());
+            const json = JSON.stringify(message);
+            const header = `Content-Length: ${Buffer.byteLength(json)}\r\n\r\n`;
+            this.child.stdin.write(header + json, (err) => err ? reject(err) : resolve());
         });
     }
     onMessage(handler) {
@@ -108,13 +129,16 @@ export class HttpTransport {
     closed = false;
     constructor(opts) {
         this.opts = opts;
+        if (typeof fetch !== "function") {
+            throw new Error("HttpTransport requires a global fetch API (Node 18+ or a polyfill)");
+        }
     }
     async send(message) {
         if (this.closed)
-            throw new Error('HttpTransport is closed');
+            throw new Error("HttpTransport is closed");
         const headers = {
-            'Content-Type': 'application/json',
-            Accept: 'application/json, text/event-stream',
+            "Content-Type": "application/json",
+            Accept: "application/json, text/event-stream",
             ...(this.opts.headers ?? {}),
         };
         // Token resolution: bearerProvider beats bearerToken so OAuth
@@ -129,7 +153,7 @@ export class HttpTransport {
         let resp;
         try {
             resp = await fetch(this.opts.url, {
-                method: 'POST',
+                method: "POST",
                 headers,
                 body: JSON.stringify(message),
                 signal: ac.signal,
@@ -139,20 +163,20 @@ export class HttpTransport {
             clearTimeout(timer);
         }
         if (!resp.ok)
-            throw new Error(`MCP HTTP ${resp.status}: ${await resp.text().catch(() => '')}`);
-        const ctype = resp.headers.get('content-type') ?? '';
-        if (ctype.includes('application/json')) {
+            throw new Error(`MCP HTTP ${resp.status}: ${await resp.text().catch(() => "")}`);
+        const ctype = resp.headers.get("content-type") ?? "";
+        if (ctype.includes("application/json")) {
             const body = await resp.json();
             for (const h of this.handlers)
                 h(body);
             return;
         }
-        if (ctype.includes('text/event-stream') && resp.body) {
+        if (ctype.includes("text/event-stream") && resp.body) {
             // Parse SSE: each block is `event: foo\ndata: {...}\n\n`.
             // We only act on `data:` lines that JSON-parse cleanly.
             const reader = resp.body.getReader();
             const decoder = new TextDecoder();
-            let buf = '';
+            let buf = "";
             while (true) {
                 const { value, done } = await reader.read();
                 if (done)
@@ -160,11 +184,11 @@ export class HttpTransport {
                 buf += decoder.decode(value, { stream: true });
                 // Process complete events (terminated by blank line).
                 let idx;
-                while ((idx = buf.indexOf('\n\n')) >= 0) {
+                while ((idx = buf.indexOf("\n\n")) >= 0) {
                     const block = buf.slice(0, idx);
                     buf = buf.slice(idx + 2);
-                    for (const line of block.split('\n')) {
-                        if (!line.startsWith('data:'))
+                    for (const line of block.split("\n")) {
+                        if (!line.startsWith("data:"))
                             continue;
                         const payload = line.slice(5).trim();
                         if (!payload)
@@ -174,7 +198,9 @@ export class HttpTransport {
                             for (const h of this.handlers)
                                 h(parsed);
                         }
-                        catch { /* skip non-JSON SSE comments */ }
+                        catch {
+                            /* skip non-JSON SSE comments */
+                        }
                     }
                 }
             }

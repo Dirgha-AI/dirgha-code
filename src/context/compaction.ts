@@ -65,17 +65,21 @@ export async function maybeCompact(
   }
 
   if (cfg.hooks) {
-    const veto = await cfg.hooks.emit("compaction_before", {
-      tokensBefore,
-      historicalCount: historical.length,
-    });
-    if (veto?.block) {
-      return {
-        messages,
-        compacted: false,
+    try {
+      const veto = await cfg.hooks.emit("compaction_before", {
         tokensBefore,
-        tokensAfter: tokensBefore,
-      };
+        historicalCount: historical.length,
+      });
+      if (veto?.block) {
+        return {
+          messages,
+          compacted: false,
+          tokensBefore,
+          tokensAfter: tokensBefore,
+        };
+      }
+    } catch {
+      /* hook failure should not block compaction */
     }
   }
 
@@ -108,11 +112,15 @@ export async function maybeCompact(
   }
 
   if (cfg.hooks) {
-    await cfg.hooks.emit("compaction_after", {
-      tokensBefore,
-      tokensAfter,
-      summary,
-    });
+    try {
+      await cfg.hooks.emit("compaction_after", {
+        tokensBefore,
+        tokensAfter,
+        summary,
+      });
+    } catch {
+      /* hook failure should not block post-compaction steps */
+    }
   }
 
   return {
@@ -152,9 +160,19 @@ async function summarise(
       if (ev.type === "text_delta") summary += ev.delta;
     }
   } catch {
-    // If the summarizer call fails (network, bad model), return a
-    // raw transcript — better than aborting the agent loop.
-    return historical.map((m) => renderForSummary(m, 1000)).join("\n\n");
+    // Summarizer call failed — return a truncated raw transcript
+    // so a huge (>100k token) fallback doesn't itself exceed context.
+    const MAX_FALLBACK_CHARS = 4_000;
+    const rendered = historical.map((m) => renderForSummary(m, 1000));
+    let fallback = "";
+    for (const block of rendered) {
+      if (fallback.length + block.length > MAX_FALLBACK_CHARS) {
+        fallback += "\n\n[...fallback transcript truncated...]";
+        break;
+      }
+      fallback += (fallback ? "\n\n" : "") + block;
+    }
+    return fallback || "[Summarisation failed]";
   }
   return summary.trim() || "[Empty summary]";
 }

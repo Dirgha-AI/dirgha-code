@@ -21,16 +21,27 @@
  * subsequent compaction — we don't truncate files here.
  */
 
-import { mkdir, readdir, readFile, stat, unlink, writeFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { join, basename } from 'node:path';
-import type { Tool, ToolContext } from './registry.js';
-import type { ToolResult } from '../kernel/types.js';
-import type { Message } from '../kernel/types.js';
-import { SessionStore, type SessionEntry } from '../context/session.js';
-import { registerCheckpoint } from '../state/index.js';
+import {
+  mkdir,
+  readdir,
+  readFile,
+  stat,
+  unlink,
+  writeFile,
+} from "node:fs/promises";
+import { homedir } from "node:os";
+import { join, basename } from "node:path";
+import type { Tool, ToolContext } from "./registry.js";
+import type { ToolResult } from "../kernel/types.js";
+import type { Message } from "../kernel/types.js";
+import { SessionStore, type SessionEntry } from "../context/session.js";
+import { registerCheckpoint } from "../state/index.js";
 
-type Action = 'save' | 'restore' | 'list' | 'delete';
+export interface CheckpointToolOptions {
+  store?: SessionStore;
+}
+
+type Action = "save" | "restore" | "list" | "delete";
 
 interface Input {
   action: Action;
@@ -60,7 +71,7 @@ interface CheckpointSummary {
   bytes: number;
 }
 
-const CHECKPOINT_DIR = join(homedir(), '.dirgha', 'checkpoints');
+const CHECKPOINT_DIR = join(homedir(), ".dirgha", "checkpoints");
 
 async function ensureDir(): Promise<void> {
   await mkdir(CHECKPOINT_DIR, { recursive: true }).catch(() => undefined);
@@ -84,7 +95,7 @@ function fail(content: string): ToolResult<never> {
 
 async function readCheckpoint(id: string): Promise<CheckpointFile | undefined> {
   const p = checkpointPath(id);
-  const raw = await readFile(p, 'utf8').catch(() => undefined);
+  const raw = await readFile(p, "utf8").catch(() => undefined);
   if (!raw) return undefined;
   try {
     return JSON.parse(raw) as CheckpointFile;
@@ -96,11 +107,13 @@ async function readCheckpoint(id: string): Promise<CheckpointFile | undefined> {
 async function listCheckpointFiles(): Promise<string[]> {
   await ensureDir();
   const names = await readdir(CHECKPOINT_DIR).catch(() => [] as string[]);
-  return names.filter(n => n.endsWith('.json'));
+  return names.filter((n) => n.endsWith(".json"));
 }
 
-async function summarise(fileName: string): Promise<CheckpointSummary | undefined> {
-  const id = fileName.replace(/\.json$/, '');
+async function summarise(
+  fileName: string,
+): Promise<CheckpointSummary | undefined> {
+  const id = fileName.replace(/\.json$/, "");
   const cp = await readCheckpoint(id);
   if (!cp) return undefined;
   const info = await stat(checkpointPath(id)).catch(() => undefined);
@@ -116,9 +129,12 @@ async function summarise(fileName: string): Promise<CheckpointSummary | undefine
   };
 }
 
-async function doSave(input: Input, ctx: ToolContext): Promise<ToolResult<CheckpointSummary>> {
+async function doSave(
+  input: Input,
+  ctx: ToolContext,
+  store: SessionStore,
+): Promise<ToolResult<CheckpointSummary>> {
   await ensureDir();
-  const store = new SessionStore();
   const session = await store.open(ctx.sessionId);
   if (!session) return fail(`session not found: ${ctx.sessionId}`);
 
@@ -134,7 +150,7 @@ async function doSave(input: Input, ctx: ToolContext): Promise<ToolResult<Checkp
     messages,
   };
   const path = checkpointPath(id);
-  await writeFile(path, JSON.stringify(payload, null, 2), 'utf8');
+  await writeFile(path, JSON.stringify(payload, null, 2), "utf8");
   // Register in unified state index (fire-and-forget, never blocks).
   void registerCheckpoint(ctx.sessionId, id);
   const info = await stat(path).catch(() => undefined);
@@ -155,12 +171,15 @@ async function doSave(input: Input, ctx: ToolContext): Promise<ToolResult<Checkp
   );
 }
 
-async function doRestore(input: Input, ctx: ToolContext): Promise<ToolResult<CheckpointSummary>> {
-  if (!input.id) return fail('id required for restore');
+async function doRestore(
+  input: Input,
+  ctx: ToolContext,
+  store: SessionStore,
+): Promise<ToolResult<CheckpointSummary>> {
+  if (!input.id) return fail("id required for restore");
   const cp = await readCheckpoint(input.id);
   if (!cp) return fail(`checkpoint not found: ${input.id}`);
 
-  const store = new SessionStore();
   const session = await store.open(ctx.sessionId);
   if (!session) return fail(`session not found: ${ctx.sessionId}`);
 
@@ -170,9 +189,9 @@ async function doRestore(input: Input, ctx: ToolContext): Promise<ToolResult<Che
   // normal transcript entries on next replay.
   const markerTs = new Date().toISOString();
   const marker: SessionEntry = {
-    type: 'system',
+    type: "system",
     ts: markerTs,
-    event: 'checkpoint_restore',
+    event: "checkpoint_restore",
     data: {
       checkpointId: cp.id,
       messageCount: cp.messageCount,
@@ -183,7 +202,7 @@ async function doRestore(input: Input, ctx: ToolContext): Promise<ToolResult<Che
   await session.append(marker);
 
   for (const message of cp.messages) {
-    const entry: SessionEntry = { type: 'message', ts: markerTs, message };
+    const entry: SessionEntry = { type: "message", ts: cp.createdAt, message };
     await session.append(entry);
   }
 
@@ -204,32 +223,37 @@ async function doRestore(input: Input, ctx: ToolContext): Promise<ToolResult<Che
   );
 }
 
-async function doList(input: Input, ctx: ToolContext): Promise<ToolResult<{ count: number; items: CheckpointSummary[] }>> {
+async function doList(
+  input: Input,
+  ctx: ToolContext,
+): Promise<ToolResult<{ count: number; items: CheckpointSummary[] }>> {
   const files = await listCheckpointFiles();
-  const all = await Promise.all(files.map(f => summarise(basename(f))));
+  const all = await Promise.all(files.map((f) => summarise(basename(f))));
   const items = all
     .filter((x): x is CheckpointSummary => x !== undefined)
-    .filter(item => (input.all ? true : item.sessionId === ctx.sessionId))
+    .filter((item) => (input.all ? true : item.sessionId === ctx.sessionId))
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 
   if (items.length === 0) {
     return ok(
       input.all
-        ? '(no checkpoints on disk)'
+        ? "(no checkpoints on disk)"
         : `(no checkpoints for session ${ctx.sessionId})`,
       { count: 0, items },
     );
   }
 
-  const lines = items.map(i => {
-    const label = i.label ? ` "${i.label}"` : '';
+  const lines = items.map((i) => {
+    const label = i.label ? ` "${i.label}"` : "";
     return `${i.id}${label}\t${i.createdAt}\tsession=${i.sessionId}\tmsgs=${i.messageCount}\t${i.bytes}B`;
   });
-  return ok(lines.join('\n'), { count: items.length, items });
+  return ok(lines.join("\n"), { count: items.length, items });
 }
 
-async function doDelete(input: Input): Promise<ToolResult<{ deleted: string }>> {
-  if (!input.id) return fail('id required for delete');
+async function doDelete(
+  input: Input,
+): Promise<ToolResult<{ deleted: string }>> {
+  if (!input.id) return fail("id required for delete");
   const p = checkpointPath(input.id);
   const info = await stat(p).catch(() => undefined);
   if (!info) return fail(`checkpoint not found: ${input.id}`);
@@ -237,45 +261,69 @@ async function doDelete(input: Input): Promise<ToolResult<{ deleted: string }>> 
   return ok(`deleted checkpoint ${input.id}`, { deleted: input.id });
 }
 
-export const checkpointTool: Tool = {
-  name: 'checkpoint',
-  description:
-    'Save, list, restore, and delete session checkpoints. Snapshots the transcript (messages + cwd + timestamp) to ~/.dirgha/checkpoints so the user can rewind to a known-good agent state.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      action: {
-        type: 'string',
-        enum: ['save', 'restore', 'list', 'delete'],
+export function createCheckpointTool(opts: CheckpointToolOptions = {}): Tool {
+  const store = opts.store ?? new SessionStore();
+
+  return {
+    name: "checkpoint",
+    description:
+      "Save, list, restore, and delete session checkpoints. Snapshots the transcript (messages + cwd + timestamp) to ~/.dirgha/checkpoints so the user can rewind to a known-good agent state.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        action: {
+          type: "string",
+          enum: ["save", "restore", "list", "delete"],
+        },
+        id: {
+          type: "string",
+          description: "Checkpoint id for restore/delete.",
+        },
+        label: {
+          type: "string",
+          description: "Optional human label attached to a save.",
+        },
+        all: {
+          type: "boolean",
+          description: "List checkpoints from every session, not just current.",
+        },
       },
-      id: { type: 'string', description: 'Checkpoint id for restore/delete.' },
-      label: { type: 'string', description: 'Optional human label attached to a save.' },
-      all: { type: 'boolean', description: 'List checkpoints from every session, not just current.' },
+      required: ["action"],
     },
-    required: ['action'],
-  },
-  requiresApproval: (raw: unknown): boolean => {
-    const input = raw as Input;
-    // Writes (save, restore, delete) require approval; list is read-only.
-    return input.action !== 'list';
-  },
-  async execute(rawInput: unknown, ctx: ToolContext): Promise<ToolResult> {
-    const input = rawInput as Input;
-    if (!input || typeof input.action !== 'string') {
-      return fail('action required');
-    }
-    try {
-      switch (input.action) {
-        case 'save': return await doSave(input, ctx);
-        case 'restore': return await doRestore(input, ctx);
-        case 'list': return await doList(input, ctx);
-        case 'delete': return await doDelete(input);
-        default: return fail(`unknown action: ${String((input as { action: unknown }).action)}`);
+    requiresApproval: (raw: unknown): boolean => {
+      if (!raw || typeof raw !== "object") return false;
+      const input = raw as Input;
+      return input.action !== "list";
+    },
+    async execute(rawInput: unknown, ctx: ToolContext): Promise<ToolResult> {
+      const input = rawInput as Input;
+      if (!input || typeof input.action !== "string") {
+        return fail("action required");
       }
-    } catch (err) {
-      return fail(`checkpoint ${input.action} failed: ${(err as Error).message}`);
-    }
-  },
-};
+      try {
+        switch (input.action) {
+          case "save":
+            return await doSave(input, ctx, store);
+          case "restore":
+            return await doRestore(input, ctx, store);
+          case "list":
+            return await doList(input, ctx);
+          case "delete":
+            return await doDelete(input);
+          default:
+            return fail(
+              `unknown action: ${String((input as { action: unknown }).action)}`,
+            );
+        }
+      } catch (err) {
+        return fail(
+          `checkpoint ${input.action} failed: ${(err as Error).message}`,
+        );
+      }
+    },
+  };
+}
+
+export const checkpointTool = createCheckpointTool();
 
 export default checkpointTool;

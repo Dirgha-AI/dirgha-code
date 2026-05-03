@@ -1,22 +1,23 @@
 import { execSync } from "node:child_process";
 import path from "node:path";
 import fs from "node:fs";
+const whichCache = new Map();
 function which(cmd) {
+    const cached = whichCache.get(cmd);
+    if (cached !== undefined)
+        return cached;
     try {
         const result = execSync(process.platform === "win32" ? `where ${cmd}` : `command -v ${cmd}`, { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] }).trim();
+        whichCache.set(cmd, result || null);
         return result || null;
     }
     catch {
+        whichCache.set(cmd, null);
         return null;
     }
 }
 function existsSync(p) {
-    try {
-        return fs.existsSync(p);
-    }
-    catch {
-        return false;
-    }
+    return fs.existsSync(p);
 }
 function findUp(dir, targets) {
     let current = path.resolve(dir);

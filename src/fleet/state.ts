@@ -4,6 +4,10 @@
  * State file: ~/.dirgha/fleet-state/<goalSlug>-<runId>.json
  * Written fire-and-forget after each agent turn and status transition.
  * Used by `dirgha fleet resume` to restart incomplete agents.
+ *
+ * Known limitation: all agents share a single JSON state file which causes
+ * write amplification (N agents × T turns = N×T rewrites of the full file).
+ * Consider per-agent files or an append-only log as the agent count grows.
  */
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -70,7 +74,10 @@ export async function writeFleetState(
     await writeFile(filePath, JSON.stringify(state, null, 2), "utf8");
   });
   // Store a non-rejecting tail so the queue is never poisoned by a write error.
-  writeQueues.set(filePath, next.catch(() => {}));
+  writeQueues.set(
+    filePath,
+    next.catch(() => {}),
+  );
   await next;
   return filePath;
 }
@@ -78,11 +85,14 @@ export async function writeFleetState(
 export async function readFleetState(path: string): Promise<FleetStateFile> {
   const raw = await readFile(path, "utf8");
   const parsed = JSON.parse(raw) as FleetStateFile;
-  if (parsed.version !== 1) throw new Error(`Unsupported fleet state version: ${parsed.version}`);
+  if (parsed.version !== 1)
+    throw new Error(`Unsupported fleet state version: ${parsed.version}`);
   return parsed;
 }
 
-export async function findLatestState(goalSubstring: string): Promise<string | null> {
+export async function findLatestState(
+  goalSubstring: string,
+): Promise<string | null> {
   const { readdir } = await import("node:fs/promises");
   let files: string[];
   try {
@@ -90,14 +100,19 @@ export async function findLatestState(goalSubstring: string): Promise<string | n
   } catch {
     return null;
   }
-  const jsonFiles = files.filter((f) => f.endsWith(".json")).sort().reverse();
+  const jsonFiles = files
+    .filter((f) => f.endsWith(".json"))
+    .sort()
+    .reverse();
   for (const f of jsonFiles) {
     try {
       const st = await readFleetState(join(STATE_DIR, f));
       if (st.goal.toLowerCase().includes(goalSubstring.toLowerCase())) {
         return join(STATE_DIR, f);
       }
-    } catch { /* corrupt state file — skip */ }
+    } catch {
+      /* corrupt state file — skip */
+    }
   }
   return null;
 }

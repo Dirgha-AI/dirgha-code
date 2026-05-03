@@ -82,7 +82,10 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
     cachedTokens: 0,
     costUsd: 0,
   };
-  const maxTurns = Math.max(0, Math.min(1000, cfg.maxTurns));
+  const loopController = new AbortController();
+  const signal = cfg.signal ?? loopController.signal;
+  cfg.signal = signal;
+  const maxTurns = Math.max(1, Math.min(1000, cfg.maxTurns));
   let stopReason: StopReason = "end_turn";
   let turnCount = 0;
   let retriesForTurn = 0;
@@ -96,7 +99,7 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
 
   try {
     for (let turnIndex = 0; turnIndex < maxTurns; turnIndex++) {
-      if (cfg.signal?.aborted) {
+      if (signal.aborted) {
         stopReason = "aborted";
         break;
       }
@@ -162,11 +165,11 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
           model: dispatchModel,
           messages: messagesForCall,
           tools: cfg.tools,
-          signal: cfg.signal,
+          signal: signal,
         })) {
           streamEvents.push(ev);
           events.emit(ev);
-          if (cfg.signal?.aborted) break;
+          if (signal.aborted) break;
         }
       } catch (err) {
         // An AbortError mid-stream is a clean cancellation, not a
@@ -176,7 +179,7 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
           (err instanceof Error &&
             (err.name === "AbortError" ||
               /aborted|abort/i.test(err.message))) ||
-          cfg.signal?.aborted === true;
+          signal.aborted;
         if (isAbort) {
           stopReason = "aborted";
           recordRequest(cfg.provider.id, false, 0);
@@ -198,6 +201,9 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
         // or 5xx upstream failures.
         const errMsg = err instanceof Error ? err.message : String(err);
         recordHealthFailure(cfg.provider.id, errMsg);
+        // Known limitation: this regex is fragile — provider error messages
+        // can change at any time. A classifier or structured error code is
+        // the correct long-term fix, but that requires per-provider parsing.
         const looksFixable =
           /not a valid model id|deprecated|model_not_found|rate.?limit|429\b|5\d\d\b|bad.?gateway|upstream/i.test(
             errMsg,
@@ -221,7 +227,6 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
           retriesForTurn++;
           const backoff = classified.backoffMs ?? 1000;
           await new Promise((r) => setTimeout(r, backoff));
-          turnIndex--;
           continue;
         }
 
@@ -231,7 +236,7 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
       }
 
       // Abort via signal.aborted break (not thrown AbortError): treat identically.
-      if (cfg.signal?.aborted) {
+      if (signal.aborted) {
         stopReason = "aborted";
         events.emit({ type: "turn_end", turnId, stopReason });
         break;
@@ -267,6 +272,9 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
       } catch {
         // loopDetector.track may throw with malformed tool inputs;
         // don't let it poison history — treat as no tools and exit.
+        console.error(
+          `[agent-loop] loopDetector.track failed for session ${cfg.sessionId}`,
+        );
         events.emit({ type: "turn_end", turnId, stopReason: "end_turn" });
         break;
       }
@@ -297,6 +305,7 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
       } catch {}
     }
   } finally {
+    loopController.abort();
     events.emit({
       type: "agent_end",
       sessionId: cfg.sessionId,
@@ -408,10 +417,7 @@ async function executeToolCalls(
     const started = Date.now();
     let result: ToolResult;
     try {
-      result = await cfg.toolExecutor.execute(
-        { ...call, input },
-        cfg.signal ?? defaultSignal(),
-      );
+      result = await cfg.toolExecutor.execute({ ...call, input }, cfg.signal!);
     } catch (err) {
       result = {
         content: `Tool execution failed: ${String(err)}`,
@@ -453,10 +459,11 @@ async function executeToolCalls(
 }
 
 function truncateForSummary(input: unknown, max = 160): string {
-  const s = typeof input === "string" ? input : JSON.stringify(input);
-  return s.length <= max ? s : s.slice(0, max - 1) + "…";
-}
-
-function defaultSignal(): AbortSignal {
-  return new AbortController().signal;
+  let s: string;
+  try {
+    s = typeof input === "string" ? input : JSON.stringify(input);
+  } catch {
+    s = String(input);
+  }
+  return s.length <= max ? s : s.slice(0, max - 1) + "\u2026";
 }

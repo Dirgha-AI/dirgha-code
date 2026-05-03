@@ -3,27 +3,34 @@
  * to a Node-native line scan. Always returns file:line:match triples,
  * capped by resultLimit to keep the LLM reply compact.
  */
-import { spawn } from 'node:child_process';
-import { readFile, readdir, stat } from 'node:fs/promises';
-import { resolve, join } from 'node:path';
+import { spawn } from "node:child_process";
+import { readFile, readdir, stat } from "node:fs/promises";
+import { join } from "node:path";
+import { isValidCwdPath } from "../utils/fs.js";
 const DEFAULT_LIMIT = 200;
 export const searchGrepTool = {
-    name: 'search_grep',
-    description: 'Search for a regex pattern across files under a directory. Prefers ripgrep when installed.',
+    name: "search_grep",
+    description: "Search for a regex pattern across files under a directory. Prefers ripgrep when installed.",
     inputSchema: {
-        type: 'object',
+        type: "object",
         properties: {
-            pattern: { type: 'string' },
-            path: { type: 'string' },
-            resultLimit: { type: 'integer', minimum: 1 },
-            ignoreCase: { type: 'boolean' },
-            filePattern: { type: 'string', description: 'Glob to limit files (ripgrep --glob).' },
+            pattern: { type: "string" },
+            path: { type: "string" },
+            resultLimit: { type: "integer", minimum: 1 },
+            ignoreCase: { type: "boolean" },
+            filePattern: {
+                type: "string",
+                description: "Glob to limit files (ripgrep --glob).",
+            },
         },
-        required: ['pattern'],
+        required: ["pattern"],
     },
     async execute(rawInput, ctx) {
         const input = rawInput;
-        const root = resolve(ctx.cwd, input.path ?? '.');
+        const check = isValidCwdPath(ctx.cwd, input.path ?? ".");
+        if (!check.valid)
+            return { content: check.error, isError: true };
+        const root = check.resolved;
         const limit = input.resultLimit ?? DEFAULT_LIMIT;
         const rg = await runRipgrep(input, root, limit);
         if (rg)
@@ -32,34 +39,51 @@ export const searchGrepTool = {
     },
 };
 async function runRipgrep(input, root, limit) {
-    const args = ['--line-number', '--no-heading', '--color', 'never', `--max-count=${limit}`];
+    const args = [
+        "--line-number",
+        "--no-heading",
+        "--color",
+        "never",
+        `--max-count=${limit}`,
+    ];
     if (input.ignoreCase)
-        args.push('--ignore-case');
+        args.push("--ignore-case");
     if (input.filePattern)
-        args.push('--glob', input.filePattern);
-    args.push('--', input.pattern, root);
-    const child = spawn('rg', args, { stdio: ['ignore', 'pipe', 'pipe'] });
+        args.push("--glob", input.filePattern);
+    args.push("--", input.pattern, root);
+    const child = spawn("rg", args, {
+        cwd: root,
+        stdio: ["ignore", "pipe", "pipe"],
+    });
     const out = [];
     const errChunks = [];
-    child.stdout.on('data', (buf) => { out.push(buf.toString('utf8')); });
-    child.stderr.on('data', (buf) => { errChunks.push(buf); });
+    child.stdout.on("data", (buf) => {
+        out.push(buf.toString("utf8"));
+    });
+    child.stderr.on("data", (buf) => {
+        errChunks.push(buf);
+    });
     const exitCode = await new Promise((resolveExit, rejectExit) => {
-        child.on('error', err => rejectExit(err));
-        child.on('exit', code => resolveExit(code ?? -1));
+        child.on("error", (err) => rejectExit(err));
+        child.on("exit", (code) => resolveExit(code ?? -1));
     }).catch(() => -1);
+    const stderrText = Buffer.concat(errChunks)
+        .toString("utf8")
+        .trim();
     if (exitCode === -1 || exitCode === 2)
         return undefined;
-    const joined = out.join('');
-    const lines = joined.length > 0 ? joined.split('\n').filter(l => l.length > 0) : [];
+    const joined = out.join("");
+    const lines = joined.length > 0 ? joined.split("\n").filter((l) => l.length > 0) : [];
     const truncated = lines.length >= limit;
+    const content = lines.length > 0 ? lines.join("\n") : "(no matches)";
     return {
-        content: lines.length > 0 ? lines.join('\n') : '(no matches)',
-        data: { matches: lines.length, truncated, engine: 'ripgrep' },
+        content: stderrText ? `${content}\n\n[stderr]\n${stderrText}` : content,
+        data: { matches: lines.length, truncated, engine: "ripgrep" },
         isError: false,
     };
 }
 async function nodeScan(input, root, limit) {
-    const flags = input.ignoreCase ? 'gi' : 'g';
+    const flags = input.ignoreCase ? "gi" : "g";
     let regex;
     try {
         regex = new RegExp(input.pattern, flags);
@@ -76,7 +100,7 @@ async function nodeScan(input, root, limit) {
         }
         const names = await readdir(dir).catch(() => []);
         for (const name of names) {
-            if (name === 'node_modules' || name === '.git' || name === 'dist')
+            if (name === "node_modules" || name === ".git" || name === "dist")
                 continue;
             const abs = join(dir, name);
             const info = await stat(abs).catch(() => undefined);
@@ -85,8 +109,8 @@ async function nodeScan(input, root, limit) {
             if (info.isDirectory())
                 await walk(abs);
             else if (info.isFile() && info.size < 512 * 1024) {
-                const text = await readFile(abs, 'utf8').catch(() => '');
-                const lines = text.split('\n');
+                const text = await readFile(abs, "utf8").catch(() => "");
+                const lines = text.split("\n");
                 for (let i = 0; i < lines.length; i++) {
                     regex.lastIndex = 0; // reset state between tests — global-flag RegExp retains lastIndex
                     if (regex.test(lines[i])) {
@@ -102,8 +126,8 @@ async function nodeScan(input, root, limit) {
     }
     await walk(root);
     return {
-        content: matches.length > 0 ? matches.join('\n') : '(no matches)',
-        data: { matches: matches.length, truncated, engine: 'node' },
+        content: matches.length > 0 ? matches.join("\n") : "(no matches)",
+        data: { matches: matches.length, truncated, engine: "node" },
         isError: false,
     };
 }

@@ -18,16 +18,18 @@ export interface PricePoint {
     supportsThinking?: boolean;
     /** Free-text family for grouping in the picker (`gpt`, `claude`, `kimi`, …). */
     family?: string;
+    /** True when prices are estimates, not confirmed from the provider. */
+    estimated?: boolean;
 }
 export declare const PRICES: PricePoint[];
 export declare function findPrice(provider: string, model: string): PricePoint | undefined;
 /**
  * Single-source-of-truth lookup. Returns the full PricePoint for a
- * model id (provider-agnostic — model ids are unique across providers
- * in our catalogue). Pair with `contextWindowFor(id)` (which adds
- * a fallback default) when you only need the context limit.
+ * model id. When a model id appears in multiple providers (e.g.
+ * "deepseek-v4-pro" exists under both "deepseek" and "nvidia"), pass
+ * the optional `provider` parameter to disambiguate.
  */
-export declare function lookupModel(modelId: string): PricePoint | undefined;
+export declare function lookupModel(modelId: string, provider?: string): PricePoint | undefined;
 /**
  * All models grouped by their `family` field (or by inferred family
  * from the model id when unset). Powers the model picker + the

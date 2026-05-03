@@ -34,6 +34,8 @@ export interface FleetCommandOptions {
     maxTurns?: number;
     concurrency?: number;
     timeoutMs?: number;
+    /** Pre-configured team template (e.g. "bugfix"). Passed through to FleetConfig. */
+    template?: string;
 }
 /**
  * Entry point for `dirgha fleet …` — returns a POSIX exit code.

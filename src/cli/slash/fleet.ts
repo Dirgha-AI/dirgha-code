@@ -41,6 +41,23 @@ export const fleetCommand: SlashCommand = {
     // + async execution — no other REPL path writes during this window.
     const { fleetCommand: runFleet } =
       await import("../../fleet/cli-command.js");
+
+    // Extract --template <name> / --template=<name> from args so it can be
+    // forwarded as a typed option. The flag is still left in args so that
+    // doLaunch()'s own parser can handle it consistently.
+    let templateName: string | undefined;
+    for (let i = 0; i < args.length; i++) {
+      const a = args[i];
+      if (a === "--template" && i + 1 < args.length) {
+        templateName = args[i + 1];
+        break;
+      }
+      if (a.startsWith("--template=")) {
+        templateName = a.slice("--template=".length);
+        break;
+      }
+    }
+
     const captured: string[] = [];
     const sink = (chunk: string | Uint8Array): boolean => {
       captured.push(
@@ -53,7 +70,10 @@ export const fleetCommand: SlashCommand = {
     process.stdout.write = sink as typeof process.stdout.write;
     process.stderr.write = sink as typeof process.stderr.write;
     try {
-      const code = await runFleet(args, { cwd: process.cwd() });
+      const code = await runFleet(args, {
+        cwd: process.cwd(),
+        template: templateName,
+      });
       const text = captured.join("").trim();
       if (code === 0) return text || "(fleet ok)";
       return `${text}\n(fleet exit=${code})`;

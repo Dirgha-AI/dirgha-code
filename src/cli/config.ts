@@ -127,7 +127,7 @@ const CURRENT_SCHEMA = 1;
 export const DEFAULT_CONFIG: DirghaConfig = {
   schemaVersion: CURRENT_SCHEMA,
   model: "moonshotai/kimi-k2.6",
-  cheapModel: "meta/llama-3.1-8b-instruct",
+  cheapModel: "deepseek-ai/deepseek-v4-flash", // widely available via DeepSeek, NIM, and OpenRouter
   summaryModel: "moonshotai/kimi-k2.5",
   maxTurns: 16,
   showThinking: false,
@@ -155,9 +155,27 @@ export async function loadConfig(
   migrateConfigSchema(merged);
   // Migrate any model IDs the upstream provider has dropped, so users
   // with stale `~/.dirgha/config.json` don't 400 on every call.
+  const originalModel = merged.model;
+  const originalCheap = merged.cheapModel;
+  const originalSummary = merged.summaryModel;
   merged.model = migrateDeprecatedModel(merged.model);
   merged.cheapModel = migrateDeprecatedModel(merged.cheapModel);
   merged.summaryModel = migrateDeprecatedModel(merged.summaryModel);
+  if (originalModel !== merged.model) {
+    process.stderr.write(
+      `[dirgha] model "${originalModel}" migrated to "${merged.model}"\n`,
+    );
+  }
+  if (originalCheap !== merged.cheapModel) {
+    process.stderr.write(
+      `[dirgha] cheapModel "${originalCheap}" migrated to "${merged.cheapModel}"\n`,
+    );
+  }
+  if (originalSummary !== merged.summaryModel) {
+    process.stderr.write(
+      `[dirgha] summaryModel "${originalSummary}" migrated to "${merged.summaryModel}"\n`,
+    );
+  }
   return merged;
 }
 
@@ -196,12 +214,22 @@ function readEnvOverrides(): Partial<DirghaConfig> {
 
 function merge(...partials: Array<Partial<DirghaConfig>>): DirghaConfig {
   const out: DirghaConfig = structuredClone(DEFAULT_CONFIG);
+  const arrayFields = new Set<keyof DirghaConfig>(["autoApproveTools"]);
   for (const p of partials) {
     if (!p) continue;
     for (const key of Object.keys(p) as Array<keyof DirghaConfig>) {
       const value = p[key];
       if (value === undefined) continue;
       if (
+        arrayFields.has(key) &&
+        Array.isArray(value) &&
+        Array.isArray(out[key])
+      ) {
+        (out[key] as unknown) = [
+          ...(out[key] as unknown as string[]),
+          ...(value as string[]),
+        ];
+      } else if (
         typeof value === "object" &&
         value !== null &&
         !Array.isArray(value)

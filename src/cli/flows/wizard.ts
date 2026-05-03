@@ -56,7 +56,8 @@ export const PROVIDERS: ProviderChoice[] = [
     hosted: false,
     env: "NVIDIA_API_KEY",
     helpUrl: "https://build.nvidia.com/settings/api-keys",
-    blurb: "Free NIM tier · Llama 3.3, DeepSeek V4, Qwen 3 (Kimi/MiniMax require NIM Pro)",
+    blurb:
+      "Free NIM tier · Llama 3.3, DeepSeek V4, Qwen 3 (Kimi/MiniMax require NIM Pro)",
   },
   {
     id: "openrouter",
@@ -177,7 +178,7 @@ export const DEFAULT_MODEL_PER_PROVIDER: Record<string, string> = {
   anthropic: "claude-sonnet-4-6",
   openai: "gpt-5",
   gemini: "gemini-2.5-pro",
-  nvidia: "moonshotai/kimi-k2.5",
+  nvidia: "moonshotai/kimi-k2.6",
   openrouter: "tencent/hy3-preview:free",
   fireworks: "accounts/fireworks/models/deepseek-v3",
   dirgha: "deepseek",
@@ -257,6 +258,8 @@ async function promptHidden(
   prompt: string,
 ): Promise<string> {
   // Override readline's echo while the user types so secrets don't render.
+  // NOTE: `_writeToOutput` is a private readline API — there is no public
+  // alternative for suppressing echo in Node's readline/promises interface.
   const writer = rl as unknown as { _writeToOutput: (s: string) => void };
   const orig = writer._writeToOutput;
   writer._writeToOutput = (s: string): void => {
@@ -316,7 +319,7 @@ async function probeLocalServer(url: string): Promise<boolean> {
   try {
     const res = await fetch(url, { method: "GET", signal: controller.signal });
     clearTimeout(timer);
-    return res.status < 500;
+    return res.ok;
   } catch {
     clearTimeout(timer);
     return false;
@@ -486,7 +489,9 @@ async function fetchLocalModels(): Promise<{
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 1500);
-    const res = await fetch("http://localhost:11434/api/tags", {
+    const ollamaBaseUrl =
+      process.env.OLLAMA_URL ?? "http://localhost:11434/api/tags";
+    const res = await fetch(ollamaBaseUrl, {
       signal: ctrl.signal,
     });
     clearTimeout(t);
@@ -781,13 +786,15 @@ async function askTelemetryConsent(
   // If the user has already explicitly enabled or disabled telemetry,
   // don't re-prompt. We track this via a `telemetry.consentSeen` flag.
   const { writeTelemetryConfig } = await import("../subcommands/telemetry.js");
-  const { existsSync, readFileSync, writeFileSync } = await import("node:fs");
+  const { existsSync, readFileSync } = await import("node:fs");
   const homeMod = await import("node:os");
   const pathMod = await import("node:path");
   const cfgPath = pathMod.join(homeMod.homedir(), ".dirgha", "config.json");
-  let cfg: any = {};
+  type ConfigJson = { telemetry?: { consentSeen?: boolean } };
+  let cfg: ConfigJson = {};
   try {
-    if (existsSync(cfgPath)) cfg = JSON.parse(readFileSync(cfgPath, "utf8"));
+    if (existsSync(cfgPath))
+      cfg = JSON.parse(readFileSync(cfgPath, "utf8")) as ConfigJson;
   } catch {
     /* */
   }
@@ -825,6 +832,7 @@ async function askTelemetryConsent(
     .trim()
     .toLowerCase();
 
+  let telemetryEnabled = false;
   if (answer === "r") {
     stdout.write(
       `\n  ${style(defaultTheme.muted, "See https://github.com/Dirgha-AI/dirgha-code/blob/main/docs/privacy/CLI-TELEMETRY.md")}\n`,
@@ -837,36 +845,28 @@ async function askTelemetryConsent(
       .trim()
       .toLowerCase();
     if (followUp === "y") {
-      writeTelemetryConfig({ enabled: true });
+      telemetryEnabled = true;
       stdout.write(
         `  ${style(defaultTheme.muted, "✓ telemetry enabled. Disable any time with `dirgha telemetry disable`.")}\n`,
       );
     } else {
-      writeTelemetryConfig({ enabled: false });
       stdout.write(
         `  ${style(defaultTheme.muted, "✓ telemetry disabled. Nothing leaves your machine.")}\n`,
       );
     }
   } else if (answer === "y") {
-    writeTelemetryConfig({ enabled: true });
+    telemetryEnabled = true;
     stdout.write(
       `  ${style(defaultTheme.muted, "✓ telemetry enabled. Disable any time with `dirgha telemetry disable`.")}\n`,
     );
   } else {
-    writeTelemetryConfig({ enabled: false });
     stdout.write(
       `  ${style(defaultTheme.muted, "✓ telemetry disabled. Nothing leaves your machine.")}\n`,
     );
   }
 
-  // Persist consentSeen so we never re-ask.
-  try {
-    if (existsSync(cfgPath)) cfg = JSON.parse(readFileSync(cfgPath, "utf8"));
-    cfg.telemetry = { ...(cfg.telemetry ?? {}), consentSeen: true };
-    writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
-  } catch {
-    /* */
-  }
+  // Persist both enabled state and consentSeen flag in one atomic write.
+  writeTelemetryConfig({ enabled: telemetryEnabled, consentSeen: true });
 }
 
 export const wizardSubcommand: Subcommand = {

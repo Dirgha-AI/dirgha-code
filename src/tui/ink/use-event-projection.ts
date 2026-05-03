@@ -369,6 +369,15 @@ export function useEventProjection(
                 progressTimerRef.current.delete(toolId);
                 const accumulated = pendingProgressRef.current.get(toolId);
                 if (!accumulated) return;
+                // Guard: the tool item may have been removed (commitLive)
+                // before this timer fired. Skip if not found in liveItemsRef.
+                const exists = liveItemsRef.current.some(
+                  (it) =>
+                    it.kind === "tool" &&
+                    it.id === toolId &&
+                    it.status === "running",
+                );
+                if (!exists) return;
                 setLive((prev) =>
                   prev.map((it) =>
                     it.kind === "tool" &&
@@ -491,6 +500,10 @@ export function useEventProjection(
       clearTimeout(flushThinkingTimerRef.current);
       flushThinkingTimerRef.current = null;
     }
+    // Cancel per-tool progress timers to prevent stale writes after commit.
+    for (const t of progressTimerRef.current.values()) clearTimeout(t);
+    progressTimerRef.current.clear();
+    pendingProgressRef.current.clear();
     // Flush any accumulated-but-not-yet-flushed text into liveItemsRef.
     const pt = pendingTextRef.current;
     if (pt) {

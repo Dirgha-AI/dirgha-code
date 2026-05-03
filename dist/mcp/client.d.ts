@@ -3,7 +3,7 @@
  * correlation by id and a simple notification fan-out. Sufficient for
  * initialize / tools/list / tools/call and resources/read.
  */
-import { Transport } from './transport.js';
+import { Transport } from "./transport.js";
 export interface McpClient {
     initialize(): Promise<InitializeResult>;
     listTools(): Promise<McpTool[]>;

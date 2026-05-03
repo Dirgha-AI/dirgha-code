@@ -9,7 +9,7 @@
  */
 import { argv, cwd, exit, stdin, stdout } from "node:process";
 import { randomUUID } from "node:crypto";
-import { statSync, truncateSync, existsSync } from "node:fs";
+import { statSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { createEventStream } from "../kernel/event-stream.js";
@@ -189,7 +189,13 @@ async function main() {
             if (topLevelMode && !tail.some((a) => a.startsWith("--mode"))) {
                 tail = [`--mode=${topLevelMode}`, ...tail];
             }
-            const code = await cmd.run(tail, { cwd: cwd() });
+            let code = 1;
+            try {
+                code = await cmd.run(tail, { cwd: cwd() });
+            }
+            catch (err) {
+                process.stderr.write(`[${verb}] ${err instanceof Error ? err.message : String(err)}\n`);
+            }
             // Telemetry — only sends when user opted in via `dirgha telemetry
             // enable`. We cap the wait at 1s so a slow Posthog response (cold
             // DNS, lossy link) never blocks the user. Opt-out users pay zero
@@ -292,7 +298,10 @@ async function main() {
         void mcpShutdown();
     });
     process.once("SIGINT", () => {
-        void mcpShutdown().then(() => process.exit(130));
+        Promise.race([
+            mcpShutdown(),
+            new Promise((r) => setTimeout(r, 5000)),
+        ]).finally(() => process.exit(130));
     });
     // Subagent dispatch: register `task` so the model can spawn a fresh
     // agent for a sub-goal. Built lazily so the
@@ -388,6 +397,13 @@ async function main() {
             });
         }
         else {
+            taskDelegatorRef.current = new SubagentDelegator({
+                registry,
+                provider: providers.forModel(model),
+                defaultModel: model,
+                cwd: cwd(),
+                parentSessionId: randomUUID(),
+            });
             await runInteractive({
                 registry,
                 providers,
@@ -395,6 +411,7 @@ async function main() {
                 config,
                 cwd: cwd(),
                 systemPrompt: system,
+                taskDelegatorRef,
             });
         }
         return;
@@ -680,12 +697,37 @@ async function isFirstRun() {
     }
     return true;
 }
+const MAX_STDIN_BYTES = 1 * 1024 * 1024; // 1 MB
+const STDIN_TIMEOUT_MS = 30_000; // 30 s
 function readAllStdin() {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
         const chunks = [];
+        let total = 0;
+        let capped = false;
+        const timer = setTimeout(() => reject(new Error("stdin read timed out")), STDIN_TIMEOUT_MS);
         stdin.setEncoding("utf8");
-        stdin.on("data", (c) => chunks.push(typeof c === "string" ? c : c.toString("utf8")));
-        stdin.on("end", () => resolve(chunks.join("")));
+        stdin.on("data", (c) => {
+            if (capped)
+                return;
+            const s = typeof c === "string" ? c : c.toString("utf8");
+            total += Buffer.byteLength(s, "utf8");
+            if (total > MAX_STDIN_BYTES) {
+                capped = true;
+                clearTimeout(timer);
+                stdin.pause();
+                resolve(chunks.join(""));
+                return;
+            }
+            chunks.push(s);
+        });
+        stdin.on("end", () => {
+            clearTimeout(timer);
+            resolve(chunks.join(""));
+        });
+        stdin.on("error", (e) => {
+            clearTimeout(timer);
+            reject(e);
+        });
     });
 }
 function printHelp() {
@@ -763,18 +805,18 @@ function rotateCrashLog() {
         if (!existsSync(path))
             return;
         const info = statSync(path);
-        // Rotate if > 10 MB or > 2000 lines (approximate)
-        if (info.size < 10 * 1024 * 1024)
+        // Rotate if > 5 MB
+        if (info.size < 5 * 1024 * 1024)
             return;
         const rotated = `${path}.old`;
-        try {
-            truncateSync(rotated, 0);
+        // Keep last 200 entries — read only up to 6 MB to stay bounded.
+        const MAX_READ = 6 * 1024 * 1024;
+        if (info.size > MAX_READ) {
+            writeFileSync(rotated, "", "utf8");
+            writeFileSync(path, "", "utf8");
+            return;
         }
-        catch {
-            /* */
-        }
-        // Keep last 200 entries
-        const raw = require("node:fs").readFileSync(path, "utf8");
+        const raw = readFileSync(path, "utf8");
         const entries = raw.split("\n[").filter(Boolean);
         const kept = entries.slice(-200);
         const rebuilt = (kept[0]?.startsWith("[") ? kept[0] : `[${kept[0]}`) +
@@ -782,8 +824,8 @@ function rotateCrashLog() {
                 .slice(1)
                 .map((e) => `[${e}`)
                 .join("");
-        require("node:fs").writeFileSync(rotated, raw, "utf8");
-        require("node:fs").writeFileSync(path, rebuilt, "utf8");
+        writeFileSync(rotated, raw, "utf8");
+        writeFileSync(path, rebuilt, "utf8");
     }
     catch {
         /* best effort — crash log rotation is cosmetic */

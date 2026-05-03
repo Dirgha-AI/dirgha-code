@@ -105,8 +105,9 @@ async function withLock<T>(lockPath: string, fn: () => Promise<T>): Promise<T> {
     }
   }
   if (!fh) {
-    // Timed out — write anyway rather than silently dropping the note.
-    return fn();
+    throw new Error(
+      `Failed to acquire scratchpad lock after ${LOCK_MAX_RETRIES} retries — dropping note to avoid corrupting shared JSONL.`,
+    );
   }
   try {
     return await fn();

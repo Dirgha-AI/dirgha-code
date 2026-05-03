@@ -160,7 +160,7 @@ export const DEFAULT_MODEL_PER_PROVIDER = {
     anthropic: "claude-sonnet-4-6",
     openai: "gpt-5",
     gemini: "gemini-2.5-pro",
-    nvidia: "moonshotai/kimi-k2.5",
+    nvidia: "moonshotai/kimi-k2.6",
     openrouter: "tencent/hy3-preview:free",
     fireworks: "accounts/fireworks/models/deepseek-v3",
     dirgha: "deepseek",
@@ -230,6 +230,8 @@ async function persistApiKey(env, key) {
 }
 async function promptHidden(rl, prompt) {
     // Override readline's echo while the user types so secrets don't render.
+    // NOTE: `_writeToOutput` is a private readline API — there is no public
+    // alternative for suppressing echo in Node's readline/promises interface.
     const writer = rl;
     const orig = writer._writeToOutput;
     writer._writeToOutput = (s) => {
@@ -276,7 +278,7 @@ async function probeLocalServer(url) {
     try {
         const res = await fetch(url, { method: "GET", signal: controller.signal });
         clearTimeout(timer);
-        return res.status < 500;
+        return res.ok;
     }
     catch {
         clearTimeout(timer);
@@ -381,7 +383,8 @@ async function fetchLocalModels() {
     try {
         const ctrl = new AbortController();
         const t = setTimeout(() => ctrl.abort(), 1500);
-        const res = await fetch("http://localhost:11434/api/tags", {
+        const ollamaBaseUrl = process.env.OLLAMA_URL ?? "http://localhost:11434/api/tags";
+        const res = await fetch(ollamaBaseUrl, {
             signal: ctrl.signal,
         });
         clearTimeout(t);
@@ -608,7 +611,7 @@ async function askTelemetryConsent(rl) {
     // If the user has already explicitly enabled or disabled telemetry,
     // don't re-prompt. We track this via a `telemetry.consentSeen` flag.
     const { writeTelemetryConfig } = await import("../subcommands/telemetry.js");
-    const { existsSync, readFileSync, writeFileSync } = await import("node:fs");
+    const { existsSync, readFileSync } = await import("node:fs");
     const homeMod = await import("node:os");
     const pathMod = await import("node:path");
     const cfgPath = pathMod.join(homeMod.homedir(), ".dirgha", "config.json");
@@ -635,38 +638,29 @@ async function askTelemetryConsent(rl) {
     const answer = (await ask(`  ${style(defaultTheme.accent, "Enable telemetry? [y / N / r=read full policy]:")} `))
         .trim()
         .toLowerCase();
+    let telemetryEnabled = false;
     if (answer === "r") {
         stdout.write(`\n  ${style(defaultTheme.muted, "See https://github.com/Dirgha-AI/dirgha-code/blob/main/docs/privacy/CLI-TELEMETRY.md")}\n`);
         const followUp = (await ask(`  ${style(defaultTheme.accent, "Enable telemetry? [y / N]:")} `))
             .trim()
             .toLowerCase();
         if (followUp === "y") {
-            writeTelemetryConfig({ enabled: true });
+            telemetryEnabled = true;
             stdout.write(`  ${style(defaultTheme.muted, "✓ telemetry enabled. Disable any time with `dirgha telemetry disable`.")}\n`);
         }
         else {
-            writeTelemetryConfig({ enabled: false });
             stdout.write(`  ${style(defaultTheme.muted, "✓ telemetry disabled. Nothing leaves your machine.")}\n`);
         }
     }
     else if (answer === "y") {
-        writeTelemetryConfig({ enabled: true });
+        telemetryEnabled = true;
         stdout.write(`  ${style(defaultTheme.muted, "✓ telemetry enabled. Disable any time with `dirgha telemetry disable`.")}\n`);
     }
     else {
-        writeTelemetryConfig({ enabled: false });
         stdout.write(`  ${style(defaultTheme.muted, "✓ telemetry disabled. Nothing leaves your machine.")}\n`);
     }
-    // Persist consentSeen so we never re-ask.
-    try {
-        if (existsSync(cfgPath))
-            cfg = JSON.parse(readFileSync(cfgPath, "utf8"));
-        cfg.telemetry = { ...(cfg.telemetry ?? {}), consentSeen: true };
-        writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
-    }
-    catch {
-        /* */
-    }
+    // Persist both enabled state and consentSeen flag in one atomic write.
+    writeTelemetryConfig({ enabled: telemetryEnabled, consentSeen: true });
 }
 export const wizardSubcommand = {
     name: "setup",

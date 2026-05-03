@@ -26,7 +26,10 @@ export async function runAgentLoop(cfg) {
         cachedTokens: 0,
         costUsd: 0,
     };
-    const maxTurns = Math.max(0, Math.min(1000, cfg.maxTurns));
+    const loopController = new AbortController();
+    const signal = cfg.signal ?? loopController.signal;
+    cfg.signal = signal;
+    const maxTurns = Math.max(1, Math.min(1000, cfg.maxTurns));
     let stopReason = "end_turn";
     let turnCount = 0;
     let retriesForTurn = 0;
@@ -38,7 +41,7 @@ export async function runAgentLoop(cfg) {
     });
     try {
         for (let turnIndex = 0; turnIndex < maxTurns; turnIndex++) {
-            if (cfg.signal?.aborted) {
+            if (signal.aborted) {
                 stopReason = "aborted";
                 break;
             }
@@ -99,11 +102,11 @@ export async function runAgentLoop(cfg) {
                     model: dispatchModel,
                     messages: messagesForCall,
                     tools: cfg.tools,
-                    signal: cfg.signal,
+                    signal: signal,
                 })) {
                     streamEvents.push(ev);
                     events.emit(ev);
-                    if (cfg.signal?.aborted)
+                    if (signal.aborted)
                         break;
                 }
             }
@@ -114,7 +117,7 @@ export async function runAgentLoop(cfg) {
                 const isAbort = (err instanceof Error &&
                     (err.name === "AbortError" ||
                         /aborted|abort/i.test(err.message))) ||
-                    cfg.signal?.aborted === true;
+                    signal.aborted;
                 if (isAbort) {
                     stopReason = "aborted";
                     recordRequest(cfg.provider.id, false, 0);
@@ -132,6 +135,9 @@ export async function runAgentLoop(cfg) {
                 // or 5xx upstream failures.
                 const errMsg = err instanceof Error ? err.message : String(err);
                 recordHealthFailure(cfg.provider.id, errMsg);
+                // Known limitation: this regex is fragile — provider error messages
+                // can change at any time. A classifier or structured error code is
+                // the correct long-term fix, but that requires per-provider parsing.
                 const looksFixable = /not a valid model id|deprecated|model_not_found|rate.?limit|429\b|5\d\d\b|bad.?gateway|upstream/i.test(errMsg);
                 const failover = looksFixable ? findFailover(cfg.model) : undefined;
                 if (looksFixable) {
@@ -151,7 +157,6 @@ export async function runAgentLoop(cfg) {
                     retriesForTurn++;
                     const backoff = classified.backoffMs ?? 1000;
                     await new Promise((r) => setTimeout(r, backoff));
-                    turnIndex--;
                     continue;
                 }
                 stopReason = "error";
@@ -159,7 +164,7 @@ export async function runAgentLoop(cfg) {
                 break;
             }
             // Abort via signal.aborted break (not thrown AbortError): treat identically.
-            if (cfg.signal?.aborted) {
+            if (signal.aborted) {
                 stopReason = "aborted";
                 events.emit({ type: "turn_end", turnId, stopReason });
                 break;
@@ -190,6 +195,7 @@ export async function runAgentLoop(cfg) {
             catch {
                 // loopDetector.track may throw with malformed tool inputs;
                 // don't let it poison history — treat as no tools and exit.
+                console.error(`[agent-loop] loopDetector.track failed for session ${cfg.sessionId}`);
                 events.emit({ type: "turn_end", turnId, stopReason: "end_turn" });
                 break;
             }
@@ -219,6 +225,7 @@ export async function runAgentLoop(cfg) {
         }
     }
     finally {
+        loopController.abort();
         events.emit({
             type: "agent_end",
             sessionId: cfg.sessionId,
@@ -317,7 +324,7 @@ async function executeToolCalls(toolUses, cfg, events) {
         const started = Date.now();
         let result;
         try {
-            result = await cfg.toolExecutor.execute({ ...call, input }, cfg.signal ?? defaultSignal());
+            result = await cfg.toolExecutor.execute({ ...call, input }, cfg.signal);
         }
         catch (err) {
             result = {
@@ -357,10 +364,13 @@ async function executeToolCalls(toolUses, cfg, events) {
     return out;
 }
 function truncateForSummary(input, max = 160) {
-    const s = typeof input === "string" ? input : JSON.stringify(input);
-    return s.length <= max ? s : s.slice(0, max - 1) + "…";
-}
-function defaultSignal() {
-    return new AbortController().signal;
+    let s;
+    try {
+        s = typeof input === "string" ? input : JSON.stringify(input);
+    }
+    catch {
+        s = String(input);
+    }
+    return s.length <= max ? s : s.slice(0, max - 1) + "\u2026";
 }
 //# sourceMappingURL=agent-loop.js.map

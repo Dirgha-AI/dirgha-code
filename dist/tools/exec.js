@@ -32,6 +32,19 @@ export function createToolExecutor(opts) {
                     isError: true,
                 };
             }
+            if (opts.permission) {
+                const decision = opts.permission.check({
+                    tool: call.name,
+                    action: "exec",
+                    target: opts.cwd,
+                });
+                if (!decision.allowed) {
+                    return {
+                        content: `Permission denied: ${decision.reason}`,
+                        isError: true,
+                    };
+                }
+            }
             const sandbox = await sandboxPromise;
             const ctx = {
                 cwd: opts.cwd,

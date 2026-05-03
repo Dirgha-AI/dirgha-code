@@ -16,7 +16,6 @@ import * as React from "react";
 import { Box, Text } from "ink";
 import { iconFor } from "../icons.js";
 import { useTheme } from "../theme-context.js";
-import { SpinnerContext } from "../spinner-context.js";
 import { SpinnerGlyph } from "./SpinnerGlyph.js";
 import { useElapsed } from "../use-elapsed.js";
 import { highlightContent, colorForKind, isCodeFile, } from "../markdown/syntax-highlight.js";
@@ -81,7 +80,6 @@ function diffShortPreview(text, maxLen = 80) {
 }
 export const ToolBox = React.memo(function ToolBox(props) {
     const palette = useTheme();
-    const { busy: _spinnerBusy } = React.useContext(SpinnerContext);
     const isRunning = props.status !== "done" &&
         props.status !== "error" &&
         props.status !== "blocked";
@@ -118,7 +116,7 @@ export const ToolBox = React.memo(function ToolBox(props) {
         : diffMode && props.outputPreview
             ? diffShortPreview(props.outputPreview, 80)
             : "";
-    return (_jsxs(Box, { flexDirection: "column", borderStyle: "round", borderColor: borderColour, paddingX: 1, marginBottom: 1, children: [_jsxs(Box, { gap: 1, children: [icon !== null ? (_jsx(Text, { color: iconColour, children: icon })) : (_jsx(SpinnerGlyph, { isActive: isRunning })), _jsx(Text, { color: props.status === "error"
+    return (_jsxs(Box, { flexDirection: "column", borderStyle: "round", borderColor: borderColour, paddingX: 1, marginBottom: 1, children: [_jsxs(Box, { gap: 1, children: [icon !== null ? (_jsx(Text, { color: iconColour, children: icon })) : (_jsx(SpinnerGlyph, { isActive: isRunning, color: palette.ui.focus })), _jsx(Text, { color: props.status === "error"
                             ? palette.status.error
                             : palette.text.accent, bold: true, children: iconFor(props.name) }), _jsx(Text, { color: props.status === "error"
                             ? palette.status.error

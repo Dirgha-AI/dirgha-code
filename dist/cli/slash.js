@@ -50,7 +50,8 @@ export class SlashRegistry {
                 };
             }
             else {
-                console.error(`[slash dispatch] no handler for "${name}" (raw="${rawName}", stripped="${stripped}"). Registered:`, [...this.handlers.keys()].sort().join(", "));
+                process.stderr.write(`[slash dispatch] no handler for "${name}" (raw="${rawName}", stripped="${stripped}"). Registered: ` +
+                    `${[...this.handlers.keys()].sort().join(", ")}\n`);
                 return {
                     handled: true,
                     output: `Unknown slash command: /${name}. Try /help.`,
@@ -62,7 +63,7 @@ export class SlashRegistry {
             return { handled: true, output };
         }
         catch (err) {
-            console.error(`[slash dispatch] /${name} handler threw:`, err instanceof Error ? (err.stack ?? err.message) : String(err));
+            process.stderr.write(`[slash dispatch] /${name} handler threw: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`);
             return {
                 handled: true,
                 output: `[slash error] ${err instanceof Error ? err.message : String(err)}`,
@@ -83,24 +84,31 @@ export function createDefaultSlashRegistry() {
         ctx.exit(0);
         return undefined;
     });
+    registry.register("stop", (_, ctx) => {
+        ctx.exit(0);
+        return undefined;
+    });
     registry.register("clear", (_, ctx) => {
         ctx.clear();
         return undefined;
     });
     registry.register("model", (args, ctx) => {
         if (args.length === 0)
-            return `Current model: ${ctx.model}`;
+            return `Current model: ${ctx.model}\nUse /models to browse and pick from the catalogue.`;
         const id = args[0];
-        // Try exact match first, then fall back to short-name suffix match.
         const exactMatch = PRICES.some((p) => p.model === id);
         if (exactMatch) {
             ctx.setModel(id);
             return `Model set to ${id}`;
         }
-        const suffixMatch = PRICES.find((p) => p.model.endsWith('/' + id));
-        if (suffixMatch) {
-            ctx.setModel(suffixMatch.model);
-            return `Model set to ${suffixMatch.model}`;
+        // Suffix match: pick the longest (most specific) match to avoid
+        // non-determinism when multiple models share the same suffix tail.
+        const suffixCandidates = PRICES.filter((p) => p.model.endsWith("/" + id));
+        if (suffixCandidates.length > 0) {
+            suffixCandidates.sort((a, b) => b.model.length - a.model.length);
+            const best = suffixCandidates[0];
+            ctx.setModel(best.model);
+            return `Model set to ${best.model}`;
         }
         return `Invalid model: ${id}. Use /models to see the catalogue.`;
     });
@@ -121,11 +129,19 @@ export function createDefaultSlashRegistry() {
 export async function registerBuiltinSlashCommands(registry) {
     const { builtinSlashCommands } = await import("./slash/index.js");
     for (const cmd of builtinSlashCommands) {
-        if (!registry.has(cmd.name))
+        if (!registry.has(cmd.name)) {
             registry.register(cmd.name, cmd.execute);
+        }
+        else {
+            process.stderr.write(`[slash] skipping "/${cmd.name}" — already registered\n`);
+        }
         for (const alias of cmd.aliases ?? []) {
-            if (!registry.has(alias))
+            if (!registry.has(alias)) {
                 registry.register(alias, cmd.execute);
+            }
+            else {
+                process.stderr.write(`[slash] skipping alias "/${alias}" for "/${cmd.name}" — already registered\n`);
+            }
         }
     }
 }

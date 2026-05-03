@@ -32,6 +32,7 @@ import {
 import { queryKb } from "../../context/kb-query.js";
 import { probeGitState, renderGitState } from "../../context/git-state.js";
 import { loadSoul } from "../../context/soul.js";
+import { routeModel } from "../../providers/dispatch.js";
 import { isAutoApprove, modePreamble } from "../../context/mode.js";
 import { runAgentLoop } from "../../kernel/agent-loop.js";
 import { createErrorClassifier } from "../../intelligence/error-classifier.js";
@@ -88,6 +89,7 @@ import { SpinnerContext } from "./spinner-context.js";
 import { SpinnerGlyph } from "./components/SpinnerGlyph.js";
 import type { ThemeName } from "../theme.js";
 import { writeFile, mkdir, readFile } from "node:fs/promises";
+import { readFileSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join as pathJoin } from "node:path";
 import {
@@ -122,6 +124,11 @@ const VERSION: string = (() => {
     return "0.0.0-dev";
   }
 })();
+
+// Cache for initialHistory — avoids sync fs I/O in the render phase
+// on re-calls (e.g. /clear). The underlying files rarely change within
+// a session so a single snapshot is sufficient.
+let _cachedInitialMessages: Message[] | null = null;
 
 export interface AppProps {
   events: EventStream;
@@ -390,6 +397,9 @@ export function App(props: AppProps): React.JSX.Element {
       } else if (ev.type === "thinking_end") {
         setThinkingStreaming(false);
       } else if (ev.type === "text_delta" || ev.type === "thinking_delta") {
+        // Approximate tokens as chars ÷ 4 — a common heuristic for English
+        // text where avg token length is ~4 characters. Not exact but keeps
+        // the tok/s rate plausible without an expensive tokenizer.
         liveOutputTokensAccRef.current += (ev.delta?.length ?? 0) / 4;
       } else if (ev.type === "usage") {
         // Only update the accumulator ref — the 1s tick interval reads it.
@@ -497,7 +507,7 @@ export function App(props: AppProps): React.JSX.Element {
       // A new submission supersedes any pending failover prompt.
       setPendingFailover(null);
 
-      if (value === "/exit" || value === "/quit") {
+      if (value === "/exit" || value === "/quit" || value === "/stop") {
         exit();
         return;
       }
@@ -515,22 +525,34 @@ export function App(props: AppProps): React.JSX.Element {
       if (value.startsWith("/model ")) {
         const id = value.slice("/model ".length).trim();
         if (id !== "") {
-          const valid = PRICES.some((p) => p.model === id);
-          if (!valid) {
+          // Exact match first, then suffix fallback — mirrors slash.ts /model handler.
+          const exactMatch = PRICES.find((p) => p.model === id);
+          if (exactMatch) {
+            setCurrentModel(exactMatch.model);
             const note: TranscriptItem = {
               kind: "notice",
               id: randomUUID(),
-              text: `Invalid model: ${id}. Use /models to see the catalogue.`,
+              text: `Model set to ${exactMatch.model}`,
             };
             setTranscript((prev) => [...prev, note]);
           } else {
-            setCurrentModel(id);
-            const note: TranscriptItem = {
-              kind: "notice",
-              id: randomUUID(),
-              text: `Model set to ${id}`,
-            };
-            setTranscript((prev) => [...prev, note]);
+            const suffixMatch = PRICES.find((p) => p.model.endsWith("/" + id));
+            if (suffixMatch) {
+              setCurrentModel(suffixMatch.model);
+              const note: TranscriptItem = {
+                kind: "notice",
+                id: randomUUID(),
+                text: `Model set to ${suffixMatch.model}`,
+              };
+              setTranscript((prev) => [...prev, note]);
+            } else {
+              const note: TranscriptItem = {
+                kind: "notice",
+                id: randomUUID(),
+                text: `Invalid model: ${id}. Use /models to see the catalogue.`,
+              };
+              setTranscript((prev) => [...prev, note]);
+            }
           }
         }
         return;
@@ -630,7 +652,11 @@ export function App(props: AppProps): React.JSX.Element {
             exit();
             process.exit(code);
           },
-          getToken: () => tokenRef.current,
+          getToken: () => {
+            // Token loads asynchronously after mount; return null
+            // gracefully so slash commands don't crash on first call.
+            return tokenRef.current;
+          },
           setToken: (newToken: Token | null) => {
             tokenRef.current = newToken;
           },
@@ -831,7 +857,10 @@ export function App(props: AppProps): React.JSX.Element {
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      const keyMatch = /^([A-Z][A-Z0-9_]+_API_KEY) is required/.exec(msg);
+      // Only match provider-key errors, not errors from deep inside the agent
+      // loop that happen to contain a similar pattern. The message must start
+      // with the key name and end with "is required" to qualify.
+      const keyMatch = /^([A-Z][A-Z0-9_]+_API_KEY) is required$/.exec(msg);
       if (keyMatch?.[1]) {
         setPendingKey({
           keyName: keyMatch[1],
@@ -852,7 +881,12 @@ export function App(props: AppProps): React.JSX.Element {
       abortRef.current = null;
     }
   };
-  runTurnRef.current = runTurn;
+  // Keep runTurnRef pointed at the latest runTurn closure so
+  // handleSubmit always calls the current version without adding
+  // runTurn's deps to handleSubmit's dependency array.
+  React.useEffect(() => {
+    runTurnRef.current = runTurn;
+  });
 
   // Drain the prompt queue when a turn finishes. Pops the oldest queued
   // prompt and re-submits it through handleSubmit (which transitions
@@ -871,6 +905,8 @@ export function App(props: AppProps): React.JSX.Element {
   //   2. If a turn is streaming → abort it (cancels the in-flight LLM
   //      request via the AbortController plumbed through runAgentLoop).
   //   3. If the input box has draft text → clear it.
+  //   (step 3 is skipped when vimMode is on — InputBox's own handler
+  //    enters NORMAL mode; clearing here would destroy the text.)
   // Always active so Esc behaves like the user expects regardless of
   // which surface they're looking at. The atfile overlay handles its
   // own Esc (cancel completion) so we skip step 1 there.
@@ -889,12 +925,13 @@ export function App(props: AppProps): React.JSX.Element {
       });
       return;
     }
-    if (input.length > 0) setInput("");
+    if (input.length > 0 && props.config.vimMode !== true) setInput("");
   });
 
   // Ctrl-C handler: if a turn is running, abort it and show "[Interrupted]"
   // in the transcript (matching the readline path in src/cli/interactive.ts).
-  // If idle, let the process exit normally via app.exit().
+  // Idle exit is handled by InputBox's own Ctrl-C handler (2-press safety
+  // within 1.5s) — we don't override that here.
   useInput((ch, key) => {
     if (!(key.ctrl && ch === "c")) return;
     if (busy && abortRef.current !== null) {
@@ -904,8 +941,6 @@ export function App(props: AppProps): React.JSX.Element {
         id: randomUUID(),
         text: "[Interrupted]",
       });
-    } else {
-      exit();
     }
   });
 
@@ -932,7 +967,7 @@ export function App(props: AppProps): React.JSX.Element {
           props.providers.forModel(id);
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
-          const m = /([A-Z][A-Z0-9_]+_API_KEY) is required/.exec(msg);
+          const m = /^([A-Z][A-Z0-9_]+_API_KEY) is required$/.exec(msg);
           if (m?.[1]) {
             // Open inline key entry instead of a static hint — the user can
             // paste their key right here without leaving the REPL.
@@ -1444,6 +1479,7 @@ function GeneratingIndicator(): React.JSX.Element {
 }
 
 function initialHistory(props: AppProps): Message[] {
+  if (_cachedInitialMessages !== null) return _cachedInitialMessages;
   const base = props.initialMessages ? [...props.initialMessages] : [];
   // Boot context: mode preamble + project primer (DIRGHA.md) +
   // caller's --system. Without this, the Ink TUI starts with zero
@@ -1460,27 +1496,18 @@ function initialHistory(props: AppProps): Message[] {
     userSystem: props.systemPrompt,
   });
   base.unshift({ role: "system", content: composedSystem });
+  _cachedInitialMessages = base;
   return base;
 }
 
 function providerIdForModel(model: string): string {
-  // Light heuristic so StatusBar has a hint without importing dispatch.
-  // Real routing still lives in providers/dispatch.ts at run time.
-  if (model.includes("claude")) return "anthropic";
-  if (model.includes("gpt") || model.startsWith("o1") || model.startsWith("o3"))
-    return "openai";
-  if (model.includes("gemini")) return "gemini";
-  if (model.includes("deepseek")) return "deepseek";
-  if (model.includes("kimi") || model.includes("moonshot")) return "nvidia";
-  if (
-    model.includes("llama") ||
-    model.includes("nvidia") ||
-    model.includes("minimax")
-  )
-    return "nvidia";
-  if (model.includes("fireworks")) return "fireworks";
-  if (model.includes("/")) return "openrouter";
-  return "local";
+  // Delegate to providers/dispatch.ts so the StatusBar readout
+  // matches the actual runtime routing at all times.
+  try {
+    return routeModel(model);
+  } catch {
+    return "local";
+  }
 }
 
 const PROVIDER_BLURB: Record<string, string> = {
@@ -1544,6 +1571,23 @@ const PROVIDER_LABEL: Record<string, string> = {
 };
 
 /**
+ * Synchronously check whether an env var exists in ~/.dirgha/keys.json.
+ * Used by buildProviderEntries as a fallback when process.env doesn't
+ * contain the key yet (race with startup hydration).
+ */
+function tryReadKeyFromStore(envVar: string): boolean {
+  try {
+    const path = pathJoin(homedir(), ".dirgha", "keys.json");
+    if (!existsSync(path)) return false;
+    const raw = readFileSync(path, "utf8");
+    const store = JSON.parse(raw) as Record<string, unknown>;
+    return typeof store[envVar] === "string" && store[envVar]!.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Group the flat model catalogue into per-provider entries for stage 1
  * of the picker. Skips providers with zero models in the catalogue.
  */
@@ -1561,7 +1605,13 @@ function buildProviderEntries(
   const out: ProviderPickerEntry[] = [];
   for (const [id, items] of buckets) {
     const env = PROVIDER_ENV[id];
-    const hasKey = env ? !!process.env[env] : true; // local providers don't need keys
+    // Check env vars AND keys.json (env vars win). keys.json is hydrated
+    // into process.env by hydrateEnvFromKeyStore at startup, but this
+    // synchronous fallback handles the edge case where hydration hasn't
+    // run yet (e.g. TUI mounts before startup hydration completes).
+    const hasKey = env
+      ? !!process.env[env] || !!tryReadKeyFromStore(env)
+      : true; // local providers don't need keys
     out.push({
       id,
       label: PROVIDER_LABEL[id] ?? id,

@@ -11,16 +11,16 @@
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { createRequire } from "node:module";
 import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { access, constants } from "node:fs/promises";
+import { safeEnvironment } from "../utils/env.js";
 import type { Tool, ToolContext } from "./registry.js";
 import type { ToolResult } from "../kernel/types.js";
 
 const execFileAsync = promisify(execFile);
 
-// Resolve the package root: require.resolve returns the absolute path to
-// package.json, so one dirname gives us the package root directory.
+import { createRequire } from "node:module";
 const _require = createRequire(import.meta.url);
 const _pkgRoot = dirname(_require.resolve("../../package.json"));
 
@@ -92,14 +92,27 @@ export const rtkTool: Tool = {
     const input = raw as { command: string; cwd?: string; timeoutMs?: number };
     const workDir = input.cwd ?? ctx.cwd ?? process.cwd();
     const timeout = input.timeoutMs ?? 30_000;
-    const cmdParts = input.command.trim().split(/\s+/);
+    const command = input.command.trim();
 
     try {
       const rtkBin = await resolveRtk();
-      const argv = rtkBin ? [rtkBin, ...cmdParts] : cmdParts;
-      const bin = argv[0];
-      const args = argv.slice(1);
-      const rtkUsed = rtkBin !== null;
+      let rtkUsed = false;
+      let bin: string;
+      let args: string[];
+      if (rtkBin) {
+        bin = rtkBin;
+        args = command.split(/\s+/);
+        rtkUsed = true;
+      } else {
+        bin =
+          process.platform === "win32"
+            ? (process.env.ComSpec ?? "cmd.exe")
+            : "/bin/sh";
+        args =
+          process.platform === "win32"
+            ? ["/d", "/s", "/c", command]
+            : ["-c", command];
+      }
 
       const { stdout, stderr } = await execFileAsync(bin, args, {
         cwd: workDir,
@@ -107,7 +120,7 @@ export const rtkTool: Tool = {
         maxBuffer: 1024 * 1024 * 4,
         // Disable rtk's default telemetry. rtk pings telemetry.rtk-ai.app
         // with aggregate command counts; Dirgha users have not opted in.
-        env: { ...process.env, RTK_TELEMETRY_DISABLED: "1" },
+        env: { ...safeEnvironment(), RTK_TELEMETRY_DISABLED: "1" },
       });
 
       const out = (stdout + (stderr ? `\n[stderr]\n${stderr}` : "")).trim();

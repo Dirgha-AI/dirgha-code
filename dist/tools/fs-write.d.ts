@@ -4,5 +4,5 @@
  * change. Refuses to silently overwrite: the description declares the
  * overwrite contract.
  */
-import type { Tool } from './registry.js';
+import type { Tool } from "./registry.js";
 export declare const fsWriteTool: Tool;

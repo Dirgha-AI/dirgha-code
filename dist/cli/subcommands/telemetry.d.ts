@@ -13,11 +13,12 @@
  * `dirgha telemetry enable` OR responds 'y' to the first-run consent
  * prompt. We NEVER send prompts, responses, file contents, or keys.
  */
-import type { Subcommand } from './index.js';
+import type { Subcommand } from "./index.js";
 export interface TelemetryConfig {
     enabled: boolean;
     endpoint: string;
     sessionId: string;
+    consentSeen?: boolean;
 }
 /** Read the current telemetry config, defaulting to opt-out. */
 export declare function readTelemetryConfig(): TelemetryConfig;

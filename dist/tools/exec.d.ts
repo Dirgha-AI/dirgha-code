@@ -11,6 +11,7 @@
  */
 import type { ToolExecutor } from "../kernel/types.js";
 import type { ToolContext, ToolRegistry } from "./registry.js";
+import type { PermissionEngine } from "./permission.js";
 export type { ToolExecutor } from "../kernel/types.js";
 export interface ToolExecutorOptions {
     registry: ToolRegistry;
@@ -19,5 +20,6 @@ export interface ToolExecutorOptions {
     sessionId: string;
     log?: ToolContext["log"];
     onProgress?: (toolId: string, message: string) => void;
+    permission?: PermissionEngine;
 }
 export declare function createToolExecutor(opts: ToolExecutorOptions): ToolExecutor;

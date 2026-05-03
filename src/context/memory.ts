@@ -227,6 +227,9 @@ export class FileMemoryStore implements MemoryStore {
       this.ftsPromise = openFtsIndex({
         dbPath: join(this.dir, "index.db"),
         namespace: "memory",
+      }).catch((_err) => {
+        this.ftsPromise = null;
+        return null;
       });
     }
     return this.ftsPromise;
@@ -313,6 +316,10 @@ function renderEntry(entry: MemoryEntry): string {
   return `${frontmatter}${entry.body}`;
 }
 
+// NOTE: This parser uses a simple line-by-line regex for YAML frontmatter.
+// It only supports flat key:value pairs. Multi-line strings, nested objects,
+// and lists are NOT handled — values containing ':' or newlines must be
+// JSON-escaped by `escapeValue` / `renderEntry` before writing.
 function parseEntry(id: string, text: string): MemoryEntry | undefined {
   const match = text.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
   if (!match) return undefined;

@@ -20,7 +20,9 @@ export function VirtualTranscript(props) {
     const buffer = 5;
     const visibleCount = Math.max(1, rows - buffer);
     const endIdx = items.length - scrollOffset;
-    const visibleStart = Math.max(0, endIdx - visibleCount - buffer);
+    // visibleCount already subtracts buffer. Only subtract one more buffer
+    // (not two) so the viewport doesn't shrink by double.
+    const visibleStart = Math.max(0, endIdx - visibleCount);
     const paddedStart = Math.max(0, visibleStart - buffer);
     const visibleItems = items.slice(paddedStart, endIdx);
     const aboveCount = paddedStart;

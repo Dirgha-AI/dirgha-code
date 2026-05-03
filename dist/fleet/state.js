@@ -4,6 +4,10 @@
  * State file: ~/.dirgha/fleet-state/<goalSlug>-<runId>.json
  * Written fire-and-forget after each agent turn and status transition.
  * Used by `dirgha fleet resume` to restart incomplete agents.
+ *
+ * Known limitation: all agents share a single JSON state file which causes
+ * write amplification (N agents × T turns = N×T rewrites of the full file).
+ * Consider per-agent files or an append-only log as the agent count grows.
  */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -51,7 +55,10 @@ export async function findLatestState(goalSubstring) {
     catch {
         return null;
     }
-    const jsonFiles = files.filter((f) => f.endsWith(".json")).sort().reverse();
+    const jsonFiles = files
+        .filter((f) => f.endsWith(".json"))
+        .sort()
+        .reverse();
     for (const f of jsonFiles) {
         try {
             const st = await readFleetState(join(STATE_DIR, f));
@@ -59,7 +66,9 @@ export async function findLatestState(goalSubstring) {
                 return join(STATE_DIR, f);
             }
         }
-        catch { /* corrupt state file — skip */ }
+        catch {
+            /* corrupt state file — skip */
+        }
     }
     return null;
 }

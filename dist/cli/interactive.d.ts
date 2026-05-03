@@ -9,6 +9,7 @@ import type { ProviderRegistry } from "../providers/index.js";
 import type { ToolRegistry } from "../tools/registry.js";
 import type { SessionStore } from "../context/session.js";
 import type { DirghaConfig } from "./config.js";
+import { SubagentDelegator } from "../subagents/delegator.js";
 export interface InteractiveOptions {
     registry: ToolRegistry;
     providers: ProviderRegistry;
@@ -17,5 +18,8 @@ export interface InteractiveOptions {
     cwd: string;
     systemPrompt?: string;
     initialMessages?: Message[];
+    taskDelegatorRef?: {
+        current: InstanceType<typeof SubagentDelegator> | null;
+    };
 }
 export declare function runInteractive(opts: InteractiveOptions): Promise<void>;

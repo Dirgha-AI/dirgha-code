@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import path from "node:path";
+import { safeEnvironment } from "../utils/env.js";
 // ── Symbol kind labels ─────────────────────────────────────────────────────
 const SYMBOL_KIND_LABELS = {
     1: "File",
@@ -184,11 +185,13 @@ export async function createLspClient(serverId, command, args, root, cwd) {
     const proc = spawn(command, args, {
         cwd: cwd || root,
         stdio: ["pipe", "pipe", "pipe"],
-        env: { ...process.env },
+        env: safeEnvironment(),
     });
     const connection = createLspConnection(proc);
     if (proc.stderr) {
-        proc.stderr.resume();
+        proc.stderr.on("data", (chunk) => {
+            process.stderr.write(`[lsp:${serverId}] ${chunk.toString("utf8")}`);
+        });
     }
     proc.on("exit", (code, signal) => {
         const reason = signal != null
@@ -202,9 +205,18 @@ export async function createLspClient(serverId, command, args, root, cwd) {
     const diagnostics = new Map();
     connection.onNotification("textDocument/publishDiagnostics", (params) => {
         const p = params;
-        const fpath = p.uri.startsWith("file://")
-            ? new URL(p.uri).pathname
-            : p.uri;
+        let fpath;
+        if (p.uri.startsWith("file://")) {
+            try {
+                fpath = new URL(p.uri).pathname;
+            }
+            catch {
+                fpath = p.uri;
+            }
+        }
+        else {
+            fpath = p.uri;
+        }
         diagnostics.set(fpath, p.diagnostics ?? []);
     });
     const initResult = await Promise.race([
@@ -236,22 +248,23 @@ export async function createLspClient(serverId, command, args, root, cwd) {
         if (openedFiles.has(filePath))
             return;
         openedFiles.add(filePath);
+        const languageId = LANGUAGE_MAP[path.extname(filePath)] ?? "plaintext";
+        let text;
         try {
             const fs = await import("node:fs/promises");
-            const text = await fs.readFile(filePath, "utf8");
-            const languageId = LANGUAGE_MAP[path.extname(filePath)] ?? "plaintext";
-            await connection.sendNotification("textDocument/didOpen", {
-                textDocument: {
-                    uri: pathToFileURL(filePath).href,
-                    languageId,
-                    version: 0,
-                    text,
-                },
-            });
+            text = await fs.readFile(filePath, "utf8");
         }
         catch {
-            /* file may not exist yet */
+            text = "";
         }
+        await connection.sendNotification("textDocument/didOpen", {
+            textDocument: {
+                uri: pathToFileURL(filePath).href,
+                languageId,
+                version: 0,
+                text,
+            },
+        });
     }
     const client = {
         serverId,

@@ -230,7 +230,12 @@ describe("/model short-name suffix match (Bug 4)", () => {
     const registry = createDefaultSlashRegistry();
     await registerBuiltinSlashCommands(registry);
     let setTo = "";
-    const ctx = { ...fakeCtx, setModel: (v: string) => { setTo = v; } };
+    const ctx = {
+      ...fakeCtx,
+      setModel: (v: string) => {
+        setTo = v;
+      },
+    };
     const result = await registry.dispatch("/model kimi-k2.6", ctx);
     expect(setTo).toBe("moonshotai/kimi-k2.6");
     expect(result.output).toContain("kimi-k2.6");
@@ -257,7 +262,10 @@ describe("/session branch is reachable — not shadowed by stub (Bug 5)", () => 
   it("/session branch returns a message that is not the old stub", async () => {
     const registry = createDefaultSlashRegistry();
     await registerBuiltinSlashCommands(registry);
-    const result = await registry.dispatch("/session branch test-name", fakeCtx);
+    const result = await registry.dispatch(
+      "/session branch test-name",
+      fakeCtx,
+    );
     // Old stub would return exactly: 'Usage: /session list | /session load <id>'
     // The real sessionCommand returns a different message (no session active).
     expect(result.output ?? "").not.toBe(
@@ -438,14 +446,14 @@ const modeEnforcementCases = [
   ["plan", "fs_write", true],
   ["plan", "fs_edit", true],
   ["plan", "shell", true],
-  ["plan", "git", true],
+  ["plan", "git", false],
   ["plan", "read_file", false],
   ["plan", "search_grep", false],
   ["act", "fs_write", false],
   ["verify", "fs_write", true],
   ["verify", "shell", true],
   ["ask", "fs_write", true],
-  ["ask", "browser", true],
+  ["ask", "browser", false],
   ["ask", "read_file", false],
 ] as const;
 
@@ -457,8 +465,52 @@ describe("mode enforcement — 12 kernel assertions (Bug 8)", () => {
         expect(expectBlock).toBe(false);
         return;
       }
-      const r = await hooks.beforeToolCall!({ id: "test", name: tool, input: {} });
+      const r = await hooks.beforeToolCall!({
+        id: "test",
+        name: tool,
+        input: {},
+      });
       expect(!!r?.block).toBe(expectBlock);
     });
   }
+
+  it("browser goto blocked in plan mode", async () => {
+    const hooks = enforceMode("plan");
+    const r = await hooks!.beforeToolCall!({
+      id: "t",
+      name: "browser",
+      input: { action: "goto" },
+    });
+    expect(!!r?.block).toBe(true);
+  });
+
+  it("browser content allowed in plan mode", async () => {
+    const hooks = enforceMode("plan");
+    const r = await hooks!.beforeToolCall!({
+      id: "t",
+      name: "browser",
+      input: { action: "content" },
+    });
+    expect(!!r?.block).toBe(false);
+  });
+
+  it("browser close allowed in verify mode", async () => {
+    const hooks = enforceMode("verify");
+    const r = await hooks!.beforeToolCall!({
+      id: "t",
+      name: "browser",
+      input: { action: "close" },
+    });
+    expect(!!r?.block).toBe(false);
+  });
+
+  it("browser click blocked in ask mode", async () => {
+    const hooks = enforceMode("ask");
+    const r = await hooks!.beforeToolCall!({
+      id: "t",
+      name: "browser",
+      input: { action: "click" },
+    });
+    expect(!!r?.block).toBe(true);
+  });
 });

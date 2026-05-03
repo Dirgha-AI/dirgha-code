@@ -21,6 +21,20 @@ const NVIDIA_NIM_MODELS = new Set([
     "mistralai/mistral-nemotron",
     "mistralai/devstral-2-123b-instruct-2512",
 ]);
+// RULE ORDERING INVARIANTS (must be preserved — tested by dispatch.test.ts):
+//   1. Exact native-ID prefix rules (claude-, gpt-, gemini-) come FIRST so
+//      they never match via the catch-all OR rule.
+//   2. Explicit vendor-prefix rules (deepseek-ai/, ollama/, fireworks/, etc.)
+//      come BEFORE the NVIDIA NIM catalogue rule so user-chosen providers are
+//      never hijacked by the catalogue.
+//   3. The NIM catalogue rule (exact-set match against NVIDIA_NIM_MODELS)
+//      comes BEFORE the catch-all because those catalogued model IDs would
+//      otherwise fall through to OpenRouter.
+//   4. Local/extra-provider explicit-prefix rules (ollama/, llamacpp/,
+//      fireworks/, mistral/, cohere/, etc.) come AFTER NIM but BEFORE the
+//      catch-all so users can explicitly pick these providers.
+//   5. The catch-all (any `/` or `:free` suffix) MUST be last so it only
+//      fires when no other rule has matched.
 const RULES = [
     // Native, no-prefix model IDs go to first-party APIs.
     { match: (id) => id.startsWith("claude-"), provider: "anthropic" },
@@ -71,7 +85,7 @@ const RULES = [
     // OpenRouter (anthropic/, openai/, google/, deepseek/, moonshotai/,
     // minimax/, qwen/, tencent/, z-ai/, inclusionai/, etc.).
     {
-        match: (id) => id.includes("/") || id.includes(":free"),
+        match: (id) => id.includes("/") || id.endsWith(":free"),
         provider: "openrouter",
     },
 ];

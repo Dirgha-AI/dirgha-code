@@ -9,7 +9,6 @@
 import * as React from "react";
 import { Box, Text, useStdout } from "ink";
 import { useTheme } from "../theme-context.js";
-import { SpinnerContext } from "../spinner-context.js";
 import { SpinnerGlyph } from "./SpinnerGlyph.js";
 import type { RenderMetricsGetters } from "../use-render-metrics.js";
 
@@ -88,7 +87,6 @@ export const StatusBar = React.memo(function StatusBar(
   const { stdout } = useStdout();
   const palette = useTheme();
   const cols = stdout?.columns ?? 80;
-  const { busy: _spinnerBusy } = React.useContext(SpinnerContext);
 
   const totalTokens = props.inputTokens + props.outputTokens;
   const costLabel = props.costUsd > 0 ? `$${props.costUsd.toFixed(3)}` : "";

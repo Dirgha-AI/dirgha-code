@@ -5,7 +5,7 @@
  * a single "exec this command?" prompt per operation.
  */
 import { spawn } from "node:child_process";
-import { resolve, sep } from "node:path";
+import { isValidCwdPath } from "../utils/fs.js";
 export const gitTool = {
     name: "git",
     description: "Run read-mostly git operations: status, diff, log, branch, show. Destructive git operations should go through the shell tool.",
@@ -18,6 +18,10 @@ export const gitTool = {
         },
         required: ["op"],
     },
+    requiresApproval: (raw) => {
+        const input = raw;
+        return input.op === "diff" || input.op === "show";
+    },
     async execute(rawInput, ctx) {
         const input = rawInput;
         const base = commandFor(input.op);
@@ -29,10 +33,12 @@ export const gitTool = {
             };
         }
         const full = [...base, ...(input.args ?? [])];
-        const requestedCwd = input.cwd ? resolve(ctx.cwd, input.cwd) : ctx.cwd;
-        const cwd = requestedCwd.startsWith(ctx.cwd + sep) || requestedCwd === ctx.cwd
-            ? requestedCwd
-            : ctx.cwd;
+        if (input.cwd) {
+            const check = isValidCwdPath(ctx.cwd, input.cwd);
+            if (!check.valid)
+                return { content: check.error, isError: true };
+        }
+        const cwd = input.cwd ? ctx.cwd : ctx.cwd;
         const result = await run("git", full, cwd, ctx.env);
         return {
             content: [result.stdout, result.stderr]
@@ -64,7 +70,7 @@ async function run(command, args, cwd, env) {
         const child = spawn(command, args, {
             cwd,
             env,
-            stdio: ["ignore", "pipe", "pipe"],
+            stdio: ["pipe", "pipe", "pipe"],
         });
         const stdout = [];
         const stderr = [];

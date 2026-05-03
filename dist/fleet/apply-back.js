@@ -50,9 +50,13 @@ export async function applyBack(worktree, options = {}) {
             return applyCherryPick(worktree, repoRoot);
     }
 }
-/** Commit every dirty file in the worktree (stage+commit). */
+/** Commit every dirty file in the worktree (stage+commit),
+ *  skipping any changes inside .fleet/ to avoid committing
+ *  worktree noise (scratchpads, ledgers, etc.). */
 async function commitDirty(worktree, message) {
     await pexec("git", ["add", "-A"], { cwd: worktree.path });
+    // Unstage anything under .fleet/ before committing.
+    await pexec("git", ["reset", "--", ".fleet/"], { cwd: worktree.path }).catch(() => { });
     const { stdout } = await pexec("git", ["status", "--porcelain"], {
         cwd: worktree.path,
     });

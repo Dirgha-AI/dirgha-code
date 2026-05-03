@@ -7,7 +7,7 @@
 
 import { randomUUID } from "node:crypto";
 import { registerSession, closeSession } from "../state/index.js";
-import { createInterface } from "node:readline";
+import { createInterface, emitKeypressEvents } from "node:readline";
 import type { Message, UsageTotal, Provider } from "../kernel/types.js";
 import { createEventStream } from "../kernel/event-stream.js";
 import { appendAudit } from "../audit/writer.js";
@@ -44,6 +44,7 @@ import { loadSoul } from "../context/soul.js";
 import { modePreamble } from "../context/mode.js";
 import { isAutoApprove } from "../context/mode.js";
 import { createErrorClassifier } from "../intelligence/error-classifier.js";
+import { SubagentDelegator } from "../subagents/delegator.js";
 
 export interface InteractiveOptions {
   registry: ToolRegistry;
@@ -53,6 +54,7 @@ export interface InteractiveOptions {
   cwd: string;
   systemPrompt?: string;
   initialMessages?: Message[];
+  taskDelegatorRef?: { current: InstanceType<typeof SubagentDelegator> | null };
 }
 
 export async function runInteractive(opts: InteractiveOptions): Promise<void> {
@@ -60,6 +62,15 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
   const session = await opts.sessions.create(sessionId);
   // Register in unified state index (fire-and-forget, never blocks).
   void registerSession(sessionId, opts.config.model);
+  if (opts.taskDelegatorRef) {
+    opts.taskDelegatorRef.current = new SubagentDelegator({
+      registry: opts.registry,
+      provider: opts.providers.forModel(opts.config.model),
+      defaultModel: opts.config.model,
+      cwd: opts.cwd,
+      parentSessionId: sessionId,
+    });
+  }
   const events = createEventStream();
   const slash = createDefaultSlashRegistry();
   await registerBuiltinSlashCommands(slash);
@@ -172,6 +183,20 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
     prompt: style(currentTheme.userPrompt, "❯ "),
   });
   rl.prompt();
+
+  // ESC key handling in readline mode: abort in-flight turn or clear input.
+  const abortRef: { current: AbortController | null } = { current: null };
+  emitKeypressEvents(process.stdin);
+  if (process.stdin.isTTY) process.stdin.setRawMode(true);
+  process.stdin.on("keypress", (_str, key) => {
+    if (key.name !== "escape") return;
+    if (isProcessing && abortRef.current !== null) {
+      abortRef.current.abort();
+      process.stdout.write(style(currentTheme.muted, "\n[Interrupted]\n"));
+    } else if ((rl.line?.length ?? 0) > 0) {
+      rl.write(null, { ctrl: true, name: "u" });
+    }
+  });
 
   rl.on("line", (line) => {
     if (isProcessing) return;
@@ -328,6 +353,7 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
       const userHooks = buildAgentHooksFromConfig(opts.config);
       const composedHooks = composeHooks(enforceMode(currentMode), userHooks);
       const abortController = new AbortController();
+      abortRef.current = abortController;
       const sigintHandler = (): void => {
         abortController.abort();
         process.stdout.write(style(currentTheme.muted, "\n[Interrupted]\n"));
@@ -387,6 +413,7 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
         );
       } finally {
         process.removeListener("SIGINT", sigintHandler);
+        abortRef.current = null;
       }
       rl.prompt();
     } finally {

@@ -72,6 +72,10 @@ export function useRenderMetrics(): RenderMetricsGetters {
   }
 
   React.useEffect(() => {
+    // Capture frameTime and frameTimesRef at mount time, then write
+    // once per render to state so the I/O doesn't repeat on re-renders
+    // of the parent (which would fire hundreds/sec).
+    const capturedFrameTime = frameTime;
     void (async () => {
       try {
         const state = await readState();
@@ -81,7 +85,7 @@ export function useRenderMetrics(): RenderMetricsGetters {
           p99History: [],
         };
         prev.totalFrames += 1;
-        prev.totalFrameTimeMs += frameTime;
+        prev.totalFrameTimeMs += capturedFrameTime;
         if (frameTimesRef.current.length >= 100) {
           const sorted = [...frameTimesRef.current].sort((a, b) => a - b);
           const idx = Math.ceil(sorted.length * 0.99) - 1;
@@ -96,7 +100,7 @@ export function useRenderMetrics(): RenderMetricsGetters {
         /* best-effort */
       }
     })();
-  });
+  }, []);
 
   return {
     framesThisSession: () => framesThisSessionRef.current,

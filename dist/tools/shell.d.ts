@@ -7,7 +7,7 @@
  * the model does not misread a capped stream as a complete one.
  *
  * Platform routing (1.13.0):
- *   posix → spawn(cmd, { shell: true })  // /bin/sh -c <cmd>
+ *   posix → spawn('/bin/sh', ['-c', command])
  *   win32 → prefer pwsh > powershell > cmd.exe via env detection;
  *           fall back to cmd if PowerShell isn't on PATH. PowerShell
  *           handles quoting + UTF-8 + multi-line scripts more cleanly

@@ -6,9 +6,9 @@
  */
 
 import { spawn } from "node:child_process";
-import { resolve, sep } from "node:path";
 import type { Tool } from "./registry.js";
 import type { ToolResult } from "../kernel/types.js";
+import { isValidCwdPath } from "../utils/fs.js";
 
 type Op = "status" | "diff" | "log" | "branch" | "show";
 
@@ -31,6 +31,10 @@ export const gitTool: Tool = {
     },
     required: ["op"],
   },
+  requiresApproval: (raw: unknown): boolean => {
+    const input = raw as Input;
+    return input.op === "diff" || input.op === "show";
+  },
   async execute(
     rawInput: unknown,
     ctx,
@@ -45,11 +49,11 @@ export const gitTool: Tool = {
       };
     }
     const full = [...base, ...(input.args ?? [])];
-    const requestedCwd = input.cwd ? resolve(ctx.cwd, input.cwd) : ctx.cwd;
-    const cwd =
-      requestedCwd.startsWith(ctx.cwd + sep) || requestedCwd === ctx.cwd
-        ? requestedCwd
-        : ctx.cwd;
+    if (input.cwd) {
+      const check = isValidCwdPath(ctx.cwd, input.cwd);
+      if (!check.valid) return { content: check.error, isError: true };
+    }
+    const cwd = input.cwd ? ctx.cwd : ctx.cwd;
     const result = await run("git", full, cwd, ctx.env);
     return {
       content: [result.stdout, result.stderr]
@@ -88,7 +92,7 @@ async function run(
     const child = spawn(command, args, {
       cwd,
       env,
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: ["pipe", "pipe", "pipe"],
     });
     const stdout: Buffer[] = [];
     const stderr: Buffer[] = [];

@@ -13,25 +13,39 @@ export interface UnifiedDiffOptions {
   toLabel?: string;
 }
 
-export function unifiedDiff(before: string, after: string, opts: UnifiedDiffOptions = {}): string {
+const MAX_DIFF_LINES = 10_000;
+
+export function unifiedDiff(
+  before: string,
+  after: string,
+  opts: UnifiedDiffOptions = {},
+): string {
   const ctx = opts.context ?? 3;
-  const a = before.split('\n');
-  const b = after.split('\n');
+  const a = before.split("\n");
+  const b = after.split("\n");
+  if (a.length > MAX_DIFF_LINES || b.length > MAX_DIFF_LINES) {
+    return `@@ diff truncated: input too large (${a.length} / ${b.length} lines, max ${MAX_DIFF_LINES}) @@`;
+  }
   const ops = lcsOps(a, b);
 
   const header = [
-    `--- ${opts.fromLabel ?? 'before'}`,
-    `+++ ${opts.toLabel ?? 'after'}`,
+    `--- ${opts.fromLabel ?? "before"}`,
+    `+++ ${opts.toLabel ?? "after"}`,
   ];
   const hunks: string[] = [];
   let i = 0;
   while (i < ops.length) {
-    if (ops[i].kind === 'eq') { i++; continue; }
+    if (ops[i].kind === "eq") {
+      i++;
+      continue;
+    }
     let start = i;
-    while (start > 0 && ops[start - 1].kind === 'eq' && i - start < ctx) start--;
+    while (start > 0 && ops[start - 1].kind === "eq" && i - start < ctx)
+      start--;
     let end = i;
-    while (end < ops.length && (ops[end].kind !== 'eq' || end - i < ctx)) end++;
-    while (end < ops.length && ops[end].kind === 'eq' && end - i < ctx * 2) end++;
+    while (end < ops.length && (ops[end].kind !== "eq" || end - i < ctx)) end++;
+    while (end < ops.length && ops[end].kind === "eq" && end - i < ctx * 2)
+      end++;
 
     let aCount = 0;
     let bCount = 0;
@@ -42,11 +56,11 @@ export function unifiedDiff(before: string, after: string, opts: UnifiedDiffOpti
       const op = ops[k];
       if (aStart < 0 && op.aLine !== undefined) aStart = op.aLine;
       if (bStart < 0 && op.bLine !== undefined) bStart = op.bLine;
-      if (op.kind === 'eq') {
+      if (op.kind === "eq") {
         lines.push(` ${op.text}`);
         aCount++;
         bCount++;
-      } else if (op.kind === 'del') {
+      } else if (op.kind === "del") {
         lines.push(`-${op.text}`);
         aCount++;
       } else {
@@ -54,24 +68,28 @@ export function unifiedDiff(before: string, after: string, opts: UnifiedDiffOpti
         bCount++;
       }
     }
-    hunks.push(`@@ -${(aStart < 0 ? 0 : aStart + 1)},${aCount} +${(bStart < 0 ? 0 : bStart + 1)},${bCount} @@`);
+    hunks.push(
+      `@@ -${aStart < 0 ? 0 : aStart + 1},${aCount} +${bStart < 0 ? 0 : bStart + 1},${bCount} @@`,
+    );
     hunks.push(...lines);
     i = end;
   }
 
-  if (hunks.length === 0) return '';
-  return [...header, ...hunks].join('\n');
+  if (hunks.length === 0) return "";
+  return [...header, ...hunks].join("\n");
 }
 
 type Op =
-  | { kind: 'eq'; text: string; aLine: number; bLine: number }
-  | { kind: 'del'; text: string; aLine: number; bLine?: number }
-  | { kind: 'add'; text: string; bLine: number; aLine?: number };
+  | { kind: "eq"; text: string; aLine: number; bLine: number }
+  | { kind: "del"; text: string; aLine: number; bLine?: number }
+  | { kind: "add"; text: string; bLine: number; aLine?: number };
 
 function lcsOps(a: string[], b: string[]): Op[] {
   const m = a.length;
   const n = b.length;
-  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  const dp: number[][] = Array.from({ length: m + 1 }, () =>
+    new Array(n + 1).fill(0),
+  );
   for (let i = m - 1; i >= 0; i--) {
     for (let j = n - 1; j >= 0; j--) {
       if (a[i] === b[j]) dp[i][j] = dp[i + 1][j + 1] + 1;
@@ -83,27 +101,37 @@ function lcsOps(a: string[], b: string[]): Op[] {
   let j = 0;
   while (i < m && j < n) {
     if (a[i] === b[j]) {
-      out.push({ kind: 'eq', text: a[i], aLine: i, bLine: j });
-      i++; j++;
+      out.push({ kind: "eq", text: a[i], aLine: i, bLine: j });
+      i++;
+      j++;
     } else if (dp[i + 1][j] >= dp[i][j + 1]) {
-      out.push({ kind: 'del', text: a[i], aLine: i });
+      out.push({ kind: "del", text: a[i], aLine: i });
       i++;
     } else {
-      out.push({ kind: 'add', text: b[j], bLine: j });
+      out.push({ kind: "add", text: b[j], bLine: j });
       j++;
     }
   }
-  while (i < m) { out.push({ kind: 'del', text: a[i], aLine: i }); i++; }
-  while (j < n) { out.push({ kind: 'add', text: b[j], bLine: j }); j++; }
+  while (i < m) {
+    out.push({ kind: "del", text: a[i], aLine: i });
+    i++;
+  }
+  while (j < n) {
+    out.push({ kind: "add", text: b[j], bLine: j });
+    j++;
+  }
   return out;
 }
 
-export function summariseDiff(diff: string): { added: number; removed: number } {
+export function summariseDiff(diff: string): {
+  added: number;
+  removed: number;
+} {
   let added = 0;
   let removed = 0;
-  for (const line of diff.split('\n')) {
-    if (line.startsWith('+') && !line.startsWith('+++')) added++;
-    else if (line.startsWith('-') && !line.startsWith('---')) removed++;
+  for (const line of diff.split("\n")) {
+    if (line.startsWith("+") && !line.startsWith("+++")) added++;
+    else if (line.startsWith("-") && !line.startsWith("---")) removed++;
   }
   return { added, removed };
 }

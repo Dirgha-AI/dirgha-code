@@ -23,24 +23,26 @@
  * `~/.dirgha/keypool.json.lock`. Stale locks (older than 30 s) are
  * stolen so a crashed CLI can't wedge the file forever.
  */
-import { chmod, mkdir, readFile, writeFile, stat, unlink } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
-import { randomBytes } from 'node:crypto';
+import { chmod, mkdir, readFile, writeFile, stat, unlink, rename, } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { randomBytes } from "node:crypto";
 const LOCK_TIMEOUT_MS = 30_000;
 export function poolPath(home = homedir()) {
-    return join(home, '.dirgha', 'keypool.json');
+    return join(home, ".dirgha", "keypool.json");
 }
 function lockPath(home = homedir()) {
-    return join(home, '.dirgha', 'keypool.json.lock');
+    return join(home, ".dirgha", "keypool.json.lock");
 }
 async function acquireLock(home) {
     const lp = lockPath(home);
-    await mkdir(join(home, '.dirgha'), { recursive: true });
+    await mkdir(join(home, ".dirgha"), { recursive: true });
     for (let attempt = 0; attempt < 30; attempt++) {
         try {
-            await writeFile(lp, String(process.pid), { flag: 'wx' });
-            return async () => { await unlink(lp).catch(() => { }); };
+            await writeFile(lp, String(process.pid), { flag: "wx" });
+            return async () => {
+                await unlink(lp).catch(() => { });
+            };
         }
         catch {
             const info = await stat(lp).catch(() => undefined);
@@ -48,32 +50,42 @@ async function acquireLock(home) {
                 await unlink(lp).catch(() => { });
                 continue;
             }
-            await new Promise(r => setTimeout(r, 100));
+            await new Promise((r) => setTimeout(r, 100));
         }
     }
-    // Fall through — last-resort overwrite to avoid deadlock.
-    await writeFile(lp, String(process.pid));
-    return async () => { await unlink(lp).catch(() => { }); };
+    const info = await stat(lp).catch(() => undefined);
+    if (!info || Date.now() - info.mtimeMs > LOCK_TIMEOUT_MS) {
+        await writeFile(lp, String(process.pid));
+        return async () => {
+            await unlink(lp).catch(() => { });
+        };
+    }
+    throw new Error(`Could not acquire keypool lock after ${LOCK_TIMEOUT_MS}ms — lock held by another process`);
 }
 export async function readPool(home = homedir()) {
-    const text = await readFile(poolPath(home), 'utf8').catch(() => '');
+    const text = await readFile(poolPath(home), "utf8").catch(() => "");
     if (!text)
         return {};
     try {
         const parsed = JSON.parse(text);
-        return parsed && typeof parsed === 'object' ? parsed : {};
+        return parsed && typeof parsed === "object" ? parsed : {};
     }
     catch {
         return {};
     }
 }
 async function writePool(pool, home = homedir()) {
-    await mkdir(join(home, '.dirgha'), { recursive: true });
-    await writeFile(poolPath(home), JSON.stringify(pool, null, 2) + '\n', 'utf8');
+    await mkdir(join(home, ".dirgha"), { recursive: true });
+    const target = poolPath(home);
+    const tmp = `${target}.tmp-${randomBytes(4).toString("hex")}`;
+    await writeFile(tmp, JSON.stringify(pool, null, 2) + "\n", "utf8");
     try {
-        await chmod(poolPath(home), 0o600);
+        await chmod(tmp, 0o600);
     }
-    catch { /* non-POSIX */ }
+    catch {
+        /* non-POSIX */
+    }
+    await rename(tmp, target);
 }
 export async function addEntry(envName, value, opts = {}) {
     const home = opts.home ?? homedir();
@@ -82,7 +94,7 @@ export async function addEntry(envName, value, opts = {}) {
         const pool = await readPool(home);
         const list = pool[envName] ?? [];
         const entry = {
-            id: randomBytes(3).toString('hex'),
+            id: randomBytes(3).toString("hex"),
             value,
             label: opts.label ?? `key-${list.length + 1}`,
             priority: opts.priority ?? 0,
@@ -104,7 +116,7 @@ export async function removeEntry(envName, id, home = homedir()) {
     try {
         const pool = await readPool(home);
         const list = pool[envName] ?? [];
-        const next = list.filter(e => e.id !== id);
+        const next = list.filter((e) => e.id !== id);
         if (next.length === list.length)
             return false;
         if (next.length === 0)
@@ -140,7 +152,7 @@ export function pickEntry(pool, envName, now = new Date()) {
     const list = pool[envName];
     if (!list || list.length === 0)
         return undefined;
-    const live = list.filter(e => !e.exhaustedUntil || new Date(e.exhaustedUntil) <= now);
+    const live = list.filter((e) => !e.exhaustedUntil || new Date(e.exhaustedUntil) <= now);
     if (live.length === 0)
         return undefined;
     // Highest priority first; tie-break on least-recently-used so we
@@ -159,7 +171,7 @@ export async function markExhausted(envName, id, untilIso, home = homedir()) {
     const release = await acquireLock(home);
     try {
         const pool = await readPool(home);
-        const entry = (pool[envName] ?? []).find(e => e.id === id);
+        const entry = (pool[envName] ?? []).find((e) => e.id === id);
         if (!entry)
             return;
         entry.exhaustedUntil = untilIso;
@@ -176,13 +188,15 @@ export async function touchEntry(envName, id, home = homedir()) {
         return;
     try {
         const pool = await readPool(home);
-        const entry = (pool[envName] ?? []).find(e => e.id === id);
+        const entry = (pool[envName] ?? []).find((e) => e.id === id);
         if (!entry)
             return;
         entry.lastUsedAt = new Date().toISOString();
         await writePool(pool, home);
     }
-    catch { /* swallow */ }
+    catch {
+        /* swallow */
+    }
     finally {
         await release();
     }
@@ -198,7 +212,7 @@ export async function hydrateEnvFromPool(env = process.env, home = homedir()) {
     const pool = await readPool(home);
     const hydrated = [];
     for (const envName of Object.keys(pool)) {
-        if (env[envName] !== undefined && env[envName] !== '')
+        if (env[envName] !== undefined && env[envName] !== "")
             continue;
         const pick = pickEntry(pool, envName);
         if (!pick)

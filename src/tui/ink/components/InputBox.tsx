@@ -136,6 +136,10 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
   }, [props.value, props.onSlashQueryChange]);
 
   // Invalidate paste-collapse if the buffer shrinks past the pasted region.
+  // NOTE: collapse boundaries become stale if the user types while collapsed
+  // (e.g. pasteSegment.end no longer points at the right position). Acceptable
+  // for now — the worst case is the paste region doesn't collapse/expand
+  // cleanly, and the user can still Ctrl+E toggle out of it.
   React.useEffect(() => {
     if (pasteSegment === null) return;
     if (props.value.length < pasteSegment.end) {
@@ -149,23 +153,17 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
   const handleChange = React.useCallback(
     (next: string): void => {
       const prev = prevValueRef.current;
-      // Strip raw DEL (0x7f) and BS (0x08) characters that slip through when
-      // Ink doesn't recognise the terminal's backspace keycode. Without this,
-      // terminals that send ^? or ^H for Backspace get literal `` / `` in
-      // the buffer instead of a deletion.
+      // Strip raw DEL (0x7f) and BS (0x08) characters from terminal
+      // backspace that Ink doesn't recognise. Instead of a double-strip
+      // (which corrupts the buffer), iterate once: backspace bytes delete
+      // the last retained character; other bytes are kept.
       const DEL = "\x7f";
       const BS = "\x08";
       let sanitized = next;
       if (next.includes(DEL) || next.includes(BS)) {
-        sanitized = next.replace(new RegExp(`[${DEL}${BS}]`, "g"), "");
-        // Emulate backspace: the raw char replaced the character before the
-        // cursor. Since we can't know the exact cursor position from here,
-        // we do the common case: strip one raw char and remove the character
-        // immediately before each occurrence.
         let result = "";
         for (const ch of next) {
-          if (ch === "\x7f" || ch === "\x08") {
-            // Delete the last character (if any) for each backspace.
+          if (ch === DEL || ch === BS) {
             if (result.length > 0) result = result.slice(0, -1);
           } else {
             result += ch;
@@ -211,7 +209,9 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
         return;
       }
       // Any other input resets history navigation.
-      if (historyIdx !== null && !key.upArrow && !key.downArrow && inputCh) {
+      // inputCh may be empty for some key events (e.g. modifier-only);
+      // reset based on the key object rather than requiring a character.
+      if (historyIdx !== null && !key.upArrow && !key.downArrow) {
         setHistoryIdx(null);
       }
 
@@ -345,7 +345,11 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
             </Text>
           )}
           {props.busy && (
-            <BusyHint palette={palette} liveDurationMs={props.liveDurationMs} />
+            <BusyHint
+              palette={palette}
+              liveDurationMs={props.liveDurationMs}
+              vimMode={props.vimMode === true}
+            />
           )}
         </Box>
         {ctrlCArmed && (
@@ -372,9 +376,11 @@ function vimModeLabel(m: VimMode): string {
 function BusyHint({
   palette,
   liveDurationMs,
+  vimMode,
 }: {
   palette: ReturnType<typeof useTheme>;
   liveDurationMs?: number;
+  vimMode?: boolean;
 }): React.JSX.Element {
   const elapsed = Math.floor((liveDurationMs ?? 0) / 1000);
   const label =
@@ -383,7 +389,10 @@ function BusyHint({
       : elapsed < 3600
         ? `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`
         : `${Math.floor(elapsed / 3600)}h ${Math.floor((elapsed % 3600) / 60)}m`;
+  const escLabel = vimMode ? "esc normal" : "esc cancel";
   return (
-    <Text color={palette.textMuted}>esc cancel · {label} · ctrl+c clear</Text>
+    <Text color={palette.textMuted}>
+      {escLabel} · {label} · ctrl+c stop
+    </Text>
   );
 }

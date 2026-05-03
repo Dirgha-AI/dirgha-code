@@ -7,16 +7,21 @@
  * the model does not misread a capped stream as a complete one.
  *
  * Platform routing (1.13.0):
- *   posix → spawn(cmd, { shell: true })  // /bin/sh -c <cmd>
+ *   posix → spawn('/bin/sh', ['-c', command])
  *   win32 → prefer pwsh > powershell > cmd.exe via env detection;
  *           fall back to cmd if PowerShell isn't on PATH. PowerShell
  *           handles quoting + UTF-8 + multi-line scripts more cleanly
  *           than cmd.exe's relic Windows-95 parser.
  */
 
-import { spawn, spawnSync } from "node:child_process";
+import { spawn, execFile } from "node:child_process";
+import { StringDecoder } from "node:string_decoder";
+import { resolve, sep } from "node:path";
+import { promisify } from "node:util";
 import type { Tool } from "./registry.js";
 import type { ToolResult } from "../kernel/types.js";
+
+const execFileAsync = promisify(execFile);
 
 interface Input {
   command: string;
@@ -24,44 +29,51 @@ interface Input {
   timeoutMs?: number;
 }
 
-/** Cached PowerShell executable detection (per-process, never re-probed). */
+/** Cached PowerShell executable detection (probed async at first use). */
 let cachedWindowsShell: {
   cmd: string;
   args: (script: string) => string[];
 } | null = null;
-
-function resolveWindowsShell(): {
+let windowsShellPromise: Promise<{
   cmd: string;
   args: (script: string) => string[];
-} {
+}> | null = null;
+
+async function resolveWindowsShell(): Promise<{
+  cmd: string;
+  args: (script: string) => string[];
+}> {
   if (cachedWindowsShell) return cachedWindowsShell;
-  // Prefer PowerShell 7+ (`pwsh`), then Windows PowerShell 5.1, then cmd.
-  for (const exe of ["pwsh", "powershell"]) {
-    const probe = spawnSync(exe, ["-NoLogo", "-Command", "exit 0"], {
-      timeout: 3000,
-    });
-    if (probe.status === 0) {
+  if (!windowsShellPromise) {
+    windowsShellPromise = (async () => {
+      for (const exe of ["pwsh", "powershell"]) {
+        try {
+          await execFileAsync(exe, ["-NoLogo", "-Command", "exit 0"], {
+            timeout: 3000,
+          });
+          cachedWindowsShell = {
+            cmd: exe,
+            args: (script: string): string[] => [
+              "-NoLogo",
+              "-NoProfile",
+              "-NonInteractive",
+              "-OutputFormat",
+              "Text",
+              "-Command",
+              script,
+            ],
+          };
+          return cachedWindowsShell;
+        } catch {}
+      }
       cachedWindowsShell = {
-        cmd: exe,
-        args: (script: string): string[] => [
-          "-NoLogo",
-          "-NoProfile",
-          "-NonInteractive",
-          "-OutputFormat",
-          "Text",
-          "-Command",
-          script,
-        ],
+        cmd: process.env.ComSpec ?? "cmd.exe",
+        args: (script: string): string[] => ["/d", "/s", "/c", script],
       };
       return cachedWindowsShell;
-    }
+    })();
   }
-  // Fallback: cmd.exe via shell:true (no /c needed since spawn handles it).
-  cachedWindowsShell = {
-    cmd: process.env.ComSpec ?? "cmd.exe",
-    args: (script: string): string[] => ["/d", "/s", "/c", script],
-  };
-  return cachedWindowsShell;
+  return windowsShellPromise;
 }
 
 interface Output {
@@ -95,32 +107,36 @@ export const shellTool: Tool = {
     const input = rawInput as Input;
     const cwd = input.cwd ?? ctx.cwd;
     const timeoutMs = input.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-    // TODO: use context.sandbox when SandboxAdapter.exec() is wired.
-    // ctx.sandbox is now populated by createToolExecutor() — replace the
-    // spawn() block below with ctx.sandbox.exec({ command, cwd, env, ... })
-    // once the mapping from Input → SandboxExecOptions is validated.
-    //
-    // Platform-aware spawn. On Windows, prefer pwsh > powershell > cmd.
-    // PowerShell handles UTF-8, quoting, and multi-line scripts more
-    // cleanly than cmd.exe's legacy parser. On POSIX, plain shell:true
-    // (= /bin/sh -c).
+
+    if (cwd !== ctx.cwd) {
+      const resolved = resolve(cwd);
+      const base = resolve(ctx.cwd);
+      const baseSep = base.endsWith(sep) ? base : base + sep;
+      if (resolved !== base && !resolved.startsWith(baseSep)) {
+        return { content: `cwd escapes workspace: ${cwd}`, isError: true };
+      }
+    }
+
     const child =
       process.platform === "win32"
-        ? (() => {
-            const shell = resolveWindowsShell();
+        ? (async () => {
+            const shell = await resolveWindowsShell();
             return spawn(shell.cmd, shell.args(input.command), {
               cwd,
               env: ctx.env,
-              stdio: ["ignore", "pipe", "pipe"],
+              stdio: ["pipe", "pipe", "pipe"],
               windowsHide: true,
             });
           })()
-        : spawn(input.command, {
+        : spawn("/bin/sh", ["-c", input.command], {
             cwd,
             env: ctx.env,
-            stdio: ["ignore", "pipe", "pipe"],
-            shell: true,
+            stdio: ["pipe", "pipe", "pipe"],
           });
+
+    const childProcess = await (child instanceof Promise
+      ? child
+      : Promise.resolve(child));
 
     const stdoutChunks: Buffer[] = [];
     const stderrChunks: Buffer[] = [];
@@ -128,11 +144,18 @@ export const shellTool: Tool = {
     let stderrBytes = 0;
     let truncated = false;
 
-    // Shared total so combined stdout+stderr never exceeds MAX_OUTPUT_BYTES.
     let totalBytes = 0;
 
+    const stdoutDecoder = new StringDecoder("utf8");
+    const stderrDecoder = new StringDecoder("utf8");
+
     const onData =
-      (chunks: Buffer[], trackBytes: (n: number) => void) => (buf: Buffer) => {
+      (
+        chunks: Buffer[],
+        decoder: StringDecoder,
+        trackBytes: (n: number) => void,
+      ) =>
+      (buf: Buffer) => {
         const remaining = MAX_OUTPUT_BYTES - totalBytes;
         if (remaining <= 0) {
           truncated = true;
@@ -144,39 +167,50 @@ export const shellTool: Tool = {
         totalBytes += slice.length;
         trackBytes(slice.length);
         if (buf.length > remaining) truncated = true;
-        const text = slice.toString("utf8");
+        const text = decoder.write(slice);
         if (text.trim().length > 0) ctx.onProgress?.(text.trimEnd());
       };
 
-    child.stdout.on(
+    childProcess.stdout.on(
       "data",
-      onData(stdoutChunks, (n) => {
+      onData(stdoutChunks, stdoutDecoder, (n) => {
         stdoutBytes += n;
       }),
     );
-    child.stderr.on(
+    childProcess.stderr.on(
       "data",
-      onData(stderrChunks, (n) => {
+      onData(stderrChunks, stderrDecoder, (n) => {
         stderrBytes += n;
       }),
     );
 
     const timer = setTimeout(() => {
-      child.kill("SIGKILL");
+      if (process.platform === "win32") {
+        childProcess.kill("SIGTERM");
+      } else {
+        childProcess.kill("SIGKILL");
+      }
     }, timeoutMs);
 
-    // Wire abort signal so Esc/cancel kills the child immediately.
     const onAbort = (): void => {
-      child.kill("SIGKILL");
+      if (process.platform === "win32") {
+        childProcess.kill("SIGTERM");
+      } else {
+        childProcess.kill("SIGKILL");
+      }
     };
-    ctx.signal?.addEventListener("abort", onAbort, { once: true });
+    if (ctx.signal) {
+      ctx.signal.addEventListener("abort", onAbort, { once: true });
+    }
 
     const exitCode: number = await new Promise((resolveExit) => {
-      child.on("error", () => resolveExit(-1));
-      child.on("close", (code) => resolveExit(code ?? -1));
+      childProcess.once("error", () => resolveExit(-1));
+      childProcess.once("close", (code) => resolveExit(code ?? -1));
     });
     clearTimeout(timer);
-    ctx.signal?.removeEventListener("abort", onAbort);
+    if (ctx.signal) {
+      ctx.signal.removeEventListener("abort", onAbort);
+    }
 
     const stdout = Buffer.concat(
       stdoutChunks as unknown as readonly Uint8Array[],

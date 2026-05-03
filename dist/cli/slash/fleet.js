@@ -33,6 +33,21 @@ export const fleetCommand = {
         // response. The monkey-patch is scoped to a single synchronous import
         // + async execution — no other REPL path writes during this window.
         const { fleetCommand: runFleet } = await import("../../fleet/cli-command.js");
+        // Extract --template <name> / --template=<name> from args so it can be
+        // forwarded as a typed option. The flag is still left in args so that
+        // doLaunch()'s own parser can handle it consistently.
+        let templateName;
+        for (let i = 0; i < args.length; i++) {
+            const a = args[i];
+            if (a === "--template" && i + 1 < args.length) {
+                templateName = args[i + 1];
+                break;
+            }
+            if (a.startsWith("--template=")) {
+                templateName = a.slice("--template=".length);
+                break;
+            }
+        }
         const captured = [];
         const sink = (chunk) => {
             captured.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8"));
@@ -43,7 +58,10 @@ export const fleetCommand = {
         process.stdout.write = sink;
         process.stderr.write = sink;
         try {
-            const code = await runFleet(args, { cwd: process.cwd() });
+            const code = await runFleet(args, {
+                cwd: process.cwd(),
+                template: templateName,
+            });
             const text = captured.join("").trim();
             if (code === 0)
                 return text || "(fleet ok)";

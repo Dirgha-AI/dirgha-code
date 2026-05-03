@@ -1,10 +1,10 @@
 /**
  * Self-contained spinner glyph component.
  *
- * Each instance runs its own 80ms interval so the rest of the App tree
- * is never re-rendered on spinner ticks. All instances share a module-level
- * start timestamp so they rotate in lockstep — no visual strobing when
- * multiple tools run simultaneously.
+ * All instances share a single module-level 80ms interval (one per process)
+ * so invisible or off-screen instances do not waste CPU on redundant timers.
+ * A global frame counter increments each tick; each component subscribes
+ * and gates rendering on its `isActive` prop.
  *
  * Usage:
  *   <SpinnerGlyph isActive={busy} />

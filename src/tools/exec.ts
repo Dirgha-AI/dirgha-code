@@ -13,6 +13,7 @@
 import type { ToolCall, ToolResult, ToolExecutor } from "../kernel/types.js";
 import type { Tool, ToolContext, ToolRegistry } from "./registry.js";
 import type { SandboxAdapter } from "../safety/sandbox/iface.js";
+import type { PermissionEngine } from "./permission.js";
 import { selectSandbox } from "../safety/sandbox/select.js";
 
 export type { ToolExecutor } from "../kernel/types.js";
@@ -24,6 +25,7 @@ export interface ToolExecutorOptions {
   sessionId: string;
   log?: ToolContext["log"];
   onProgress?: (toolId: string, message: string) => void;
+  permission?: PermissionEngine;
 }
 
 export function createToolExecutor(opts: ToolExecutorOptions): ToolExecutor {
@@ -48,6 +50,19 @@ export function createToolExecutor(opts: ToolExecutorOptions): ToolExecutor {
           content: `Tool "${call.name}" is not registered.`,
           isError: true,
         };
+      }
+      if (opts.permission) {
+        const decision = opts.permission.check({
+          tool: call.name,
+          action: "exec",
+          target: opts.cwd,
+        });
+        if (!decision.allowed) {
+          return {
+            content: `Permission denied: ${decision.reason}`,
+            isError: true,
+          };
+        }
       }
       const sandbox = await sandboxPromise;
       const ctx: ToolContext = {

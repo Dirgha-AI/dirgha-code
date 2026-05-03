@@ -30,19 +30,46 @@ export { DeepSeekProvider } from "./deepseek.js";
 export class ProviderRegistry {
     config;
     cache = new Map();
+    /** Timestamp in ms (performance.now) when each provider was cached. */
+    cacheTime = new Map();
+    /** Invalidate cached providers older than this many ms (30 min). */
+    static CACHE_TTL_MS = 30 * 60 * 1000;
     constructor(config = {}) {
         this.config = config;
+    }
+    /** Force-evict a cached provider so the next call to forModel
+     *  re-constructs it with the latest config. Call this after updating
+     *  API keys or other provider settings mid-session. */
+    invalidate(providerId) {
+        this.cache.delete(providerId);
+        this.cacheTime.delete(providerId);
+    }
+    /** Evict all cached providers (e.g. after bulk config reload). */
+    invalidateAll() {
+        this.cache.clear();
+        this.cacheTime.clear();
     }
     forModel(modelId) {
         const id = routeModel(modelId);
         const cached = this.cache.get(id);
-        if (cached)
-            return cached;
+        if (cached) {
+            const cachedAt = this.cacheTime.get(id);
+            if (cachedAt !== undefined) {
+                const ageMs = performance.now() - cachedAt;
+                if (ageMs < ProviderRegistry.CACHE_TTL_MS)
+                    return cached;
+                // Entry expired — fall through to re-construct below.
+            }
+        }
         const provider = this.maybeRateLimit(this.construct(id));
         this.cache.set(id, provider);
+        this.cacheTime.set(id, performance.now());
         return provider;
     }
     maybeRateLimit(provider) {
+        // Known limitation: rateLimit config is captured at Registry
+        // construction time. There is no way to add rate limiting
+        // mid-session without reconstructing the full Registry.
         if (!this.config.rateLimit)
             return provider;
         return withRateLimit(provider, this.config.rateLimit);

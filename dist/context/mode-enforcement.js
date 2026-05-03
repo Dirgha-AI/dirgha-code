@@ -23,16 +23,25 @@ export const WRITE_TOOLS = new Set([
     "fs_write",
     "fs_edit",
     "shell",
-    "git",
-    "browser",
     "checkpoint",
     "cron",
 ]);
+const READ_ONLY_BROWSER_ACTIONS = new Set(["content", "close"]);
 export function enforceMode(mode) {
     if (mode === "act" || mode === "yolo")
         return undefined;
     return {
         beforeToolCall: async (call) => {
+            if (call.name === "browser") {
+                const action = call.input?.action;
+                if (action && !READ_ONLY_BROWSER_ACTIONS.has(action)) {
+                    return {
+                        block: true,
+                        reason: `Mode is ${mode.toUpperCase()} — browser '${action}' is blocked. content and close are allowed (read-only).`,
+                    };
+                }
+                return undefined;
+            }
             if (WRITE_TOOLS.has(call.name)) {
                 return {
                     block: true,

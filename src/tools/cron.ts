@@ -150,8 +150,6 @@ export function createCronTool(opts: CronToolOptions = {}): Tool {
         const job = jobs.find((j) => j.id === input.id);
         if (!job)
           return { content: `No job with id "${input.id}".`, isError: true };
-        job.lastRunAt = new Date().toISOString();
-        await writeJobs(filePath, jobs);
         return {
           content: [
             `Marked cron job ${job.id} as manually run.`,
@@ -185,7 +183,7 @@ async function readJobs(filePath: string): Promise<CronJob[]> {
 
 async function writeJobs(filePath: string, jobs: CronJob[]): Promise<void> {
   await ensureParent(filePath);
-  const tmp = filePath + ".tmp";
+  const tmp = filePath + ".tmp." + randomUUID().slice(0, 8);
   await writeFile(tmp, `${JSON.stringify(jobs, null, 2)}\n`, "utf8");
   await rename(tmp, filePath);
 }

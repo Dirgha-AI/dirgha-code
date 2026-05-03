@@ -2,10 +2,10 @@ import { jsx as _jsx } from "react/jsx-runtime";
 /**
  * Self-contained spinner glyph component.
  *
- * Each instance runs its own 80ms interval so the rest of the App tree
- * is never re-rendered on spinner ticks. All instances share a module-level
- * start timestamp so they rotate in lockstep — no visual strobing when
- * multiple tools run simultaneously.
+ * All instances share a single module-level 80ms interval (one per process)
+ * so invisible or off-screen instances do not waste CPU on redundant timers.
+ * A global frame counter increments each tick; each component subscribes
+ * and gates rendering on its `isActive` prop.
  *
  * Usage:
  *   <SpinnerGlyph isActive={busy} />
@@ -14,23 +14,43 @@ import * as React from "react";
 import { Text } from "ink";
 import { SPINNER_FRAMES } from "../spinner-context.js";
 const SPINNER_INTERVAL_MS = 80;
-let GLOBAL_START = 0;
-function computeFrame() {
-    if (GLOBAL_START === 0)
-        GLOBAL_START = Date.now();
-    const elapsed = Date.now() - GLOBAL_START;
-    return Math.floor(elapsed / SPINNER_INTERVAL_MS) % SPINNER_FRAMES.length;
+let _globalFrame = 0;
+let _globalInterval = null;
+const _subscribers = new Set();
+function startGlobalInterval() {
+    if (_globalInterval !== null)
+        return;
+    _globalInterval = setInterval(() => {
+        _globalFrame = (_globalFrame + 1) % SPINNER_FRAMES.length;
+        for (const notify of _subscribers)
+            notify();
+    }, SPINNER_INTERVAL_MS);
+}
+function stopGlobalInterval() {
+    if (_globalInterval === null)
+        return;
+    clearInterval(_globalInterval);
+    _globalInterval = null;
 }
 export function SpinnerGlyph({ isActive, color, bold, }) {
-    const [frame, setFrame] = React.useState(computeFrame);
+    const [, setTick] = React.useState(0);
     React.useEffect(() => {
         if (!isActive) {
-            setFrame(0);
+            _subscribers.delete(notify);
             return;
         }
-        const t = setInterval(() => setFrame(computeFrame()), SPINNER_INTERVAL_MS);
-        return () => clearInterval(t);
+        function notify() {
+            setTick((n) => n + 1);
+        }
+        _subscribers.add(notify);
+        startGlobalInterval();
+        return () => {
+            _subscribers.delete(notify);
+            if (_subscribers.size === 0)
+                stopGlobalInterval();
+        };
     }, [isActive]);
+    const frame = _globalFrame;
     return (_jsx(Text, { color: color, bold: bold, children: isActive
             ? (SPINNER_FRAMES[frame] ?? SPINNER_FRAMES[0])
             : SPINNER_FRAMES[0] }));
