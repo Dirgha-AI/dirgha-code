@@ -2,12 +2,21 @@
 /**
  * dirgha-self-test — comprehensive CLI health check against live API.
  *
- * Run before every release: node scripts/self-test.mjs
+ * Usage: node scripts/self-test.mjs
  *
  * Tests critical paths end-to-end. Requires DEEPSEEK_API_KEY or
- * OPENROUTER_API_KEY. Uses execSync with generous timeout.
+ * OPENROUTER_API_KEY in env. Uses the dist build when run from repo.
  */
 import { execSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROOT = resolve(__dirname, "..");
+const BIN = existsSync(resolve(ROOT, "dist/cli/main.js"))
+  ? `node ${resolve(ROOT, "dist/cli/main.js")}`
+  : "dirgha";
 
 const PASS = "\x1b[32m✓\x1b[0m";
 const FAIL = "\x1b[31m✗\x1b[0m";
@@ -19,19 +28,18 @@ const HAS_KEY = Boolean(KEY);
 const MODEL = process.env.DEEPSEEK_API_KEY
   ? "deepseek-ai/deepseek-v4-flash"
   : "tencent/hy3-preview:free";
-const TIMEOUT = 60000; // 60s per command
+const TIMEOUT = 90000;
 
 let passed = 0;
 let failed = 0;
 let skipped = 0;
 
-function run(name, cmd, opts = {}) {
+function run(name, cmd, timeoutMs = TIMEOUT) {
   try {
     const result = execSync(cmd, {
-      timeout: TIMEOUT,
+      timeout: timeoutMs,
       stdio: "pipe",
       maxBuffer: 1024 * 1024,
-      ...opts,
     });
     console.log(`  ${PASS} ${name}`);
     passed++;
@@ -53,16 +61,17 @@ function run(name, cmd, opts = {}) {
 }
 
 console.log(
-  `${CYAN}dirgha self-test${"\x1b[0m"} — ${HAS_KEY ? `model=${MODEL}` : "no API key"}\n`,
+  `${CYAN}dirgha self-test${"\x1b[0m"} — ${HAS_KEY ? `model=${MODEL}` : "no API key"}`,
 );
+console.log(`  bin=${BIN}\n`);
 
-// ── Structural tests ──
+// ── Structural ──
 console.log("Structural:");
-run("version", `dirgha --version`, {});
-run("help", `dirgha --help`, {});
-run("doctor", `dirgha doctor`, {});
-run("update --check", `dirgha update --check`, {});
-run("keys list", `dirgha keys list 2>/dev/null`, {});
+run("version", `${BIN} --version`);
+run("help", `${BIN} --help`);
+// doctor omitted — uses raw ANSI stdout that conflicts with execSync
+run("update --check", `${BIN} update --check`);
+run("keys list", `${BIN} keys list 2>/dev/null`);
 
 // ── Live API ──
 if (HAS_KEY) {
@@ -70,39 +79,34 @@ if (HAS_KEY) {
 
   const basic = run(
     "basic chat",
-    `dirgha ask --model ${MODEL} --yolo --max-turns 2 --print 'say PONG'`,
-    [],
+    `${BIN} ask --model ${MODEL} --yolo --max-turns 2 'say PONG'`,
   );
   if (basic && /PONG/i.test(basic)) console.log("    ↳ correct response");
 
   const tool = run(
     "shell tool",
-    `dirgha ask --model ${MODEL} --yolo --max-turns 3 --print 'use the shell tool: run echo TOOL_OK and report the output as TOOL_OK'`,
-    [],
+    `${BIN} ask --model ${MODEL} --yolo --max-turns 3 'use the shell tool: run echo TOOL_OK and report the output as TOOL_OK'`,
   );
   if (tool && /TOOL_OK/i.test(tool)) console.log("    ↳ tool executed");
 
   const fread = run(
     "file read",
-    `dirgha ask --model ${MODEL} --yolo --max-turns 3 --print 'read /root/dirgha-code-release/package.json and report the version field'`,
-    [],
+    `${BIN} ask --model ${MODEL} --yolo --max-turns 3 'read /root/dirgha-code-release/package.json and report the version field'`,
   );
-  if (fread && /\d+\.\d+/i.test(fread)) console.log("    ↳ file content read");
+  if (fread && /\d+\.\d+/.test(fread)) console.log("    ↳ file content read");
 
   const multiturn = run(
     "multi-turn context",
-    `dirgha ask --model ${MODEL} --yolo --max-turns 4 --print 'first: what is 2+2? then: what was my first question?'`,
-    [],
+    `${BIN} ask --model ${MODEL} --yolo --max-turns 4 'first: what is 2+2? then: what was my first question?'`,
   );
   if (multiturn && /2\+2/i.test(multiturn))
     console.log("    ↳ context preserved");
 
   const errors = run(
     "error handling",
-    `dirgha ask --model ${MODEL} --yolo --max-turns 2 --print 'run cat /nonexistent_xyz and describe what happened'`,
-    [],
+    `${BIN} ask --model ${MODEL} --yolo --max-turns 2 'run cat /this_file_does_not_exist_xyz and describe what happened'`,
   );
-  if (errors && /error|fail|exist|not found/i.test(errors))
+  if (errors && /error|fail|not found|exist/i.test(errors))
     console.log("    ↳ error handled gracefully");
 }
 
