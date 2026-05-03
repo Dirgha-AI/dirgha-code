@@ -116,23 +116,25 @@ export function ToolBox(props: ToolBoxProps): React.JSX.Element {
     props.status === "error"
       ? palette.status.error
       : props.status === "blocked"
-        ? palette.text.secondary
+        ? palette.status.warning
         : palette.ui.focus;
   const borderColour =
     props.status === "error"
       ? palette.status.error
       : props.status === "blocked"
-        ? palette.border.default
+        ? palette.status.warning
         : props.status === "done"
           ? palette.border.default
           : palette.ui.focus;
 
   const elapsedLabel =
-    props.status === "running"
-      ? formatElapsed(Date.now() - props.startedAt)
-      : props.durationMs !== undefined
-        ? formatElapsed(props.durationMs)
-        : "";
+    props.status === "blocked"
+      ? ""
+      : props.status === "running"
+        ? formatElapsed(Date.now() - props.startedAt)
+        : props.durationMs !== undefined
+          ? formatElapsed(props.durationMs)
+          : "";
   const diffMode = isDiffOutput(props);
 
   const preview =
@@ -179,6 +181,9 @@ export function ToolBox(props: ToolBoxProps): React.JSX.Element {
           <Text color={palette.text.secondary} dimColor>
             {elapsedLabel}
           </Text>
+        )}
+        {props.status === "blocked" && (
+          <Text color={palette.status.warning}>(blocked)</Text>
         )}
       </Box>
       {preview !== "" && !diffMode && (

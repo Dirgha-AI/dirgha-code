@@ -1,14 +1,39 @@
 /**
  * /spawn <prompt> — dispatch an in-process sub-agent via SubagentDelegator.
  *
- * Uses the current provider and model from SlashContext. Because SlashContext
- * does not expose a ToolRegistry or cwd, tools are disabled (toolAllowlist: [])
- * so the sub-agent runs as a pure LLM reasoning step with no file-system access.
- * Use `dirgha fleet` when you need a full tool-capable agent.
+ * Uses the current provider and model from SlashContext. SlashContext does not
+ * expose a ToolRegistry, so we build a minimal read-only registry directly
+ * from builtInTools filtered to a safe read-only subset. This gives the
+ * sub-agent file-read and search capability needed for coding tasks without
+ * exposing write/shell/network tools.
+ *
+ * Use `dirgha fleet` when you need a full write-capable agent.
  */
 
 import type { SlashCommand } from "./types.js";
 import { SubagentDelegator } from "../../subagents/delegator.js";
+import { builtInTools, createToolRegistry } from "../../tools/index.js";
+
+/**
+ * Read-only tool names available to /spawn sub-agents.
+ * Does NOT include write (fs_write, fs_edit), shell, browser, cron, or
+ * checkpoint — those require user approval flows not present in slash context.
+ */
+const READ_ONLY_TOOLS = new Set([
+  'fs_read',
+  'fs_ls',
+  'search_grep',
+  'search_glob',
+  'git',
+  'go_to_definition',
+  'find_references',
+  'hover_documentation',
+  'document_symbols',
+]);
+
+const spawnRegistry = createToolRegistry(
+  builtInTools.filter((t) => READ_ONLY_TOOLS.has(t.name)),
+);
 
 export const spawnCommand: SlashCommand = {
   name: "spawn",
@@ -25,17 +50,7 @@ export const spawnCommand: SlashCommand = {
     }
 
     const delegator = new SubagentDelegator({
-      // SlashContext does not expose a ToolRegistry; supply an empty shim so
-      // the delegator constructs without error. toolAllowlist: [] ensures no
-      // tools are filtered in, making the scoped registry a no-op.
-      registry: {
-        register() { throw new Error("spawn: registry is read-only"); },
-        unregister() { return false; },
-        has() { return false; },
-        get() { return undefined; },
-        list() { return []; },
-        sanitize() { return { definitions: [], nameSet: new Set() }; },
-      } as never,
+      registry: spawnRegistry,
       provider,
       defaultModel: ctx.model,
       cwd: process.cwd(),
@@ -46,8 +61,11 @@ export const spawnCommand: SlashCommand = {
     try {
       const result = await delegator.delegate({
         prompt,
-        toolAllowlist: [], // disable all tools — pure reasoning only
-        maxTurns: 5,
+        // READ_ONLY_TOOLS allowlist is enforced; sub-agent cannot call write
+        // or shell tools even if it attempts to, because they are absent from
+        // spawnRegistry.list() and will not appear in the LLM's tool list.
+        toolAllowlist: [...READ_ONLY_TOOLS],
+        maxTurns: 8,
       });
       const elapsed = ((Date.now() - start) / 1000).toFixed(1);
       const summary = `[spawn done in ${elapsed}s, ${result.stopReason}]`;

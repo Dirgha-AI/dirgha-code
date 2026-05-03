@@ -91,20 +91,22 @@ export function ToolBox(props) {
     const iconColour = props.status === "error"
         ? palette.status.error
         : props.status === "blocked"
-            ? palette.text.secondary
+            ? palette.status.warning
             : palette.ui.focus;
     const borderColour = props.status === "error"
         ? palette.status.error
         : props.status === "blocked"
-            ? palette.border.default
+            ? palette.status.warning
             : props.status === "done"
                 ? palette.border.default
                 : palette.ui.focus;
-    const elapsedLabel = props.status === "running"
-        ? formatElapsed(Date.now() - props.startedAt)
-        : props.durationMs !== undefined
-            ? formatElapsed(props.durationMs)
-            : "";
+    const elapsedLabel = props.status === "blocked"
+        ? ""
+        : props.status === "running"
+            ? formatElapsed(Date.now() - props.startedAt)
+            : props.durationMs !== undefined
+                ? formatElapsed(props.durationMs)
+                : "";
     const diffMode = isDiffOutput(props);
     const preview = !diffMode && props.outputPreview
         ? props.outputPreview.replace(/\s+/g, " ").slice(0, 80)
@@ -113,6 +115,6 @@ export function ToolBox(props) {
             : "";
     return (_jsxs(Box, { flexDirection: "column", borderStyle: "round", borderColor: borderColour, paddingX: 1, marginBottom: 1, children: [_jsxs(Box, { gap: 1, children: [icon !== null ? (_jsx(Text, { color: iconColour, children: icon })) : (_jsx(SpinnerGlyph, { isActive: isRunning })), _jsx(Text, { color: palette.text.accent, bold: true, children: iconFor(props.name) }), _jsx(Text, { color: props.status === "done" || props.status === "blocked"
                             ? palette.text.secondary
-                            : palette.text.primary, bold: props.status !== "blocked", dimColor: props.status === "blocked", children: prettyName(props.name) }), props.argSummary !== undefined && props.argSummary.length > 0 && (_jsxs(Text, { color: palette.text.secondary, dimColor: true, children: ["(", props.argSummary, ")"] })), elapsedLabel !== "" && (_jsx(Text, { color: palette.text.secondary, dimColor: true, children: elapsedLabel }))] }), preview !== "" && !diffMode && (_jsx(Box, { children: _jsx(Text, { color: palette.text.secondary, dimColor: true, children: preview }) })), diffMode && props.outputPreview && (_jsx(Box, { flexDirection: "column", children: renderDiffLines(props.outputPreview, 30) }))] }));
+                            : palette.text.primary, bold: props.status !== "blocked", dimColor: props.status === "blocked", children: prettyName(props.name) }), props.argSummary !== undefined && props.argSummary.length > 0 && (_jsxs(Text, { color: palette.text.secondary, dimColor: true, children: ["(", props.argSummary, ")"] })), elapsedLabel !== "" && (_jsx(Text, { color: palette.text.secondary, dimColor: true, children: elapsedLabel })), props.status === "blocked" && (_jsx(Text, { color: palette.status.warning, children: "(blocked)" }))] }), preview !== "" && !diffMode && (_jsx(Box, { children: _jsx(Text, { color: palette.text.secondary, dimColor: true, children: preview }) })), diffMode && props.outputPreview && (_jsx(Box, { flexDirection: "column", children: renderDiffLines(props.outputPreview, 30) }))] }));
 }
 //# sourceMappingURL=ToolBox.js.map

@@ -44,7 +44,7 @@ export const askSubcommand: Subcommand = {
     const prompt = positionals.join(" ").trim();
     if (!prompt) {
       stderr.write(
-        'usage: dirgha ask "your prompt" [-m <model>] [-s <system>] [--max-turns N] [--cwd <dir>] [--json]\n',
+        'usage: dirgha ask "your prompt" [-m <model>] [-s <system>] [--mode <plan|act|verify|ask>] [--max-turns N] [--cwd <dir>] [--json]\n',
       );
       return 1;
     }

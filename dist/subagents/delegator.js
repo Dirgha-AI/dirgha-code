@@ -31,10 +31,25 @@ export class SubagentDelegator {
     async delegate(req) {
         const sessionId = `${this.opts.parentSessionId}-sub-${randomUUID().slice(0, 8)}`;
         const events = createEventStream();
-        const allowlist = req.toolAllowlist
+        // Use `!== undefined` (not truthiness) so an explicit empty array []
+        // is honoured as "no tools" rather than falling through to defaults.
+        // An array of length 0 is truthy in JS, so `req.toolAllowlist ?` would
+        // also produce an empty set — but the intent is clearer and safer here.
+        const allowlist = req.toolAllowlist !== undefined
             ? new Set(req.toolAllowlist)
             : DEFAULT_SUBAGENT_TOOLS;
         const filteredTools = this.opts.registry.list().filter((t) => allowlist.has(t.name));
+        // Enforce: when allowlist is empty (toolAllowlist: []), filteredTools must
+        // be empty so the LLM receives zero tool definitions — not just zero
+        // executable tools. The scoped registry built below is the sole source of
+        // `sanitized.definitions` passed to runAgentLoop.
+        if (req.toolAllowlist !== undefined && req.toolAllowlist.length === 0) {
+            // filteredTools is already [] from the filter above; this assertion
+            // documents the invariant so future refactors cannot silently break it.
+            if (filteredTools.length !== 0) {
+                throw new Error("toolAllowlist contract violation: toolAllowlist is [] but filteredTools is non-empty");
+            }
+        }
         const scoped = new Map();
         for (const t of filteredTools)
             scoped.set(t.name, t);

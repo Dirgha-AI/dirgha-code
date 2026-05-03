@@ -72,6 +72,7 @@ async function runOneAudit(opts: {
   cliBin: string;
   promptHeader: string;
   maxTurns: number;
+  timeoutMs: number;
 }): Promise<PartialResult> {
   const t0 = Date.now();
   const fullPrompt = `Audit the directory ${opts.module.path}. ${opts.promptHeader}\n\nWhen done, write your findings table to ${join(opts.outDir, opts.module.name + '.md')} via fs_write, then report 'done' with the absolute path.`;
@@ -80,15 +81,24 @@ async function runOneAudit(opts: {
       stdio: ['ignore', 'pipe', 'pipe'],
       env: process.env,
     });
+
+    const killer = setTimeout(() => {
+      child.kill('SIGTERM');
+    }, opts.timeoutMs);
+
     let buf = '';
     child.stdout.on('data', d => { buf += d.toString('utf8'); });
     child.stderr.on('data', d => { buf += d.toString('utf8'); });
     child.on('close', async code => {
+      clearTimeout(killer);
       let markdown = '';
       try { markdown = await readFile(join(opts.outDir, opts.module.name + '.md'), 'utf8'); } catch { /* missing */ }
       resolveTask({ module: opts.module.name, ok: code === 0 && markdown.length > 0, markdown, durationMs: Date.now() - t0 });
     });
-    child.on('error', () => resolveTask({ module: opts.module.name, ok: false, markdown: buf.slice(-500), durationMs: Date.now() - t0 }));
+    child.on('error', () => {
+      clearTimeout(killer);
+      resolveTask({ module: opts.module.name, ok: false, markdown: buf.slice(-500), durationMs: Date.now() - t0 });
+    });
   });
 }
 
@@ -119,6 +129,7 @@ export const auditCodebaseSubcommand: Subcommand = {
       stdout.write(`  --concurrency=<n>      Parallel sub-agents (default: 4)\n`);
       stdout.write(`  -m, --model=<id>       Model alias for every sub-agent (default: hy3)\n`);
       stdout.write(`  --max-turns=<n>        Per-agent turn cap (default: 15)\n`);
+      stdout.write(`  --timeout-per-agent=<s> Wall-clock timeout per sub-agent in seconds (default: 90)\n`);
       return 0;
     }
     const root = parseArg(argv, 'root') ?? join(process.cwd(), 'src');
@@ -126,6 +137,7 @@ export const auditCodebaseSubcommand: Subcommand = {
     const concurrency = Number.parseInt(parseArg(argv, 'concurrency') ?? '4', 10);
     const model = resolveModelAlias(parseArg(argv, 'm') ?? parseArg(argv, 'model') ?? 'hy3');
     const maxTurns = Number.parseInt(parseArg(argv, 'max-turns') ?? '15', 10);
+    const perAgentTimeoutMs = parseInt(parseArg(argv, 'timeout-per-agent') ?? '90', 10) * 1000;
 
     const rootResolved = resolve(root);
     const modules = await listImmediateModules(rootResolved);
@@ -144,7 +156,7 @@ export const auditCodebaseSubcommand: Subcommand = {
 
     const partials = await runWithLimit(modules, concurrency, async (m) => {
       stdout.write(`  ${style(defaultTheme.muted, '▸')} ${m.name}…\n`);
-      const r = await runOneAudit({ module: m, model, outDir, cliBin, promptHeader: DEFAULT_AUDIT_PROMPT, maxTurns });
+      const r = await runOneAudit({ module: m, model, outDir, cliBin, promptHeader: DEFAULT_AUDIT_PROMPT, maxTurns, timeoutMs: perAgentTimeoutMs });
       const tag = r.ok ? style(defaultTheme.success, 'ok') : style(defaultTheme.danger, 'fail');
       stdout.write(`  ${tag}  ${m.name.padEnd(16)}  ${(r.durationMs / 1000).toFixed(1)}s\n`);
       return r;

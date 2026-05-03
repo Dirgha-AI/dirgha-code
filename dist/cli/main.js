@@ -180,7 +180,15 @@ async function main() {
         const cmd = verb ? findSubcommand(verb) : undefined;
         if (cmd) {
             const verbIdx = rawArgs.indexOf(verb);
-            const tail = verbIdx >= 0 ? rawArgs.slice(verbIdx + 1) : positionals.slice(1);
+            let tail = verbIdx >= 0 ? rawArgs.slice(verbIdx + 1) : positionals.slice(1);
+            // Propagate top-level --mode=<value> into the subcommand's argv so
+            // that `dirgha --mode=plan ask "prompt"` is equivalent to
+            // `dirgha ask --mode=plan "prompt"`. Only inject when the subcommand
+            // tail doesn't already contain its own --mode flag.
+            const topLevelMode = typeof flags.mode === "string" ? flags.mode : undefined;
+            if (topLevelMode && !tail.some((a) => a.startsWith("--mode"))) {
+                tail = [`--mode=${topLevelMode}`, ...tail];
+            }
             const code = await cmd.run(tail, { cwd: cwd() });
             // Telemetry — only sends when user opted in via `dirgha telemetry
             // enable`. We cap the wait at 1s so a slow Posthog response (cold
