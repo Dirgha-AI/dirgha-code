@@ -49,6 +49,10 @@ Information flows up. Old context gets distilled, not discarded.
 
 `dirgha fleet launch "<goal>"` decomposes the goal into N independent tasks, spawns each in its own git worktree, runs them in parallel, and merges the winners back. `dirgha fleet triple "<goal>"` runs three approaches and lets a judge pick. `dirgha fleet dag "step1..." "step2..." "step3..."` chains agents sequentially with cumulative context propagation — each step builds on the previous one's output. Inside any session, the agent can call the `task` tool to dispatch a fresh sub-agent with its own context budget for a sub-problem — no compaction loss on the parent.
 
+### GitHub — native, not shelled
+
+`dirgha` ships a `github` tool that wraps `gh` CLI: create and list PRs (`pr_create`, `pr_list`), create and list issues (`issue_create`, `issue_list`), inspect repos (`repo_view`). The agent can open a PR in the same turn it finishes a fix — no copy-pasting URLs. Requires `gh` installed and authenticated (`gh auth login`). The `git` tool handles commit / push / status / diff; `github` handles the GitHub layer on top.
+
 ### Skills, scanned
 
 SKILL.md packs are portable Markdown agents — share one git URL, anyone can `dirgha skills install <url>`. Every third-party skill is scanned at install AND load time by a heuristic prompt-injection / supply-chain check. Critical findings block. Today: 112 installed across 4 packs, 74 allow · 36 warn · 2 block. TypeScript / ESM plugins are the sibling concept — drop a `.mjs` at `~/.dirgha/extensions/<name>/index.mjs` and register tools, slashes, subcommands, or lifecycle hooks in ~20 lines.
@@ -74,7 +78,7 @@ The interactive TUI is `dirgha` with no args. Resume a session with `dirgha resu
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **17 providers**      | anthropic, openai, gemini, openrouter, nvidia, fireworks, deepseek, groq, cerebras, together, deepinfra, mistral, xai, perplexity, cohere, kimi, zai             |
 | **34 model aliases**  | `kimi`, `opus`, `sonnet`, `haiku`, `gemini`, `flash`, `deepseek`, `llama`, `ling`, `hy3`, … resolved before routing                                              |
-| **12 built-in tools** | `fs_read`, `fs_write`, `fs_edit`, `fs_ls`, `shell`, `search_grep`, `search_glob`, `git`, `browser`, `checkpoint`, `cron`, `task`                                 |
+| **18 built-in tools** | `fs_read`, `fs_write`, `fs_edit`, `fs_ls`, `shell`, `git`, `github`, `search_grep`, `search_glob`, `browser`, `checkpoint`, `cron`, `task`, `go_to_definition`, `find_references`, `hover_documentation`, `document_symbols`, `qmd_search` |
 | **20 slash commands** | `/account`, `/clear`, `/compact`, `/cost`, `/fleet`, `/keys`, `/login`, `/memory`, `/mode`, `/models`, `/resume`, `/session`, `/status`, `/theme`, `/upgrade`, … |
 | **18 subcommands**    | `audit`, `audit-codebase`, `cost`, `kb`, `keys`, `ledger`, `login`, `models`, `resume`, `skills`, `undo`, `update`, `verify`, …                                  |
 | **4 modes**           | `act` · `plan` (read-only thinking) · `verify` (read-only audit) · `ask` (read-only Q&A)                                                                         |
@@ -85,10 +89,10 @@ The interactive TUI is `dirgha` with no args. Resume a session with `dirgha resu
 
 |                                        |                                                                                                                             |
 | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| Tests                                    | **104/104** in ~8 s. TS 0 errors, ESLint 0 warnings. CI green is a precondition for any PR.                                                                                        |
+| Tests                                    | **232 vitest + 41 offline** in ~40 s. TS 0 errors, ESLint 0 warnings. CI green is a precondition for any PR.                                                                      |
 | 17 providers                             | Multi-key BYOK pool with cooldown rotation, 4-tier failover cascade, health scoring with compaction.                                                                                |
-| 12 built-in tools                        | Per-tool timeout enforcement. Shell 300s, reads 30s, default 60s.                                                                                                                  |
-| 16 vulnerability classes fixed in v1.18  | Path traversal (memory/session/scaffold), API key overlay isolation, NaN cost poisoning, LSP timer leak, model routing mismatch, web URL routing, stale-cache fallback, and more. |
+| 18 built-in tools                        | Per-tool timeout enforcement. Shell 300s (PTY streaming via `streamOutput`), reads 30s, default 60s.                                                                               |
+| Mode enforcement                         | `git`, `shell`, `fs_write`, `fs_edit`, `browser` are write-gated in `plan` / `verify` / `ask` modes at the kernel hook layer — not just prompt nudging.                           |
 
 ## Why this exists
 
