@@ -9,31 +9,6 @@
  */
 export const NIM_CATALOGUE = [
     {
-        id: "deepseek-ai/deepseek-v4-pro",
-        label: "DeepSeek V4 Pro",
-        family: "deepseek",
-        contextWindow: 1_000_000,
-        maxOutputTokens: 16_384,
-        tools: true,
-        vision: false,
-        thinkingMode: "opt-in",
-        thinkingParam: { chat_template_kwargs: { thinking: true } },
-        defaultModel: true,
-        tags: ["agents", "long-context", "reasoning"],
-    },
-    {
-        id: "deepseek-ai/deepseek-v4-flash",
-        label: "DeepSeek V4 Flash",
-        family: "deepseek",
-        contextWindow: 1_000_000,
-        maxOutputTokens: 16_384,
-        tools: true,
-        vision: false,
-        thinkingMode: "opt-in",
-        thinkingParam: { chat_template_kwargs: { thinking: true } },
-        tags: ["fast", "long-context"],
-    },
-    {
         id: "moonshotai/kimi-k2.6",
         label: "Kimi K2.6",
         family: "kimi",

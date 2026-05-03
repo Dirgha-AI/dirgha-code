@@ -22,8 +22,6 @@ const NVIDIA_NIM_MODELS = new Set([
     "mistralai/devstral-2-123b-instruct-2512",
 ]);
 const RULES = [
-    // Specific NVIDIA NIM models (override the prefix-based OR fallback).
-    { match: (id) => NVIDIA_NIM_MODELS.has(id), provider: "nvidia" },
     // Native, no-prefix model IDs go to first-party APIs.
     { match: (id) => id.startsWith("claude-"), provider: "anthropic" },
     {
@@ -31,6 +29,19 @@ const RULES = [
         provider: "openai",
     },
     { match: (id) => id.startsWith("gemini-"), provider: "gemini" },
+    // Vendor-prefix explicit providers MUST come before the NIM catalogue
+    // rule. When a user types "deepseek-ai/deepseek-v4-pro" they explicitly
+    // chose native DeepSeek — the NIM catalogue should not hijack that.
+    { match: (id) => id.startsWith("deepseek-ai/"), provider: "deepseek" },
+    { match: (id) => id.startsWith("deepseek-native/"), provider: "deepseek" },
+    // DeepSeek native API — bare canonical IDs.
+    {
+        match: (id) => /^deepseek-(chat|reasoner|coder|v4-flash|v4-pro|r1|prover-v2)$/.test(id),
+        provider: "deepseek",
+    },
+    // Specific NVIDIA NIM models — after explicit prefixes so vendor-prefix
+    // deepseek/ai/, anthropic/, etc. are never hijacked by the NIM catalogue.
+    { match: (id) => NVIDIA_NIM_MODELS.has(id), provider: "nvidia" },
     // Local & explicit-prefix providers.
     { match: (id) => id.startsWith("ollama/"), provider: "ollama" },
     { match: (id) => id.startsWith("llamacpp/"), provider: "llamacpp" },
@@ -56,15 +67,6 @@ const RULES = [
         match: (id) => id.startsWith("zai/") || id.startsWith("z-ai/") || id.startsWith("glm/"),
         provider: "zai",
     },
-    // DeepSeek native API — bare canonical IDs and the deepseek-ai/ vendor prefix.
-    // These go direct to api.deepseek.com (lower latency, own quota, cache discount).
-    // Vendor-prefixed deepseek/ slugs (OpenRouter style) still go to OR.
-    {
-        match: (id) => /^deepseek-(chat|reasoner|coder|v4-flash|v4-pro|r1|prover-v2)$/.test(id),
-        provider: "deepseek",
-    },
-    { match: (id) => id.startsWith("deepseek-native/"), provider: "deepseek" },
-    { match: (id) => id.startsWith("deepseek-ai/"), provider: "deepseek" },
     // Catch-all: any vendor-prefixed slug or `:free` variant goes via
     // OpenRouter (anthropic/, openai/, google/, deepseek/, moonshotai/,
     // minimax/, qwen/, tencent/, z-ai/, inclusionai/, etc.).

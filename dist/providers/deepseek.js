@@ -15,29 +15,13 @@
  */
 import { ProviderError } from "./iface.js";
 import { streamChatCompletions } from "./openai-compat.js";
+import { DEEPSEEK_CATALOGUE, DEEPSEEK_BY_ID, DEEPSEEK_MODEL_IDS } from "./deepseek-catalogue.js";
 const DEFAULT_BASE = "https://api.deepseek.com/v1";
-// Canonical model IDs served by api.deepseek.com as of 2026-04.
-// deepseek-chat   = V3/V4 (flagship, general purpose)
-// deepseek-v4-flash = lightweight fast variant
-// deepseek-v4-pro   = full MoE, best quality
-// deepseek-reasoner = R1 (thinking/chain-of-thought)
-// deepseek-prover-v2 = math/theorem proving
-export const DEEPSEEK_MODELS = [
-    { id: "deepseek-chat", label: "DeepSeek V3 (default)" },
-    { id: "deepseek-v4-flash", label: "DeepSeek V4 Flash (fast)" },
-    { id: "deepseek-v4-pro", label: "DeepSeek V4 Pro (max quality)" },
-    { id: "deepseek-reasoner", label: "DeepSeek R1 (reasoning)" },
-    { id: "deepseek-prover-v2", label: "DeepSeek Prover V2 (math)" },
-];
-// Models that surface a reasoning/thinking channel.
-// deepseek-v4-flash is excluded from explicit thinking mode but reasoning
-// content is always captured for multi-turn echo-back compliance regardless.
-const THINKING_MODELS = new Set([
-    "deepseek-reasoner",
-    "deepseek-v4-pro",
-    "deepseek-r1",
-    "deepseek-prover-v2",
-]);
+// Canonical model list derived from deepseek-catalogue.ts.
+// Re-export for backward-compat with callers that imported DEEPSEEK_MODELS.
+export const DEEPSEEK_MODELS = DEEPSEEK_CATALOGUE.map(m => ({ id: m.id, label: m.label }));
+// DEEPSEEK_MODEL_IDS re-exported from catalogue for dispatch/routing use.
+export { DEEPSEEK_MODEL_IDS };
 export class DeepSeekProvider {
     id = "deepseek";
     apiKey;
@@ -57,7 +41,7 @@ export class DeepSeekProvider {
     }
     supportsThinking(modelId) {
         const base = modelId.replace(/^deepseek(?:-ai|-native)?\//, "");
-        return THINKING_MODELS.has(base);
+        return (DEEPSEEK_BY_ID.get(base)?.thinkingMode ?? "none") !== "none";
     }
     stream(req) {
         const model = req.model.replace(/^deepseek(?:-ai|-native)?\//, "");

@@ -6,6 +6,7 @@
  */
 import { ProviderError } from './iface.js';
 import { streamSSE } from './http.js';
+import { ANTHROPIC_BY_ID } from './anthropic-catalogue.js';
 const DEFAULT_BASE = 'https://api.anthropic.com/v1';
 const DEFAULT_VERSION = '2023-06-01';
 export class AnthropicProvider {
@@ -26,7 +27,8 @@ export class AnthropicProvider {
         return true;
     }
     supportsThinking(modelId) {
-        return /claude-(opus|sonnet|haiku)-[0-9]/.test(modelId);
+        const bare = modelId.replace(/^anthropic\//, '');
+        return (ANTHROPIC_BY_ID.get(bare)?.thinkingMode ?? 'none') !== 'none';
     }
     async *stream(req) {
         const model = req.model.replace(/^anthropic\//, '');

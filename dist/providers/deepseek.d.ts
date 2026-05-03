@@ -15,10 +15,12 @@
  */
 import type { AgentEvent } from "../kernel/types.js";
 import type { Provider, StreamRequest, ProviderConfig } from "./iface.js";
-export declare const DEEPSEEK_MODELS: Array<{
+import { DEEPSEEK_MODEL_IDS } from "./deepseek-catalogue.js";
+export declare const DEEPSEEK_MODELS: {
     id: string;
     label: string;
-}>;
+}[];
+export { DEEPSEEK_MODEL_IDS };
 export declare class DeepSeekProvider implements Provider {
     readonly id = "deepseek";
     private readonly apiKey;

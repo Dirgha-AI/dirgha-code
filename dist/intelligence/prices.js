@@ -32,9 +32,11 @@ export const PRICES = [
         cachedInputPerM: 0.08,
     },
     // OpenAI — native API
+    // gpt-5.5-pro / gpt-5.5 / gpt-5-mini are speculative model IDs — prices
+    // are estimates and will be updated when OpenAI confirms availability.
     { provider: "openai", model: "gpt-5.5-pro", inputPerM: 30, outputPerM: 180 },
     { provider: "openai", model: "gpt-5.5", inputPerM: 5, outputPerM: 30 },
-    { provider: "openai", model: "gpt-5", inputPerM: 10, outputPerM: 30 },
+    { provider: "openai", model: "gpt-5", inputPerM: 2.50, outputPerM: 10 },
     { provider: "openai", model: "gpt-5-mini", inputPerM: 0.5, outputPerM: 2 },
     {
         provider: "openai",
@@ -248,7 +250,7 @@ export const PRICES = [
     },
     {
         provider: "openrouter",
-        model: "anthropic/claude-opus-4.7",
+        model: "anthropic/claude-opus-4-7",
         inputPerM: 5,
         outputPerM: 25,
     },
@@ -802,14 +804,6 @@ export const PRICES = [
         outputPerM: 0.59,
         contextWindow: 131_000,
         family: "qwen",
-    },
-    {
-        provider: "groq",
-        model: "groq/moonshotai/kimi-k2-instruct-0905",
-        inputPerM: 1,
-        outputPerM: 3,
-        contextWindow: 256_000,
-        family: "kimi",
     },
     {
         provider: "groq",

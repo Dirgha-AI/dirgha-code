@@ -11,47 +11,68 @@
  * so they reuse the existing wire protocol.
  */
 import { defineOpenAICompatProvider } from './define-openai-compat.js';
+import { GROQ_BY_ID } from './groq-catalogue.js';
+import { XAI_BY_ID } from './xai-catalogue.js';
+import { MISTRAL_BY_ID } from './mistral-catalogue.js';
+import { PERPLEXITY_BY_ID } from './perplexity-catalogue.js';
+import { COHERE_BY_ID } from './cohere-catalogue.js';
+import { CEREBRAS_BY_ID } from './cerebras-catalogue.js';
+import { TOGETHER_BY_ID } from './together-catalogue.js';
 export const MistralProvider = defineOpenAICompatProvider({
     id: 'mistral',
     defaultBaseUrl: 'https://api.mistral.ai/v1',
     apiKeyEnv: 'MISTRAL_API_KEY',
     modelPrefixToStrip: /^mistral\//,
+    supportsThinking: (modelId) => (MISTRAL_BY_ID.get(modelId.replace(/^mistral\//, ''))?.thinkingMode ?? 'none') !== 'none',
+    supportsTools: (modelId) => MISTRAL_BY_ID.get(modelId.replace(/^mistral\//, ''))?.tools ?? true,
 });
 export const CohereProvider = defineOpenAICompatProvider({
     id: 'cohere',
     defaultBaseUrl: 'https://api.cohere.com/compatibility/v1',
     apiKeyEnv: 'COHERE_API_KEY',
     modelPrefixToStrip: /^cohere\//,
+    supportsThinking: (modelId) => (COHERE_BY_ID.get(modelId.replace(/^cohere\//, ''))?.thinkingMode ?? 'none') !== 'none',
+    supportsTools: (modelId) => COHERE_BY_ID.get(modelId.replace(/^cohere\//, ''))?.tools ?? true,
 });
 export const CerebrasProvider = defineOpenAICompatProvider({
     id: 'cerebras',
     defaultBaseUrl: 'https://api.cerebras.ai/v1',
     apiKeyEnv: 'CEREBRAS_API_KEY',
     modelPrefixToStrip: /^cerebras\//,
+    supportsThinking: (modelId) => (CEREBRAS_BY_ID.get(modelId.replace(/^cerebras\//, ''))?.thinkingMode ?? 'none') !== 'none',
+    supportsTools: (modelId) => CEREBRAS_BY_ID.get(modelId.replace(/^cerebras\//, ''))?.tools ?? true,
 });
 export const TogetherProvider = defineOpenAICompatProvider({
     id: 'together',
     defaultBaseUrl: 'https://api.together.xyz/v1',
     apiKeyEnv: 'TOGETHER_API_KEY',
     // Together uses vendor-prefixed slugs as-is (no strip).
+    supportsThinking: (modelId) => (TOGETHER_BY_ID.get(modelId)?.thinkingMode ?? 'none') !== 'none',
+    supportsTools: (modelId) => TOGETHER_BY_ID.get(modelId)?.tools ?? true,
 });
 export const PerplexityProvider = defineOpenAICompatProvider({
     id: 'perplexity',
     defaultBaseUrl: 'https://api.perplexity.ai',
     apiKeyEnv: 'PERPLEXITY_API_KEY',
     modelPrefixToStrip: /^perplexity\//,
+    supportsThinking: (modelId) => (PERPLEXITY_BY_ID.get(modelId.replace(/^perplexity\//, ''))?.thinkingMode ?? 'none') !== 'none',
+    supportsTools: (modelId) => PERPLEXITY_BY_ID.get(modelId.replace(/^perplexity\//, ''))?.tools ?? true,
 });
 export const XaiProvider = defineOpenAICompatProvider({
     id: 'xai',
     defaultBaseUrl: 'https://api.x.ai/v1',
     apiKeyEnv: 'XAI_API_KEY',
     modelPrefixToStrip: /^xai\//,
+    supportsThinking: (modelId) => (XAI_BY_ID.get(modelId.replace(/^xai\//, ''))?.thinkingMode ?? 'none') !== 'none',
+    supportsTools: (modelId) => XAI_BY_ID.get(modelId.replace(/^xai\//, ''))?.tools ?? true,
 });
 export const GroqProvider = defineOpenAICompatProvider({
     id: 'groq',
     defaultBaseUrl: 'https://api.groq.com/openai/v1',
     apiKeyEnv: 'GROQ_API_KEY',
     modelPrefixToStrip: /^groq\//,
+    supportsThinking: (modelId) => (GROQ_BY_ID.get(modelId.replace(/^groq\//, ''))?.thinkingMode ?? 'none') !== 'none',
+    supportsTools: (modelId) => GROQ_BY_ID.get(modelId.replace(/^groq\//, ''))?.tools ?? true,
 });
 export const ZaiProvider = defineOpenAICompatProvider({
     id: 'zai',

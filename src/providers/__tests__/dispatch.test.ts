@@ -24,30 +24,49 @@ describe("routeModel", () => {
   // prefix is shared with OpenRouter (e.g. moonshotai/kimi-k2.5 lives
   // only on OR; sending it to NIM would 404).
   describe("NVIDIA NIM whitelist", () => {
-    it("deepseek-ai/deepseek-v4-pro → deepseek (1.12.4: routed to native api.deepseek.com)", () => {
-      expect(routeModel("deepseek-ai/deepseek-v4-pro")).toBe("deepseek");
+    it("moonshotai/kimi-k2.6 → nvidia", () => {
+      expect(routeModel("moonshotai/kimi-k2.6")).toBe("nvidia");
     });
-    it("deepseek-ai/deepseek-v4-flash → deepseek (1.12.4: routed to native api.deepseek.com)", () => {
-      expect(routeModel("deepseek-ai/deepseek-v4-flash")).toBe("deepseek");
+    it("moonshotai/kimi-k2-thinking → nvidia", () => {
+      expect(routeModel("moonshotai/kimi-k2-thinking")).toBe("nvidia");
     });
-    it("moonshotai/kimi-k2-instruct → nvidia (still active on NIM)", () => {
-      expect(routeModel("moonshotai/kimi-k2-instruct")).toBe("nvidia");
+    it("qwen/qwen3.5-397b-a17b → nvidia", () => {
+      expect(routeModel("qwen/qwen3.5-397b-a17b")).toBe("nvidia");
     });
-    it("moonshotai/kimi-k2.5 → openrouter (NOT nvidia — OpenRouter-only model)", () => {
-      expect(routeModel("moonshotai/kimi-k2.5")).toBe("openrouter");
+    it("qwen/qwen3-coder-480b-a35b-instruct → nvidia", () => {
+      expect(routeModel("qwen/qwen3-coder-480b-a35b-instruct")).toBe("nvidia");
     });
-    it("qwen/qwen3-next-80b-a3b-instruct → nvidia", () => {
-      expect(routeModel("qwen/qwen3-next-80b-a3b-instruct")).toBe("nvidia");
+    it("minimaxai/minimax-m2.7 → nvidia", () => {
+      expect(routeModel("minimaxai/minimax-m2.7")).toBe("nvidia");
     });
-    it("meta/llama-3.1-70b-instruct → nvidia", () => {
-      expect(routeModel("meta/llama-3.1-70b-instruct")).toBe("nvidia");
+    it("mistralai/mistral-large-3-675b-instruct-2512 → nvidia", () => {
+      expect(routeModel("mistralai/mistral-large-3-675b-instruct-2512")).toBe(
+        "nvidia",
+      );
+    });
+    it("meta/llama-4-maverick-17b-128e-instruct → nvidia", () => {
+      expect(routeModel("meta/llama-4-maverick-17b-128e-instruct")).toBe(
+        "nvidia",
+      );
     });
   });
 
-  // Any prefixed ID NOT on the NIM whitelist falls through to OpenRouter.
-  // anthropic/, openai/, google/ included by design — those reach the
-  // native backend via OpenRouter, not our direct first-party clients.
-  describe("non-whitelist prefixed IDs → openrouter", () => {
+  // Vendor-prefix explicit providers take priority over NIM catalogue.
+  // deepseek-ai/ routes to native DeepSeek, not NIM.
+  describe("vendor-prefix beats NIM catalogue", () => {
+    it("deepseek-ai/deepseek-v4-pro → deepseek (native API, not NIM)", () => {
+      expect(routeModel("deepseek-ai/deepseek-v4-pro")).toBe("deepseek");
+    });
+    it("deepseek-ai/deepseek-v4-flash → deepseek (native API, not NIM)", () => {
+      expect(routeModel("deepseek-ai/deepseek-v4-flash")).toBe("deepseek");
+    });
+    it("deepseek-v4-pro → deepseek (bare ID)", () => {
+      expect(routeModel("deepseek-v4-pro")).toBe("deepseek");
+    });
+  });
+
+  // Prefixed IDs NOT in any catalogue fall through to OpenRouter.
+  describe("prefixed IDs → openrouter", () => {
     it("anthropic/claude-opus-4-7 → openrouter", () => {
       expect(routeModel("anthropic/claude-opus-4-7")).toBe("openrouter");
     });
@@ -57,8 +76,8 @@ describe("routeModel", () => {
     it("google/gemini-2.5-pro → openrouter", () => {
       expect(routeModel("google/gemini-2.5-pro")).toBe("openrouter");
     });
-    it("minimaxai/minimax-m2 → openrouter", () => {
-      expect(routeModel("minimaxai/minimax-m2")).toBe("openrouter");
+    it("minimaxai/minimax-m2 → nvidia (auto-migrated to -m2.7 in NIM catalogue)", () => {
+      expect(routeModel("minimaxai/minimax-m2")).toBe("nvidia");
     });
     it("z-ai/glm-5.1 → zai (1.10.1: native Z.AI provider)", () => {
       // Used to fall through to openrouter; 1.10.1 added native Z.AI dispatch

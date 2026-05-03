@@ -4,10 +4,10 @@
  * the provider adapter under test. Scenarios are format-agnostic; the
  * runner maps them onto mock HTTP servers per provider.
  */
-import type { AgentEvent, Message, ToolDefinition } from '../kernel/types.js';
+import type { AgentEvent, Message, ToolDefinition } from "../kernel/types.js";
 export interface ParityScenario {
     name: string;
-    provider: 'nvidia' | 'openrouter' | 'openai' | 'anthropic' | 'gemini';
+    provider: "nvidia" | "openrouter" | "openai" | "anthropic" | "gemini";
     model: string;
     request: {
         messages: Message[];
@@ -15,6 +15,6 @@ export interface ParityScenario {
     };
     /** Mock SSE response lines (without the leading `data:` prefix). */
     mockChunks: string[];
-    expectedEventTypes: Array<AgentEvent['type']>;
+    expectedEventTypes: Array<AgentEvent["type"]>;
 }
 export declare const DEFAULT_SCENARIOS: ParityScenario[];
