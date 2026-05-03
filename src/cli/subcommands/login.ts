@@ -174,11 +174,16 @@ export async function runLogin(argv: string[]): Promise<number> {
   print(`  1. Open: ${start.verifyUri}`);
   print(`  2. Enter code: ${style(defaultTheme.accent, start.userCode)}`);
   print("");
+  // The verification URI now includes ?code=XXXX for pre-fill.
+  // Append fallback params carefully to avoid double ?code=.
+  const baseDevice = start.verifyUri.replace(/\?code=.*$/, "");
+  const hasCode = start.verifyUri.includes("?code=");
+  if (hasCode) {
+    print(`If the code isn't pre-filled, enter it manually on the page.`);
+  }
   print(
-    `If the page is blank, try opening: ${start.verifyUri}?code=${start.userCode}`,
+    `No account? Sign up at: ${baseDevice.replace(/\/device$/, "/signup")}`,
   );
-  const signupUrl = start.verifyUri.replace(/\/device$/, "/signup");
-  print(`No account? Sign up at: ${signupUrl}`);
   print("");
   print(
     `Waiting for authorization (expires in ~${Math.round(start.expiresIn / 60_000)} min)...`,
