@@ -7,5 +7,5 @@
  * 3 s timeout). Prints a table by default; emits NDJSON when `--json`
  * is passed. Exit code 0 when every check passes, 1 if any fails.
  */
-import type { Subcommand } from './index.js';
+import type { Subcommand } from "./index.js";
 export declare const doctorSubcommand: Subcommand;

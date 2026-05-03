@@ -53,6 +53,8 @@ export interface InputBoxProps {
   inputFocus?: boolean;
   /** Parent wants to toggle YOLO mode (Ctrl+Y). */
   onRequestYoloToggle?: () => void;
+  /** Parent wants to trigger self-upgrade (Ctrl+U). */
+  onRequestUpgrade?: () => void;
   /** Prior submitted prompts, newest first (for up/down arrow recall). */
   promptHistory?: readonly string[];
 }
@@ -254,6 +256,12 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
       // Ctrl+Y — toggle YOLO mode at any time.
       if (key.ctrl && inputCh === "y") {
         if (props.onRequestYoloToggle) props.onRequestYoloToggle();
+        return;
+      }
+
+      // Ctrl+U — trigger self-upgrade.
+      if (key.ctrl && inputCh === "u") {
+        if (props.onRequestUpgrade) props.onRequestUpgrade();
         return;
       }
 

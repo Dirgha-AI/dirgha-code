@@ -75,6 +75,7 @@ import {
   migrateLegacyAuth,
   type Token,
 } from "../../integrations/device-auth.js";
+import { getUpdateBannerVersion } from "../../cli/update-check.js";
 import { AtFileComplete } from "./components/AtFileComplete.js";
 import { SlashComplete } from "./components/SlashComplete.js";
 import { ThemePicker } from "./components/ThemePicker.js";
@@ -89,6 +90,13 @@ import {
   type TranscriptItem,
 } from "./use-event-projection.js";
 import { useOverlays } from "./use-overlays.js";
+import { useDeclinedVersions } from "./use-declined-versions.js";
+import { useStartupHealth, type HealthResult } from "./use-startup-health.js";
+import {
+  getRemoteConfig,
+  isVersionBelowMin,
+  type RemoteConfig,
+} from "../../intelligence/remote-config.js";
 
 import { createRequire } from "node:module";
 
@@ -237,6 +245,110 @@ export function App(props: AppProps): React.JSX.Element {
   const [liveDurationMs, setLiveDurationMs] = React.useState(0);
   const turnStartRef = React.useRef<number>(0);
   const liveOutputTokensAccRef = React.useRef<number>(0);
+
+  const [updateVersion, setUpdateVersion] = React.useState<string | null>(null);
+  const updateShownRef = React.useRef(false);
+  const declined = useDeclinedVersions();
+
+  React.useEffect(() => {
+    if (updateShownRef.current) return;
+    updateShownRef.current = true;
+    getUpdateBannerVersion(VERSION).then((v) => {
+      if (v && !declined.isDeclined(v)) setUpdateVersion(v);
+    });
+  }, [declined]);
+
+  // Startup health check — non-blocking, cached for 24h.
+  const healthResult: HealthResult | null = useStartupHealth();
+
+  // Remote config: fetch once on mount, set model default, show MOTD.
+  const [remoteConfig, setRemoteConfig] = React.useState<RemoteConfig | null>(
+    null,
+  );
+  const [motdShown, setMotdShown] = React.useState(false);
+  const [remoteConfigFetched, setRemoteConfigFetched] = React.useState(false);
+
+  React.useEffect(() => {
+    if (remoteConfigFetched) return;
+    setRemoteConfigFetched(true);
+    void getRemoteConfig().then((cfg) => {
+      if (cfg) setRemoteConfig(cfg);
+    });
+  }, [remoteConfigFetched]);
+
+  // Apply remote config model default on first load if no explicit model set.
+  const remoteModelAppliedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!remoteConfig || remoteModelAppliedRef.current) return;
+    remoteModelAppliedRef.current = true;
+    const explicit = props.config.model;
+    const hasDefault =
+      explicit !== undefined &&
+      explicit !== "" &&
+      explicit !== "accounts/fireworks/routers/kimi-k2p5-turbo";
+    if (!hasDefault && remoteConfig.recommendedModel) {
+      setCurrentModel(remoteConfig.recommendedModel);
+    }
+  }, [remoteConfig, props.config.model]);
+
+  // Show MOTD once per session.
+  React.useEffect(() => {
+    if (!remoteConfig?.motd || motdShown) return;
+    setMotdShown(true);
+    const note: TranscriptItem = {
+      kind: "notice",
+      id: randomUUID(),
+      text: remoteConfig.motd,
+    };
+    setTranscript((prev) => [...prev, note]);
+  }, [remoteConfig, motdShown]);
+
+  // Warn about deprecated models if the current model is in the list.
+  const deprecatedWarnedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!remoteConfig || deprecatedWarnedRef.current) return;
+    if (
+      remoteConfig.deprecatedModels.length > 0 &&
+      remoteConfig.deprecatedModels.includes(currentModel)
+    ) {
+      deprecatedWarnedRef.current = true;
+      const note: TranscriptItem = {
+        kind: "notice",
+        id: randomUUID(),
+        text: `[DEPRECATED] Model ${currentModel} is deprecated. Switch to ${remoteConfig.recommendedModel ?? "a supported model"} via /model.`,
+      };
+      setTranscript((prev) => [...prev, note]);
+    }
+  }, [remoteConfig, currentModel]);
+
+  // Minimum version nag: show upgrade banner immediately if below minimum.
+  const [minVersionNagShown, setMinVersionNagShown] = React.useState(false);
+  React.useEffect(() => {
+    if (!remoteConfig || minVersionNagShown) return;
+    if (isVersionBelowMin(VERSION, remoteConfig.minimumVersion)) {
+      setMinVersionNagShown(true);
+      setUpdateVersion(remoteConfig.minimumVersion);
+    }
+  }, [remoteConfig, minVersionNagShown]);
+
+  // Self-upgrade handler (Ctrl+U or /upgrade).
+  const handleUpgrade = React.useCallback((): void => {
+    void (async () => {
+      try {
+        const { execFileSync } = await import("node:child_process");
+        const isWin = process.platform === "win32";
+        const npmBin = isWin ? "npm.cmd" : "npm";
+        execFileSync(npmBin, ["i", "-g", "@dirgha/code@latest"], {
+          stdio: "inherit",
+          shell: isWin,
+        });
+      } catch {
+        /* fall through to exit */
+      }
+      exit();
+      process.exit(0);
+    })();
+  }, [exit]);
 
   React.useEffect(() => {
     const unsub = props.events.subscribe((ev) => {
@@ -400,15 +512,31 @@ export function App(props: AppProps): React.JSX.Element {
         overlays.openOverlay("theme");
         return;
       }
+      // /upgrade and /self-update trigger npm install + restart.
+      if (
+        value === "/upgrade" ||
+        value === "/self-update" ||
+        value === "/update --self"
+      ) {
+        const note: TranscriptItem = {
+          kind: "notice",
+          id: randomUUID(),
+          text: "Upgrading @dirgha/code to latest via npm…",
+        };
+        setTranscript((prev) => [...prev, note]);
+        handleUpgrade();
+        return;
+      }
 
       // Anything else starting with `/` goes through the SlashRegistry — that
       // covers /init /keys /memory /compact /setup /login /status /resume
-      // /session /history /fleet /account /upgrade /config /mode and friends.
-      // The hardcoded branches above (clear/help/model[s]/theme) ran first
-      // because they open Ink overlays and don't fit the registry string-output
-      // contract. Without this dispatch, unrecognised slash commands fell
-      // through to runTurn() and were sent to the LLM as user prompts —
-      // surprising behaviour that S1/2026-04-27 fixes.
+      // /session /history /fleet /account /config /mode and friends.
+      // The hardcoded branches above (clear/help/model[s]/theme/upgrade) ran first
+      // because they open Ink overlays or trigger self-upgrade and don't fit
+      // the registry string-output contract. Without this dispatch,
+      // unrecognised slash commands fell through to runTurn() and were sent
+      // to the LLM as user prompts — surprising behaviour that S1/2026-04-27
+      // fixes.
       if (value.startsWith("/")) {
         const ctx: SlashContext = {
           get model() {
@@ -568,6 +696,7 @@ export function App(props: AppProps): React.JSX.Element {
       overlays.setSlashQuery,
       overlays.setActive,
       overlays.active,
+      handleUpgrade,
     ],
   );
 
@@ -1029,8 +1158,18 @@ export function App(props: AppProps): React.JSX.Element {
                 },
               ]);
             }}
+            onRequestUpgrade={handleUpgrade}
             inputFocus={inputFocus}
           />
+          {healthResult !== null && !healthResult.allOk && (
+            <Box paddingX={1}>
+              <Text color="yellow">
+                [! System check: {healthResult.failures.length} issue
+                {healthResult.failures.length !== 1 ? "s" : ""} found — run
+                'dirgha doctor' for details]
+              </Text>
+            </Box>
+          )}
           {overlays.active === "atfile" && overlays.atQuery !== null && (
             <AtFileComplete
               cwd={props.cwd}
@@ -1110,6 +1249,14 @@ export function App(props: AppProps): React.JSX.Element {
               onSave={handleKeySetSave}
               onCancel={() => setPendingKey(null)}
             />
+          )}
+          {updateVersion !== null && (
+            <Box paddingX={1}>
+              <Text color="yellow">
+                [v{updateVersion} available — press Ctrl+U or /upgrade to
+                upgrade]
+              </Text>
+            </Box>
           )}
           <StatusBar
             model={currentModel}

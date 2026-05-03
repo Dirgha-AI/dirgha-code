@@ -179,3 +179,82 @@ The CI expects these GitHub Actions secrets:
 2. Push tag → CI gates kick in → SBOM → sign → publish
 3. Release appears on npm: `npm i -g @dirgha/code@latest`
 4. Release-please updates CHANGELOG + bumps version in next PR
+
+## Self-Healing Architecture
+
+Every feature we ship must satisfy these principles. If it doesn't, it's a draft.
+
+### 1. Declarative Configuration
+
+- Models are catalogued, not regex'd. See `src/providers/*-catalogue.ts`.
+- Routing rules are ordered by explicitness (vendor prefix > catalogue > catch-all).
+- Adding a model is a one-line JSON entry in the catalogue. No code changes needed.
+
+### 2. Live-Aware Tests
+
+- Every provider has at least one E2E test that calls the real API.
+- CI skips E2E when credentials are absent (forks, external PRs).
+- Unit tests cover the routing layer; E2E tests cover the wire.
+
+### 3. Graceful Degradation
+
+- Failovers are automatic. See `src/intelligence/failover-chain.ts`.
+- The last-resort fallback is `tencent/hy3-preview:free` (always available).
+- After 5 consecutive failovers on a model, it's blacklisted for the session.
+
+### 4. Self-Diagnostics
+
+- `dirgha doctor` checks all providers, session store, memory store, disk space.
+- CI runs doctor in publish pipeline. A failing doctor blocks release.
+- Users run `dirgha doctor` before filing bugs.
+
+### 5. Session Persistence
+
+- Sessions survive SIGINT, SIGTERM, and crashes.
+- Auto-save fires in the TUI, readline REPL, and one-shot modes.
+- Sessions are stored in `~/.dirgha/sessions/` as JSONL + SQLite.
+
+### 6. Error UX
+
+- Errors are classified into 12 reasons. See `src/intelligence/error-classifier.ts`.
+- Every error message includes: what happened, why, how to fix it.
+- Never show raw API responses to users.
+
+### 7. Versioned Artifacts
+
+- Releases are tagged `vX.Y.Z` matching `package.json`.
+- CI gates on: lint, typecheck, tests, build, smoke, bundle budget, SBOM, cosign.
+- Release-please manages version bumps from conventional commits.
+
+### 8. Regression Guards
+
+- Every bug fix includes a regression test in `src/__tests__/regression.test.ts`.
+- The test name references the GitHub issue and date fixed.
+- Regression tests are the first line of defense against reintroduced bugs.
+
+## Ship Confident Checklist
+
+Before tagging a release, confirm all of these:
+
+- [ ] `npm run lint` — 0 errors, 0 warnings
+- [ ] `npm run typecheck` — 0 errors
+- [ ] `npm test` — all tests pass (190+)
+- [ ] `npm run test:cli:offline` — headless Ink + slash audit pass
+- [ ] `npm run prepublish-guard` — entry points verified
+- [ ] `npm run build` — clean build
+- [ ] `dirgha doctor` — all providers reachable (skip if no keys)
+- [ ] `node src/__tests__/e2e-gate.test.ts` — live E2E gate passes (skip if no keys)
+- [ ] Version in `package.json` matches git tag (`vX.Y.Z`)
+- [ ] `.release-please-manifest.json` is synced
+- [ ] No hardcoded paths, secrets, or tokens in source
+- [ ] Bundle size under 6 MB (CI checks this)
+- [ ] Manual smoke: `dirgha ask` with real model responds correctly
+
+## Known Gaps
+
+| Gap                                           | Impact                                     | Planned fix                                 |
+| --------------------------------------------- | ------------------------------------------ | ------------------------------------------- |
+| No branch protection rules on GitHub          | Bad merges bypass CI                       | Configure in repo settings (requires admin) |
+| No UI for model discovery in non-TUI mode     | Readline REPL users can't browse models    | `/models` slash command (done in TUI)       |
+| Compaction drops thinking content             | Multi-turn with reasoning may lose context | Keep reasoning in compaction summary        |
+| Fire-and-forget DB writes (no error handling) | DB corruption silently ignored             | Add telemetry on DB write failures          |

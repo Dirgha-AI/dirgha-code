@@ -38,13 +38,7 @@ export async function checkStartupUpdate(currentVersion) {
     if (!shouldCheck())
         return;
     try {
-        const res = await fetch("https://registry.npmjs.org/@dirgha/code/latest", {
-            signal: AbortSignal.timeout(5000),
-        });
-        if (!res.ok)
-            return;
-        const data = (await res.json());
-        const latest = data.version;
+        const latest = await fetchLatestVersion();
         if (!latest || !isSemverNewer(latest, currentVersion))
             return;
         process.stderr.write(`\n📦 @dirgha/code ${latest} is available (you have ${currentVersion})\n` +
@@ -55,6 +49,36 @@ export async function checkStartupUpdate(currentVersion) {
         /* network error — silent */
     }
     markChecked();
+}
+async function fetchLatestVersion() {
+    try {
+        const res = await fetch("https://registry.npmjs.org/@dirgha/code/latest", {
+            signal: AbortSignal.timeout(5000),
+        });
+        if (!res.ok)
+            return null;
+        const data = (await res.json());
+        return data.version ?? null;
+    }
+    catch {
+        return null;
+    }
+}
+export async function getUpdateBannerVersion(currentVersion) {
+    if (!shouldCheck())
+        return null;
+    try {
+        const latest = await fetchLatestVersion();
+        if (!latest || !isSemverNewer(latest, currentVersion))
+            return null;
+        return latest;
+    }
+    catch {
+        return null;
+    }
+    finally {
+        markChecked();
+    }
 }
 function isSemverNewer(latest, current) {
     try {

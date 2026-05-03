@@ -210,6 +210,12 @@ export function InputBox(props) {
                 props.onRequestYoloToggle();
             return;
         }
+        // Ctrl+U — trigger self-upgrade.
+        if (key.ctrl && inputCh === "u") {
+            if (props.onRequestUpgrade)
+                props.onRequestUpgrade();
+            return;
+        }
         // Overlay hotkeys bubble up to App.
         if (props.onRequestOverlay) {
             if (key.ctrl && inputCh === "m") {

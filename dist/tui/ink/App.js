@@ -48,6 +48,7 @@ import { HelpOverlay, } from "./components/HelpOverlay.js";
 import { KeySetOverlay } from "./components/KeySetOverlay.js";
 import { saveKey } from "../../auth/keystore.js";
 import { loadToken, migrateLegacyAuth, } from "../../integrations/device-auth.js";
+import { getUpdateBannerVersion } from "../../cli/update-check.js";
 import { AtFileComplete } from "./components/AtFileComplete.js";
 import { SlashComplete } from "./components/SlashComplete.js";
 import { ThemePicker } from "./components/ThemePicker.js";
@@ -58,6 +59,9 @@ import { homedir } from "node:os";
 import { join as pathJoin } from "node:path";
 import { useEventProjection, } from "./use-event-projection.js";
 import { useOverlays } from "./use-overlays.js";
+import { useDeclinedVersions } from "./use-declined-versions.js";
+import { useStartupHealth } from "./use-startup-health.js";
+import { getRemoteConfig, isVersionBelowMin, } from "../../intelligence/remote-config.js";
 import { createRequire } from "node:module";
 // Pulled from the installed package.json so the TUI title matches the
 // shipped binary version. Falls back to '0.0.0-dev' if the file isn't
@@ -168,6 +172,104 @@ export function App(props) {
     const [liveDurationMs, setLiveDurationMs] = React.useState(0);
     const turnStartRef = React.useRef(0);
     const liveOutputTokensAccRef = React.useRef(0);
+    const [updateVersion, setUpdateVersion] = React.useState(null);
+    const updateShownRef = React.useRef(false);
+    const declined = useDeclinedVersions();
+    React.useEffect(() => {
+        if (updateShownRef.current)
+            return;
+        updateShownRef.current = true;
+        getUpdateBannerVersion(VERSION).then((v) => {
+            if (v && !declined.isDeclined(v))
+                setUpdateVersion(v);
+        });
+    }, [declined]);
+    // Startup health check — non-blocking, cached for 24h.
+    const healthResult = useStartupHealth();
+    // Remote config: fetch once on mount, set model default, show MOTD.
+    const [remoteConfig, setRemoteConfig] = React.useState(null);
+    const [motdShown, setMotdShown] = React.useState(false);
+    const [remoteConfigFetched, setRemoteConfigFetched] = React.useState(false);
+    React.useEffect(() => {
+        if (remoteConfigFetched)
+            return;
+        setRemoteConfigFetched(true);
+        void getRemoteConfig().then((cfg) => {
+            if (cfg)
+                setRemoteConfig(cfg);
+        });
+    }, [remoteConfigFetched]);
+    // Apply remote config model default on first load if no explicit model set.
+    const remoteModelAppliedRef = React.useRef(false);
+    React.useEffect(() => {
+        if (!remoteConfig || remoteModelAppliedRef.current)
+            return;
+        remoteModelAppliedRef.current = true;
+        const explicit = props.config.model;
+        const hasDefault = explicit !== undefined &&
+            explicit !== "" &&
+            explicit !== "accounts/fireworks/routers/kimi-k2p5-turbo";
+        if (!hasDefault && remoteConfig.recommendedModel) {
+            setCurrentModel(remoteConfig.recommendedModel);
+        }
+    }, [remoteConfig, props.config.model]);
+    // Show MOTD once per session.
+    React.useEffect(() => {
+        if (!remoteConfig?.motd || motdShown)
+            return;
+        setMotdShown(true);
+        const note = {
+            kind: "notice",
+            id: randomUUID(),
+            text: remoteConfig.motd,
+        };
+        setTranscript((prev) => [...prev, note]);
+    }, [remoteConfig, motdShown]);
+    // Warn about deprecated models if the current model is in the list.
+    const deprecatedWarnedRef = React.useRef(false);
+    React.useEffect(() => {
+        if (!remoteConfig || deprecatedWarnedRef.current)
+            return;
+        if (remoteConfig.deprecatedModels.length > 0 &&
+            remoteConfig.deprecatedModels.includes(currentModel)) {
+            deprecatedWarnedRef.current = true;
+            const note = {
+                kind: "notice",
+                id: randomUUID(),
+                text: `[DEPRECATED] Model ${currentModel} is deprecated. Switch to ${remoteConfig.recommendedModel ?? "a supported model"} via /model.`,
+            };
+            setTranscript((prev) => [...prev, note]);
+        }
+    }, [remoteConfig, currentModel]);
+    // Minimum version nag: show upgrade banner immediately if below minimum.
+    const [minVersionNagShown, setMinVersionNagShown] = React.useState(false);
+    React.useEffect(() => {
+        if (!remoteConfig || minVersionNagShown)
+            return;
+        if (isVersionBelowMin(VERSION, remoteConfig.minimumVersion)) {
+            setMinVersionNagShown(true);
+            setUpdateVersion(remoteConfig.minimumVersion);
+        }
+    }, [remoteConfig, minVersionNagShown]);
+    // Self-upgrade handler (Ctrl+U or /upgrade).
+    const handleUpgrade = React.useCallback(() => {
+        void (async () => {
+            try {
+                const { execFileSync } = await import("node:child_process");
+                const isWin = process.platform === "win32";
+                const npmBin = isWin ? "npm.cmd" : "npm";
+                execFileSync(npmBin, ["i", "-g", "@dirgha/code@latest"], {
+                    stdio: "inherit",
+                    shell: isWin,
+                });
+            }
+            catch {
+                /* fall through to exit */
+            }
+            exit();
+            process.exit(0);
+        })();
+    }, [exit]);
     React.useEffect(() => {
         const unsub = props.events.subscribe((ev) => {
             if (ev.type === "agent_start") {
@@ -327,14 +429,28 @@ export function App(props) {
             overlays.openOverlay("theme");
             return;
         }
+        // /upgrade and /self-update trigger npm install + restart.
+        if (value === "/upgrade" ||
+            value === "/self-update" ||
+            value === "/update --self") {
+            const note = {
+                kind: "notice",
+                id: randomUUID(),
+                text: "Upgrading @dirgha/code to latest via npm…",
+            };
+            setTranscript((prev) => [...prev, note]);
+            handleUpgrade();
+            return;
+        }
         // Anything else starting with `/` goes through the SlashRegistry — that
         // covers /init /keys /memory /compact /setup /login /status /resume
-        // /session /history /fleet /account /upgrade /config /mode and friends.
-        // The hardcoded branches above (clear/help/model[s]/theme) ran first
-        // because they open Ink overlays and don't fit the registry string-output
-        // contract. Without this dispatch, unrecognised slash commands fell
-        // through to runTurn() and were sent to the LLM as user prompts —
-        // surprising behaviour that S1/2026-04-27 fixes.
+        // /session /history /fleet /account /config /mode and friends.
+        // The hardcoded branches above (clear/help/model[s]/theme/upgrade) ran first
+        // because they open Ink overlays or trigger self-upgrade and don't fit
+        // the registry string-output contract. Without this dispatch,
+        // unrecognised slash commands fell through to runTurn() and were sent
+        // to the LLM as user prompts — surprising behaviour that S1/2026-04-27
+        // fixes.
         if (value.startsWith("/")) {
             const ctx = {
                 get model() {
@@ -482,6 +598,7 @@ export function App(props) {
         overlays.setSlashQuery,
         overlays.setActive,
         overlays.active,
+        handleUpgrade,
     ]);
     const runTurn = async () => {
         setBusy(true);
@@ -861,7 +978,7 @@ export function App(props) {
                                         : "YOLO mode OFF — back to standard confirmation.",
                                 },
                             ]);
-                        }, inputFocus: inputFocus }), overlays.active === "atfile" && overlays.atQuery !== null && (_jsx(AtFileComplete, { cwd: props.cwd, query: overlays.atQuery, onPick: handleAtPick, onCancel: () => {
+                        }, onRequestUpgrade: handleUpgrade, inputFocus: inputFocus }), healthResult !== null && !healthResult.allOk && (_jsx(Box, { paddingX: 1, children: _jsxs(Text, { color: "yellow", children: ["[! System check: ", healthResult.failures.length, " issue", healthResult.failures.length !== 1 ? "s" : "", " found \u2014 run 'dirgha doctor' for details]"] }) })), overlays.active === "atfile" && overlays.atQuery !== null && (_jsx(AtFileComplete, { cwd: props.cwd, query: overlays.atQuery, onPick: handleAtPick, onCancel: () => {
                             overlays.setAtQuery(null);
                             overlays.setActive(null);
                         } })), overlays.active === "slash" && overlays.slashQuery !== null && (_jsx(SlashComplete, { commands: slashCommands, query: overlays.slashQuery, onPick: handleSlashPick, onCancel: () => {
@@ -890,7 +1007,7 @@ export function App(props) {
                             // Esc inside ModelPicker → back to ProviderPicker (NOT close).
                             setPickerStage("provider");
                             setPickerProvider(null);
-                        } })), overlays.active === "help" && (_jsx(HelpOverlay, { slashCommands: slashCommands, onClose: overlays.closeOverlay })), overlays.active === "theme" && (_jsx(ThemePicker, { current: themeName, onPick: handleThemePick, onCancel: overlays.closeOverlay })), pendingKey && (_jsx(KeySetOverlay, { keyName: pendingKey.keyName, onSave: handleKeySetSave, onCancel: () => setPendingKey(null) })), _jsx(StatusBar, { model: currentModel, provider: providerIdForModel(currentModel), inputTokens: projection.totals.inputTokens, outputTokens: projection.totals.outputTokens, costUsd: projection.totals.costUsd, cwd: props.cwd, busy: busy, mode: mode, contextWindow: contextWindowFor(currentModel), liveOutputTokens: liveOutputTokens, liveDurationMs: liveDurationMs })] }) }) }));
+                        } })), overlays.active === "help" && (_jsx(HelpOverlay, { slashCommands: slashCommands, onClose: overlays.closeOverlay })), overlays.active === "theme" && (_jsx(ThemePicker, { current: themeName, onPick: handleThemePick, onCancel: overlays.closeOverlay })), pendingKey && (_jsx(KeySetOverlay, { keyName: pendingKey.keyName, onSave: handleKeySetSave, onCancel: () => setPendingKey(null) })), updateVersion !== null && (_jsx(Box, { paddingX: 1, children: _jsxs(Text, { color: "yellow", children: ["[v", updateVersion, " available \u2014 press Ctrl+U or /upgrade to upgrade]"] }) })), _jsx(StatusBar, { model: currentModel, provider: providerIdForModel(currentModel), inputTokens: projection.totals.inputTokens, outputTokens: projection.totals.outputTokens, costUsd: projection.totals.costUsd, cwd: props.cwd, busy: busy, mode: mode, contextWindow: contextWindowFor(currentModel), liveOutputTokens: liveOutputTokens, liveDurationMs: liveDurationMs })] }) }) }));
 }
 /**
  * Walk the transcript and fold consecutive `tool` items into a single

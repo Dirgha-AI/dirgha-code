@@ -31,7 +31,15 @@ import type { EventStream } from "./event-stream.js";
 import { assembleTurn, extractToolUses, appendToolResults } from "./message.js";
 import { resolveModelForDispatch } from "../providers/dispatch.js";
 import { findFailover } from "../intelligence/prices.js";
+import {
+  recordFailover,
+  isBlacklisted,
+} from "../intelligence/failover-chain.js";
 import { recordRequest, recordRateLimit } from "../providers/health.js";
+import {
+  recordSuccess as recordHealthSuccess,
+  recordFailure as recordHealthFailure,
+} from "../intelligence/health-monitor.js";
 
 export interface AgentLoopConfig {
   sessionId: string;
@@ -113,6 +121,21 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
         break;
       }
 
+      // Self-healing: if the model has been blacklisted after too many
+      // consecutive failovers, surface the failover so the TUI/caller
+      // can prompt the user to switch. The loop itself continues with
+      // the current model (callers swap between runAgentLoop calls).
+      if (turnIndex === 0 && isBlacklisted(cfg.model)) {
+        const fallback = findFailover(cfg.model);
+        events.emit({
+          type: "error",
+          message: `Model "${cfg.model}" is blacklisted after repeated failures`,
+          reason: "failover",
+          retryable: false,
+          ...(fallback ? { failoverModel: fallback } : {}),
+        });
+      }
+
       turnCount = turnIndex + 1;
       const turnId = `t${turnIndex}-${Date.now().toString(36)}`;
 
@@ -174,11 +197,15 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
         // bad-id (400 "not a valid model"), deprecated, rate-limit,
         // or 5xx upstream failures.
         const errMsg = err instanceof Error ? err.message : String(err);
+        recordHealthFailure(cfg.provider.id, errMsg);
         const looksFixable =
           /not a valid model id|deprecated|model_not_found|rate.?limit|429\b|5\d\d\b|bad.?gateway|upstream/i.test(
             errMsg,
           );
         const failover = looksFixable ? findFailover(cfg.model) : undefined;
+        if (looksFixable) {
+          recordFailover(cfg.model);
+        }
         events.emit({
           type: "error",
           message: errMsg,
@@ -215,6 +242,7 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
       totals.outputTokens += assembled.outputTokens;
       totals.cachedTokens += assembled.cachedTokens;
       recordRequest(cfg.provider.id, true, 0);
+      recordHealthSuccess(cfg.provider.id, 0);
       retriesForTurn = 0;
       if (cfg.costCalculator) {
         totals.costUsd += cfg.costCalculator(
@@ -323,7 +351,11 @@ async function executeToolCalls(
           });
           return { call, result };
         }
-        if (decision && !decision.block && decision.replaceInput !== undefined) {
+        if (
+          decision &&
+          !decision.block &&
+          decision.replaceInput !== undefined
+        ) {
           input = decision.replaceInput;
         }
       } catch (hookErr) {

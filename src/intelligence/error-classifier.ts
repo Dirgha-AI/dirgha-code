@@ -53,30 +53,60 @@ function composeUserMessage(
   model: string,
 ): string | undefined {
   const label = PROVIDER_ENV[provider];
+  const msg = err instanceof Error ? err.message : String(err);
   switch (reason) {
-    case "auth":
+    case "auth": {
+      // Distinguish "no key configured" from "key is wrong/expired"
+      const keyRequired =
+        msg.includes("is required") || msg.includes("No API key configured");
+      if (label && keyRequired) {
+        return `No API key configured for ${provider}.
+  Get one at: https://dirgha.ai/models (or bring your own key)
+  Add it:  /keys set ${label} <your-key>
+  Free model:  /model tencent/hy3-preview:free`;
+      }
       if (label) {
-        return `No API key configured for ${provider}. Run: /keys set ${label} <your-key>
-  Or try a free model: /model tencent/hy3-preview:free`;
+        return `Your ${label} was rejected by ${provider} (401/403).
+  The key may be expired, revoked, or has insufficient permissions.
+  Get a new key at your provider dashboard, then: /keys set ${label} <new-key>`;
       }
       return `Authentication failed for ${provider}. Check your API key or run: dirgha setup`;
+    }
     case "rate_limit":
       return `Rate limited by ${provider}. Waiting and retrying automatically.
-  Tip: Add more providers for fallback.`;
+  Tip: Add more providers for fallback with /keys set`;
     case "overloaded":
       return `${provider} is overloaded. Trying fallback...`;
     case "model_not_found":
-      return `Model not found: ${model}. Check available: /models`;
+      return `Model not found: ${model}.
+  Check available models: /models
+  Try an alternative: /model deepseek-ai/deepseek-v4-pro`;
     case "billing":
-      return `Billing issue with ${provider}. Check your account balance.
-  Tip: Switch to a free model: /model tencent/hy3-preview:free`;
+      return `Billing issue with ${provider}.
+  Check your account balance or switch to a free model: /model tencent/hy3-preview:free`;
+    case "context_overflow":
+      return `Message too long for ${model}. Try /compact or switch to a long-context model.`;
+    case "content_filter":
+      return `Content filtered by ${provider}. Reframe your prompt or try another model.`;
+    case "tool_schema":
+      return `Tool schema incompatible with ${provider}. This is an internal error — try /model to switch.`;
+    case "network":
+      return `Cannot reach ${provider}. Check your connection or try a different provider.`;
+    case "format_error":
+    case "timeout":
     default: {
-      const msg = err instanceof Error ? err.message : String(err);
+      if (/reasoning_content/i.test(msg)) {
+        return `The model requires reasoning echo-back. This should be handled automatically — if it persists, try a different model: /model deepseek-v4-pro`;
+      }
       if (/5\d\d/.test(msg)) {
         return `Server error from ${provider}. Retrying...`;
       }
       if (/timeout|timed out/i.test(msg)) {
         return `Request to ${provider} timed out. Retrying...`;
+      }
+      if (/403|forbidden/i.test(msg)) {
+        return `${provider} returned 403. Your key doesn't have access to ${model}.
+  Try: /model deepseek-ai/deepseek-v4-pro (works with most keys)`;
       }
       return undefined;
     }

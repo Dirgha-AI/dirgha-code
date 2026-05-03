@@ -37,6 +37,8 @@ export interface InputBoxProps {
     inputFocus?: boolean;
     /** Parent wants to toggle YOLO mode (Ctrl+Y). */
     onRequestYoloToggle?: () => void;
+    /** Parent wants to trigger self-upgrade (Ctrl+U). */
+    onRequestUpgrade?: () => void;
     /** Prior submitted prompts, newest first (for up/down arrow recall). */
     promptHistory?: readonly string[];
 }

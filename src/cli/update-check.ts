@@ -40,12 +40,7 @@ export async function checkStartupUpdate(
   if (!shouldCheck()) return;
 
   try {
-    const res = await fetch("https://registry.npmjs.org/@dirgha/code/latest", {
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!res.ok) return;
-    const data = (await res.json()) as { version?: string };
-    const latest = data.version;
+    const latest = await fetchLatestVersion();
     if (!latest || !isSemverNewer(latest, currentVersion)) return;
 
     process.stderr.write(
@@ -57,6 +52,35 @@ export async function checkStartupUpdate(
     /* network error — silent */
   }
   markChecked();
+}
+
+async function fetchLatestVersion(): Promise<string | null> {
+  try {
+    const res = await fetch("https://registry.npmjs.org/@dirgha/code/latest", {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { version?: string };
+    return data.version ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function getUpdateBannerVersion(
+  currentVersion: string,
+): Promise<string | null> {
+  if (!shouldCheck()) return null;
+
+  try {
+    const latest = await fetchLatestVersion();
+    if (!latest || !isSemverNewer(latest, currentVersion)) return null;
+    return latest;
+  } catch {
+    return null;
+  } finally {
+    markChecked();
+  }
 }
 
 function isSemverNewer(latest: string, current: string): boolean {
