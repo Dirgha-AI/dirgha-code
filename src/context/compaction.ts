@@ -154,9 +154,7 @@ async function summarise(
   } catch {
     // If the summarizer call fails (network, bad model), return a
     // raw transcript — better than aborting the agent loop.
-    const chartext = historical
-      .map((m) => renderForSummary(m, maxThinking))
-      .join("\n\n");
+    return historical.map((m) => renderForSummary(m, 1000)).join("\n\n");
   }
   return summary.trim() || "[Empty summary]";
 }
