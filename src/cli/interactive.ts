@@ -37,6 +37,7 @@ import {
 } from "../integrations/device-auth.js";
 import { resolveMode, type Mode } from "../context/mode.js";
 import { loadProjectPrimer, composeSystemPrompt } from "../context/primer.js";
+import { queryKb } from "../context/kb-query.js";
 import { ledgerScope, renderLedgerContext } from "../context/ledger.js";
 import { probeGitState, renderGitState } from "../context/git-state.js";
 import { loadSoul } from "../context/soul.js";
@@ -197,14 +198,19 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
   }
 
   const soulLoaded = loadSoul();
-  /** Build the per-turn system prompt: soul + mode + primer + git_state + --system. */
-  const buildSystem = async (): Promise<string> => {
+  /** Build the per-turn system prompt: soul + mode + primer + kb + git_state + --system. */
+  const buildSystem = async (userTurn?: string): Promise<string> => {
     const ledgerCtx = await renderLedgerContext(ledgerScope("default"));
+    const kbCtx =
+      opts.config.kbAutoInject !== false && userTurn
+        ? await queryKb(userTurn)
+        : undefined;
     return composeSystemPrompt({
       soul: soulLoaded.text,
       modePreamble: modePreamble(currentMode),
       primer: primerLoaded.primer,
       ledgerContext: ledgerCtx,
+      kbContext: kbCtx,
       gitState: renderGitState(probeGitState(opts.cwd)),
       userSystem: opts.systemPrompt,
     });
@@ -280,7 +286,8 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
       }
 
       // Rebuild system prompt per turn so /mode changes apply immediately.
-      const system = await buildSystem();
+      // Pass the user's turn text so relevant KB articles can be injected.
+      const system = await buildSystem(line);
       const turnHistory: Message[] = system
         ? [{ role: "system", content: system }, ...history]
         : [...history];

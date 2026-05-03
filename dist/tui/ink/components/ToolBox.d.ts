@@ -12,7 +12,7 @@
  * red (-) / cyan (@@) to match monorepo patterns.
  */
 import * as React from "react";
-export type ToolStatus = "pending" | "running" | "done" | "error";
+export type ToolStatus = "pending" | "running" | "done" | "error" | "blocked";
 export interface ToolBoxProps {
     name: string;
     status: ToolStatus;

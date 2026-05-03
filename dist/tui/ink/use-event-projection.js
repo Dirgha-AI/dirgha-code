@@ -247,16 +247,25 @@ export function useEventProjection(events) {
                         progressTimerRef.current.delete(event.id);
                     }
                     pendingProgressRef.current.delete(event.id);
-                    const status = event.isError ? "error" : "done";
+                    const isModeBlock = typeof event.output === "string" &&
+                        event.output.startsWith("[MODE BLOCK]");
+                    const status = isModeBlock
+                        ? "blocked"
+                        : event.isError
+                            ? "error"
+                            : "done";
+                    const rawOutput = isModeBlock
+                        ? event.output.slice("[MODE BLOCK] ".length)
+                        : event.output;
                     const diff = typeof event.metadata?.diff === "string"
                         ? event.metadata.diff
                         : undefined;
                     const outputKind = diff !== undefined
                         ? "diff"
-                        : hasDiffMarkers(event.output)
+                        : hasDiffMarkers(rawOutput)
                             ? "diff"
                             : "text";
-                    const outputText = outputKind === "diff" && diff !== undefined ? diff : event.output;
+                    const outputText = outputKind === "diff" && diff !== undefined ? diff : rawOutput;
                     setLive((prev) => prev.map((it) => it.kind === "tool" && it.id === event.id
                         ? {
                             ...it,

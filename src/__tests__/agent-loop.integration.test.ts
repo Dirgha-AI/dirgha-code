@@ -123,27 +123,30 @@ describe('Test B: mode=plan blocks fs_write tool call', () => {
         ev.type === 'tool_exec_end',
     );
 
-    // When a hook blocks, the loop returns early from executeToolCalls without
-    // ever calling executor or emitting tool_exec_end. Verify via result
-    // messages instead: the tool result part must carry isError.
+    // When a hook blocks, the result carries a [MODE BLOCK] content marker
+    // and isError is false (policy block, not an execution error).
     const toolResultMessages = result.messages.filter(
       (m) => m.role === 'user',
     );
-    const hasErrorResult = toolResultMessages.some((m) => {
+    const hasModeBlockResult = toolResultMessages.some((m) => {
       if (typeof m.content === 'string') return false;
       return m.content.some(
-        (p) => p.type === 'tool_result' && (p as { isError?: boolean }).isError === true,
+        (p) =>
+          p.type === 'tool_result' &&
+          typeof (p as { content?: unknown }).content === 'string' &&
+          ((p as { content: string }).content.startsWith('[MODE BLOCK]') ||
+            (p as { isError?: boolean }).isError === true),
       );
     });
-    expect(hasErrorResult).toBe(true);
+    expect(hasModeBlockResult).toBe(true);
 
-    // Even if tool_exec_end is emitted (depending on implementation path),
-    // any that exist for fs_write should be errors.
+    // tool_exec_end events for fs_write (if emitted) must not be "error" class.
     const fsWriteEnd = execEndEvents.filter(
       (ev) => (ev as unknown as { name?: string }).name === 'fs_write',
     );
     for (const ev of fsWriteEnd) {
-      expect(ev.isError).toBe(true);
+      // Mode blocks emit isError: false — they are policy decisions, not failures.
+      expect(ev.isError).toBe(false);
     }
 
     expect(result.stopReason).not.toBe('error');

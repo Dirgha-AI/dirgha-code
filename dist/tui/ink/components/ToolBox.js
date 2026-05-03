@@ -78,22 +78,28 @@ function diffShortPreview(text, maxLen = 80) {
 export function ToolBox(props) {
     const palette = useTheme();
     const { busy: _spinnerBusy } = React.useContext(SpinnerContext);
-    const isRunning = props.status !== "done" && props.status !== "error";
+    const isRunning = props.status !== "done" &&
+        props.status !== "error" &&
+        props.status !== "blocked";
     const icon = props.status === "error"
         ? "✗"
         : props.status === "done"
             ? "✓"
-            : null;
+            : props.status === "blocked"
+                ? "○"
+                : null;
     const iconColour = props.status === "error"
-        ? palette.error
-        : props.status === "done"
-            ? palette.brand
-            : palette.brand;
+        ? palette.status.error
+        : props.status === "blocked"
+            ? palette.text.secondary
+            : palette.ui.focus;
     const borderColour = props.status === "error"
-        ? palette.error
-        : props.status === "done"
-            ? palette.borderIdle
-            : palette.brand;
+        ? palette.status.error
+        : props.status === "blocked"
+            ? palette.border.default
+            : props.status === "done"
+                ? palette.border.default
+                : palette.ui.focus;
     const elapsedLabel = props.status === "running"
         ? formatElapsed(Date.now() - props.startedAt)
         : props.durationMs !== undefined
@@ -105,6 +111,8 @@ export function ToolBox(props) {
         : diffMode && props.outputPreview
             ? diffShortPreview(props.outputPreview, 80)
             : "";
-    return (_jsxs(Box, { flexDirection: "column", borderStyle: "round", borderColor: borderColour, paddingX: 1, marginBottom: 1, children: [_jsxs(Box, { gap: 1, children: [icon !== null ? (_jsx(Text, { color: iconColour, children: icon })) : (_jsx(SpinnerGlyph, { isActive: isRunning })), _jsx(Text, { color: palette.accent, bold: true, children: iconFor(props.name) }), _jsx(Text, { color: props.status === "done" ? palette.textMuted : palette.textPrimary, bold: true, children: prettyName(props.name) }), props.argSummary !== undefined && props.argSummary.length > 0 && (_jsxs(Text, { color: palette.textMuted, dimColor: true, children: ["(", props.argSummary, ")"] })), elapsedLabel !== "" && (_jsx(Text, { color: palette.textMuted, dimColor: true, children: elapsedLabel }))] }), preview !== "" && !diffMode && (_jsx(Box, { children: _jsx(Text, { color: palette.textMuted, dimColor: true, children: preview }) })), diffMode && props.outputPreview && (_jsx(Box, { flexDirection: "column", children: renderDiffLines(props.outputPreview, 30) }))] }));
+    return (_jsxs(Box, { flexDirection: "column", borderStyle: "round", borderColor: borderColour, paddingX: 1, marginBottom: 1, children: [_jsxs(Box, { gap: 1, children: [icon !== null ? (_jsx(Text, { color: iconColour, children: icon })) : (_jsx(SpinnerGlyph, { isActive: isRunning })), _jsx(Text, { color: palette.text.accent, bold: true, children: iconFor(props.name) }), _jsx(Text, { color: props.status === "done" || props.status === "blocked"
+                            ? palette.text.secondary
+                            : palette.text.primary, bold: props.status !== "blocked", dimColor: props.status === "blocked", children: prettyName(props.name) }), props.argSummary !== undefined && props.argSummary.length > 0 && (_jsxs(Text, { color: palette.text.secondary, dimColor: true, children: ["(", props.argSummary, ")"] })), elapsedLabel !== "" && (_jsx(Text, { color: palette.text.secondary, dimColor: true, children: elapsedLabel }))] }), preview !== "" && !diffMode && (_jsx(Box, { children: _jsx(Text, { color: palette.text.secondary, dimColor: true, children: preview }) })), diffMode && props.outputPreview && (_jsx(Box, { flexDirection: "column", children: renderDiffLines(props.outputPreview, 30) }))] }));
 }
 //# sourceMappingURL=ToolBox.js.map

@@ -62,6 +62,12 @@ export interface DirghaConfig {
    */
   mode?: "plan" | "act" | "yolo" | "verify" | "ask";
   /**
+   * When true (default), the top-K most relevant KB articles from
+   * ~/.dirgha/knowledge/ are injected into the system prompt on each
+   * turn based on the user's input. Set to false to opt out.
+   */
+  kbAutoInject?: boolean;
+  /**
    * Optional MCP servers to spawn on startup. Each entry runs as a
    * subprocess; its tools are bridged into the local tool registry
    * with a `${name}_` prefix. Standard `mcpServers` block shape so
@@ -122,6 +128,7 @@ export const DEFAULT_CONFIG: DirghaConfig = {
   smartRoute: { enabled: false },
   compaction: { triggerTokens: 120_000, preserveLastTurns: 6 },
   telemetry: { enabled: false },
+  kbAutoInject: true,
 };
 
 export async function loadConfig(

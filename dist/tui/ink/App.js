@@ -23,6 +23,7 @@ import { contextWindowFor } from "../../intelligence/prices.js";
 import { buildAgentHooksFromConfig } from "../../hooks/config-bridge.js";
 import { enforceMode, composeHooks } from "../../context/mode-enforcement.js";
 import { loadProjectPrimer, composeSystemPrompt, } from "../../context/primer.js";
+import { queryKb } from "../../context/kb-query.js";
 import { probeGitState, renderGitState } from "../../context/git-state.js";
 import { loadSoul } from "../../context/soul.js";
 import { isAutoApprove, modePreamble } from "../../context/mode.js";
@@ -410,6 +411,40 @@ export function App(props) {
         setBusy(true);
         const abort = new AbortController();
         abortRef.current = abort;
+        // KB auto-inject: refresh the system message (index 0) with KB
+        // context relevant to the current user turn before sending to the
+        // model. Wrapped in try/catch so a KB failure never blocks a turn.
+        if (props.config.kbAutoInject !== false) {
+            try {
+                const userTurn = lastUserPromptRef.current;
+                if (userTurn) {
+                    const kbCtx = await queryKb(userTurn);
+                    if (kbCtx !== undefined) {
+                        const msgs = historyRef.current;
+                        if (msgs.length > 0 && msgs[0].role === "system") {
+                            const primer = loadProjectPrimer(props.cwd);
+                            const soul = loadSoul();
+                            const refreshedSystem = composeSystemPrompt({
+                                soul: soul.text,
+                                modePreamble: modePreamble(mode),
+                                primer: primer.primer,
+                                ledgerContext: props.ledgerContext,
+                                kbContext: kbCtx,
+                                gitState: renderGitState(probeGitState(props.cwd)),
+                                userSystem: props.systemPrompt,
+                            });
+                            historyRef.current = [
+                                { role: "system", content: refreshedSystem },
+                                ...msgs.slice(1),
+                            ];
+                        }
+                    }
+                }
+            }
+            catch {
+                /* KB unavailable — proceed without it */
+            }
+        }
         try {
             const executor = createToolExecutor({
                 registry: props.registry,
@@ -522,6 +557,24 @@ export function App(props) {
         }
         if (input.length > 0)
             setInput("");
+    });
+    // Ctrl-C handler: if a turn is running, abort it and show "[Interrupted]"
+    // in the transcript (matching the readline path in src/cli/interactive.ts).
+    // If idle, let the process exit normally via app.exit().
+    useInput((ch, key) => {
+        if (!(key.ctrl && ch === "c"))
+            return;
+        if (busy && abortRef.current !== null) {
+            abortRef.current.abort();
+            projection.appendLive({
+                kind: "notice",
+                id: randomUUID(),
+                text: "[Interrupted]",
+            });
+        }
+        else {
+            exit();
+        }
     });
     const handleModelPick = React.useCallback((id) => {
         overlays.closeOverlay();

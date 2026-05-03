@@ -15,6 +15,7 @@ import { costCommand } from "./cost.js";
 import { exitCommand } from "./exit.js";
 import { exportCommand } from "./export.js";
 import { fleetCommand } from "./fleet.js";
+import { spawnCommand } from "./spawn.js";
 import { fsCommand } from "./fs.js";
 import { helpCommand, registerHelpSource } from "./help.js";
 import { historyCommand } from "./history.js";
@@ -54,6 +55,7 @@ export const builtinSlashCommands: SlashCommand[] = [
   sessionCommand,
   themeCommand,
   fleetCommand,
+  spawnCommand,
   accountCommand,
   pasteCommand,
   providerCommand,
@@ -92,6 +94,7 @@ export {
   resumeCommand,
   sessionCommand,
   setupCommand,
+  spawnCommand,
   statusCommand,
   themeCommand,
   updateCommand,

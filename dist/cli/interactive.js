@@ -23,6 +23,7 @@ import { createDefaultSlashRegistry, registerBuiltinSlashCommands, } from "./sla
 import { loadToken, migrateLegacyAuth, } from "../integrations/device-auth.js";
 import { resolveMode } from "../context/mode.js";
 import { loadProjectPrimer, composeSystemPrompt } from "../context/primer.js";
+import { queryKb } from "../context/kb-query.js";
 import { ledgerScope, renderLedgerContext } from "../context/ledger.js";
 import { probeGitState, renderGitState } from "../context/git-state.js";
 import { loadSoul } from "../context/soul.js";
@@ -152,14 +153,18 @@ export async function runInteractive(opts) {
         process.stdout.write(style(currentTheme.muted, `  primer: ${primerLoaded.source}${primerLoaded.truncated ? " (truncated)" : ""}\n`));
     }
     const soulLoaded = loadSoul();
-    /** Build the per-turn system prompt: soul + mode + primer + git_state + --system. */
-    const buildSystem = async () => {
+    /** Build the per-turn system prompt: soul + mode + primer + kb + git_state + --system. */
+    const buildSystem = async (userTurn) => {
         const ledgerCtx = await renderLedgerContext(ledgerScope("default"));
+        const kbCtx = opts.config.kbAutoInject !== false && userTurn
+            ? await queryKb(userTurn)
+            : undefined;
         return composeSystemPrompt({
             soul: soulLoaded.text,
             modePreamble: modePreamble(currentMode),
             primer: primerLoaded.primer,
             ledgerContext: ledgerCtx,
+            kbContext: kbCtx,
             gitState: renderGitState(probeGitState(opts.cwd)),
             userSystem: opts.systemPrompt,
         });
@@ -232,7 +237,8 @@ export async function runInteractive(opts) {
                 return;
             }
             // Rebuild system prompt per turn so /mode changes apply immediately.
-            const system = await buildSystem();
+            // Pass the user's turn text so relevant KB articles can be injected.
+            const system = await buildSystem(line);
             const turnHistory = system
                 ? [{ role: "system", content: system }, ...history]
                 : [...history];

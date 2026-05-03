@@ -299,7 +299,28 @@ async function executeToolCalls(
       try {
         const decision = await cfg.hooks.beforeToolCall(call);
         if (decision?.block) {
-          const result: ToolResult = { content: decision.reason, isError: true };
+          const blockReason =
+            decision.reason ??
+            `Tool '${call.name}' is not allowed in current mode.`;
+          const result: ToolResult = {
+            content: `[MODE BLOCK] ${blockReason}`,
+            isError: false,
+          };
+          // Emit start so the projection has an item to transition to
+          // "blocked" state. Without this, tool_exec_end maps over nothing.
+          events.emit({
+            type: "tool_exec_start",
+            id: call.id,
+            name: call.name,
+            input: call.input,
+          });
+          events.emit({
+            type: "tool_exec_end",
+            id: call.id,
+            output: result.content,
+            isError: false,
+            durationMs: 0,
+          });
           return { call, result };
         }
         if (decision && !decision.block && decision.replaceInput !== undefined) {

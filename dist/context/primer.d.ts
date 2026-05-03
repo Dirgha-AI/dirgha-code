@@ -32,8 +32,9 @@ export declare function loadProjectPrimer(startDir: string): PrimerResult;
  *   2. modePreamble  — act/plan/verify/ask gates
  *   3. project primer — DIRGHA.md / CLAUDE.md
  *   4. ledgerContext — cross-session memory (digest + recent entries)
- *   5. gitState      — workspace snapshot (interactive only)
- *   6. userSystem    — caller-supplied --system flag (escape hatch)
+ *   5. kbContext     — top-K KB articles relevant to the current turn
+ *   6. gitState      — workspace snapshot (interactive only)
+ *   7. userSystem    — caller-supplied --system flag (escape hatch)
  *
  * Empty sections drop out — no leading/trailing blank lines.
  */
@@ -42,6 +43,7 @@ export declare function composeSystemPrompt(parts: {
     modePreamble: string;
     primer?: string;
     ledgerContext?: string;
+    kbContext?: string;
     gitState?: string;
     userSystem?: string | undefined;
 }): string;

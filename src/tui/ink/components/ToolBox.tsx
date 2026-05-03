@@ -19,7 +19,7 @@ import { useTheme } from "../theme-context.js";
 import { SpinnerContext } from "../spinner-context.js";
 import { SpinnerGlyph } from "./SpinnerGlyph.js";
 
-export type ToolStatus = "pending" | "running" | "done" | "error";
+export type ToolStatus = "pending" | "running" | "done" | "error" | "blocked";
 
 export interface ToolBoxProps {
   name: string;
@@ -99,26 +99,33 @@ function diffShortPreview(text: string, maxLen = 80): string {
 export function ToolBox(props: ToolBoxProps): React.JSX.Element {
   const palette = useTheme();
   const { busy: _spinnerBusy } = React.useContext(SpinnerContext);
-  const isRunning = props.status !== "done" && props.status !== "error";
+  const isRunning =
+    props.status !== "done" &&
+    props.status !== "error" &&
+    props.status !== "blocked";
 
   const icon =
     props.status === "error"
       ? "✗"
       : props.status === "done"
         ? "✓"
-        : null;
+        : props.status === "blocked"
+          ? "○"
+          : null;
   const iconColour =
     props.status === "error"
-      ? palette.error
-      : props.status === "done"
-        ? palette.brand
-        : palette.brand;
+      ? palette.status.error
+      : props.status === "blocked"
+        ? palette.text.secondary
+        : palette.ui.focus;
   const borderColour =
     props.status === "error"
-      ? palette.error
-      : props.status === "done"
-        ? palette.borderIdle
-        : palette.brand;
+      ? palette.status.error
+      : props.status === "blocked"
+        ? palette.border.default
+        : props.status === "done"
+          ? palette.border.default
+          : palette.ui.focus;
 
   const elapsedLabel =
     props.status === "running"
@@ -149,31 +156,34 @@ export function ToolBox(props: ToolBoxProps): React.JSX.Element {
         ) : (
           <SpinnerGlyph isActive={isRunning} />
         )}
-        <Text color={palette.accent} bold>
+        <Text color={palette.text.accent} bold>
           {iconFor(props.name)}
         </Text>
         <Text
           color={
-            props.status === "done" ? palette.textMuted : palette.textPrimary
+            props.status === "done" || props.status === "blocked"
+              ? palette.text.secondary
+              : palette.text.primary
           }
-          bold
+          bold={props.status !== "blocked"}
+          dimColor={props.status === "blocked"}
         >
           {prettyName(props.name)}
         </Text>
         {props.argSummary !== undefined && props.argSummary.length > 0 && (
-          <Text color={palette.textMuted} dimColor>
+          <Text color={palette.text.secondary} dimColor>
             ({props.argSummary})
           </Text>
         )}
         {elapsedLabel !== "" && (
-          <Text color={palette.textMuted} dimColor>
+          <Text color={palette.text.secondary} dimColor>
             {elapsedLabel}
           </Text>
         )}
       </Box>
       {preview !== "" && !diffMode && (
         <Box>
-          <Text color={palette.textMuted} dimColor>
+          <Text color={palette.text.secondary} dimColor>
             {preview}
           </Text>
         </Box>
