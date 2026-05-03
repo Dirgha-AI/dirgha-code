@@ -128,7 +128,9 @@ async function summarise(
   cfg: CompactionConfig,
   historical: Message[],
 ): Promise<string> {
-  const transcript = historical.map(renderForSummary).join("\n\n");
+  const transcript = historical
+    .map((m) => renderForSummary(m, 1000))
+    .join("\n\n");
   const prompt: Message[] = [
     {
       role: "system",
@@ -152,19 +154,22 @@ async function summarise(
   } catch {
     // If the summarizer call fails (network, bad model), return a
     // raw transcript — better than aborting the agent loop.
-    return `${historical.map(renderForSummary).join("\n\n")}`;
+    const chartext = historical
+      .map((m) => renderForSummary(m, maxThinking))
+      .join("\n\n");
   }
   return summary.trim() || "[Empty summary]";
 }
 
-function renderForSummary(msg: Message): string {
+function renderForSummary(msg: Message, thinkingChars: number): string {
+  const maxThinking = thinkingChars > 0 ? thinkingChars : 1000;
   const body = normaliseContent(msg)
     .map((p) => {
       switch (p.type) {
         case "text":
           return p.text;
         case "thinking":
-          return `[Previous assistant reasoning: ${p.text.slice(0, 300)}${p.text.length > 300 ? "..." : ""}]`;
+          return `[Previous assistant reasoning: ${p.text.slice(0, maxThinking)}${p.text.length > maxThinking ? "..." : ""}]`;
         case "tool_use":
           return `(tool_use ${p.name}: ${truncate(JSON.stringify(p.input), 240)})`;
         case "tool_result":

@@ -49,9 +49,8 @@ const TOOL_LABEL: Record<string, string> = {
   task: "Task",
 };
 
-const DIFF_ADD_COLOUR = "#50fa7b";
-const DIFF_DEL_COLOUR = "#ff5555";
-const DIFF_HUNK_COLOUR = "#00ffff";
+// Diff colours are computed from the theme palette inside the component.
+// Module-level constants removed — see renderDiffLines for theme usage.
 
 function prettyName(name: string): string {
   return TOOL_LABEL[name] ?? name.replace(/_/g, " ");
@@ -74,15 +73,21 @@ function isDiffOutput(props: ToolBoxProps): boolean {
   return false;
 }
 
-function renderDiffLines(text: string, limit: number): React.ReactNode[] {
+function renderDiffLines(
+  text: string,
+  limit: number,
+  palette: any,
+): React.ReactNode[] {
+  const addColour = palette.status.success ?? "#50fa7b";
+  const delColour = palette.status.error ?? "#ff5555";
+  const hunkColour = palette.ui.focus ?? "#00ffff";
   const lines = text.split("\n").slice(0, limit);
   return lines.map((line, i) => {
     let colour: string | undefined;
-    if (line.startsWith("+") && !line.startsWith("+++"))
-      colour = DIFF_ADD_COLOUR;
+    if (line.startsWith("+") && !line.startsWith("+++")) colour = addColour;
     else if (line.startsWith("-") && !line.startsWith("---"))
-      colour = DIFF_DEL_COLOUR;
-    else if (/^@@\s/.test(line)) colour = DIFF_HUNK_COLOUR;
+      colour = delColour;
+    else if (/^@@\s/.test(line)) colour = hunkColour;
     return (
       <Box key={i} flexDirection="row">
         <Text color={colour} dimColor={!colour}>
@@ -228,7 +233,7 @@ export const ToolBox = React.memo(function ToolBox(
       )}
       {diffMode && props.outputPreview && (
         <Box flexDirection="column">
-          {renderDiffLines(props.outputPreview, 30)}
+          {renderDiffLines(props.outputPreview, 30, palette)}
         </Box>
       )}
     </Box>

@@ -1,79 +1,70 @@
 /**
- * Thinking block: collapsible render of reasoning tokens.
+ * Thinking block — Gemini CLI-style always-visible reasoning display.
  *
- * Collapsed by default to a one-line summary (`∇ thinking… (N chars)`)
- * to stop reasoning-heavy models from flooding the screen. Press Enter
- * or Space to toggle. Auto-expands during active streaming and
- * auto-collapses when the thinking span ends.
+ * Thinking content is shown as a clean bubble: first line is a bold
+ * summary heading, the remainder is in a left-bordered italic block.
+ * Always visible — no toggle/collapse. During streaming the heading
+ * updates live; after streaming the block stays visible for context.
  *
- * ThinkingBlockGroup wraps 3+ consecutive thinking blocks in a single
- * collapsible accordion row.
+ * ThinkingBlockGroup merges 3+ consecutive blocks into single grouped rows.
  */
 
 import * as React from "react";
-import { Box, Text, useInput } from "ink";
+import { Box, Text } from "ink";
 import { useTheme } from "../theme-context.js";
-import { TRANSCRIPT_GLYPHS } from "../icons.js";
 
 export interface ThinkingBlockProps {
   content: string;
   isStreaming?: boolean;
 }
 
+function splitContent(content: string): { summary: string; body: string } {
+  const lines = content.trim().split("\n");
+  if (lines.length <= 1) return { summary: "", body: content.trim() };
+  return {
+    summary: lines[0].trim(),
+    body: lines.slice(1).join("\n").trim(),
+  };
+}
+
 export const ThinkingBlock = React.memo(function ThinkingBlock({
   content,
-  isStreaming = false,
 }: ThinkingBlockProps): React.JSX.Element | null {
   const palette = useTheme();
-  const [collapsed, setCollapsed] = React.useState(true);
+  if (!content) return null;
 
-  React.useEffect(() => {
-    if (isStreaming) {
-      setCollapsed(false);
-    } else {
-      setCollapsed(true);
-    }
-  }, [isStreaming]);
-
-  useInput(
-    (input, key) => {
-      if ((key.return || input === " ") && !isStreaming) {
-        setCollapsed((prev) => !prev);
-      }
-    },
-    { isActive: true },
-  );
-
-  if (content.length === 0 && !isStreaming) return null;
-
-  if (collapsed) {
-    return (
-      <Box gap={1} marginBottom={1}>
-        <Text color={palette.text.secondary} dimColor>
-          {TRANSCRIPT_GLYPHS.thinking}
-        </Text>
-        <Text color={palette.text.secondary} dimColor italic>
-          thinking…
-          {content.length > 0
-            ? ` (${content.length} chars — Enter/Space to expand)`
-            : ""}
-        </Text>
-      </Box>
-    );
-  }
+  const { summary, body } = splitContent(content);
 
   return (
-    <Box flexDirection="row" marginBottom={1}>
-      <Box width={2}>
-        <Text color={palette.text.secondary} dimColor>
-          {TRANSCRIPT_GLYPHS.thinking}
+    <Box flexDirection="column" marginBottom={1} paddingLeft={1}>
+      {summary.length > 0 && (
+        <Box paddingLeft={2} marginBottom={body.length > 0 ? 0 : 0}>
+          <Text color={palette.text.primary} bold italic>
+            {summary}
+          </Text>
+        </Box>
+      )}
+      {body.length > 0 && (
+        <Box
+          borderStyle="single"
+          borderLeft
+          borderRight={false}
+          borderTop={false}
+          borderBottom={false}
+          borderColor={palette.border.default}
+          paddingLeft={1}
+          marginLeft={2}
+        >
+          <Text color={palette.text.secondary} italic wrap="wrap">
+            {body}
+          </Text>
+        </Box>
+      )}
+      {summary.length === 0 && body.length === 0 && (
+        <Text color={palette.text.secondary} italic>
+          {content}
         </Text>
-      </Box>
-      <Box flexGrow={1} flexDirection="column">
-        <Text color={palette.text.secondary} dimColor italic wrap="wrap">
-          {content || "thinking…"}
-        </Text>
-      </Box>
+      )}
     </Box>
   );
 });
@@ -86,53 +77,48 @@ export const ThinkingBlockGroup = React.memo(function ThinkingBlockGroup({
   blocks,
 }: ThinkingBlockGroupProps): React.JSX.Element | null {
   const palette = useTheme();
-  const [collapsed, setCollapsed] = React.useState(true);
+  if (blocks.length === 0) return null;
 
-  useInput(
-    (input, key) => {
-      if (key.return || input === " ") {
-        setCollapsed((prev) => !prev);
-      }
-    },
-    { isActive: true },
-  );
-
-  const totalChars = blocks.reduce((sum, b) => sum + b.content.length, 0);
-
-  if (collapsed) {
-    return (
-      <Box gap={1} marginBottom={1}>
-        <Text color={palette.text.secondary} dimColor>
-          {TRANSCRIPT_GLYPHS.thinking}
-        </Text>
-        <Text color={palette.text.secondary} dimColor italic>
-          thinking ({blocks.length} blocks, {totalChars} chars — Enter/Space to
-          expand)
-        </Text>
-      </Box>
-    );
+  // One block with content — delegate to ThinkingBlock.
+  if (blocks.length === 1) {
+    return <ThinkingBlock content={blocks[0].content} />;
   }
 
   return (
-    <Box flexDirection="column" marginBottom={1}>
-      {blocks.map((block, i) => (
-        <Box
-          key={block.id}
-          flexDirection="row"
-          marginBottom={i < blocks.length - 1 ? 0 : 0}
-        >
-          <Box width={2}>
-            <Text color={palette.text.secondary} dimColor>
-              {TRANSCRIPT_GLYPHS.thinking}
-            </Text>
+    <Box flexDirection="column" marginBottom={1} paddingLeft={1}>
+      {blocks.map((block, i) => {
+        const { summary, body } = splitContent(block.content);
+        return (
+          <Box key={block.id} flexDirection="column">
+            {summary.length > 0 && (
+              <Box paddingLeft={2} marginBottom={body.length > 0 ? 0 : 0}>
+                <Text color={palette.text.primary} bold italic>
+                  {summary}
+                </Text>
+              </Box>
+            )}
+            {body.length > 0 && (
+              <Box
+                borderStyle="single"
+                borderLeft
+                borderRight={false}
+                borderTop={false}
+                borderBottom={false}
+                borderColor={
+                  palette.colors.border ?? palette.border.default ?? "#444"
+                }
+                paddingLeft={1}
+                marginLeft={2}
+                marginBottom={i < blocks.length - 1 ? 1 : 0}
+              >
+                <Text color={palette.text.secondary} italic wrap="wrap">
+                  {body}
+                </Text>
+              </Box>
+            )}
           </Box>
-          <Box flexGrow={1} flexDirection="column">
-            <Text color={palette.text.secondary} dimColor italic wrap="wrap">
-              {block.content}
-            </Text>
-          </Box>
-        </Box>
-      ))}
+        );
+      })}
     </Box>
   );
 });
