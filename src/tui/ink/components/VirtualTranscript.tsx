@@ -21,7 +21,7 @@ export interface VirtualTranscriptProps {
   inputFocus: boolean;
 }
 
-export function VirtualTranscript(
+export const VirtualTranscript = React.memo(function VirtualTranscript(
   props: VirtualTranscriptProps,
 ): React.JSX.Element {
   const { items, renderItem, autoScroll, inputFocus } = props;
@@ -66,4 +66,4 @@ export function VirtualTranscript(
       )}
     </Box>
   );
-}
+});

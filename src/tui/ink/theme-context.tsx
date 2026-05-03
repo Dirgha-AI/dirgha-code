@@ -22,9 +22,12 @@ interface ThemeProviderProps {
 }
 
 export function ThemeProvider({ activeTheme, children }: ThemeProviderProps): React.ReactElement {
-  const palette = paletteFor(activeTheme);
+  // Stable object references — avoids re-rendering every useTheme() consumer
+  // (including Logo inside <Static>) on each App re-render.
+  const palette = React.useMemo(() => paletteFor(activeTheme), [activeTheme]);
+  const value = React.useMemo(() => ({ palette }), [palette]);
   return (
-    <ThemeContext.Provider value={{ palette }}>
+    <ThemeContext.Provider value={value}>
       {children}
     </ThemeContext.Provider>
   );

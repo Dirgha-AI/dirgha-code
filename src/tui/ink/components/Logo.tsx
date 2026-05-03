@@ -58,7 +58,10 @@ function skinFor(themeName: string | undefined): LogoSkin {
 export function Logo({ version }: LogoProps): React.JSX.Element {
   const { stdout } = useStdout();
   const palette = useTheme();
-  const cols = stdout?.columns ?? 80;
+  // Snapshot terminal width at mount — Logo lives inside Ink's <Static> and
+  // must not re-render. A ref avoids creating a reactive resize subscription.
+  const colsRef = React.useRef(stdout?.columns ?? 80);
+  const cols = colsRef.current;
   // The palette doesn't carry its own name, so we infer the skin from
   // a stable fingerprint: themes with a unique brand colour map to
   // their named skin. Anything we don't recognise gets violet-storm.

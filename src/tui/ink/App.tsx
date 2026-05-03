@@ -1153,17 +1153,22 @@ export function App(props: AppProps): React.JSX.Element {
   );
 
   const LOGO_ITEMS = React.useMemo(() => [{ key: "logo" }], []);
+  const spinnerCtx = React.useMemo(() => ({ busy, frame: 0 }), [busy]);
+  const renderTranscriptItem = React.useCallback(
+    (item: TranscriptItem) => <TranscriptRow key={item.id} item={item} />,
+    [],
+  );
 
   return (
     <ThemeProvider activeTheme={themeName}>
-      <SpinnerContext.Provider value={{ busy, frame: 0 }}>
+      <SpinnerContext.Provider value={spinnerCtx}>
         <Box flexDirection="column">
           <Static items={LOGO_ITEMS}>
             {(): React.JSX.Element => <Logo key="logo" version={VERSION} />}
           </Static>
           <VirtualTranscript
             items={transcript}
-            renderItem={(item) => <TranscriptRow key={item.id} item={item} />}
+            renderItem={renderTranscriptItem}
             autoScroll
             inputFocus={inputFocus}
           />
