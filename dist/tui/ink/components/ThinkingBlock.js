@@ -1,56 +1,44 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 /**
- * Thinking block: collapsible render of reasoning tokens.
+ * Thinking block — Gemini CLI-style always-visible reasoning display.
  *
- * Collapsed by default to a one-line summary (`∇ thinking… (N chars)`)
- * to stop reasoning-heavy models from flooding the screen. Press Enter
- * or Space to toggle. Auto-expands during active streaming and
- * auto-collapses when the thinking span ends.
+ * Thinking content is shown as a clean bubble: first line is a bold
+ * summary heading, the remainder is in a left-bordered italic block.
+ * Always visible — no toggle/collapse. During streaming the heading
+ * updates live; after streaming the block stays visible for context.
  *
- * ThinkingBlockGroup wraps 3+ consecutive thinking blocks in a single
- * collapsible accordion row.
+ * ThinkingBlockGroup merges 3+ consecutive blocks into single grouped rows.
  */
 import * as React from "react";
-import { Box, Text, useInput } from "ink";
+import { Box, Text } from "ink";
 import { useTheme } from "../theme-context.js";
-import { TRANSCRIPT_GLYPHS } from "../icons.js";
-export const ThinkingBlock = React.memo(function ThinkingBlock({ content, isStreaming = false, }) {
+function splitContent(content) {
+    const lines = content.trim().split("\n");
+    if (lines.length <= 1)
+        return { summary: "", body: content.trim() };
+    return {
+        summary: lines[0].trim(),
+        body: lines.slice(1).join("\n").trim(),
+    };
+}
+export const ThinkingBlock = React.memo(function ThinkingBlock({ content, }) {
     const palette = useTheme();
-    const [collapsed, setCollapsed] = React.useState(true);
-    React.useEffect(() => {
-        if (isStreaming) {
-            setCollapsed(false);
-        }
-        else {
-            setCollapsed(true);
-        }
-    }, [isStreaming]);
-    useInput((input, key) => {
-        if ((key.return || input === " ") && !isStreaming) {
-            setCollapsed((prev) => !prev);
-        }
-    }, { isActive: true });
-    if (content.length === 0 && !isStreaming)
+    if (!content)
         return null;
-    if (collapsed) {
-        return (_jsxs(Box, { gap: 1, marginBottom: 1, children: [_jsx(Text, { color: palette.text.secondary, dimColor: true, children: TRANSCRIPT_GLYPHS.thinking }), _jsxs(Text, { color: palette.text.secondary, dimColor: true, italic: true, children: ["thinking\u2026", content.length > 0
-                            ? ` (${content.length} chars — Enter/Space to expand)`
-                            : ""] })] }));
-    }
-    return (_jsxs(Box, { flexDirection: "row", marginBottom: 1, children: [_jsx(Box, { width: 2, children: _jsx(Text, { color: palette.text.secondary, dimColor: true, children: TRANSCRIPT_GLYPHS.thinking }) }), _jsx(Box, { flexGrow: 1, flexDirection: "column", children: _jsx(Text, { color: palette.text.secondary, dimColor: true, italic: true, wrap: "wrap", children: content || "thinking…" }) })] }));
+    const { summary, body } = splitContent(content);
+    return (_jsxs(Box, { flexDirection: "column", marginBottom: 1, paddingLeft: 1, children: [summary.length > 0 && (_jsx(Box, { paddingLeft: 2, marginBottom: body.length > 0 ? 0 : 0, children: _jsx(Text, { color: palette.text.primary, bold: true, italic: true, children: summary }) })), body.length > 0 && (_jsx(Box, { borderStyle: "single", borderLeft: true, borderRight: false, borderTop: false, borderBottom: false, borderColor: palette.border.default, paddingLeft: 1, marginLeft: 2, children: _jsx(Text, { color: palette.text.secondary, italic: true, wrap: "wrap", children: body }) })), summary.length === 0 && body.length === 0 && (_jsx(Text, { color: palette.text.secondary, italic: true, children: content }))] }));
 });
 export const ThinkingBlockGroup = React.memo(function ThinkingBlockGroup({ blocks, }) {
     const palette = useTheme();
-    const [collapsed, setCollapsed] = React.useState(true);
-    useInput((input, key) => {
-        if (key.return || input === " ") {
-            setCollapsed((prev) => !prev);
-        }
-    }, { isActive: true });
-    const totalChars = blocks.reduce((sum, b) => sum + b.content.length, 0);
-    if (collapsed) {
-        return (_jsxs(Box, { gap: 1, marginBottom: 1, children: [_jsx(Text, { color: palette.text.secondary, dimColor: true, children: TRANSCRIPT_GLYPHS.thinking }), _jsxs(Text, { color: palette.text.secondary, dimColor: true, italic: true, children: ["thinking (", blocks.length, " blocks, ", totalChars, " chars \u2014 Enter/Space to expand)"] })] }));
+    if (blocks.length === 0)
+        return null;
+    // One block with content — delegate to ThinkingBlock.
+    if (blocks.length === 1) {
+        return _jsx(ThinkingBlock, { content: blocks[0].content });
     }
-    return (_jsx(Box, { flexDirection: "column", marginBottom: 1, children: blocks.map((block, i) => (_jsxs(Box, { flexDirection: "row", marginBottom: i < blocks.length - 1 ? 0 : 0, children: [_jsx(Box, { width: 2, children: _jsx(Text, { color: palette.text.secondary, dimColor: true, children: TRANSCRIPT_GLYPHS.thinking }) }), _jsx(Box, { flexGrow: 1, flexDirection: "column", children: _jsx(Text, { color: palette.text.secondary, dimColor: true, italic: true, wrap: "wrap", children: block.content }) })] }, block.id))) }));
+    return (_jsx(Box, { flexDirection: "column", marginBottom: 1, paddingLeft: 1, children: blocks.map((block, i) => {
+            const { summary, body } = splitContent(block.content);
+            return (_jsxs(Box, { flexDirection: "column", children: [summary.length > 0 && (_jsx(Box, { paddingLeft: 2, marginBottom: body.length > 0 ? 0 : 0, children: _jsx(Text, { color: palette.text.primary, bold: true, italic: true, children: summary }) })), body.length > 0 && (_jsx(Box, { borderStyle: "single", borderLeft: true, borderRight: false, borderTop: false, borderBottom: false, borderColor: palette.colors.border ?? palette.border.default ?? "#444", paddingLeft: 1, marginLeft: 2, marginBottom: i < blocks.length - 1 ? 1 : 0, children: _jsx(Text, { color: palette.text.secondary, italic: true, wrap: "wrap", children: body }) }))] }, block.id));
+        }) }));
 });
 //# sourceMappingURL=ThinkingBlock.js.map

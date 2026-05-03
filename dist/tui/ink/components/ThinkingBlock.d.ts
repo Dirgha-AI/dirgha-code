@@ -1,13 +1,12 @@
 /**
- * Thinking block: collapsible render of reasoning tokens.
+ * Thinking block — Gemini CLI-style always-visible reasoning display.
  *
- * Collapsed by default to a one-line summary (`∇ thinking… (N chars)`)
- * to stop reasoning-heavy models from flooding the screen. Press Enter
- * or Space to toggle. Auto-expands during active streaming and
- * auto-collapses when the thinking span ends.
+ * Thinking content is shown as a clean bubble: first line is a bold
+ * summary heading, the remainder is in a left-bordered italic block.
+ * Always visible — no toggle/collapse. During streaming the heading
+ * updates live; after streaming the block stays visible for context.
  *
- * ThinkingBlockGroup wraps 3+ consecutive thinking blocks in a single
- * collapsible accordion row.
+ * ThinkingBlockGroup merges 3+ consecutive blocks into single grouped rows.
  */
 import * as React from "react";
 export interface ThinkingBlockProps {

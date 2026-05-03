@@ -15,6 +15,15 @@ export function useFlickerDetector(lineCount = 0) {
     const overflowRef = React.useRef(false);
     const warnedRef = React.useRef(false);
     frameCountRef.current++;
+    // Skip the first 5 frames — the TUI needs time to stabilize after
+    // mount (alternate buffer enter, Logo render, initial layout).
+    // Detecting overflow during startup produces false positives.
+    if (frameCountRef.current <= 5) {
+        return {
+            overflowDetected: overflowRef.current,
+            frameCount: frameCountRef.current,
+        };
+    }
     if (lineCount > rows && !warnedRef.current) {
         warnedRef.current = true;
         overflowRef.current = true;

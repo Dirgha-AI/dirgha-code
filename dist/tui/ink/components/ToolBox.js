@@ -31,9 +31,8 @@ const TOOL_LABEL = {
     git: "Git",
     task: "Task",
 };
-const DIFF_ADD_COLOUR = "#50fa7b";
-const DIFF_DEL_COLOUR = "#ff5555";
-const DIFF_HUNK_COLOUR = "#00ffff";
+// Diff colours are computed from the theme palette inside the component.
+// Module-level constants removed — see renderDiffLines for theme usage.
 function prettyName(name) {
     return TOOL_LABEL[name] ?? name.replace(/_/g, " ");
 }
@@ -55,16 +54,19 @@ function isDiffOutput(props) {
         return true;
     return false;
 }
-function renderDiffLines(text, limit) {
+function renderDiffLines(text, limit, palette) {
+    const addColour = palette.status.success ?? "#50fa7b";
+    const delColour = palette.status.error ?? "#ff5555";
+    const hunkColour = palette.ui.focus ?? "#00ffff";
     const lines = text.split("\n").slice(0, limit);
     return lines.map((line, i) => {
         let colour;
         if (line.startsWith("+") && !line.startsWith("+++"))
-            colour = DIFF_ADD_COLOUR;
+            colour = addColour;
         else if (line.startsWith("-") && !line.startsWith("---"))
-            colour = DIFF_DEL_COLOUR;
+            colour = delColour;
         else if (/^@@\s/.test(line))
-            colour = DIFF_HUNK_COLOUR;
+            colour = hunkColour;
         return (_jsx(Box, { flexDirection: "row", children: _jsx(Text, { color: colour, dimColor: !colour, children: line || " " }) }, i));
     });
 }
@@ -125,6 +127,6 @@ export const ToolBox = React.memo(function ToolBox(props) {
                                 : palette.text.primary, bold: props.status !== "blocked", dimColor: props.status === "blocked", children: prettyName(props.name) }), props.argSummary !== undefined && props.argSummary.length > 0 && (_jsxs(Text, { color: palette.text.secondary, dimColor: true, children: ["(", props.argSummary, ")"] })), elapsedLabel !== "" && (_jsx(Text, { color: palette.text.secondary, dimColor: true, children: elapsedLabel })), props.status === "blocked" && (_jsx(Text, { color: palette.status.warning, children: "(blocked)" }))] }), preview !== "" && !diffMode && (_jsx(Box, { children: props.name === "fs_read" &&
                     props.argSummary &&
                     isCodeFile(props.argSummary) &&
-                    props.outputPreview ? (_jsx(Text, { children: highlightContent(props.outputPreview, props.argSummary).map((tok, i) => (_jsx(Text, { color: colorForKind(tok.kind, palette), children: tok.value }, i))) })) : (_jsx(Text, { color: palette.text.secondary, dimColor: true, children: preview })) })), diffMode && props.outputPreview && (_jsx(Box, { flexDirection: "column", children: renderDiffLines(props.outputPreview, 30) }))] }));
+                    props.outputPreview ? (_jsx(Text, { children: highlightContent(props.outputPreview, props.argSummary).map((tok, i) => (_jsx(Text, { color: colorForKind(tok.kind, palette), children: tok.value }, i))) })) : (_jsx(Text, { color: palette.text.secondary, dimColor: true, children: preview })) })), diffMode && props.outputPreview && (_jsx(Box, { flexDirection: "column", children: renderDiffLines(props.outputPreview, 30, palette) }))] }));
 });
 //# sourceMappingURL=ToolBox.js.map
