@@ -217,13 +217,22 @@ async function executeToolCalls(toolUses, cfg, events) {
     const run = async (call) => {
         let input = call.input;
         if (cfg.hooks?.beforeToolCall) {
-            const decision = await cfg.hooks.beforeToolCall(call);
-            if (decision?.block) {
-                const result = { content: decision.reason, isError: true };
-                return { call, result };
+            try {
+                const decision = await cfg.hooks.beforeToolCall(call);
+                if (decision?.block) {
+                    const result = { content: decision.reason, isError: true };
+                    return { call, result };
+                }
+                if (decision && !decision.block && decision.replaceInput !== undefined) {
+                    input = decision.replaceInput;
+                }
             }
-            if (decision && !decision.block && decision.replaceInput !== undefined) {
-                input = decision.replaceInput;
+            catch (hookErr) {
+                const result = {
+                    content: `Hook error: ${hookErr instanceof Error ? hookErr.message : String(hookErr)}`,
+                    isError: true,
+                };
+                return { call, result };
             }
         }
         if (cfg.approvalBus?.requiresApproval(call.name, input) &&

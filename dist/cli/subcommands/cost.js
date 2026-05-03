@@ -37,7 +37,13 @@ async function readTurnEnds() {
     return out;
 }
 function tokensToCost(model, u) {
-    const provider = routeModel(model);
+    let provider;
+    try {
+        provider = routeModel(model);
+    }
+    catch {
+        return 0; // unknown model (e.g. "stub-model" from test sessions)
+    }
     const price = findPrice(provider, model);
     if (!price)
         return 0;

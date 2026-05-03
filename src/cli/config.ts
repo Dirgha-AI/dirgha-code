@@ -166,6 +166,15 @@ function readEnvOverrides(): Partial<DirghaConfig> {
   if (process.env.DIRGHA_MAX_TURNS)
     out.maxTurns = Number.parseInt(process.env.DIRGHA_MAX_TURNS, 10);
   if (process.env.DIRGHA_SHOW_THINKING === "1") out.showThinking = true;
+  const modeEnv = process.env.DIRGHA_MODE;
+  if (
+    modeEnv &&
+    (["plan", "act", "yolo", "verify", "ask"] as const).includes(
+      modeEnv as "plan" | "act" | "yolo" | "verify" | "ask",
+    )
+  ) {
+    out.mode = modeEnv as "plan" | "act" | "yolo" | "verify" | "ask";
+  }
   return out;
 }
 

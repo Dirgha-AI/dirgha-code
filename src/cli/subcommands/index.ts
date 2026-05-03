@@ -52,6 +52,7 @@ import { hardwareSubcommand } from './hardware.js';
 import { webSubcommand } from './web.js';
 import { stateSubcommand } from './state.js';
 import { historySubcommand } from './history.js';
+import { pingSubcommand } from './ping.js';
 
 export const subcommands: Subcommand[] = [
   doctorSubcommand,
@@ -85,6 +86,7 @@ export const subcommands: Subcommand[] = [
   webSubcommand,
   stateSubcommand,
   historySubcommand,
+  pingSubcommand,
 ];
 
 export function findSubcommand(verb: string): Subcommand | undefined {
@@ -100,6 +102,7 @@ export {
   auditSubcommand,
   statsSubcommand,
   statusSubcommand,
+  pingSubcommand,
   initSubcommand,
   keysSubcommand,
   modelsSubcommand,

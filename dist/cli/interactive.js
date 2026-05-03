@@ -256,6 +256,7 @@ export async function runInteractive(opts) {
             const abortController = new AbortController();
             const sigintHandler = () => {
                 abortController.abort();
+                process.stdout.write(style(currentTheme.muted, "\n[Interrupted]\n"));
             };
             process.once("SIGINT", sigintHandler);
             try {

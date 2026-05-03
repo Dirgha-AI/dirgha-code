@@ -58,6 +58,11 @@ function readEnvOverrides() {
         out.maxTurns = Number.parseInt(process.env.DIRGHA_MAX_TURNS, 10);
     if (process.env.DIRGHA_SHOW_THINKING === "1")
         out.showThinking = true;
+    const modeEnv = process.env.DIRGHA_MODE;
+    if (modeEnv &&
+        ["plan", "act", "yolo", "verify", "ask"].includes(modeEnv)) {
+        out.mode = modeEnv;
+    }
     return out;
 }
 function merge(...partials) {

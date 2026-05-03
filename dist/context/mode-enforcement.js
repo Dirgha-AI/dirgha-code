@@ -71,13 +71,17 @@ export function composeHooks(a, b) {
     }
     if (a.beforeToolCall || b.beforeToolCall) {
         out.beforeToolCall = async (call) => {
+            let current = call;
             if (a.beforeToolCall) {
-                const r = await a.beforeToolCall(call);
+                const r = await a.beforeToolCall(current);
                 if (r && 'block' in r && r.block === true)
                     return r;
+                // Propagate input replacement so b sees the updated input.
+                if (r?.replaceInput !== undefined)
+                    current = { ...current, input: r.replaceInput };
             }
             if (b.beforeToolCall)
-                return b.beforeToolCall(call);
+                return b.beforeToolCall(current);
             return undefined;
         };
     }

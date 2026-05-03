@@ -55,7 +55,12 @@ async function readTurnEnds(): Promise<AuditEntry[]> {
 }
 
 function tokensToCost(model: string, u: NonNullable<AuditEntry['usage']>): number {
-  const provider = routeModel(model);
+  let provider;
+  try {
+    provider = routeModel(model);
+  } catch {
+    return 0; // unknown model (e.g. "stub-model" from test sessions)
+  }
   const price = findPrice(provider, model);
   if (!price) return 0;
   const i = (u.inputTokens  ?? 0) / 1_000_000 * price.inputPerM;

@@ -29,6 +29,7 @@ import { hardwareSubcommand } from './hardware.js';
 import { webSubcommand } from './web.js';
 import { stateSubcommand } from './state.js';
 import { historySubcommand } from './history.js';
+import { pingSubcommand } from './ping.js';
 export const subcommands = [
     doctorSubcommand,
     loginSubcommand,
@@ -61,10 +62,11 @@ export const subcommands = [
     webSubcommand,
     stateSubcommand,
     historySubcommand,
+    pingSubcommand,
 ];
 export function findSubcommand(verb) {
     return subcommands.find(cmd => cmd.name === verb || (cmd.aliases ?? []).includes(verb));
 }
 export { runLogin, runLogout, runSetup };
-export { loginSubcommand, logoutSubcommand, setupSubcommand, doctorSubcommand, auditSubcommand, statsSubcommand, statusSubcommand, initSubcommand, keysSubcommand, modelsSubcommand, chatSubcommand, askSubcommand, compactSubcommand, exportSessionSubcommand, importSessionSubcommand, };
+export { loginSubcommand, logoutSubcommand, setupSubcommand, doctorSubcommand, auditSubcommand, statsSubcommand, statusSubcommand, pingSubcommand, initSubcommand, keysSubcommand, modelsSubcommand, chatSubcommand, askSubcommand, compactSubcommand, exportSessionSubcommand, importSessionSubcommand, };
 //# sourceMappingURL=index.js.map

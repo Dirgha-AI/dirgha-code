@@ -141,8 +141,9 @@ export class SlashRegistry {
 
 export function createDefaultSlashRegistry(): SlashRegistry {
   const registry = new SlashRegistry();
-  // Core readline-REPL primitives
-  registry.register("help", (_, ctx) => ctx.showHelp());
+  // Core readline-REPL primitives — /help is intentionally NOT registered here
+  // so registerBuiltinSlashCommands() can install the full dynamic helpCommand
+  // from slash/help.ts which lists every registered command.
   registry.register("exit", (_, ctx) => {
     ctx.exit(0);
     return undefined;
@@ -157,19 +158,21 @@ export function createDefaultSlashRegistry(): SlashRegistry {
   });
   registry.register("model", (args, ctx) => {
     if (args.length === 0) return `Current model: ${ctx.model}`;
-    const id = args[0];
-    const valid = PRICES.some((p) => p.model === id);
-    if (!valid)
-      return `Invalid model: ${id}. Use /models to see the catalogue.`;
-    ctx.setModel(id);
-    return `Model set to ${id}`;
+    const id = args[0]!;
+    // Try exact match first, then fall back to short-name suffix match.
+    const exactMatch = PRICES.some((p) => p.model === id);
+    if (exactMatch) {
+      ctx.setModel(id);
+      return `Model set to ${id}`;
+    }
+    const suffixMatch = PRICES.find((p) => p.model.endsWith('/' + id));
+    if (suffixMatch) {
+      ctx.setModel(suffixMatch.model);
+      return `Model set to ${suffixMatch.model}`;
+    }
+    return `Invalid model: ${id}. Use /models to see the catalogue.`;
   });
   registry.register("compact", (_, ctx) => ctx.compact());
-  registry.register("session", async (args, ctx) => {
-    if (args[0] === "list") return ctx.listSessions();
-    if (args[0] === "load" && args[1]) return ctx.loadSession(args[1]);
-    return "Usage: /session list | /session load <id>";
-  });
   registry.register("skills", (_, ctx) => ctx.listSkills());
   registry.register("cost", (_, ctx) => ctx.showCost());
 

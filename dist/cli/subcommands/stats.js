@@ -9,7 +9,7 @@
  * By-model and by-day rollups are also emitted so the user can see
  * which model ate the budget and how usage trends over time.
  */
-import { readdir } from 'node:fs/promises';
+import { readdir, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { stdout, stderr } from 'node:process';
@@ -48,9 +48,14 @@ function costFor(model, input, output, cached) {
     }
     return 0;
 }
+const MAX_SESSION_FILES = 100;
 async function aggregate(win) {
     const dir = join(homedir(), '.dirgha', 'sessions');
-    const files = await readdir(dir).catch(() => []);
+    const allFiles = (await readdir(dir).catch(() => [])).filter(f => f.endsWith('.jsonl'));
+    // Cap to the 100 most-recent files by mtime to prevent hanging on large stores.
+    const filesWithMtime = await Promise.all(allFiles.map(async (f) => ({ f, mtime: (await stat(join(dir, f)).catch(() => ({ mtimeMs: 0 }))).mtimeMs })));
+    filesWithMtime.sort((a, b) => b.mtime - a.mtime);
+    const files = filesWithMtime.slice(0, MAX_SESSION_FILES).map(x => x.f);
     const since = windowStart(win);
     const agg = empty();
     for (const file of files) {

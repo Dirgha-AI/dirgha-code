@@ -307,6 +307,7 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
       const abortController = new AbortController();
       const sigintHandler = (): void => {
         abortController.abort();
+        process.stdout.write(style(currentTheme.muted, "\n[Interrupted]\n"));
       };
       process.once("SIGINT", sigintHandler);
       try {
