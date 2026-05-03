@@ -1,0 +1,94 @@
+/**
+ * Anthropic model catalogue — source of truth for all Anthropic-hosted models.
+ * Prices in USD per million tokens as of May 2026.
+ */
+
+import type { ModelDescriptor } from './catalogue.js';
+import { makeIndex, defaultModel, activeModels } from './catalogue.js';
+
+const THINKING_PARAM = { thinking: { type: 'enabled', budget_tokens: 8000 } };
+
+export const ANTHROPIC_CATALOGUE: ModelDescriptor[] = [
+  {
+    id: 'claude-opus-4-7',
+    label: 'Claude Opus 4.7',
+    family: 'claude',
+    contextWindow: 200_000,
+    maxOutputTokens: 32_768,
+    tools: true,
+    vision: true,
+    thinkingMode: 'opt-in',
+    thinkingParam: THINKING_PARAM,
+    inputPerM: 15,
+    outputPerM: 75,
+    cachedInputPerM: 1.5,
+    tags: ['flagship', 'reasoning'],
+  },
+  {
+    id: 'claude-sonnet-4-6',
+    label: 'Claude Sonnet 4.6',
+    family: 'claude',
+    contextWindow: 200_000,
+    maxOutputTokens: 64_000,
+    tools: true,
+    vision: true,
+    thinkingMode: 'opt-in',
+    thinkingParam: THINKING_PARAM,
+    inputPerM: 3,
+    outputPerM: 15,
+    cachedInputPerM: 0.3,
+    defaultModel: true,
+    tags: ['balanced'],
+  },
+  {
+    id: 'claude-haiku-4-5-20251001',
+    label: 'Claude Haiku 4.5',
+    family: 'claude',
+    contextWindow: 200_000,
+    maxOutputTokens: 8_192,
+    tools: true,
+    vision: true,
+    thinkingMode: 'opt-in',
+    thinkingParam: THINKING_PARAM,
+    inputPerM: 0.80,
+    outputPerM: 4,
+    cachedInputPerM: 0.08,
+    tags: ['fast'],
+  },
+  {
+    id: 'claude-sonnet-4-5',
+    label: 'Claude Sonnet 4.5',
+    family: 'claude',
+    contextWindow: 200_000,
+    maxOutputTokens: 64_000,
+    tools: true,
+    vision: true,
+    thinkingMode: 'opt-in',
+    thinkingParam: THINKING_PARAM,
+    inputPerM: 3,
+    outputPerM: 15,
+    deprecated: true,
+    replacedBy: 'claude-sonnet-4-6',
+    tags: [],
+  },
+  {
+    id: 'claude-opus-4',
+    label: 'Claude Opus 4',
+    family: 'claude',
+    contextWindow: 200_000,
+    maxOutputTokens: 32_768,
+    tools: true,
+    vision: true,
+    thinkingMode: 'opt-in',
+    thinkingParam: THINKING_PARAM,
+    inputPerM: 15,
+    outputPerM: 75,
+    deprecated: true,
+    replacedBy: 'claude-opus-4-7',
+    tags: [],
+  },
+];
+
+export const ANTHROPIC_BY_ID = makeIndex(ANTHROPIC_CATALOGUE);
+export const ANTHROPIC_DEFAULT = defaultModel(ANTHROPIC_CATALOGUE);
+export const ANTHROPIC_ACTIVE = activeModels(ANTHROPIC_CATALOGUE);

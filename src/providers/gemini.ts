@@ -9,6 +9,7 @@
 import type { AgentEvent, ContentPart, ToolDefinition } from '../kernel/types.js';
 import type { Provider, StreamRequest, ProviderConfig } from './iface.js';
 import { ProviderError } from './iface.js';
+import { GEMINI_BY_ID } from './gemini-catalogue.js';
 
 const DEFAULT_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
@@ -30,13 +31,17 @@ export class GeminiProvider implements Provider {
   }
 
   supportsThinking(modelId: string): boolean {
-    return modelId.includes('thinking') || modelId.includes('2.5');
+    const bare = modelId.replace(/^(google|gemini)\//, '').replace(/^gemini-/, '');
+    const withPrefix = bare.startsWith('gemini-') ? bare : `gemini-${bare}`;
+    return (GEMINI_BY_ID.get(withPrefix)?.thinkingMode ?? 'none') !== 'none';
   }
 
   async *stream(req: StreamRequest): AsyncIterable<AgentEvent> {
     const model = req.model.replace(/^(google|gemini)\//, '').replace(/^gemini-/, '');
     const url = `${this.baseUrl}/models/gemini-${model}:streamGenerateContent?alt=sse&key=${encodeURIComponent(this.apiKey)}`;
-    const body = buildGeminiBody(req);
+    const useThinking = this.supportsThinking(req.model) && req.thinking && req.thinking !== 'off';
+    const thinkingParam = useThinking ? (GEMINI_BY_ID.get(`gemini-${model}`)?.thinkingParam ?? null) : null;
+    const body = buildGeminiBody(req, thinkingParam);
 
     const { signal, cancel } = makeTimeoutSignal(this.timeoutMs, req.signal);
     let response: Response;
@@ -144,7 +149,7 @@ interface GeminiStreamChunk {
   };
 }
 
-function buildGeminiBody(req: StreamRequest): Record<string, unknown> {
+function buildGeminiBody(req: StreamRequest, thinkingParam: Record<string, unknown> | null = null): Record<string, unknown> {
   const contents: Array<{ role: 'user' | 'model'; parts: Array<{ text?: string }> }> = [];
   let systemInstruction: { parts: Array<{ text: string }> } | undefined;
 
@@ -179,6 +184,10 @@ function buildGeminiBody(req: StreamRequest): Record<string, unknown> {
   const generationConfig: Record<string, unknown> = {};
   if (req.temperature !== undefined) generationConfig.temperature = req.temperature;
   if (req.maxTokens !== undefined) generationConfig.maxOutputTokens = req.maxTokens;
+  // Merge thinking config from catalogue if thinking is requested.
+  if (thinkingParam?.generationConfig) {
+    Object.assign(generationConfig, (thinkingParam.generationConfig as Record<string, unknown>));
+  }
   if (Object.keys(generationConfig).length > 0) body.generationConfig = generationConfig;
   return body;
 }

@@ -9,6 +9,7 @@ import type { AgentEvent, Message, ContentPart } from '../kernel/types.js';
 import type { Provider, StreamRequest, ProviderConfig } from './iface.js';
 import { ProviderError } from './iface.js';
 import { streamSSE } from './http.js';
+import { ANTHROPIC_BY_ID } from './anthropic-catalogue.js';
 
 const DEFAULT_BASE = 'https://api.anthropic.com/v1';
 const DEFAULT_VERSION = '2023-06-01';
@@ -33,7 +34,8 @@ export class AnthropicProvider implements Provider {
   }
 
   supportsThinking(modelId: string): boolean {
-    return /claude-(opus|sonnet|haiku)-[0-9]/.test(modelId);
+    const bare = modelId.replace(/^anthropic\//, '');
+    return (ANTHROPIC_BY_ID.get(bare)?.thinkingMode ?? 'none') !== 'none';
   }
 
   async *stream(req: StreamRequest): AsyncIterable<AgentEvent> {
