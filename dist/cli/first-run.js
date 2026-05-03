@@ -87,7 +87,6 @@ export async function showWelcomeWizard() {
     const accent = (s) => style(T.accent, s);
     const success = (s) => style(T.success, s);
     const warning = (s) => style(T.warning, s);
-    const muted = (s) => style(T.muted, s);
     stdout.write(`\n`);
     stdout.write(`  ${bold("◆  DIRGHA CODE")}\n`);
     stdout.write(`\n`);

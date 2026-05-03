@@ -17,6 +17,9 @@ import { findFailover } from "../intelligence/prices.js";
 import { recordFailover, isBlacklisted, } from "../intelligence/failover-chain.js";
 import { recordRequest, recordRateLimit } from "../providers/health.js";
 import { recordSuccess as recordHealthSuccess, recordFailure as recordHealthFailure, } from "../intelligence/health-monitor.js";
+import { drainPending } from "../safety/audit-log.js";
+import { pushAuditEntries } from "../telemetry/gateway-push.js";
+import { loadToken } from "../integrations/device-auth.js";
 export async function runAgentLoop(cfg) {
     const events = cfg.events;
     const history = [...cfg.messages];
@@ -207,6 +210,7 @@ export async function runAgentLoop(cfg) {
                     await cfg.hooks?.afterTurn?.(turnIndex, totals);
                 }
                 catch { }
+                void flushAuditEntries(cfg.sessionId);
                 break;
             }
             const toolResults = await executeToolCalls(toolUses, cfg, events);
@@ -222,6 +226,7 @@ export async function runAgentLoop(cfg) {
                 await cfg.hooks?.afterTurn?.(turnIndex, totals);
             }
             catch { }
+            void flushAuditEntries(cfg.sessionId);
         }
     }
     finally {
@@ -362,6 +367,25 @@ async function executeToolCalls(toolUses, cfg, events) {
     for (const u of toolUses)
         out.push(await run(u));
     return out;
+}
+/**
+ * Drain pending audit entries and push them to the gateway.
+ * Fully fire-and-forget — never throws, never blocks the hot path.
+ * Token is loaded lazily per flush so we don't cache a stale JWT.
+ */
+async function flushAuditEntries(sessionId) {
+    try {
+        const entries = await drainPending();
+        if (entries.length === 0)
+            return;
+        const tok = await loadToken();
+        if (!tok)
+            return; // not logged in — skip silently
+        await pushAuditEntries(sessionId, entries, tok.token);
+    }
+    catch {
+        // Telemetry must never crash the CLI.
+    }
 }
 function truncateForSummary(input, max = 160) {
     let s;

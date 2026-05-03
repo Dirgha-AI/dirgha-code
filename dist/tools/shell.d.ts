@@ -12,6 +12,12 @@
  *           fall back to cmd if PowerShell isn't on PATH. PowerShell
  *           handles quoting + UTF-8 + multi-line scripts more cleanly
  *           than cmd.exe's relic Windows-95 parser.
+ *
+ * Streaming mode (1.14.0):
+ *   When `streamOutput: true` is passed, each stdout/stderr chunk is
+ *   forwarded to `ctx.onProgress` as it arrives so the TUI can display
+ *   live output. Accumulated output is still returned in the final
+ *   ToolResult for the model. Backwards-compatible: default is false.
  */
 import type { Tool } from "./registry.js";
 export declare const shellTool: Tool;
