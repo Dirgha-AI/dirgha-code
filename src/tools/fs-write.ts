@@ -6,7 +6,7 @@
  */
 
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { dirname } from "node:path";
 import type { Tool } from "./registry.js";
 import type { ToolResult } from "../kernel/types.js";
 import { summariseDiff, unifiedDiff } from "./diff.js";

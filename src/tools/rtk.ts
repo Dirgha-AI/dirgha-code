@@ -12,7 +12,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath as _fileURLToPath } from "node:url";
 import { access, constants } from "node:fs/promises";
 import { safeEnvironment } from "../utils/env.js";
 import type { Tool, ToolContext } from "./registry.js";
