@@ -258,3 +258,35 @@ Before tagging a release, confirm all of these:
 | No UI for model discovery in non-TUI mode     | Readline REPL users can't browse models    | `/models` slash command (done in TUI)       |
 | Compaction drops thinking content             | Multi-turn with reasoning may lose context | Keep reasoning in compaction summary        |
 | Fire-and-forget DB writes (no error handling) | DB corruption silently ignored             | Add telemetry on DB write failures          |
+
+## Policy: Don't Be Aggressive
+
+These design rules prevent over-engineering that hurts users:
+
+1. **Health blacklist uses exponential backoff, not hard thresholds.**
+   5 failures → 30s cooldown, not 30min. Only escalate when the provider
+   keeps failing after cooldown expires. 2 successes = fresh start.
+   See `src/intelligence/health-monitor.ts`.
+
+2. **Failover blacklist is session-scoped, never persisted.**
+   If a model fails 5 consecutive times within ONE conversation, it's
+   avoided for that session. Restarting the CLI resets everything.
+   See `src/intelligence/failover-chain.ts`.
+
+3. **Rate limits trigger automatic backoff, never errors.**
+   The agent waits and retries. Users never see rate-limit errors
+   unless ALL providers are rate-limited simultaneously.
+
+4. **Fallback is always available.**
+   `tencent/hy3-preview:free` is the eternal last resort. It requires
+   no API key and is always routed through OpenRouter. No user ever
+   gets stuck with "no model available."
+
+5. **Error messages tell the user WHAT to do, not WHAT happened.**
+   "Your key was rejected (401). Get a new one at dashboard." — not
+   "Authentication failed." Every error includes a concrete next action.
+
+6. **Nothing breaks silently.**
+   DB write failure → logged. Config parse error → warns.
+   Remote catalogue fetch fails → falls back to hardcoded catalogues.
+   Every failure path has a fallback. Nothing is required for startup.
