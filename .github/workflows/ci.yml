@@ -39,10 +39,13 @@ jobs:
       - name: Install
         shell: bash
         run: |
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            npm install --no-audit --no-fund
-          else
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
             npm ci --no-audit --no-fund
+          else
+            # macOS + Windows: npm ci mis-skips platform-native optional deps
+            # (rolldown bindings) when lock was generated on Linux. Use
+            # npm install to let npm resolve them correctly for the current OS.
+            npm install --no-audit --no-fund
           fi
 
       - name: Lint
