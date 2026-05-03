@@ -67,7 +67,7 @@ jobs:
           cp _rtk_src/target/${{ matrix.cargo_target }}/release/rtk ${{ matrix.out }}
           chmod +x ${{ matrix.out }}
           sha256sum ${{ matrix.out }} > ${{ matrix.out }}.sha256
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: steps.ver.outputs.pending != 'true'
         with:
           name: rtk-${{ matrix.target }}
@@ -131,7 +131,7 @@ jobs:
           cp _qmd_src/dist/qmd ${{ matrix.out }}
           chmod +x ${{ matrix.out }}
           sha256sum ${{ matrix.out }} > ${{ matrix.out }}.sha256
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: steps.ver.outputs.pending != 'true'
         with:
           name: qmd-${{ matrix.target }}
