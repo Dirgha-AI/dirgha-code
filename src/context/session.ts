@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { createReadStream } from "node:fs";
 import type { Message, UsageTotal } from "../kernel/types.js";
-import { dbOpenSession, dbAppendMessage } from "../state/db.js";
+import { dbOpenSession, dbAppendMessage, dbCloseSession } from "../state/db.js";
 
 export type SessionEntry =
   | { type: "message"; ts: string; message: Message }
@@ -32,6 +32,7 @@ export interface Session {
   replay(): AsyncIterable<SessionEntry>;
   replayAll(): Promise<SessionEntry[]>;
   messages(): Promise<Message[]>;
+  close(): void;
 }
 
 export interface SessionStoreOptions {
@@ -87,8 +88,14 @@ class SessionImpl implements Session {
   async append(entry: SessionEntry): Promise<void> {
     await appendFile(this.path, `${JSON.stringify(entry)}\n`, "utf8");
     if (entry.type === "message") {
-      void Promise.resolve().then(() => dbAppendMessage(this.id, entry.message));
+      void Promise.resolve().then(() =>
+        dbAppendMessage(this.id, entry.message),
+      );
     }
+  }
+
+  close(): void {
+    dbCloseSession(this.id);
   }
 
   async *replay(): AsyncIterable<SessionEntry> {

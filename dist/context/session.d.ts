@@ -41,6 +41,7 @@ export interface Session {
     replay(): AsyncIterable<SessionEntry>;
     replayAll(): Promise<SessionEntry[]>;
     messages(): Promise<Message[]>;
+    close(): void;
 }
 export interface SessionStoreOptions {
     directory?: string;

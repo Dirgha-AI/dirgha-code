@@ -18,7 +18,7 @@ import type { Message } from "../../kernel/types.js";
 import type { EventStream } from "../../kernel/event-stream.js";
 import type { ProviderRegistry } from "../../providers/index.js";
 import type { ToolRegistry } from "../../tools/registry.js";
-import type { SessionStore } from "../../context/session.js";
+import type { SessionStore, Session } from "../../context/session.js";
 import type { DirghaConfig } from "../../cli/config.js";
 import type { SlashRegistry } from "../../cli/slash.js";
 import { type ModelEntry } from "./components/ModelPicker.js";
@@ -40,5 +40,9 @@ export interface AppProps {
     slashRegistry: SlashRegistry;
     /** Cross-session memory/ledger context injected into system prompt. */
     ledgerContext?: string;
+    /** Mutable ref — write the active session here so runInkTUI can flush on exit. */
+    sessionHandle?: {
+        session: Session | null;
+    };
 }
 export declare function App(props: AppProps): React.JSX.Element;

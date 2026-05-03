@@ -45,7 +45,7 @@ import {
   ApprovalPrompt,
   type ApprovalRequest,
 } from "./components/ApprovalPrompt.js";
-import type { SessionStore } from "../../context/session.js";
+import type { SessionStore, Session } from "../../context/session.js";
 import type { DirghaConfig } from "../../cli/config.js";
 import type { SlashRegistry, SlashContext } from "../../cli/slash.js";
 import type { Mode } from "../../context/mode.js";
@@ -122,6 +122,8 @@ export interface AppProps {
   slashRegistry: SlashRegistry;
   /** Cross-session memory/ledger context injected into system prompt. */
   ledgerContext?: string;
+  /** Mutable ref — write the active session here so runInkTUI can flush on exit. */
+  sessionHandle?: { session: Session | null };
 }
 
 export function App(props: AppProps): React.JSX.Element {
@@ -130,6 +132,25 @@ export function App(props: AppProps): React.JSX.Element {
   const historyRef = React.useRef<Message[]>(initialHistory(props));
   const abortRef = React.useRef<AbortController | null>(null);
   const pendingModelRef = React.useRef<string | null>(null);
+  const sessionRef = React.useRef<Session | null>(null);
+
+  React.useEffect(() => {
+    const id = sessionIdRef.current;
+    void props.sessions.create(id).then((s) => {
+      sessionRef.current = s;
+      if (props.sessionHandle) props.sessionHandle.session = s;
+    });
+    return () => {
+      if (sessionRef.current) {
+        try {
+          sessionRef.current.close();
+        } catch {
+          /* swallow */
+        }
+        if (props.sessionHandle) props.sessionHandle.session = null;
+      }
+    };
+  }, [props.sessions, props.sessionHandle]);
 
   const [transcript, setTranscript] = React.useState<TranscriptItem[]>([]);
   const [input, setInput] = React.useState("");
@@ -520,6 +541,12 @@ export function App(props: AppProps): React.JSX.Element {
       setTranscript((prev) => [...prev, userItem]);
       historyRef.current.push({ role: "user", content: value });
 
+      void sessionRef.current?.append({
+        type: "message",
+        ts: new Date().toISOString(),
+        message: { role: "user", content: value },
+      });
+
       void runTurnRef.current();
     },
     [
@@ -616,6 +643,7 @@ export function App(props: AppProps): React.JSX.Element {
       const userHooks = buildAgentHooksFromConfig(props.config);
       const composedHooks = composeHooks(enforceMode(mode), userHooks);
       const autoApprove = isAutoApprove(mode);
+      const prevHistoryLen = historyRef.current.length;
       const result = await runAgentLoop({
         sessionId: sessionIdRef.current,
         model: currentModel,
@@ -633,6 +661,13 @@ export function App(props: AppProps): React.JSX.Element {
         ...(composedHooks !== undefined ? { hooks: composedHooks } : {}),
       });
       historyRef.current = result.messages;
+      for (const msg of result.messages.slice(prevHistoryLen)) {
+        void sessionRef.current?.append({
+          type: "message",
+          ts: new Date().toISOString(),
+          message: msg,
+        });
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       const keyMatch = /^([A-Z][A-Z0-9_]+_API_KEY) is required/.exec(msg);

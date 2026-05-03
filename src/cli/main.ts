@@ -29,7 +29,7 @@ import { runInkTUI } from "../tui/ink/index.js";
 import { builtinSlashCommands } from "./slash/index.js";
 import { renderStreamingEvents } from "../tui/renderer.js";
 import { createSessionStore } from "../context/session.js";
-import { registerSession } from "../state/index.js";
+import { registerSession, closeSession } from "../state/index.js";
 import { runSubmitPaper } from "./submit-paper.js";
 import {
   runLogin,
@@ -735,6 +735,12 @@ async function main(): Promise<void> {
     } catch {
       /* swallow */
     }
+  }
+  try {
+    session.close();
+    void closeSession(sessionId);
+  } catch {
+    /* best-effort */
   }
   if (!json) stdout.write("\n");
   if (result.stopReason === "error") exit(2);

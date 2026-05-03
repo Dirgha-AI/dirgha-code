@@ -8,6 +8,7 @@
 import * as React from "react";
 import { render } from "ink";
 import { createEventStream } from "../../kernel/event-stream.js";
+import { closeSession } from "../../state/index.js";
 import { App } from "./App.js";
 import { createDefaultSlashRegistry, registerBuiltinSlashCommands, } from "../../cli/slash.js";
 export { App } from "./App.js";
@@ -30,22 +31,32 @@ export async function runInkTUI(opts) {
     if (useAltBuffer) {
         process.stdout.write("\x1b[?1049h");
     }
-    // Restore terminal on force-exit (SIGINT, SIGTERM). Without this,
-    // a crash leaves the terminal in raw mode with the alternate buffer
-    // still active — user sees a blank screen and must run `reset`.
     const restore = () => {
         if (useAltBuffer) {
             process.stdout.write("\x1b[?1049l");
         }
     };
-    process.once("SIGINT", () => {
+    const doExit = () => {
+        const s = opts.sessionHandle?.session;
+        if (s) {
+            try {
+                s.close();
+                void closeSession(s.id);
+            }
+            catch {
+                /* best-effort */
+            }
+        }
         restore();
-        process.exit(1);
+        process.exit(s ? 0 : 1);
+    };
+    process.once("SIGINT", () => {
+        doExit();
     });
     process.once("SIGTERM", () => {
-        restore();
-        process.exit(1);
+        doExit();
     });
+    const sessionHandle = { session: null };
     const element = React.createElement(App, {
         events,
         registry: opts.registry,
@@ -54,6 +65,7 @@ export async function runInkTUI(opts) {
         config: opts.config,
         cwd: opts.cwd,
         slashRegistry,
+        sessionHandle,
         ...(opts.systemPrompt !== undefined
             ? { systemPrompt: opts.systemPrompt }
             : {}),

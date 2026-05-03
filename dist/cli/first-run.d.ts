@@ -1,10 +1,11 @@
 /**
- * First-run detection and welcome wizard.
+ * First-run detection and interactive key setup.
  *
- * When no provider API keys are configured (no keys.json entries, no
- * env vars), shows a friendly wizard that guides new users through
- * their options. Designed to be the very first thing the CLI does on
- * a new install before anything else.
+ * If no API key is found, shows an interactive wizard that lets the user
+ * paste a key immediately (no restart needed). After saving, launches the
+ * TUI with a recommended free model so the first chat works in < 30 seconds.
+ *
+ * Also detects: OpenRouter free tokens, NVIDIA free tier, environment vars.
  */
 export declare function checkFirstRun(): boolean;
 export declare function showWelcomeWizard(): Promise<void>;

@@ -78,6 +78,27 @@ export function App(props) {
     const historyRef = React.useRef(initialHistory(props));
     const abortRef = React.useRef(null);
     const pendingModelRef = React.useRef(null);
+    const sessionRef = React.useRef(null);
+    React.useEffect(() => {
+        const id = sessionIdRef.current;
+        void props.sessions.create(id).then((s) => {
+            sessionRef.current = s;
+            if (props.sessionHandle)
+                props.sessionHandle.session = s;
+        });
+        return () => {
+            if (sessionRef.current) {
+                try {
+                    sessionRef.current.close();
+                }
+                catch {
+                    /* swallow */
+                }
+                if (props.sessionHandle)
+                    props.sessionHandle.session = null;
+            }
+        };
+    }, [props.sessions, props.sessionHandle]);
     const [transcript, setTranscript] = React.useState([]);
     const [input, setInput] = React.useState("");
     const [busy, setBusy] = React.useState(false);
@@ -436,6 +457,11 @@ export function App(props) {
         };
         setTranscript((prev) => [...prev, userItem]);
         historyRef.current.push({ role: "user", content: value });
+        void sessionRef.current?.append({
+            type: "message",
+            ts: new Date().toISOString(),
+            message: { role: "user", content: value },
+        });
         void runTurnRef.current();
     }, [
         busy,
@@ -523,6 +549,7 @@ export function App(props) {
             const userHooks = buildAgentHooksFromConfig(props.config);
             const composedHooks = composeHooks(enforceMode(mode), userHooks);
             const autoApprove = isAutoApprove(mode);
+            const prevHistoryLen = historyRef.current.length;
             const result = await runAgentLoop({
                 sessionId: sessionIdRef.current,
                 model: currentModel,
@@ -540,6 +567,13 @@ export function App(props) {
                 ...(composedHooks !== undefined ? { hooks: composedHooks } : {}),
             });
             historyRef.current = result.messages;
+            for (const msg of result.messages.slice(prevHistoryLen)) {
+                void sessionRef.current?.append({
+                    type: "message",
+                    ts: new Date().toISOString(),
+                    message: msg,
+                });
+            }
         }
         catch (err) {
             const msg = err instanceof Error ? err.message : String(err);

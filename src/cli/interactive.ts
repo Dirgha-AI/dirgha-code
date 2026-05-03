@@ -6,7 +6,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { registerSession } from "../state/index.js";
+import { registerSession, closeSession } from "../state/index.js";
 import { createInterface } from "node:readline";
 import type { Message, UsageTotal, Provider } from "../kernel/types.js";
 import { createEventStream } from "../kernel/event-stream.js";
@@ -177,7 +177,23 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
     if (isProcessing) return;
     void handleLine(line);
   });
-  rl.on("close", () => process.exit(0));
+  rl.on("close", () => {
+    session.close();
+    void closeSession(sessionId);
+    process.exit(0);
+  });
+
+  const gracefulShutdown = (): void => {
+    try {
+      session.close();
+      void closeSession(sessionId);
+    } catch {
+      /* best-effort */
+    }
+    process.exit(0);
+  };
+  process.once("SIGINT", gracefulShutdown);
+  process.once("SIGTERM", gracefulShutdown);
 
   const emitStatus = (message: string): void => {
     process.stdout.write(style(currentTheme.muted, `\n${message}\n`));
@@ -446,36 +462,38 @@ function buildSlashCtx(a: SlashCtxArgs): SlashContext {
     },
     async listSessions(): Promise<string> {
       const ids = await a.opts.sessions.list();
-      if (ids.length === 0) return '(no saved sessions)';
+      if (ids.length === 0) return "(no saved sessions)";
 
-      const { stat: fstat } = await import('node:fs/promises');
-      const { join: pjoin } = await import('node:path');
-      const { homedir: hd } = await import('node:os');
+      const { stat: fstat } = await import("node:fs/promises");
+      const { join: pjoin } = await import("node:path");
+      const { homedir: hd } = await import("node:os");
 
-      const sessDir = pjoin(hd(), '.dirgha', 'sessions');
+      const sessDir = pjoin(hd(), ".dirgha", "sessions");
       const withMtime = await Promise.all(
-        ids.map(async id => {
+        ids.map(async (id) => {
           try {
             const s = await fstat(pjoin(sessDir, `${id}.jsonl`));
             return { id, mtime: s.mtime };
           } catch {
             return { id, mtime: new Date(0) };
           }
-        })
+        }),
       );
 
       withMtime.sort((x, y) => y.mtime.getTime() - x.mtime.getTime());
       const shown = withMtime.slice(0, 20);
 
       const lines = shown.map(({ id, mtime }) => {
-        const d = mtime.toISOString().slice(0, 16).replace('T', ' ');
+        const d = mtime.toISOString().slice(0, 16).replace("T", " ");
         return `  ${d}  ${id.slice(0, 8)}…`;
       });
 
       if (ids.length > 20) {
-        lines.push(`  (showing 20 of ${ids.length} — use /session load <full-id> to restore)`);
+        lines.push(
+          `  (showing 20 of ${ids.length} — use /session load <full-id> to restore)`,
+        );
       }
-      return lines.join('\n');
+      return lines.join("\n");
     },
     async loadSession(id: string): Promise<string> {
       const next = await a.opts.sessions.open(id);

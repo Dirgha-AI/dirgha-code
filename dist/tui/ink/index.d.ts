@@ -8,7 +8,7 @@
 import type { Message } from "../../kernel/types.js";
 import type { ProviderRegistry } from "../../providers/index.js";
 import type { ToolRegistry } from "../../tools/registry.js";
-import type { SessionStore } from "../../context/session.js";
+import type { SessionStore, Session } from "../../context/session.js";
 import type { DirghaConfig } from "../../cli/config.js";
 export { App } from "./App.js";
 export { Logo } from "./components/Logo.js";
@@ -36,5 +36,9 @@ export interface RunInkTUIOptions {
     /** Model catalogue forwarded to the model picker. */
     models?: ModelEntry[];
     ledgerContext?: string;
+    /** Mutable ref — App writes the active session here so runInkTUI can flush on exit. */
+    sessionHandle?: {
+        session: Session | null;
+    };
 }
 export declare function runInkTUI(opts: RunInkTUIOptions): Promise<void>;

@@ -12,8 +12,9 @@ import type { Message } from "../../kernel/types.js";
 import { createEventStream } from "../../kernel/event-stream.js";
 import type { ProviderRegistry } from "../../providers/index.js";
 import type { ToolRegistry } from "../../tools/registry.js";
-import type { SessionStore } from "../../context/session.js";
+import type { SessionStore, Session } from "../../context/session.js";
 import type { DirghaConfig } from "../../cli/config.js";
+import { closeSession } from "../../state/index.js";
 import { App } from "./App.js";
 import {
   createDefaultSlashRegistry,
@@ -56,6 +57,8 @@ export interface RunInkTUIOptions {
   /** Model catalogue forwarded to the model picker. */
   models?: ModelEntry[];
   ledgerContext?: string;
+  /** Mutable ref — App writes the active session here so runInkTUI can flush on exit. */
+  sessionHandle?: { session: Session | null };
 }
 
 export async function runInkTUI(opts: RunInkTUIOptions): Promise<void> {
@@ -69,22 +72,34 @@ export async function runInkTUI(opts: RunInkTUIOptions): Promise<void> {
     process.stdout.write("\x1b[?1049h");
   }
 
-  // Restore terminal on force-exit (SIGINT, SIGTERM). Without this,
-  // a crash leaves the terminal in raw mode with the alternate buffer
-  // still active — user sees a blank screen and must run `reset`.
   const restore = (): void => {
     if (useAltBuffer) {
       process.stdout.write("\x1b[?1049l");
     }
   };
-  process.once("SIGINT", () => {
+
+  const doExit = (): void => {
+    const s = opts.sessionHandle?.session;
+    if (s) {
+      try {
+        s.close();
+        void closeSession(s.id);
+      } catch {
+        /* best-effort */
+      }
+    }
     restore();
-    process.exit(1);
+    process.exit(s ? 0 : 1);
+  };
+
+  process.once("SIGINT", () => {
+    doExit();
   });
   process.once("SIGTERM", () => {
-    restore();
-    process.exit(1);
+    doExit();
   });
+
+  const sessionHandle: { session: Session | null } = { session: null };
 
   const element = React.createElement(App, {
     events,
@@ -94,6 +109,7 @@ export async function runInkTUI(opts: RunInkTUIOptions): Promise<void> {
     config: opts.config,
     cwd: opts.cwd,
     slashRegistry,
+    sessionHandle,
     ...(opts.systemPrompt !== undefined
       ? { systemPrompt: opts.systemPrompt }
       : {}),
