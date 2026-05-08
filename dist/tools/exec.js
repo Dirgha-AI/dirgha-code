@@ -72,23 +72,32 @@ async function runTool(tool, input, ctx) {
     const started = Date.now();
     const deadlineMs = tool.timeoutMs ?? 0;
     // Race tool.execute against ctx.signal so ESC aborts immediately
-    // instead of waiting for tool completion (regression fix).
-    const abortPromise = new Promise((resolve) => {
-        if (ctx.signal.aborted) {
-            resolve({
-                content: `Tool "${tool.name}" aborted before start.`,
-                isError: true,
-            });
-            return;
-        }
-        ctx.signal.addEventListener("abort", () => {
-            resolve({
-                content: `Tool "${tool.name}" aborted by user (signal).`,
-                isError: true,
-                durationMs: Date.now() - started,
-            });
-        }, { once: true });
-    });
+    // instead of waiting for tool completion. Tolerate legacy callers
+    // and test harnesses that pass a ctx without a signal — the abort
+    // race is then a never-resolving promise that simply waits for the
+    // tool/timeout to settle, identical to pre-fix behaviour for those
+    // callers. The real agent loop always passes a signal so the abort
+    // behaviour is preserved end-to-end.
+    const abortPromise = ctx.signal
+        ? new Promise((resolve) => {
+            if (ctx.signal.aborted) {
+                resolve({
+                    content: `Tool "${tool.name}" aborted before start.`,
+                    isError: true,
+                });
+                return;
+            }
+            ctx.signal.addEventListener("abort", () => {
+                resolve({
+                    content: `Tool "${tool.name}" aborted by user (signal).`,
+                    isError: true,
+                    durationMs: Date.now() - started,
+                });
+            }, { once: true });
+        })
+        : new Promise(() => {
+            /* never resolves — caller passed no AbortSignal */
+        });
     let result;
     if (deadlineMs > 0) {
         result = await Promise.race([
