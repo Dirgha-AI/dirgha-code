@@ -29,7 +29,8 @@ import { fileURLToPath as _toPath, pathToFileURL as _toUrl } from 'node:url';
 import { dirname as _dn, resolve as _rs, join as _join } from 'node:path';
 const ROOT = _rs(_dn(_toPath(import.meta.url)), '..', '..', 'dist');
 const _imp = (rel) => import(_toUrl(_join(ROOT, rel)).href);
-const { App } = await _imp('tui/ink/App.js');
+const { App, VERSION } = await _imp('tui/ink/App.js');
+const { renderLogoString } = await _imp('tui/ink/components/Logo.js');
 const { createEventStream } = await _imp('kernel/event-stream.js');
 const { ProviderRegistry } = await _imp('providers/index.js');
 const { createToolRegistry, builtInTools } = await _imp('tools/index.js');
@@ -104,6 +105,14 @@ const config = {
   vimMode: false,
   autoApproveTools: ['shell', 'fs-read'],
 };
+
+// Mirror runInkTUI: emit the logo banner BEFORE Ink mounts. The logo
+// no longer lives inside App's render tree (it was repainted on every
+// overflow frame inside Ink's <Static>), so the live entry point and
+// this test both pre-emit it via renderLogoString → stdout. Without
+// this, the "Logo + input box rendered" assertion fails because
+// "Dirgha Code" is never written to the captured stream.
+stdout.write(renderLogoString(undefined, VERSION, 120));
 
 const element = React.createElement(App, {
   events, registry, providers, sessions, config, cwd: '/tmp', slashCommands: [],
