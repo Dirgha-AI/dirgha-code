@@ -41,11 +41,14 @@ export interface DirghaConfig {
      */
     theme?: "readable" | "dark" | "light" | "none" | "midnight" | "ocean" | "solarized" | "warm" | "violet-storm" | "cosmic" | "nord" | "ember" | "sakura" | "obsidian-gold" | "crimson" | "dracula" | "github-dark" | "tokyonight" | "atom-one-dark" | "ayu-dark";
     /**
-     * When true (default), the Ink TUI enters the terminal alternate buffer
-     * (`\\x1b[?1049h`) on startup and exits (`\\x1b[?1049l`) on quit.
-     * This eliminates the "flashing background" effect caused by Ink frames
-     * writing over accumulated scrollback in the main buffer. Set to false
-     * if you need scrollback access during the session.
+     * When true, the Ink TUI enters the terminal alternate buffer
+     * (`\\x1b[?1049h`) on startup and exits (`\\x1b[?1049l`) on quit —
+     * giving a clean exit (terminal looks like dirgha never ran) at the
+     * cost of breaking native terminal scrollback, mouse-wheel selection,
+     * and copy. Default is now false (matches gemini-cli, claude-code,
+     * bash/zsh) so wheel-scroll, copy/paste and scrollback work natively.
+     * Set to true if you prefer the clean-exit experience and accept the
+     * trade-off.
      */
     alternateBuffer?: boolean;
     /**
