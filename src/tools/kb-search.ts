@@ -2,14 +2,23 @@
  * kb_search tool — cosine-similarity search over the local embeddings
  * index. Uses sqlite-vec's vec0 virtual table + embedding_meta sidecar.
  * Gracefully degrades when the vec extension is absent.
+ *
+ * Inputs accept either:
+ *   - `query`: a string. We embed it via {@link selectEmbedder} (local
+ *     Xenova by default, remote HTTP when `embeddingsEndpoint` is set).
+ *   - `query_vector`: a pre-computed float[384] array. Backwards compat
+ *     for callers that already have a vector in hand.
  */
 
 import type { Tool } from "./registry.js";
 import type { ToolResult } from "../kernel/types.js";
 import { openDb } from "../state/db.js";
+import { selectEmbedder } from "../embeddings/select.js";
+import { loadConfig } from "../cli/config.js";
 
 interface Input {
-  query_vector: number[];
+  query?: string;
+  query_vector?: number[];
   k?: number;
   source_prefix?: string;
 }
@@ -25,21 +34,57 @@ export const kbSearchTool: Tool = {
   name: "kb_search",
   description:
     "Cosine-similarity search over the local embeddings index. " +
-    "Returns top-K chunks with their source label and distance score.",
+    "Pass `query` (string — auto-embedded) or `query_vector` (number[384]). " +
+    "Returns top-K chunks with source label and distance score.",
   inputSchema: {
     type: "object",
     properties: {
+      query: { type: "string" },
       query_vector: { type: "array", items: { type: "number" } },
       k: { type: "integer", minimum: 1, maximum: 50 },
       source_prefix: { type: "string" },
     },
-    required: ["query_vector"],
   },
   async execute(rawInput: unknown, _ctx): Promise<ToolResult<Hit[]>> {
     const input = rawInput as Input;
-    if (!Array.isArray(input.query_vector) || input.query_vector.length === 0) {
-      return { content: "query_vector must be a non-empty array", isError: true };
+    const hasVector =
+      Array.isArray(input.query_vector) && input.query_vector.length > 0;
+    const hasQuery =
+      typeof input.query === "string" && input.query.trim() !== "";
+
+    if (!hasVector && !hasQuery) {
+      return {
+        content:
+          "kb_search requires either `query` (string) or `query_vector` (non-empty number[]).",
+        isError: true,
+      };
     }
+
+    let queryVector: number[];
+    if (hasVector) {
+      queryVector = input.query_vector as number[];
+    } else {
+      // Embed the query string. Failures here are fatal — the caller
+      // asked us to search by text and we can't.
+      try {
+        const config = await loadConfig();
+        const embedder = selectEmbedder(config);
+        const vectors = await embedder.embed([input.query as string]);
+        if (!vectors[0] || vectors[0].length === 0) {
+          return {
+            content: "kb_search failed: embedder returned empty vector",
+            isError: true,
+          };
+        }
+        queryVector = vectors[0];
+      } catch (err) {
+        return {
+          content: `kb_search failed to embed query: ${(err as Error).message}`,
+          isError: true,
+        };
+      }
+    }
+
     const k = input.k ?? 5;
 
     let db: ReturnType<typeof openDb>;
@@ -53,7 +98,7 @@ export const kbSearchTool: Tool = {
     }
 
     try {
-      const vec = JSON.stringify(input.query_vector);
+      const vec = JSON.stringify(queryVector);
       const sql = input.source_prefix
         ? `
           SELECT m.id, m.source, m.chunk, e.distance

@@ -126,6 +126,21 @@ export interface DirghaConfig {
             matcher?: string;
         }>;
     };
+    /**
+     * Optional remote endpoint for text embeddings. When set, kb_search
+     * and any other embedding consumer POST `{texts: string[]}` here and
+     * expect `{vectors: number[][]}` back. Leave unset to use the local
+     * Xenova/transformers.js adapter (requires the optional
+     * `@xenova/transformers` package). Override at runtime via the
+     * `DIRGHA_EMBEDDINGS_ENDPOINT` env var.
+     */
+    embeddingsEndpoint?: string;
+    /**
+     * Optional bearer token for the embeddings endpoint. Sent as
+     * `Authorization: Bearer <token>`. Override via the
+     * `DIRGHA_EMBEDDINGS_TOKEN` env var.
+     */
+    embeddingsBearerToken?: string;
 }
 export declare const DEFAULT_CONFIG: DirghaConfig;
 export declare function loadConfig(cwd?: string): Promise<DirghaConfig>;
