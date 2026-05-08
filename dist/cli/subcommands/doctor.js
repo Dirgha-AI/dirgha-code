@@ -12,6 +12,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { stdout } from "node:process";
 import { constants } from "node:fs";
+import { createRequire } from "node:module";
 import { style, defaultTheme } from "../../tui/theme.js";
 import { getDbTelemetry } from "../../state/db-telemetry.js";
 const DIRGHA_DIR = join(homedir(), ".dirgha");
@@ -120,26 +121,17 @@ const LOCAL_PROBES = [
     { label: "llama.cpp", url: "http://localhost:8080/v1/models" },
 ];
 async function checkPlaywright() {
+    const cliRequire = createRequire(import.meta.url);
     try {
-        const { execSync } = await import("node:child_process");
-        // Try to find the playwright executable or chromium
-        try {
-            execSync("node -e \"require('playwright')\"", {
-                stdio: "ignore",
-                timeout: 3000,
-            });
-            return { name: "playwright", status: "pass", detail: "installed" };
-        }
-        catch {
-            return {
-                name: "playwright",
-                status: "warn",
-                detail: "not installed — browser tool will fail (run: npm install playwright && npx playwright install chromium)",
-            };
-        }
+        cliRequire.resolve("playwright");
+        return { name: "playwright", status: "pass", detail: "installed" };
     }
     catch {
-        return { name: "playwright", status: "warn", detail: "check failed" };
+        return {
+            name: "playwright",
+            status: "warn",
+            detail: "not installed — browser tool will fail (run: npm install playwright && npx playwright install chromium)",
+        };
     }
 }
 async function checkLsp() {
@@ -272,7 +264,7 @@ async function checkSessionStore() {
         const store = createSessionStore({
             directory: join(DIRGHA_DIR, "sessions"),
         });
-        const testId = `doctor-probe-${Date.now()}`;
+        const testId = "doctor-probe";
         const session = await store.create(testId);
         await session.append({
             type: "system",
@@ -303,7 +295,7 @@ async function checkMemoryStore() {
             useFtsIndex: false,
         });
         await store.upsert({
-            id: `doctor-probe-${Date.now()}`,
+            id: "doctor-probe",
             type: "user",
             name: "doctor-probe",
             description: "Temporary probe from dirgha doctor",
@@ -311,6 +303,7 @@ async function checkMemoryStore() {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
         });
+        await store.remove("doctor-probe");
         return {
             name: "memory-store",
             status: "pass",
