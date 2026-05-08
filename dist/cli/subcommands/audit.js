@@ -60,18 +60,20 @@ function usage() {
     return [
         'usage:',
         '  dirgha audit list [N]                Last N entries (default 20)',
-        '  dirgha audit tail                    Follow the log',
+        '  dirgha audit tail [-n N] [--no-follow]  Follow the log (default 20, auto-exit on non-TTY)',
         '  dirgha audit search <q>              Entries containing q',
         '  dirgha audit kinds                   Tally entries by kind',
         '  dirgha audit ... --filter=<kind>     Restrict to one kind (turn-end, tool, error, failover, …)',
         '  dirgha audit ... --json              JSON output',
     ].join('\n');
 }
-async function runTail(json, matchKind = () => true) {
+async function runTail(json, last, follow, matchKind = () => true) {
     await ensureLog();
     const path = auditPath();
     const initial = await readEntries();
-    emit(initial.filter(matchKind).slice(-20), json);
+    emit(initial.filter(matchKind).slice(-last), json);
+    if (!follow)
+        return 0;
     let lastSize = (await stat(path).catch(() => undefined))?.size ?? 0;
     stderr.write(style(defaultTheme.muted, '\n(following — Ctrl-C to stop)\n'));
     return new Promise(resolve => {
@@ -104,20 +106,38 @@ export const auditSubcommand = {
     description: 'Read the local audit log (list / tail / search)',
     async run(argv) {
         const json = argv.includes('--json');
+        const noFollow = argv.includes('--no-follow');
         const filterFlag = argv.find(a => a.startsWith('--filter='))?.split('=')[1];
-        const args = argv.filter(a => a !== '--json' && !a.startsWith('--filter='));
-        const op = args[0] ?? 'list';
+        // Parse -n N or --last N (default 20)
+        let lastNum = 20;
+        const nIdx = argv.indexOf('-n');
+        const lastIdx = argv.indexOf('--last');
+        if (nIdx >= 0 && nIdx + 1 < argv.length)
+            lastNum = Math.max(1, Number.parseInt(argv[nIdx + 1], 10) || 20);
+        else if (lastIdx >= 0 && lastIdx + 1 < argv.length)
+            lastNum = Math.max(1, Number.parseInt(argv[lastIdx + 1], 10) || 20);
+        const args = argv.filter(a => a !== '--json' && a !== '--no-follow' && a !== '-n' && a !== '--last' && !a.startsWith('--filter='));
+        // Also filter out the value arg following -n / --last
+        const cleanArgs = args.filter((_, i, arr) => {
+            if (i > 0 && (arr[i - 1] === '-n' || arr[i - 1] === '--last'))
+                return false;
+            return true;
+        });
+        const op = cleanArgs[0] ?? 'list';
         const matchKind = (e) => !filterFlag || e.kind === filterFlag;
+        // Non-TTY stdout → behave as --no-follow (standard tail -f semantics)
+        const follow = !noFollow && process.stdout.isTTY;
         if (op === 'list') {
-            const n = Number.parseInt(args[1] ?? '20', 10);
+            const nPos = cleanArgs[1] ? Number.parseInt(cleanArgs[1], 10) : 20;
+            const n = Number.isNaN(nPos) ? 20 : nPos;
             const entries = await readEntries();
             emit(entries.filter(matchKind).slice(-n), json);
             return 0;
         }
         if (op === 'tail')
-            return runTail(json, matchKind);
+            return runTail(json, lastNum, follow, matchKind);
         if (op === 'search') {
-            const query = args[1];
+            const query = cleanArgs[1];
             if (!query) {
                 stderr.write(`${usage()}\n`);
                 return 1;
