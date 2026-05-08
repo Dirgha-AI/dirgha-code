@@ -2,6 +2,17 @@
 
 All notable changes are tracked here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); we use [Semantic Versioning](https://semver.org/).
 
+## [1.20.33] — 2026-05-08
+
+### Fixed
+
+- **SQLite was disabled by an ESM/CJS bug.** `src/state/db.ts` called bare `require("better-sqlite3")` from inside an ES Module. At runtime this threw `ReferenceError: require is not defined`, which the `catch` rewrote as `SQLite unavailable (optional feature) — run "dirgha setup --features" to install.`. Every CLI invocation failed to open `~/.dirgha/dirgha.db`, even though the native module is bundled with `@dirgha/code` and the database file already existed and was healthy. On affected machines, message persistence had been silently failing for an unknown number of releases. Replaced with `createRequire(import.meta.url)`. Same fix applied to dormant `require()` calls in `src/cli/slash/paste.ts` and `src/cli/subcommands/feature-setup.ts`.
+- **Spurious "DB writes failing" warning.** `src/state/db-telemetry.ts` armed the stderr warning at `failedWrites >= 10` and persisted that counter across processes, so once an environment crossed the threshold every future run printed the warning forever. The warning also lacked the actual cause. Now the warning includes `telemetry.lastError` (so users see what to fix), and `failedWrites` resets to 0 on the first successful write of the process.
+- **`dirgha audit tail` hung in non-TTY contexts.** The subcommand always installed `fs.watch` and waited for SIGINT, so any pipe / script / CI invocation blocked indefinitely. Added `--no-follow` and `-n N` (`--last N`) flags; default to no-follow when `process.stdout.isTTY` is `false`, matching the `journalctl` / `kubectl logs` pattern. The `(following — Ctrl-C to stop)` hint is now suppressed in non-follow mode.
+- **`dirgha doctor` playwright check was cwd-dependent.** Spawned `node -e "require('playwright')"` whose subprocess inherited `process.cwd()`, so the resolution matched `<cwd>/node_modules/playwright` and gave false negatives anywhere outside the CLI's own checkout. Replaced with an in-process `createRequire(import.meta.url).resolve("playwright")` probe rooted at the CLI's install location.
+- **`dirgha doctor` polluted user memory.** `checkSessionStore` and `checkMemoryStore` wrote a probe entry with id `doctor-probe-${Date.now()}` on every invocation, accumulating in `~/.dirgha/memory/` (one machine had 18 of them, drowning user-authored entries in `dirgha memory list`). Switched to a fixed singleton id `doctor-probe` plus best-effort cleanup; each doctor run now leaves at most one probe entry behind.
+- **`dirgha memory add "<long human string>"` was hard-rejected.** A single positional containing spaces, colons, or other non-id characters failed with `Invalid memory key …` (also the wrong noun: the help and rest of the codebase say `id`). Now: when only one positional is supplied and it isn't a valid id, the CLI auto-slugifies it (lowercase, runs of non-id chars → dash, trim, cap at 60 chars, fallback `memory-<unix-ms>`), uses the slug as id and the original string as description, and prints `(slugified from "...")` so the user sees what happened. The two-arg form is unchanged. Validation error message now says "id" not "key".
+
 ## [1.20.10] — 2026-05-03
 
 ### Fixed

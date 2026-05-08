@@ -28,6 +28,7 @@ function getDb() {
         _db.pragma("journal_mode = WAL");
         _db.pragma("synchronous = NORMAL");
         initSchema(_db);
+        migrateSchema(_db);
         return _db;
     }
     catch {
@@ -61,6 +62,39 @@ function initSchema(db) {
       VALUES (new.id, new.content, new.session_id, new.role);
     END;
   `);
+}
+/**
+ * Idempotent schema migration for existing databases from earlier CLI
+ * versions.  Adds missing columns without data loss; backfills ts from
+ * the legacy created_at text column when present.
+ *
+ * Failures are captured via recordDbError but never thrown — the CLI
+ * must continue to work without DB persistence rather than crash.
+ */
+function migrateSchema(db) {
+    try {
+        // messages: add ts if it doesn't exist
+        const msgCols = db.pragma("table_info(messages)");
+        const hasTs = msgCols.some((c) => c.name === "ts");
+        const hasCreatedAt = msgCols.some((c) => c.name === "created_at");
+        if (!hasTs) {
+            db.exec("ALTER TABLE messages ADD COLUMN ts INTEGER NOT NULL DEFAULT 0");
+        }
+        if (hasCreatedAt) {
+            // Backfill ts from legacy text timestamp (once, for rows still at 0).
+            db.exec("UPDATE messages SET ts = CAST(strftime('%s', created_at) * 1000 AS INTEGER) WHERE ts = 0 AND created_at IS NOT NULL");
+        }
+        // sessions: add started_at if it doesn't exist (defensive — no known
+        // users hit this, but keeps the pattern consistent).
+        const sessCols = db.pragma("table_info(sessions)");
+        const hasStartedAt = sessCols.some((c) => c.name === "started_at");
+        if (!hasStartedAt) {
+            db.exec("ALTER TABLE sessions ADD COLUMN started_at INTEGER NOT NULL DEFAULT 0");
+        }
+    }
+    catch (err) {
+        recordDbError(err);
+    }
 }
 export function dbOpenSession(id, model, cwd) {
     try {
