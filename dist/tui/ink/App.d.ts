@@ -2,7 +2,7 @@
  * Ink root component for the dirgha TUI.
  *
  * Layout is a single vertical stack:
- *   1. Logo (rendered once inside <Static>, never re-renders)
+ *   1. Logo (emitted to stdout once before Ink mounts — see ./index.ts)
  *   2. Transcript (finalised user messages + completed turn blocks)
  *   3. LiveTurn (the currently streaming turn, if any)
  *   4. InputBox
@@ -23,6 +23,7 @@ import type { DirghaConfig } from "../../cli/config.js";
 import type { SlashRegistry } from "../../cli/slash.js";
 import { type ModelEntry } from "./components/ModelPicker.js";
 import { type HelpSlashCommand } from "./components/HelpOverlay.js";
+export declare const VERSION: string;
 export interface AppProps {
     events: EventStream;
     registry: ToolRegistry;

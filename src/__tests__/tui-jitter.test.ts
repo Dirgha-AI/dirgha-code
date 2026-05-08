@@ -465,3 +465,67 @@ describe("multi-turn stability", () => {
     await m.cleanup();
   });
 });
+
+// ──────────────────────────────────────────────────────────
+// TEST: renderLogoString — pre-mount banner emission
+// ──────────────────────────────────────────────────────────
+//
+// The Ink TUI emits the banner via process.stdout.write(renderLogoString())
+// BEFORE Ink mounts so the logo lives in terminal scrollback and isn't
+// re-emitted by Ink's overflow path (clearTerminal + fullStaticOutput +
+// output at node_modules/ink/build/ink.js:121). These tests pin the
+// renderer's output shape so that path stays out of Ink's render tree.
+describe("renderLogoString", () => {
+  // Strip ANSI for content assertions; keep raw for escape-code assertions.
+  const ANSI_RX = /\x1b\[[\d;]*m/g;
+
+  test("wide layout (cols >= 60) contains box border + all 6 letterform rows + tag line", async () => {
+    const { renderLogoString } = await import("../tui/ink/components/Logo.js");
+    const out = renderLogoString("violet-storm", "1.20.36", 120);
+    const stripped = out.replace(ANSI_RX, "");
+    // Top + bottom border
+    expect(stripped).toMatch(/╭─{58}╮/);
+    expect(stripped).toMatch(/╰─{58}╯/);
+    // Each unique-to-logo glyph appears exactly the count it does in
+    // ONE WIDE_ROWS render — this is the regression: if the function
+    // ever ran twice or the source-of-truth array drifted, the count
+    // would change.
+    expect((stripped.match(/╔══/g) ?? []).length).toBe(7);
+    expect((stripped.match(/╚══/g) ?? []).length).toBe(2);
+    expect((stripped.match(/██████/g) ?? []).length).toBe(8);
+    // Tag line + version
+    expect(stripped).toMatch(/Dirgha Code\s+v1\.20\.36/);
+  });
+
+  test("compact layout (cols < 60) is single line and short", async () => {
+    const { renderLogoString } = await import("../tui/ink/components/Logo.js");
+    const out = renderLogoString("violet-storm", "1.20.36", 40);
+    const stripped = out.replace(ANSI_RX, "");
+    expect(stripped).toMatch(/◆ DIRGHA CODE\s+v1\.20\.36/);
+    // No box-drawing border in compact mode
+    expect(stripped).not.toMatch(/╭|╮|╰|╯/);
+  });
+
+  test("emits 24-bit ANSI foreground codes for theme colours", async () => {
+    const { renderLogoString } = await import("../tui/ink/components/Logo.js");
+    const out = renderLogoString("violet-storm", "1.20.36", 120);
+    // Violet-storm border #5B21B6 → ESC[38;2;91;33;182m
+    expect(out).toMatch(/\x1b\[38;2;91;33;182m/);
+    // Reset between coloured spans
+    expect(out).toMatch(/\x1b\[0m/);
+  });
+
+  test("falls back to violet-storm for unknown theme name", async () => {
+    const { renderLogoString } = await import("../tui/ink/components/Logo.js");
+    const a = renderLogoString("not-a-real-theme", "1.20.36", 120);
+    const b = renderLogoString("violet-storm", "1.20.36", 120);
+    expect(a).toBe(b);
+  });
+
+  test("output is deterministic for same inputs", async () => {
+    const { renderLogoString } = await import("../tui/ink/components/Logo.js");
+    const a = renderLogoString("cosmic", "1.20.36", 120);
+    const b = renderLogoString("cosmic", "1.20.36", 120);
+    expect(a).toBe(b);
+  });
+});

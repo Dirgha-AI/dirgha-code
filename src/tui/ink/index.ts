@@ -15,7 +15,8 @@ import type { ToolRegistry } from "../../tools/registry.js";
 import type { SessionStore, Session } from "../../context/session.js";
 import type { DirghaConfig } from "../../cli/config.js";
 import { closeSession } from "../../state/index.js";
-import { App } from "./App.js";
+import { App, VERSION } from "./App.js";
+import { renderLogoString } from "./components/Logo.js";
 import {
   createDefaultSlashRegistry,
   registerBuiltinSlashCommands,
@@ -70,6 +71,19 @@ export async function runInkTUI(opts: RunInkTUIOptions): Promise<void> {
 
   if (useAltBuffer) {
     process.stdout.write("\x1b[?1049h");
+  }
+
+  // Emit the brand logo to stdout BEFORE Ink mounts. Keeping the logo
+  // out of Ink's render tree avoids the re-emission flicker users hit
+  // when transcripts overflow the viewport: Ink's onRender prepends
+  // `fullStaticOutput` (which would include the logo if it lived in
+  // `<Static>`) on every overflow redraw — see
+  // node_modules/ink/build/ink.js:118-125. The logo now sits in
+  // terminal scrollback (or alt buffer scrollback) and Ink never
+  // touches it.
+  if (process.stdout.isTTY) {
+    const cols = process.stdout.columns ?? 80;
+    process.stdout.write(renderLogoString(opts.config.theme, VERSION, cols));
   }
 
   const restore = (): void => {

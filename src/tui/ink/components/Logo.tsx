@@ -7,6 +7,20 @@
  * themes because the brand wordmark should read the same regardless
  * of which palette the user prefers for chrome. Themes that ship
  * their own logo gradient (cosmic, ember, sakura, …) override below.
+ *
+ * Two render paths:
+ *   - `Logo` React component — kept for tests / non-Ink callers that
+ *     still mount the component directly.
+ *   - `renderLogoString(themeName, version, cols)` — emits the same
+ *     content as a plain ANSI-coloured string. The Ink entry point
+ *     uses this to print the banner BEFORE Ink mounts, so the logo
+ *     lives in terminal scrollback and Ink never re-emits it on
+ *     viewport overflow. (`use-flicker-detector.ts` already warns
+ *     when content height > terminal rows, which is exactly the
+ *     condition that triggers Ink's `clearTerminal + fullStaticOutput
+ *     + output` path at node_modules/ink/build/ink.js:121 — repaints
+ *     the whole `<Static>` history every overflow frame and shows up
+ *     as rapid logo flicker on small terminals.)
  */
 
 import * as React from 'react';
@@ -53,6 +67,53 @@ const SKINS: Record<string, LogoSkin> = {
 function skinFor(themeName: string | undefined): LogoSkin {
   if (themeName && SKINS[themeName]) return SKINS[themeName] as LogoSkin;
   return VIOLET_STORM;
+}
+
+function hexToAnsiFg(hex: string): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return "";
+  const v = parseInt(m[1] as string, 16);
+  const r = (v >> 16) & 0xff;
+  const g = (v >> 8) & 0xff;
+  const b = v & 0xff;
+  return `\x1b[38;2;${r};${g};${b}m`;
+}
+
+const ANSI_RESET = "\x1b[0m";
+const ANSI_BOLD = "\x1b[1m";
+const TEXT_MUTED_HEX = "#7C7C7C";
+
+/**
+ * Pure string version of the logo, mirroring the React layout one-for-one.
+ * Use this when you want to emit the banner via process.stdout.write()
+ * outside Ink's render tree.
+ */
+export function renderLogoString(
+  themeName: string | undefined,
+  version: string,
+  cols: number,
+): string {
+  const skin = skinFor(themeName);
+  const border = hexToAnsiFg(skin.border);
+  const tag = hexToAnsiFg(skin.tag);
+  const muted = hexToAnsiFg(TEXT_MUTED_HEX);
+  if (cols < 60) {
+    const accent = hexToAnsiFg(skin.rows[2] ?? skin.tag);
+    return (
+      `  ${accent}${ANSI_BOLD}◆ DIRGHA CODE${ANSI_RESET}` +
+      `${muted}  v${version}${ANSI_RESET}\n\n`
+    );
+  }
+  const top = `${border}    ╭${"─".repeat(58)}╮${ANSI_RESET}`;
+  const bottom = `${border}    ╰${"─".repeat(58)}╯${ANSI_RESET}`;
+  const middle = WIDE_ROWS.map((row, i) => {
+    const colour = hexToAnsiFg(skin.rows[i] ?? skin.rows[0] ?? skin.tag);
+    return `${border}    │${colour}${row}${border}│${ANSI_RESET}`;
+  }).join("\n");
+  const tagLine =
+    `    ${tag}${ANSI_BOLD}Dirgha Code${ANSI_RESET}` +
+    `${muted}  v${version}${ANSI_RESET}`;
+  return `${top}\n${middle}\n${bottom}\n${tagLine}\n\n`;
 }
 
 export function Logo({ version }: LogoProps): React.JSX.Element {

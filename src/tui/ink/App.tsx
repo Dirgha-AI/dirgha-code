@@ -2,7 +2,7 @@
  * Ink root component for the dirgha TUI.
  *
  * Layout is a single vertical stack:
- *   1. Logo (rendered once inside <Static>, never re-renders)
+ *   1. Logo (emitted to stdout once before Ink mounts — see ./index.ts)
  *   2. Transcript (finalised user messages + completed turn blocks)
  *   3. LiveTurn (the currently streaming turn, if any)
  *   4. InputBox
@@ -15,7 +15,7 @@
  */
 
 import * as React from "react";
-import { Box, Static, Text, useApp, useInput } from "ink";
+import { Box, Text, useApp, useInput } from "ink";
 import { randomUUID } from "node:crypto";
 import { VirtualTranscript } from "./components/VirtualTranscript.js";
 import type { Message } from "../../kernel/types.js";
@@ -52,7 +52,6 @@ import type { DirghaConfig } from "../../cli/config.js";
 import type { SlashRegistry, SlashContext } from "../../cli/slash.js";
 import type { Mode } from "../../context/mode.js";
 import { PRICES } from "../../intelligence/prices.js";
-import { Logo } from "./components/Logo.js";
 import { StatusBar } from "./components/StatusBar.js";
 import { StreamingText } from "./components/StreamingText.js";
 import {
@@ -115,7 +114,7 @@ import { createRequire } from "node:module";
 // Pulled from the installed package.json so the TUI title matches the
 // shipped binary version. Falls back to '0.0.0-dev' if the file isn't
 // reachable (e.g. an unusual deploy layout).
-const VERSION: string = (() => {
+export const VERSION: string = (() => {
   try {
     const req = createRequire(import.meta.url);
     const pkg = req("../../../package.json") as { version?: string };
@@ -1152,20 +1151,23 @@ export function App(props: AppProps): React.JSX.Element {
     [models, currentModel],
   );
 
-  const LOGO_ITEMS = React.useMemo(() => [{ key: "logo" }], []);
   const spinnerCtx = React.useMemo(() => ({ busy, frame: 0 }), [busy]);
   const renderTranscriptItem = React.useCallback(
     (item: TranscriptItem) => <TranscriptRow key={item.id} item={item} />,
     [],
   );
 
+  // Logo is emitted via process.stdout.write() before Ink mounts (see
+  // tui/ink/index.ts). Keeping it out of Ink's render tree avoids the
+  // re-emission flicker users hit when transcripts overflow the
+  // viewport: Ink's onRender prepends `fullStaticOutput` (which includes
+  // the logo) on every overflow redraw, repainting it on every chat
+  // turn that fills the screen. `use-flicker-detector` already warns
+  // when this is about to happen.
   return (
     <ThemeProvider activeTheme={themeName}>
       <SpinnerContext.Provider value={spinnerCtx}>
         <Box flexDirection="column">
-          <Static items={LOGO_ITEMS}>
-            {(): React.JSX.Element => <Logo key="logo" version={VERSION} />}
-          </Static>
           <VirtualTranscript
             items={transcript}
             renderItem={renderTranscriptItem}

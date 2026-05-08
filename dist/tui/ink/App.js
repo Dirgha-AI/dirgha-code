@@ -3,7 +3,7 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
  * Ink root component for the dirgha TUI.
  *
  * Layout is a single vertical stack:
- *   1. Logo (rendered once inside <Static>, never re-renders)
+ *   1. Logo (emitted to stdout once before Ink mounts — see ./index.ts)
  *   2. Transcript (finalised user messages + completed turn blocks)
  *   3. LiveTurn (the currently streaming turn, if any)
  *   4. InputBox
@@ -15,7 +15,7 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
  * focused on layout and lifecycle.
  */
 import * as React from "react";
-import { Box, Static, Text, useApp, useInput } from "ink";
+import { Box, Text, useApp, useInput } from "ink";
 import { randomUUID } from "node:crypto";
 import { VirtualTranscript } from "./components/VirtualTranscript.js";
 import { appendAudit } from "../../audit/writer.js";
@@ -35,7 +35,6 @@ import { createToolExecutor } from "../../tools/exec.js";
 import { createInkApprovalBus, } from "./ink-approval-bus.js";
 import { ApprovalPrompt, } from "./components/ApprovalPrompt.js";
 import { PRICES } from "../../intelligence/prices.js";
-import { Logo } from "./components/Logo.js";
 import { StatusBar } from "./components/StatusBar.js";
 import { StreamingText } from "./components/StreamingText.js";
 import { ThinkingBlock, ThinkingBlockGroup, } from "./components/ThinkingBlock.js";
@@ -72,7 +71,7 @@ import { createRequire } from "node:module";
 // Pulled from the installed package.json so the TUI title matches the
 // shipped binary version. Falls back to '0.0.0-dev' if the file isn't
 // reachable (e.g. an unusual deploy layout).
-const VERSION = (() => {
+export const VERSION = (() => {
     try {
         const req = createRequire(import.meta.url);
         const pkg = req("../../../package.json");
@@ -1009,20 +1008,16 @@ export function App(props) {
     }, [overlays]);
     const liveJsx = React.useMemo(() => renderTranscript(projection.liveItems, thinkingStreaming), [projection.liveItems, thinkingStreaming]);
     const providerEntries = React.useMemo(() => buildProviderEntries(models, currentModel), [models, currentModel]);
-    // POSITIVE-CONTROL FLICKER (jitter-test 2026-05-08) — DO NOT MERGE.
-    // Forces visible content change every 250ms by alternating the Static
-    // item key AND injecting a label that flips between two strings. Revert.
-    const [_flickerTick, _setFlickerTick] = React.useState(0);
-    React.useEffect(() => {
-        const t = setInterval(() => _setFlickerTick(x => x + 1), 250);
-        return () => clearInterval(t);
-    }, []);
-    const _flickerLabel = (_flickerTick % 2 === 0) ? "FLICKER-A" : "FLICKER-B";
-    const LOGO_ITEMS = [{ key: `logo-${_flickerTick}`, label: _flickerLabel }];
-    // const LOGO_ITEMS = React.useMemo(() => [{ key: "logo" }], []);
     const spinnerCtx = React.useMemo(() => ({ busy, frame: 0 }), [busy]);
     const renderTranscriptItem = React.useCallback((item) => _jsx(TranscriptRow, { item: item }, item.id), []);
-    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: spinnerCtx, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: LOGO_ITEMS, children: (item) => _jsx(Logo, { version: `${VERSION}-${item.label}` }, item.label) }), _jsx(VirtualTranscript, { items: transcript, renderItem: renderTranscriptItem, autoScroll: true, inputFocus: inputFocus }), _jsx(Box, { flexDirection: "column", children: liveJsx }), busy && projection.liveItems.length === 0 && _jsx(GeneratingIndicator, { startedAtMs: turnStartRef.current, liveOutputTokens: liveOutputTokens }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
+    // Logo is emitted via process.stdout.write() before Ink mounts (see
+    // tui/ink/index.ts). Keeping it out of Ink's render tree avoids the
+    // re-emission flicker users hit when transcripts overflow the
+    // viewport: Ink's onRender prepends `fullStaticOutput` (which includes
+    // the logo) on every overflow redraw, repainting it on every chat
+    // turn that fills the screen. `use-flicker-detector` already warns
+    // when this is about to happen.
+    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: spinnerCtx, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(VirtualTranscript, { items: transcript, renderItem: renderTranscriptItem, autoScroll: true, inputFocus: inputFocus }), _jsx(Box, { flexDirection: "column", children: liveJsx }), busy && projection.liveItems.length === 0 && _jsx(GeneratingIndicator, { startedAtMs: turnStartRef.current, liveOutputTokens: liveOutputTokens }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
                             approvalBusRef.current?.resolve(pendingApproval.id, decision);
                         } })), pendingFailover !== null && (_jsx(ModelSwitchPrompt, { failedModel: pendingFailover.failedModel, failoverModel: pendingFailover.failoverModel, onAccept: (failover) => {
                             const lastPrompt = pendingFailover.lastPrompt;
