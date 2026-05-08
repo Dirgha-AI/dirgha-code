@@ -2,6 +2,13 @@
 
 All notable changes are tracked here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); we use [Semantic Versioning](https://semver.org/).
 
+## [1.20.36](https://github.com/Dirgha-AI/dirgha-code/compare/v1.20.35...v1.20.36) (2026-05-08)
+
+
+### Bug Fixes
+
+* **tui+kernel:** logo re-emit flicker + TTFT retry storm ([4dc8448](https://github.com/Dirgha-AI/dirgha-code/commit/4dc8448eb9343baf3e996a0ade05f44e0ec5075a))
+
 ## [1.20.35](https://github.com/Dirgha-AI/dirgha-code/compare/v1.20.34...v1.20.35) (2026-05-08)
 
 
