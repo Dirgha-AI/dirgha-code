@@ -269,7 +269,7 @@ function unescapeValue(s) {
 }
 function assertValidKey(key) {
     if (!key || !/^[a-zA-Z0-9][a-zA-Z0-9_\-.]*$/.test(key)) {
-        throw new Error(`Invalid memory key "${key}". Use alphanumeric, dash, dot, underscore.`);
+        throw new Error(`Invalid memory id "${key}". Use alphanumeric, dash, dot, underscore.`);
     }
 }
 function firstHeading(text) {
