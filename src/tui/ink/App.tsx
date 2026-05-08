@@ -232,7 +232,7 @@ export function App(props: AppProps): React.JSX.Element {
   // turns. Replaces the legacy `createTuiApprovalBus` that wrote prompts
   // direct to stdout (overdrawn by Ink) and read stdin raw (hung on
   // Windows). See `ink-approval-bus.ts` for the full rationale.
-  const approvalBusRef = React.useRef<InkApprovalBus>();
+  const approvalBusRef = React.useRef<InkApprovalBus | null>(null);
   if (!approvalBusRef.current) {
     approvalBusRef.current = createInkApprovalBus(
       new Set(props.config.autoApproveTools),
