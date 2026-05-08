@@ -21,6 +21,7 @@ export const DEFAULT_CONFIG = {
     telemetry: { enabled: false },
     kbAutoInject: true,
     alternateBuffer: false,
+    sandbox: "off",
 };
 export async function loadConfig(cwd = process.cwd()) {
     const userPath = join(homedir(), ".dirgha", "config.json");

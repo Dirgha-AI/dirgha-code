@@ -68,6 +68,19 @@ export interface DirghaConfig {
    */
   alternateBuffer?: boolean;
   /**
+   * Sandbox mode for tools that spawn external commands (shell, git,
+   * lsp). Default `off` = current behaviour, no containment. `auto`
+   * confines spawnable tools to the cwd via the platform sandbox
+   * (bwrap on Linux, sandbox-exec on macOS, JobObject on Windows)
+   * with network allowed. `strict` adds a network ban. Toggle live
+   * via `/sandbox <mode>`.
+   *
+   * fs-read / fs-write / fs-edit / search-glob still run inline JS
+   * and are not affected by this setting today (path-allowlist work
+   * is queued for a follow-up release).
+   */
+  sandbox?: "off" | "auto" | "strict";
+  /**
    * Persisted execution mode. Defaults to 'act' (normal execution).
    * Changed live via /mode; also honoured by fresh sessions.
    */
@@ -141,6 +154,7 @@ export const DEFAULT_CONFIG: DirghaConfig = {
   telemetry: { enabled: false },
   kbAutoInject: true,
   alternateBuffer: false,
+  sandbox: "off",
 };
 
 export async function loadConfig(

@@ -52,6 +52,7 @@ export function createToolExecutor(opts) {
                 sessionId: opts.sessionId,
                 signal,
                 sandbox,
+                sandboxMode: opts.sandboxMode ?? "off",
                 log: opts.log,
                 onProgress: opts.onProgress
                     ? (msg) => opts.onProgress(call.id, msg)

@@ -29,6 +29,7 @@ import { modelsCommand } from "./models.js";
 import { pasteCommand } from "./paste.js";
 import { providerCommand } from "./provider.js";
 import { resumeCommand } from "./resume.js";
+import { sandboxCommand } from "./sandbox.js";
 import { sessionCommand } from "./session.js";
 import { setupCommand } from "./setup.js";
 import { statusCommand } from "./status.js";
@@ -52,6 +53,7 @@ export const builtinSlashCommands: SlashCommand[] = [
   exitCommand,
   historyCommand,
   resumeCommand,
+  sandboxCommand,
   sessionCommand,
   themeCommand,
   fleetCommand,
@@ -92,6 +94,7 @@ export {
   modelsCommand,
   providerCommand,
   resumeCommand,
+  sandboxCommand,
   sessionCommand,
   setupCommand,
   spawnCommand,

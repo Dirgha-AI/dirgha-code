@@ -101,6 +101,10 @@ export function App(props) {
     // instruction only on the first turn; after the first agent_end the
     // instruction is stripped out so it does not appear on every turn.
     const firstTurnRef = React.useRef(!(props.initialMessages ?? []).some((m) => m.role === "user" || m.role === "assistant"));
+    // Live sandbox mode — initialised from config, mutated by /sandbox.
+    // Read by the executor wiring on every tool dispatch so the toggle
+    // takes effect on the next tool call without re-mounting the App.
+    const sandboxModeRef = React.useRef(props.config.sandbox ?? "off");
     React.useEffect(() => {
         const id = sessionIdRef.current;
         void props.sessions.create(id).then((s) => {
@@ -659,6 +663,10 @@ export function App(props) {
                 setMode: (m) => setMode(m),
                 getTheme: () => props.config.theme ?? "readable",
                 setTheme: () => undefined,
+                getSandbox: () => sandboxModeRef.current,
+                setSandbox: (next) => {
+                    sandboxModeRef.current = next;
+                },
                 getSession: () => null,
                 getSessionStore: () => props.sessions,
                 getProvider: () => props.providers.forModel(currentModel),
@@ -775,6 +783,7 @@ export function App(props) {
                 registry: props.registry,
                 cwd: props.cwd,
                 sessionId: sessionIdRef.current,
+                sandboxMode: sandboxModeRef.current,
                 onProgress: (toolId, message) => {
                     props.events.emit({
                         type: "tool_exec_progress",

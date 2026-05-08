@@ -170,6 +170,12 @@ export function App(props: AppProps): React.JSX.Element {
       (m) => m.role === "user" || m.role === "assistant",
     ),
   );
+  // Live sandbox mode — initialised from config, mutated by /sandbox.
+  // Read by the executor wiring on every tool dispatch so the toggle
+  // takes effect on the next tool call without re-mounting the App.
+  const sandboxModeRef = React.useRef<"off" | "auto" | "strict">(
+    props.config.sandbox ?? "off",
+  );
 
   React.useEffect(() => {
     const id = sessionIdRef.current;
@@ -765,6 +771,10 @@ export function App(props: AppProps): React.JSX.Element {
           getTheme: () =>
             (props.config.theme as ThemeName | undefined) ?? "readable",
           setTheme: () => undefined,
+          getSandbox: () => sandboxModeRef.current,
+          setSandbox: (next: "off" | "auto" | "strict") => {
+            sandboxModeRef.current = next;
+          },
           getSession: () => null,
           getSessionStore: () => props.sessions,
           getProvider: () => props.providers.forModel(currentModel),
@@ -886,6 +896,7 @@ export function App(props: AppProps): React.JSX.Element {
         registry: props.registry,
         cwd: props.cwd,
         sessionId: sessionIdRef.current,
+        sandboxMode: sandboxModeRef.current,
         onProgress: (toolId: string, message: string): void => {
           props.events.emit({
             type: "tool_exec_progress",

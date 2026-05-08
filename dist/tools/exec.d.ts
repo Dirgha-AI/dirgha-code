@@ -10,7 +10,7 @@
  * progress push events back through the agent-loop event stream.
  */
 import type { ToolExecutor } from "../kernel/types.js";
-import type { ToolContext, ToolRegistry } from "./registry.js";
+import type { ToolContext, ToolRegistry, SandboxMode } from "./registry.js";
 import type { PermissionEngine } from "./permission.js";
 export type { ToolExecutor } from "../kernel/types.js";
 export interface ToolExecutorOptions {
@@ -21,5 +21,8 @@ export interface ToolExecutorOptions {
     log?: ToolContext["log"];
     onProgress?: (toolId: string, message: string) => void;
     permission?: PermissionEngine;
+    /** User-selected sandbox mode (config + /sandbox slash command).
+     *  Defaults to "off" when omitted (backwards compatible). */
+    sandboxMode?: SandboxMode;
 }
 export declare function createToolExecutor(opts: ToolExecutorOptions): ToolExecutor;

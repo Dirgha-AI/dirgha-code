@@ -42,6 +42,11 @@ export interface SlashContext {
     getTheme(): ThemeName;
     /** Swap the theme — readline REPL applies live; Ink requires restart. */
     setTheme(name: ThemeName): void;
+    /** Current sandbox mode for tools that spawn external commands. */
+    getSandbox(): "off" | "auto" | "strict";
+    /** Swap sandbox mode — applies to the next tool call. Persists to
+     *  ~/.dirgha/config.json so future sessions inherit the setting. */
+    setSandbox(mode: "off" | "auto" | "strict"): void;
     /** Active session (null in headless contexts). */
     getSession(): Session | null;
     /** Session store for creating branches / loading siblings. */
