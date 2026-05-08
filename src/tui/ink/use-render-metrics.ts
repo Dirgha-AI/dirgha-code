@@ -102,20 +102,32 @@ export function useRenderMetrics(): RenderMetricsGetters {
     })();
   }, []);
 
-  return {
-    framesThisSession: () => framesThisSessionRef.current,
-    avgFrameTimeMs: () => {
-      const n = frameTimesRef.current.length;
-      return n > 0 ? Math.round((totalFrameTimeRef.current / n) * 10) / 10 : 0;
-    },
-    p99FrameTimeMs: () => {
-      const times = [...frameTimesRef.current].sort((a, b) => a - b);
-      const idx = Math.ceil(times.length * 0.99) - 1;
-      return times[idx] ?? 0;
-    },
-    lastFrameTimeMs: () => {
-      const times = frameTimesRef.current;
-      return times.length > 0 ? times[times.length - 1] : 0;
-    },
-  };
+  // Memoise the getters object across renders. Without this, every App
+  // re-render (every keystroke!) returned a NEW object reference, which
+  // defeated `React.memo` on consumers like StatusBar — the bar
+  // re-rendered on every keypress and Ink redrew the InputBox/StatusBar
+  // zone, producing visible flicker while typing.
+  // The getters close over refs only, so a single instance stays correct
+  // for the lifetime of the component.
+  return React.useMemo<RenderMetricsGetters>(
+    () => ({
+      framesThisSession: () => framesThisSessionRef.current,
+      avgFrameTimeMs: () => {
+        const n = frameTimesRef.current.length;
+        return n > 0
+          ? Math.round((totalFrameTimeRef.current / n) * 10) / 10
+          : 0;
+      },
+      p99FrameTimeMs: () => {
+        const times = [...frameTimesRef.current].sort((a, b) => a - b);
+        const idx = Math.ceil(times.length * 0.99) - 1;
+        return times[idx] ?? 0;
+      },
+      lastFrameTimeMs: () => {
+        const times = frameTimesRef.current;
+        return times.length > 0 ? (times[times.length - 1] as number) : 0;
+      },
+    }),
+    [],
+  );
 }
