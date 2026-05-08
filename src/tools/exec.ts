@@ -148,7 +148,7 @@ async function runTool(
             durationMs: deadlineMs,
           });
         }, deadlineMs);
-        ctx.signal.addEventListener("abort", () => clearTimeout(timer), {
+        ctx.signal?.addEventListener("abort", () => clearTimeout(timer), {
           once: true,
         });
       }),

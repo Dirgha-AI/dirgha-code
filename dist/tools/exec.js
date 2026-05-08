@@ -111,7 +111,7 @@ async function runTool(tool, input, ctx) {
                         durationMs: deadlineMs,
                     });
                 }, deadlineMs);
-                ctx.signal.addEventListener("abort", () => clearTimeout(timer), {
+                ctx.signal?.addEventListener("abort", () => clearTimeout(timer), {
                     once: true,
                 });
             }),
