@@ -9,6 +9,11 @@
  * Uses better-sqlite3 for synchronous, zero-config SQLite.
  */
 import type { Message } from "../kernel/types.js";
+/**
+ * Stop the optional chokidar watcher and reset internal state. Used by
+ * tests that need to swap out the home directory between runs.
+ */
+export declare function _resetForTests(): Promise<void>;
 /** Return the shared SQLite database handle, opening it if needed. */
 export declare function openDb(): import("better-sqlite3").Database;
 export declare function dbOpenSession(id: string, model?: string, cwd?: string): void;

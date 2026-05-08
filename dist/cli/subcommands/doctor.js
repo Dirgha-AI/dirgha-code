@@ -62,6 +62,7 @@ const LOCAL_CHECK_NAMES = new Set([
     "memory-store",
     "db-errors",
     "sqlite-vec",
+    "kb_chunks",
     "Ollama",
     "llama.cpp",
 ]);
@@ -454,6 +455,43 @@ async function checkVecExtension() {
         detail: "vec extension not loaded (vector search disabled, optional)",
     };
 }
+/**
+ * Reports the count of memory + KB chunks indexed in SQLite plus the
+ * timestamp of the most recent sync. The index is derived from
+ * ~/.dirgha/memory/*.md and ~/.dirgha/knowledge/*.md and is rebuilt
+ * automatically on first openDb() per process — see sync-index.ts.
+ */
+async function checkKbChunks() {
+    try {
+        const { openDb } = await import("../../state/db.js");
+        const { getKbChunkStats } = await import("../../state/sync-index.js");
+        const db = openDb();
+        const stats = getKbChunkStats(db);
+        const synced = stats.latestSync
+            ? new Date(stats.latestSync).toISOString()
+            : "never";
+        if (stats.count === 0) {
+            return {
+                name: "kb_chunks",
+                status: "warn",
+                detail: `0 indexed (no markdown files in ~/.dirgha/memory or ~/.dirgha/knowledge)`,
+            };
+        }
+        return {
+            name: "kb_chunks",
+            status: "pass",
+            detail: `${stats.count} indexed (synced ${synced})`,
+        };
+    }
+    catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return {
+            name: "kb_chunks",
+            status: "warn",
+            detail: `cannot read index: ${msg}`,
+        };
+    }
+}
 async function probeLocal(p) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -519,6 +557,8 @@ export const doctorSubcommand = {
         results.push(await checkCron());
         // sqlite-vec extension status
         results.push(await checkVecExtension());
+        // Markdown → SQLite index status (Sprint 6 — sync-index.ts)
+        results.push(await checkKbChunks());
         // New self-diagnostics
         results.push(await checkDiskSpace());
         results.push(await checkSessionStore());

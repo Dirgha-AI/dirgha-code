@@ -14,11 +14,14 @@ import { mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { recordDbError, recordDbSuccess } from "./db-telemetry.js";
 import { loadVecExtension } from "./vec.js";
+import { bootstrapIndex, ensureIndexStateTable, } from "./sync-index.js";
 const _require = createRequire(import.meta.url);
 const DB_DIR = join(homedir(), ".dirgha");
 const DB_PATH = join(DB_DIR, "dirgha.db");
 // Lazy singleton — only opened when first needed.
 let _db = null;
+let _watcher = null;
+let _indexBootstrapped = false;
 function getDb() {
     if (_db)
         return _db;
@@ -32,11 +35,49 @@ function getDb() {
         initSchema(db);
         migrateSchema(db);
         loadVecExtension(db);
+        ensureIndexStateTable(db);
+        bootstrapIndexOnce(db);
         return db;
     }
     catch {
         throw new Error(`SQLite unavailable (optional feature) — run "dirgha setup --features" to install.`);
     }
+}
+/**
+ * First-call only: walk ~/.dirgha/memory and ~/.dirgha/knowledge into
+ * `embedding_meta`, and (if chokidar is installed) attach a watcher.
+ * Wrapped in a flag so re-entrant `openDb()` calls during startup don't
+ * trigger a second sync. Failures are swallowed — the SQLite index is
+ * a derived view and must never block CLI boot.
+ */
+function bootstrapIndexOnce(db) {
+    if (_indexBootstrapped)
+        return;
+    _indexBootstrapped = true;
+    try {
+        const { watcher } = bootstrapIndex(db);
+        _watcher = watcher;
+    }
+    catch (err) {
+        recordDbError(err);
+    }
+}
+/**
+ * Stop the optional chokidar watcher and reset internal state. Used by
+ * tests that need to swap out the home directory between runs.
+ */
+export async function _resetForTests() {
+    if (_watcher) {
+        try {
+            await _watcher.close();
+        }
+        catch {
+            /* swallow */
+        }
+        _watcher = null;
+    }
+    _indexBootstrapped = false;
+    _db = null;
 }
 function initSchema(db) {
     db.exec(`
