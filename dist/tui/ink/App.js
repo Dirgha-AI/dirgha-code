@@ -1012,7 +1012,7 @@ export function App(props) {
     const LOGO_ITEMS = React.useMemo(() => [{ key: "logo" }], []);
     const spinnerCtx = React.useMemo(() => ({ busy, frame: 0 }), [busy]);
     const renderTranscriptItem = React.useCallback((item) => _jsx(TranscriptRow, { item: item }, item.id), []);
-    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: spinnerCtx, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: LOGO_ITEMS, children: () => _jsx(Logo, { version: VERSION }, "logo") }), _jsx(VirtualTranscript, { items: transcript, renderItem: renderTranscriptItem, autoScroll: true, inputFocus: inputFocus }), _jsx(Box, { flexDirection: "column", children: liveJsx }), busy && projection.liveItems.length === 0 && _jsx(GeneratingIndicator, {}), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
+    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: spinnerCtx, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: LOGO_ITEMS, children: () => _jsx(Logo, { version: VERSION }, "logo") }), _jsx(VirtualTranscript, { items: transcript, renderItem: renderTranscriptItem, autoScroll: true, inputFocus: inputFocus }), _jsx(Box, { flexDirection: "column", children: liveJsx }), busy && projection.liveItems.length === 0 && _jsx(GeneratingIndicator, { startedAtMs: turnStartRef.current, liveOutputTokens: liveOutputTokens }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
                             approvalBusRef.current?.resolve(pendingApproval.id, decision);
                         } })), pendingFailover !== null && (_jsx(ModelSwitchPrompt, { failedModel: pendingFailover.failedModel, failoverModel: pendingFailover.failoverModel, onAccept: (failover) => {
                             const lastPrompt = pendingFailover.lastPrompt;
@@ -1145,9 +1145,19 @@ function TranscriptRow({ item, isStreaming = false, }) {
             return (_jsx(Box, { marginBottom: 1, children: _jsx(Text, { color: "yellow", children: item.text }) }));
     }
 }
-function GeneratingIndicator() {
+function GeneratingIndicator(props) {
     const palette = useTheme();
-    return (_jsxs(Box, { gap: 1, marginBottom: 1, children: [_jsx(SpinnerGlyph, { isActive: true, color: palette.text.secondary }), _jsx(Text, { color: palette.text.secondary, dimColor: true, children: "generating\u2026" })] }));
+    const [now, setNow] = React.useState(Date.now());
+    React.useEffect(() => {
+        const t = setInterval(() => setNow(Date.now()), 1000);
+        return () => clearInterval(t);
+    }, []);
+    const elapsedSec = props.startedAtMs > 0 ? Math.round((now - props.startedAtMs) / 1000) : 0;
+    const slow = elapsedSec >= 5 && props.liveOutputTokens === 0;
+    const label = slow
+        ? `warming up · ${elapsedSec}s · first token can take 10–30s on free models`
+        : `generating · ${elapsedSec}s`;
+    return (_jsxs(Box, { gap: 1, marginBottom: 1, children: [_jsx(SpinnerGlyph, { isActive: true, color: palette.text.secondary }), _jsx(Text, { color: palette.text.secondary, dimColor: true, children: label })] }));
 }
 function initialHistory(props) {
     if (_cachedInitialMessages !== null)

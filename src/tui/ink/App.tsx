@@ -1173,7 +1173,7 @@ export function App(props: AppProps): React.JSX.Element {
             inputFocus={inputFocus}
           />
           <Box flexDirection="column">{liveJsx}</Box>
-          {busy && projection.liveItems.length === 0 && <GeneratingIndicator />}
+          {busy && projection.liveItems.length === 0 && <GeneratingIndicator startedAtMs={turnStartRef.current} liveOutputTokens={liveOutputTokens} />}
           {pendingApproval !== null && approvalBusRef.current && (
             <ApprovalPrompt
               request={pendingApproval}
@@ -1480,13 +1480,27 @@ function TranscriptRow({
   }
 }
 
-function GeneratingIndicator(): React.JSX.Element {
+function GeneratingIndicator(props: {
+  startedAtMs: number;
+  liveOutputTokens: number;
+}): React.JSX.Element {
   const palette = useTheme();
+  const [now, setNow] = React.useState(Date.now());
+  React.useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const elapsedSec =
+    props.startedAtMs > 0 ? Math.round((now - props.startedAtMs) / 1000) : 0;
+  const slow = elapsedSec >= 5 && props.liveOutputTokens === 0;
+  const label = slow
+    ? `warming up · ${elapsedSec}s · first token can take 10–30s on free models`
+    : `generating · ${elapsedSec}s`;
   return (
     <Box gap={1} marginBottom={1}>
       <SpinnerGlyph isActive={true} color={palette.text.secondary} />
       <Text color={palette.text.secondary} dimColor>
-        generating…
+        {label}
       </Text>
     </Box>
   );
