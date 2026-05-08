@@ -6,6 +6,10 @@
  * each configured provider's base endpoint is reachable (HEAD/GET with a
  * 3 s timeout). Prints a table by default; emits NDJSON when `--json`
  * is passed. Exit code 0 when every check passes, 1 if any fails.
+ *
+ * Pass `--strict` to fail on remote-auth/provider checks; by default
+ * only local checks (node, git, disk-space, store writes, etc.)
+ * affect the exit code.
  */
 import type { Subcommand } from "./index.js";
 export declare const doctorSubcommand: Subcommand;

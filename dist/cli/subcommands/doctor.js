@@ -6,6 +6,10 @@
  * each configured provider's base endpoint is reachable (HEAD/GET with a
  * 3 s timeout). Prints a table by default; emits NDJSON when `--json`
  * is passed. Exit code 0 when every check passes, 1 if any fails.
+ *
+ * Pass `--strict` to fail on remote-auth/provider checks; by default
+ * only local checks (node, git, disk-space, store writes, etc.)
+ * affect the exit code.
  */
 import { stat, access, mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -45,6 +49,21 @@ const PROVIDER_PROBES = [
 ];
 const TIMEOUT_MS = 3_000;
 const MIN_NODE_MAJOR = 20;
+/** Check names that do not talk to a non-localhost network. */
+const LOCAL_CHECK_NAMES = new Set([
+    "node",
+    "git",
+    "dirgha-home",
+    "terminal",
+    "lsp",
+    "cron",
+    "disk-space",
+    "session-store",
+    "memory-store",
+    "db-errors",
+    "Ollama",
+    "llama.cpp",
+]);
 async function checkNode() {
     const major = Number.parseInt(process.version.slice(1).split(".")[0], 10);
     if (Number.isNaN(major))
@@ -294,6 +313,21 @@ async function checkMemoryStore() {
             directory: join(DIRGHA_DIR, "memory"),
             useFtsIndex: false,
         });
+        // One-shot legacy cleanup: prior versions wrote doctor-probe-<ts> on
+        // every doctor run, accumulating in the memory store. Remove any such
+        // stale entries (id starts with "doctor-probe-" and is followed by
+        // digits). Best-effort — failures are silent.
+        try {
+            const all = await store.list();
+            for (const m of all) {
+                if (/^doctor-probe-\d+/.test(m.id)) {
+                    await store.remove(m.id).catch(() => { });
+                }
+            }
+        }
+        catch {
+            /* best-effort sweep */
+        }
         await store.upsert({
             id: "doctor-probe",
             type: "user",
@@ -436,7 +470,7 @@ function printNdjson(results) {
 }
 export const doctorSubcommand = {
     name: "doctor",
-    description: "Environment diagnostics (node, git, providers)",
+    description: "Environment diagnostics (node, git, providers). Pass --strict to gate on remote auth.",
     async run(argv) {
         // CI-6b: --send-crash-report builds a sanitised bundle of doctor
         // output + audit log tail + recent error, shows the user a preview,
@@ -469,7 +503,10 @@ export const doctorSubcommand = {
             printNdjson(results);
         else
             printTable(results);
-        return results.some((r) => r.status === "fail") ? 1 : 0;
+        const strict = argv.includes("--strict");
+        const failedLocal = results.some((r) => r.status === "fail" && LOCAL_CHECK_NAMES.has(r.name));
+        const failedAny = results.some((r) => r.status === "fail");
+        return (strict ? failedAny : failedLocal) ? 1 : 0;
     },
 };
 //# sourceMappingURL=doctor.js.map
