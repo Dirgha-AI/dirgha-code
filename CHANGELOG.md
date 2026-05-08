@@ -2,6 +2,13 @@
 
 All notable changes are tracked here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); we use [Semantic Versioning](https://semver.org/).
 
+## [1.20.39](https://github.com/Dirgha-AI/dirgha-code/compare/v1.20.38...v1.20.39) (2026-05-08)
+
+
+### Bug Fixes
+
+* **tui:** default alt buffer off + emit OSC terminal title ([1f7dbb4](https://github.com/Dirgha-AI/dirgha-code/commit/1f7dbb41ac8eb4fbfad5b0a8ec5f8ab2f0a68336))
+
 ## [1.20.38](https://github.com/Dirgha-AI/dirgha-code/compare/v1.20.37...v1.20.38) (2026-05-08)
 
 
