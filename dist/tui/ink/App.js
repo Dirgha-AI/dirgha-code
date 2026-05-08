@@ -188,7 +188,14 @@ export function App(props) {
         // session entry, (c) React state for any future `/sessions` UI.
         isFirstTurn: React.useCallback(() => firstTurnRef.current, []),
         onSessionTitle: React.useCallback((title) => {
-            const safe = title.replace(/[\x00-\x1f\x7f]/g, "").slice(0, 80).trim();
+            // Strip control characters (the LLM is untrusted output going
+            // straight into an OSC sequence; a raw 0x07/0x9c could close the
+            // string control prematurely and inject arbitrary terminal codes).
+            // eslint-disable-next-line no-control-regex
+            const safe = title
+                .replace(/[\x00-\x1f\x7f]/g, "")
+                .slice(0, 80)
+                .trim();
             if (!safe)
                 return;
             sessionTitleRef.current = safe;
