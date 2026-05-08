@@ -19,10 +19,25 @@ jobs:
     name: npm publish
     runs-on: ubuntu-latest
     steps:
+      - name: Resolve target tag
+        id: tag
+        run: |
+          if [ -n "${{ inputs.tag }}" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          if [ -z "$TAG" ] || [ "$TAG" = "$GITHUB_REF" ]; then
+            echo "Could not resolve tag from inputs.tag or GITHUB_REF=$GITHUB_REF" >&2
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
       - name: Check out
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
+          ref: ${{ steps.tag.outputs.tag }}
 
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -34,7 +49,8 @@ jobs:
       - name: Verify tag matches package.json version
         run: |
           PKG_VER=$(node -p "require('./package.json').version")
-          TAG_VER=${GITHUB_REF#refs/tags/v}
+          TAG_VER="${{ steps.tag.outputs.tag }}"
+          TAG_VER="${TAG_VER#v}"
           if [ "$PKG_VER" != "$TAG_VER" ]; then
             echo "package.json version ($PKG_VER) does not match git tag ($TAG_VER)" >&2
             exit 1
