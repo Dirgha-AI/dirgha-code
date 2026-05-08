@@ -102,10 +102,44 @@ async function runTool(
 ): Promise<ToolResult> {
   const started = Date.now();
   const deadlineMs = tool.timeoutMs ?? 0;
+
+  // Race tool.execute against ctx.signal so ESC aborts immediately
+  // instead of waiting for tool completion. Tolerate legacy callers
+  // and test harnesses that pass a ctx without a signal — the abort
+  // race is then a never-resolving promise that simply waits for the
+  // tool/timeout to settle, identical to pre-fix behaviour for those
+  // callers. The real agent loop always passes a signal so the abort
+  // behaviour is preserved end-to-end.
+  const abortPromise = ctx.signal
+    ? new Promise<ToolResult>((resolve) => {
+        if (ctx.signal!.aborted) {
+          resolve({
+            content: `Tool "${tool.name}" aborted before start.`,
+            isError: true,
+          });
+          return;
+        }
+        ctx.signal!.addEventListener(
+          "abort",
+          () => {
+            resolve({
+              content: `Tool "${tool.name}" aborted by user (signal).`,
+              isError: true,
+              durationMs: Date.now() - started,
+            });
+          },
+          { once: true },
+        );
+      })
+    : new Promise<ToolResult>(() => {
+        /* never resolves — caller passed no AbortSignal */
+      });
+
   let result: ToolResult;
   if (deadlineMs > 0) {
     result = await Promise.race([
       tool.execute(input, ctx),
+      abortPromise,
       new Promise<ToolResult>((resolve) => {
         const timer = setTimeout(() => {
           resolve({
@@ -114,13 +148,13 @@ async function runTool(
             durationMs: deadlineMs,
           });
         }, deadlineMs);
-        // Clean up timer on success to avoid leaking.
-        const abort = () => clearTimeout(timer);
-        ctx.signal?.addEventListener("abort", abort, { once: true });
+        ctx.signal?.addEventListener("abort", () => clearTimeout(timer), {
+          once: true,
+        });
       }),
     ]);
   } else {
-    result = await tool.execute(input, ctx);
+    result = await Promise.race([tool.execute(input, ctx), abortPromise]);
   }
   result.durationMs = result.durationMs ?? Date.now() - started;
   return result;

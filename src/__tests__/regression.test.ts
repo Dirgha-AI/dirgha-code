@@ -274,3 +274,43 @@ describe("regression: TTFT timeout retries at most once", () => {
     }
   });
 });
+
+// ============================================================================
+// regression: tool execute is raced against ctx.signal — ESC aborts within ~50ms
+// issue: https://github.com/Dirgha-AI/dirgha-code/issues/1191
+// fixed: 2026-05-08
+// ============================================================================
+
+describe("regression: tool execute raced against ctx.signal", () => {
+  it("aborts a slow tool within 500ms when signal fires at 50ms", async () => {
+    const { createToolRegistry, createToolExecutor } =
+      await import("../tools/index.js");
+    const slowTool = {
+      name: "slow_test",
+      description: "test",
+      inputSchema: { type: "object", properties: {} } as const,
+      async execute(_input) {
+        // Simulate a tool that doesn't check signal — runs for 5 seconds.
+        await new Promise((r) => setTimeout(r, 5000));
+        return { content: "completed", isError: false };
+      },
+    };
+    const registry = createToolRegistry([slowTool]);
+    const executor = createToolExecutor({
+      registry,
+      cwd: "/tmp",
+      sessionId: "t",
+    });
+    const ac = new AbortController();
+    const start = Date.now();
+    setTimeout(() => ac.abort(), 50);
+    const result = await executor.execute(
+      { id: "1", name: "slow_test", input: {} },
+      ac.signal,
+    );
+    const elapsed = Date.now() - start;
+    expect(result.isError).toBe(true);
+    expect(result.content).toMatch(/aborted/i);
+    expect(elapsed).toBeLessThan(500);
+  });
+});
