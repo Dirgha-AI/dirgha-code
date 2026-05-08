@@ -41,6 +41,8 @@ const ctx = {
   getMode: () => 'act',
   setTheme: () => {},
   getTheme: () => 'dark',
+  setSandbox: () => {},
+  getSandbox: () => 'off',
   // Auth + session shape so /account, /upgrade, /login don't error.
   getToken: () => null,
   setToken: () => {},
