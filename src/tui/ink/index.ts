@@ -84,6 +84,9 @@ export async function runInkTUI(opts: RunInkTUIOptions): Promise<void> {
   if (process.stdout.isTTY) {
     const cols = process.stdout.columns ?? 80;
     process.stdout.write(renderLogoString(opts.config.theme, VERSION, cols));
+    // OSC 0: set both window title and icon name. Updated to include
+    // the session title once the model emits one (see App.tsx).
+    process.stdout.write("\x1b]0;Dirgha\x07");
   }
 
   const restore = (): void => {
