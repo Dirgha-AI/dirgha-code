@@ -64,6 +64,28 @@ function initSchema(db) {
       INSERT INTO messages_fts(rowid, content, session_id, role)
       VALUES (new.id, new.content, new.session_id, new.role);
     END;
+
+    -- Sprint 3 graph schema (docs/cli/index/agent-db.md).
+    -- graph_nodes + graph_edges with directed labelled edges.
+    CREATE TABLE IF NOT EXISTS graph_nodes (
+      id    TEXT PRIMARY KEY,
+      type  TEXT NOT NULL,
+      props TEXT,
+      ts    INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE TABLE IF NOT EXISTS graph_edges (
+      src   TEXT NOT NULL,
+      dst   TEXT NOT NULL,
+      rel   TEXT NOT NULL,
+      props TEXT,
+      ts    INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+      PRIMARY KEY (src, dst, rel),
+      FOREIGN KEY (src) REFERENCES graph_nodes(id) ON DELETE CASCADE,
+      FOREIGN KEY (dst) REFERENCES graph_nodes(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_edges_src ON graph_edges(src, rel);
+    CREATE INDEX IF NOT EXISTS idx_edges_dst ON graph_edges(dst, rel);
+    CREATE INDEX IF NOT EXISTS idx_nodes_type ON graph_nodes(type);
   `);
 }
 /**

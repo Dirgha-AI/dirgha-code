@@ -22,6 +22,8 @@ import { rtkTool } from "./rtk.js";
 import { qmdTool } from "./qmd.js";
 import { githubTool } from "./github.js";
 import { kbSearchTool } from "./kb-search.js";
+import { graphNeighborsTool } from "./graph-neighbors.js";
+import { graphTraverseTool } from "./graph-traverse.js";
 export { createMultimodalTool } from "./multimodal.js";
 export { createCronTool } from "./cron.js";
 export { createCheckpointTool } from "./checkpoint.js";
@@ -56,6 +58,8 @@ export const builtInTools = [
     rtkTool,
     qmdTool,
     kbSearchTool,
+    graphNeighborsTool,
+    graphTraverseTool,
 ];
-export { fsReadTool, fsWriteTool, fsEditTool, fsLsTool, shellTool, searchGrepTool, searchGlobTool, gitTool, githubTool, browserTool, checkpointTool, cronTool, lspGoToDefinitionTool, lspFindReferencesTool, lspHoverTool, lspDocumentSymbolsTool, rtkTool, qmdTool, kbSearchTool, };
+export { fsReadTool, fsWriteTool, fsEditTool, fsLsTool, shellTool, searchGrepTool, searchGlobTool, gitTool, githubTool, browserTool, checkpointTool, cronTool, lspGoToDefinitionTool, lspFindReferencesTool, lspHoverTool, lspDocumentSymbolsTool, rtkTool, qmdTool, kbSearchTool, graphNeighborsTool, graphTraverseTool, };
 //# sourceMappingURL=index.js.map
