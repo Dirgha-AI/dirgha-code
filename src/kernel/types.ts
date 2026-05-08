@@ -104,7 +104,12 @@ export type AgentEvent =
       retryable?: boolean;
       failoverModel?: string;
       userMessage?: string;
-    };
+    }
+  // Synthesised by the projection when the model emits the
+  // `[session-title] X` marker on the first line of its first
+  // response. The TUI updates the OSC 0 terminal title and persists
+  // the value to the session JSONL.
+  | { type: "session_title"; title: string };
 
 export interface ToolCall {
   id: string;

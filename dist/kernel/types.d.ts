@@ -111,6 +111,9 @@ export type AgentEvent = {
     retryable?: boolean;
     failoverModel?: string;
     userMessage?: string;
+} | {
+    type: "session_title";
+    title: string;
 };
 export interface ToolCall {
     id: string;

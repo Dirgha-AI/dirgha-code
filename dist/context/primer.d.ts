@@ -26,6 +26,21 @@ export interface PrimerResult {
  */
 export declare function loadProjectPrimer(startDir: string): PrimerResult;
 /**
+ * First-turn-only addendum that asks the model to emit a session
+ * title marker on the first line of its first response. The TUI
+ * parser strips the line from display and updates the OSC 0
+ * terminal title + persists the value to the session JSONL.
+ *
+ * Format chosen for parser stability:
+ *   `[session-title] Three to five word summary`
+ *
+ * Plain text (no XML/JSON), one line, distinctive prefix that real
+ * model output rarely starts with. Strict regex match in the
+ * projection — malformed marker is treated as no-op (model output
+ * passes through unchanged).
+ */
+export declare function sessionTitleInstruction(): string;
+/**
  * Compose the full boot system prompt. Order:
  *
  *   1. soul          — who dirgha is and how it should behave
@@ -35,6 +50,7 @@ export declare function loadProjectPrimer(startDir: string): PrimerResult;
  *   5. kbContext     — top-K KB articles relevant to the current turn
  *   6. gitState      — workspace snapshot (interactive only)
  *   7. userSystem    — caller-supplied --system flag (escape hatch)
+ *   8. firstTurn     — session title instruction (only on first turn)
  *
  * Empty sections drop out — no leading/trailing blank lines.
  */
@@ -46,4 +62,5 @@ export declare function composeSystemPrompt(parts: {
     kbContext?: string;
     gitState?: string;
     userSystem?: string | undefined;
+    firstTurn?: boolean;
 }): string;

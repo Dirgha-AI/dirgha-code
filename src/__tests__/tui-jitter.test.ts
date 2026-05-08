@@ -615,3 +615,159 @@ describe("useElapsed isLive gate (body-flicker regression)", () => {
     ink.unmount();
   });
 });
+
+// ──────────────────────────────────────────────────────────
+// TEST: session-title marker parser (v1.20.40)
+// ──────────────────────────────────────────────────────────
+//
+// The model emits `[session-title] X\n\n` as the first line of its
+// first response. The projection must:
+//   - extract X and call onSessionTitle(X)
+//   - strip the marker line + trailing blank lines from displayed text
+//   - never trigger on second-turn text or on user messages that
+//     incidentally contain `[session-title]` later in the stream
+describe("session-title marker (first-turn only)", () => {
+  test("marker is extracted, stripped from display, callback fired", async () => {
+    const { useEventProjection } = await import(
+      "../tui/ink/use-event-projection.js"
+    );
+    const { createEventStream } = await import("../kernel/event-stream.js");
+    const { Text, render } = await import("ink");
+
+    const events = createEventStream();
+    let captured: string | null = null;
+    let liveText = "";
+
+    function Probe() {
+      const projection = useEventProjection(events, {
+        isFirstTurn: () => true,
+        onSessionTitle: (title) => {
+          captured = title;
+        },
+      });
+      const text = projection.liveItems
+        .filter((it: any) => it.kind === "text")
+        .map((it: any) => it.content)
+        .join("");
+      liveText = text;
+      return React.createElement(Text, null, text || " ");
+    }
+
+    const stdout = new CaptureStream();
+    const stdin = new FakeStdin();
+    const ink = render(React.createElement(Probe), {
+      stdout: stdout as any,
+      stdin: stdin as any,
+      debug: true,
+    });
+
+    events.emit({ type: "agent_start", sessionId: "t", model: "x" });
+    events.emit({ type: "turn_start", turnId: "t0", turnIndex: 0 });
+    events.emit({ type: "text_start" });
+    events.emit({ type: "text_delta", delta: "[session-title] Setting up auth" });
+    events.emit({ type: "text_delta", delta: "\n\nHere is how to do it.\n" });
+    await sleep(250); // wait past the projection flush timer (80ms)
+
+    expect(captured).toBe("Setting up auth");
+    expect(liveText).toBe("Here is how to do it.\n");
+
+    ink.unmount();
+    events.close();
+  });
+
+  test("non-marker first-turn output is unchanged", async () => {
+    const { useEventProjection } = await import(
+      "../tui/ink/use-event-projection.js"
+    );
+    const { createEventStream } = await import("../kernel/event-stream.js");
+    const { Text, render } = await import("ink");
+
+    const events = createEventStream();
+    let captured: string | null = null;
+    let liveText = "";
+
+    function Probe() {
+      const projection = useEventProjection(events, {
+        isFirstTurn: () => true,
+        onSessionTitle: (title) => {
+          captured = title;
+        },
+      });
+      liveText = projection.liveItems
+        .filter((it: any) => it.kind === "text")
+        .map((it: any) => it.content)
+        .join("");
+      return React.createElement(Text, null, liveText || " ");
+    }
+
+    const stdout = new CaptureStream();
+    const stdin = new FakeStdin();
+    const ink = render(React.createElement(Probe), {
+      stdout: stdout as any,
+      stdin: stdin as any,
+      debug: true,
+    });
+
+    events.emit({ type: "agent_start", sessionId: "t", model: "x" });
+    events.emit({ type: "turn_start", turnId: "t0", turnIndex: 0 });
+    events.emit({ type: "text_start" });
+    events.emit({ type: "text_delta", delta: "Hello, world.\n" });
+    await sleep(250);
+
+    expect(captured).toBeNull();
+    expect(liveText).toBe("Hello, world.\n");
+
+    ink.unmount();
+    events.close();
+  });
+
+  test("non-first-turn never fires the callback even with marker text", async () => {
+    const { useEventProjection } = await import(
+      "../tui/ink/use-event-projection.js"
+    );
+    const { createEventStream } = await import("../kernel/event-stream.js");
+    const { Text, render } = await import("ink");
+
+    const events = createEventStream();
+    let captured: string | null = null;
+    let liveText = "";
+
+    function Probe() {
+      const projection = useEventProjection(events, {
+        isFirstTurn: () => false, // explicit not-first-turn
+        onSessionTitle: (title) => {
+          captured = title;
+        },
+      });
+      liveText = projection.liveItems
+        .filter((it: any) => it.kind === "text")
+        .map((it: any) => it.content)
+        .join("");
+      return React.createElement(Text, null, liveText || " ");
+    }
+
+    const stdout = new CaptureStream();
+    const stdin = new FakeStdin();
+    const ink = render(React.createElement(Probe), {
+      stdout: stdout as any,
+      stdin: stdin as any,
+      debug: true,
+    });
+
+    events.emit({ type: "agent_start", sessionId: "t", model: "x" });
+    events.emit({ type: "turn_start", turnId: "t0", turnIndex: 0 });
+    events.emit({ type: "text_start" });
+    events.emit({
+      type: "text_delta",
+      delta: "[session-title] Should not fire\nrest of message\n",
+    });
+    await sleep(250);
+
+    expect(captured).toBeNull();
+    // Marker is NOT stripped on non-first turns — passes through.
+    expect(liveText).toContain("[session-title] Should not fire");
+
+    ink.unmount();
+    events.close();
+  });
+});

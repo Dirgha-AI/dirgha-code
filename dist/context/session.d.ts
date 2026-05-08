@@ -29,6 +29,10 @@ export type SessionEntry = {
     parentId: string;
     name: string;
 } | {
+    type: "title";
+    ts: string;
+    title: string;
+} | {
     type: "system";
     ts: string;
     event: string;

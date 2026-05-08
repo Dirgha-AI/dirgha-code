@@ -161,6 +161,15 @@ export function App(props: AppProps): React.JSX.Element {
   const interruptMsgRef = React.useRef<string | null>(null);
   const pendingModelRef = React.useRef<string | null>(null);
   const sessionRef = React.useRef<Session | null>(null);
+  // Tracks whether the model has produced its first response in this
+  // session. The system prompt includes a one-line `[session-title]`
+  // instruction only on the first turn; after the first agent_end the
+  // instruction is stripped out so it does not appear on every turn.
+  const firstTurnRef = React.useRef<boolean>(
+    !(props.initialMessages ?? []).some(
+      (m) => m.role === "user" || m.role === "assistant",
+    ),
+  );
 
   React.useEffect(() => {
     const id = sessionIdRef.current;
@@ -257,7 +266,53 @@ export function App(props: AppProps): React.JSX.Element {
     onCommitSplit: React.useCallback((item: TranscriptItem) => {
       setTranscript((prev) => [...prev, item]);
     }, []),
+    // First-turn `[session-title] X` marker support. The projection
+    // strips the marker line from the transcript; here we surface the
+    // captured title as: (a) the OSC 0 terminal title, (b) a persisted
+    // session entry, (c) React state for any future `/sessions` UI.
+    isFirstTurn: React.useCallback(() => firstTurnRef.current, []),
+    onSessionTitle: React.useCallback((title: string) => {
+      // Strip control characters from LLM-supplied title before
+      // injecting into an OSC sequence — a raw 0x07/0x9c would close
+      // the OSC string early and let the model inject arbitrary
+      // terminal codes. Codepoint filter avoids eslint's
+      // `no-control-regex` rule (which fires on both literal and
+      // string-constructed regexes).
+      const safe = Array.from(title)
+        .filter((c) => {
+          const cp = c.charCodeAt(0);
+          return cp >= 0x20 && cp !== 0x7f;
+        })
+        .join("")
+        .slice(0, 80)
+        .trim();
+      if (!safe) return;
+      sessionTitleRef.current = safe;
+      try {
+        if (process.stdout.isTTY) {
+          process.stdout.write(`\x1b]0;Dirgha · ${safe}\x07`);
+        }
+      } catch {
+        /* OSC write best-effort */
+      }
+      const s = sessionRef.current;
+      if (s) {
+        void s
+          .append({
+            type: "title",
+            ts: new Date().toISOString(),
+            title: safe,
+          })
+          .catch(() => {
+            /* persistence best-effort — non-blocking */
+          });
+      }
+    }, []),
   });
+  // Holds the most recent session title (set by the projection's
+  // `onSessionTitle` callback). Read by future surfaces (/sessions
+  // list, status bar, etc) — not currently displayed in v1.20.40.
+  const sessionTitleRef = React.useRef<string | null>(null);
   const overlays = useOverlays();
   // Live counters for the in-progress turn — drive the StatusBar
   // tok/s readout. Reset at agent_start, accumulate output deltas,
@@ -412,10 +467,36 @@ export function App(props: AppProps): React.JSX.Element {
         setLiveDurationMs(0);
         setLiveOutputTokens(0);
         liveOutputTokensAccRef.current = 0;
+        // After the first response completes, refresh the system
+        // message to drop the one-line session-title instruction so
+        // the model does not keep emitting `[session-title]` on every
+        // subsequent turn. Composing here uses cached project primer
+        // + soul (cheap) and only runs once per session.
+        if (firstTurnRef.current) {
+          firstTurnRef.current = false;
+          const msgs = historyRef.current;
+          if (msgs.length > 0 && msgs[0].role === "system") {
+            const primer = loadProjectPrimer(props.cwd);
+            const soul = loadSoul();
+            const refreshedSystem = composeSystemPrompt({
+              soul: soul.text,
+              modePreamble: modePreamble(mode),
+              primer: primer.primer,
+              ledgerContext: props.ledgerContext,
+              gitState: renderGitState(probeGitState(props.cwd)),
+              userSystem: props.systemPrompt,
+              firstTurn: false,
+            });
+            historyRef.current = [
+              { role: "system", content: refreshedSystem },
+              ...msgs.slice(1),
+            ];
+          }
+        }
       }
     });
     return unsub;
-  }, [props.events]);
+  }, [props.events, mode, props.cwd, props.ledgerContext, props.systemPrompt]);
 
   // globalSpinnerFrame removed — spinner interval now lives inside
   // SpinnerGlyph so only the glyph subtree re-renders at 80ms, not the
@@ -1511,6 +1592,13 @@ function GeneratingIndicator(props: {
 function initialHistory(props: AppProps): Message[] {
   if (_cachedInitialMessages !== null) return _cachedInitialMessages;
   const base = props.initialMessages ? [...props.initialMessages] : [];
+  // Detect resumed sessions — if the caller passed user/assistant
+  // messages, the session already has history and the LLM should NOT
+  // emit a session-title marker (we'd be retrofitting one onto an
+  // already-named conversation).
+  const isFreshSession = !base.some(
+    (m) => m.role === "user" || m.role === "assistant",
+  );
   // Boot context: mode preamble + project primer (DIRGHA.md) +
   // caller's --system. Without this, the Ink TUI starts with zero
   // project awareness — same parity-matrix #1 fix as the one-shot
@@ -1524,6 +1612,7 @@ function initialHistory(props: AppProps): Message[] {
     ledgerContext: props.ledgerContext,
     gitState: renderGitState(probeGitState(props.cwd)),
     userSystem: props.systemPrompt,
+    firstTurn: isFreshSession,
   });
   base.unshift({ role: "system", content: composedSystem });
   _cachedInitialMessages = base;
