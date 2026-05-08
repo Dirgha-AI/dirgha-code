@@ -64,27 +64,33 @@ hash_str() { sha1sum | cut -d' ' -f1 | cut -c1-8; }
 
 # Detect the logo content in a frame.
 #
-# The Logo banner is uniquely identifiable by its ASCII top row of
-# block characters: each DIRGHA letter starts with "██████╗". We
-# extract ONLY the lines containing those block characters (the 6
-# rows of letterforms — no borders, no whitespace). Other ╭─/╰─
-# bordered boxes in the agent's transcript (tool-call boxes, input
-# box, sidecars) are NOT confused with the logo because they don't
-# contain the block-character pattern.
+# The DIRGHA logo has 6 letterform rows. Adjacency / corner characters
+# differ per row, but rows 1-5 all contain "██" (consecutive block
+# chars), and row 6 is the bottom-corner row "╚═════╝ ╚═╝╚═╝...".
+# Anchor to "██" — it appears in rows 1-5 of the letterforms and
+# nowhere else in the TUI (tool-call boxes use ╭─/╰─ borders and
+# regular ASCII text inside, never the block character).
 #
-# Returns: the 6-line letterform block, OR "__NO_LOGO__" if all 6
-# rows aren't present (logo scrolled off or partially visible).
-LOGO_SIGNATURE='██████'
+# A frame is considered to have the logo "fully visible" when ≥5
+# matched lines are present (covers letterform rows 1-5; the row-6
+# corner-only line is decorative and absent in many partial-scroll
+# cases anyway). Frames with <5 matches are mid-scroll or absent
+# logo, and are excluded from comparison.
+#
+# Earlier version of this function required 6 matches to a signature
+# that only matches 3 rows ("██████"), so it ALWAYS returned
+# __NO_LOGO__ and the logo check was a silent no-op (caught by
+# DeepSeek adversarial review 2026-05-08 — the positive-control
+# flicker injection passed because of this). Lowering the threshold
+# to 5 with the more inclusive "██" anchor fixes that.
+LOGO_SIGNATURE='██'
 extract_logo() {
   local content
   content=$(cat)
-  # Pull every line containing the block character. The full DIRGHA
-  # logo has 6 such lines. If we see fewer than 6, the logo is
-  # mid-scroll or partially clipped — don't compare.
   local letter_lines count
   letter_lines=$(echo "$content" | grep -F "$LOGO_SIGNATURE" || true)
   count=$(echo "$letter_lines" | grep -c .)
-  if [ "$count" -lt 6 ]; then
+  if [ "$count" -lt 5 ]; then
     echo "__NO_LOGO__"
     return
   fi

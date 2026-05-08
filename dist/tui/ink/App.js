@@ -1009,10 +1009,20 @@ export function App(props) {
     }, [overlays]);
     const liveJsx = React.useMemo(() => renderTranscript(projection.liveItems, thinkingStreaming), [projection.liveItems, thinkingStreaming]);
     const providerEntries = React.useMemo(() => buildProviderEntries(models, currentModel), [models, currentModel]);
-    const LOGO_ITEMS = React.useMemo(() => [{ key: "logo" }], []);
+    // POSITIVE-CONTROL FLICKER (jitter-test 2026-05-08) — DO NOT MERGE.
+    // Forces visible content change every 250ms by alternating the Static
+    // item key AND injecting a label that flips between two strings. Revert.
+    const [_flickerTick, _setFlickerTick] = React.useState(0);
+    React.useEffect(() => {
+        const t = setInterval(() => _setFlickerTick(x => x + 1), 250);
+        return () => clearInterval(t);
+    }, []);
+    const _flickerLabel = (_flickerTick % 2 === 0) ? "FLICKER-A" : "FLICKER-B";
+    const LOGO_ITEMS = [{ key: `logo-${_flickerTick}`, label: _flickerLabel }];
+    // const LOGO_ITEMS = React.useMemo(() => [{ key: "logo" }], []);
     const spinnerCtx = React.useMemo(() => ({ busy, frame: 0 }), [busy]);
     const renderTranscriptItem = React.useCallback((item) => _jsx(TranscriptRow, { item: item }, item.id), []);
-    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: spinnerCtx, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: LOGO_ITEMS, children: () => _jsx(Logo, { version: VERSION }, "logo") }), _jsx(VirtualTranscript, { items: transcript, renderItem: renderTranscriptItem, autoScroll: true, inputFocus: inputFocus }), _jsx(Box, { flexDirection: "column", children: liveJsx }), busy && projection.liveItems.length === 0 && _jsx(GeneratingIndicator, { startedAtMs: turnStartRef.current, liveOutputTokens: liveOutputTokens }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
+    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: spinnerCtx, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: LOGO_ITEMS, children: (item) => _jsx(Logo, { version: `${VERSION}-${item.label}` }, item.label) }), _jsx(VirtualTranscript, { items: transcript, renderItem: renderTranscriptItem, autoScroll: true, inputFocus: inputFocus }), _jsx(Box, { flexDirection: "column", children: liveJsx }), busy && projection.liveItems.length === 0 && _jsx(GeneratingIndicator, { startedAtMs: turnStartRef.current, liveOutputTokens: liveOutputTokens }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
                             approvalBusRef.current?.resolve(pendingApproval.id, decision);
                         } })), pendingFailover !== null && (_jsx(ModelSwitchPrompt, { failedModel: pendingFailover.failedModel, failoverModel: pendingFailover.failoverModel, onAccept: (failover) => {
                             const lastPrompt = pendingFailover.lastPrompt;
