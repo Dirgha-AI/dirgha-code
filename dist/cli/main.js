@@ -220,11 +220,20 @@ async function main() {
     // CLI-level overrides for flags that affect interactive mode too.
     // `--yolo` is the most surface-level form of "skip every approval",
     // more discoverable than `DIRGHA_MODE=yolo`.
-    if (flags.yolo === true)
+    //
+    // FIX 2026-05-08: also set DIRGHA_MODE in the process env so that
+    // `interactive.ts`'s `resolveMode()` (which reads env first, then
+    // stored config) picks up the flag. Without this, `dirgha --yolo`
+    // dropped into interactive mode at the wrong mode and every tool
+    // call still hit the ApprovalBus.
+    if (flags.yolo === true) {
         config.mode = "yolo";
+        process.env["DIRGHA_MODE"] = "yolo";
+    }
     if (typeof flags.mode === "string" &&
         ["plan", "act", "yolo", "verify", "ask"].includes(flags.mode)) {
         config.mode = flags.mode;
+        process.env["DIRGHA_MODE"] = flags.mode;
     }
     const rawModel = typeof flags.model === "string"
         ? flags.model
