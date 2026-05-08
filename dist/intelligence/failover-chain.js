@@ -21,6 +21,12 @@
 import { lookupModel, PRICES } from "../intelligence/prices.js";
 import { familyAlternatives } from "../providers/family-fallback.js";
 const LAST_RESORT_MODEL = "tencent/hy3-preview:free";
+// Demoted 2026-05-08 — both models hang on NIM (verified live). Still
+// in the catalogue for manual `--model` selection; just not auto-picked.
+const AUTO_FAILOVER_BLACKLIST = new Set([
+    "minimaxai/minimax-m2.7",
+    "meta/llama-4-maverick-17b-128e-instruct",
+]);
 /**
  * Per-session state: tracks consecutive failover counts per model.
  * After 5 consecutive failovers on the same model, it is blacklisted
@@ -114,7 +120,10 @@ export function buildFailoverChain(modelId, opts = {}) {
             return finalize(tiers, seen);
     }
     // Tier 4 — first free model as last resort
-    const free = PRICES.find((p) => p.outputPerM === 0 && p.inputPerM === 0 && !seen.has(p.model));
+    const free = PRICES.find((p) => p.outputPerM === 0 &&
+        p.inputPerM === 0 &&
+        !seen.has(p.model) &&
+        !AUTO_FAILOVER_BLACKLIST.has(p.model));
     if (free && !isBlacklisted(free.model) && !seen.has(free.model)) {
         tiers.push({ model: free.model, reason: "free-fallback" });
         seen.add(free.model);
