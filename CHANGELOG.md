@@ -2,6 +2,13 @@
 
 All notable changes are tracked here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); we use [Semantic Versioning](https://semver.org/).
 
+## [1.20.37](https://github.com/Dirgha-AI/dirgha-code/compare/v1.20.36...v1.20.37) (2026-05-08)
+
+
+### Bug Fixes
+
+* **tui:** stop 1Hz body pulse from idle ToolBox elapsed subscriptions ([c734d97](https://github.com/Dirgha-AI/dirgha-code/commit/c734d976b0cf5953518b19d74148ef19d6fe04de))
+
 ## [1.20.36](https://github.com/Dirgha-AI/dirgha-code/compare/v1.20.35...v1.20.36) (2026-05-08)
 
 
