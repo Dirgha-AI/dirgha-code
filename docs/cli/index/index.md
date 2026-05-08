@@ -1,6 +1,6 @@
 # Dirgha CLI — Index
 
-> Latest: **v1.20.25** | [npm](https://www.npmjs.com/package/@dirgha/code) | [GitHub](https://github.com/Dirgha-AI/dirgha-code)
+> Latest: **v1.22.0** | [npm](https://www.npmjs.com/package/@dirgha/code) | [GitHub](https://github.com/Dirgha-AI/dirgha-code)
 
 ## Quick Links
 
@@ -14,7 +14,8 @@
 | [Testing & Quality](#testing--quality)             | Self-test suite, E2E tests, regression guards, CI pipeline                    |
 | [Developer Experience](#developer-experience)      | Interactive wizard, error UX, prompt history, syntax highlighting             |
 | [Architecture Decisions](#architecture-decisions)  | Smart backoff, no-aggressive-blacklist, vendor prefix priority                |
-| [Release History](#release-history)                | Full changelog v1.20.9 → v1.20.25                                             |
+| [Agent-DB workstream](./agent-db.md)               | dirgha-in-VPS as the answer to "agent-native DB" — 7-sprint plan + VC pitch   |
+| [Release History](#release-history)                | Full changelog v1.20.9 → v1.22.0                                              |
 
 ---
 
@@ -321,6 +322,13 @@ Tracks DB write failures. Warns after 10 errors in a session. Exposed via `dirgh
 
 | Version      | Date       | Highlights                                                                                                     |
 | ------------ | ---------- | -------------------------------------------------------------------------------------------------------------- |
+| **v1.22.0**  | 2026-05-08 | `/sandbox` slash command + Ink SandboxPicker overlay; shell tool routes through bwrap/sandbox-exec/JobObject when mode≠off; 20 new sandbox tests; LLM-emitted session title `[session-title] X` on first response sets OSC terminal title |
+| **v1.21.0**  | 2026-05-08 | LLM-emitted session title (preview before Release Please bumped to 1.22.0)                                     |
+| **v1.20.39** | 2026-05-08 | Default alt buffer OFF — restores native scrollback, mouse-wheel selection, copy. Eliminates wheel-replays-old-prompts footgun. OSC 0 title at startup. |
+| **v1.20.38** | 2026-05-08 | Ink 5→7 + React 18→19 upgrade. DECSET 2026 synchronized output wraps every render frame — typing flicker on slow terminals (tmux, vscode, gnome-terminal) atomic-update fixed. |
+| **v1.20.37** | 2026-05-08 | `useElapsed(start, isLive)` — finished ToolBox / DenseToolMessage instances drop the global 1 Hz tick subscription, killing the steady-pulse body flicker after work completes. |
+| **v1.20.36** | 2026-05-08 | Logo flicker on overflow fix — banner emitted via `process.stdout.write()` before Ink mounts, lives in scrollback, Ink's `clearTerminal + fullStaticOutput + output` overflow path can no longer repaint it. |
+| **v1.20.35** | 2026-05-08 | YOLO mode env propagation (`--yolo` reaches interactive REPL via `DIRGHA_MODE`); jitter stability test harness with 4 scenarios |
 | **v1.20.25** | 2026-05-03 | Self-test suite, version sync                                                                                  |
 | **v1.20.24** | 2026-05-03 | Self-test: 9 live API regression tests                                                                         |
 | **v1.20.23** | 2026-05-03 | Flicker detector startup suppression                                                                           |
@@ -343,4 +351,4 @@ Tracks DB write failures. Warns after 10 errors in a session. Exposed via `dirgh
 
 ---
 
-_Last updated: 2026-05-03. CI publishing v1.20.25 to npm._
+_Last updated: 2026-05-08. v1.22.0 published to npm. Agent-DB workstream scoped — see [agent-db.md](./agent-db.md)._
