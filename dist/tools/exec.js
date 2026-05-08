@@ -71,10 +71,29 @@ export function createToolExecutor(opts) {
 async function runTool(tool, input, ctx) {
     const started = Date.now();
     const deadlineMs = tool.timeoutMs ?? 0;
+    // Race tool.execute against ctx.signal so ESC aborts immediately
+    // instead of waiting for tool completion (regression fix).
+    const abortPromise = new Promise((resolve) => {
+        if (ctx.signal.aborted) {
+            resolve({
+                content: `Tool "${tool.name}" aborted before start.`,
+                isError: true,
+            });
+            return;
+        }
+        ctx.signal.addEventListener("abort", () => {
+            resolve({
+                content: `Tool "${tool.name}" aborted by user (signal).`,
+                isError: true,
+                durationMs: Date.now() - started,
+            });
+        }, { once: true });
+    });
     let result;
     if (deadlineMs > 0) {
         result = await Promise.race([
             tool.execute(input, ctx),
+            abortPromise,
             new Promise((resolve) => {
                 const timer = setTimeout(() => {
                     resolve({
@@ -83,14 +102,14 @@ async function runTool(tool, input, ctx) {
                         durationMs: deadlineMs,
                     });
                 }, deadlineMs);
-                // Clean up timer on success to avoid leaking.
-                const abort = () => clearTimeout(timer);
-                ctx.signal?.addEventListener("abort", abort, { once: true });
+                ctx.signal.addEventListener("abort", () => clearTimeout(timer), {
+                    once: true,
+                });
             }),
         ]);
     }
     else {
-        result = await tool.execute(input, ctx);
+        result = await Promise.race([tool.execute(input, ctx), abortPromise]);
     }
     result.durationMs = result.durationMs ?? Date.now() - started;
     return result;
