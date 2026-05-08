@@ -2,6 +2,57 @@
 
 All notable changes are tracked here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); we use [Semantic Versioning](https://semver.org/).
 
+## [1.22.0](https://github.com/Dirgha-AI/dirgha-code/compare/v1.21.0...v1.22.0) (2026-05-08)
+
+
+### Features
+
+* 10/10 polish — collapsible thinking, theme consistency, syntax highlighting, stream spinner ([e47e687](https://github.com/Dirgha-AI/dirgha-code/commit/e47e687108959823462e8999796a4178c11c8eee))
+* dirgha-self-test — 9-test regression suite against live API ([eed2b95](https://github.com/Dirgha-AI/dirgha-code/commit/eed2b95845aa4aaca01260ccdb087cd59aa86ec5))
+* dirgha-self-test — comprehensive live API regression suite ([9087b64](https://github.com/Dirgha-AI/dirgha-code/commit/9087b645713aa31e17d3772c911b2945abf85624))
+* fleet --template &lt;name&gt; wires TEAM_TEMPLATES into runFleet() — skip LLM ([6f88fd3](https://github.com/Dirgha-AI/dirgha-code/commit/6f88fd3f3609522d377ba15e261311d16e9bba82))
+* Gemini CLI-style thinking — always visible bubble, summary+body ([8e0c6bc](https://github.com/Dirgha-AI/dirgha-code/commit/8e0c6bc85e744107298ea86a6a9907eb9e369910))
+* github tool + shell PTY streaming ([3f3adf2](https://github.com/Dirgha-AI/dirgha-code/commit/3f3adf27a10a7ba69cea5401c276b9b9fb1b688e))
+* push CLI audit entries to gateway at turn-end ([13e83d4](https://github.com/Dirgha-AI/dirgha-code/commit/13e83d409665188b7db768090a601d0661599208))
+* Sprint 4-5 — virtualized transcript, flicker detector, render metrics, InputBox cleanup, Date.now fix, compaction thinking, DB telemetry ([b66803d](https://github.com/Dirgha-AI/dirgha-code/commit/b66803db2400506f8b8ffe28b4a64b903506d224))
+* **tui:** LLM-emitted session title on first response ([bd4906d](https://github.com/Dirgha-AI/dirgha-code/commit/bd4906d6fdbc133442a553d66b280d354beba7f3))
+* v1.20.26 — security hardening + fleet templates + config locking ([6f88fd3](https://github.com/Dirgha-AI/dirgha-code/commit/6f88fd3f3609522d377ba15e261311d16e9bba82))
+
+
+### Bug Fixes
+
+* add git to WRITE_TOOLS, default-block browser without explicit action ([36c482c](https://github.com/Dirgha-AI/dirgha-code/commit/36c482ce79b0d32bb122a667defc69853afa3d61))
+* advisory lockfile around config read+merge+write (10-retry, stale steal). ([6f88fd3](https://github.com/Dirgha-AI/dirgha-code/commit/6f88fd3f3609522d377ba15e261311d16e9bba82))
+* **audit:** tail exits cleanly in non-TTY context ([5f084ff](https://github.com/Dirgha-AI/dirgha-code/commit/5f084ff32508000d16510d161fd0e54beb32c6fd))
+* **ci:** remove vite override to eliminate rolldown native binding failure ([8b7713f](https://github.com/Dirgha-AI/dirgha-code/commit/8b7713f8abe0bd8cb9208a9bccbd243fda1bf425))
+* **cli:** YOLO mode interactive env propagation + jitter stability test harness ([6a5aec0](https://github.com/Dirgha-AI/dirgha-code/commit/6a5aec038e17a5cc9c913a6045a967788f939789))
+* **doctor:** cwd-independent playwright probe + singleton memory probe ([21bc276](https://github.com/Dirgha-AI/dirgha-code/commit/21bc276c753b7bdd6d236a7301a681c258461072))
+* **doctor:** legacy doctor-probe-&lt;ts&gt; sweep + --strict exit gate ([9bc6cf9](https://github.com/Dirgha-AI/dirgha-code/commit/9bc6cf9a88bf6529bac294c5117aea13eea97977))
+* **failover:** demote MiniMax-M2.7 + Llama-4-Maverick from auto-pick ([5c0dc1e](https://github.com/Dirgha-AI/dirgha-code/commit/5c0dc1e9bbdeb3629a46207e9178805998cb9747))
+* **memory:** slugify single-arg `memory add` + fix terminology ([6b5a1d2](https://github.com/Dirgha-AI/dirgha-code/commit/6b5a1d296056a55410cf6a21d2496d4b38394691))
+* **providers:** tighten total request timeout from 5min to 90s ([704d97c](https://github.com/Dirgha-AI/dirgha-code/commit/704d97c1094aceacfb215ff084e24654050c88ac))
+* publish uses NODE_AUTH_TOKEN instead of OIDC trusted publisher ([b69eddc](https://github.com/Dirgha-AI/dirgha-code/commit/b69eddc6db09bfee5fa05b8a82213d768b2d008f))
+* remove unused vars — unblock CI lint gate ([4e6d35f](https://github.com/Dirgha-AI/dirgha-code/commit/4e6d35f2d7590f6cdfd6c76dfff10b901844b059))
+* resolve all 8 CLI offline test failures ([4de18cb](https://github.com/Dirgha-AI/dirgha-code/commit/4de18cbfbeeb437b397ad9cd3ee3101c2e46e777))
+* skip vendor builds gracefully when SHA is PENDING ([5fd2d51](https://github.com/Dirgha-AI/dirgha-code/commit/5fd2d51c0ead562c301597b0b839ed646395a17d))
+* smart exponential-backoff health monitor instead of aggressive blacklist ([79647c3](https://github.com/Dirgha-AI/dirgha-code/commit/79647c32648f059528064d810a61d079d333921f))
+* **smoke:** repair nightly Provider Smoke matrix ([a59469f](https://github.com/Dirgha-AI/dirgha-code/commit/a59469f42ca81948cc95803f0d6d1352a187e141))
+* **state:** migrate legacy messages/sessions schema on open ([3b307b7](https://github.com/Dirgha-AI/dirgha-code/commit/3b307b79492cab4c39a681d08078de9b9452a1ca))
+* **state:** use createRequire for better-sqlite3 in ESM context ([01b3652](https://github.com/Dirgha-AI/dirgha-code/commit/01b3652d7f0106e27d629d3889323dd4a2035c06))
+* suppress flicker detector false-positives during TUI startup (first 5 frames) ([634dfd1](https://github.com/Dirgha-AI/dirgha-code/commit/634dfd1f64e6f347a7e4ae55a4e55d6d6ee9469e))
+* sync package.json to v1.20.25 ([49d209c](https://github.com/Dirgha-AI/dirgha-code/commit/49d209c41da659fd5a4a361041b557a00cd74605))
+* ThinkingBlock palette.colors.border type error ([53ba9b6](https://github.com/Dirgha-AI/dirgha-code/commit/53ba9b6f405a900e820312e573333e8e90d5d2a3))
+* **tui+kernel:** logo re-emit flicker + TTFT retry storm ([4dc8448](https://github.com/Dirgha-AI/dirgha-code/commit/4dc8448eb9343baf3e996a0ade05f44e0ec5075a))
+* **tui:** default alt buffer off + emit OSC terminal title ([1f7dbb4](https://github.com/Dirgha-AI/dirgha-code/commit/1f7dbb41ac8eb4fbfad5b0a8ec5f8ab2f0a68336))
+* **tui:** eliminate logo flicker and layout instability ([82d8d8f](https://github.com/Dirgha-AI/dirgha-code/commit/82d8d8f1c8142149117892573dde7ce2629048a0))
+* **tui:** reliable ESC/Ctrl-C abort + reduced tool-progress flicker ([9fb8998](https://github.com/Dirgha-AI/dirgha-code/commit/9fb89982a72fca10852fcf3e362ce1ac53823368))
+* **tui:** stop 1Hz body pulse from idle ToolBox elapsed subscriptions ([c734d97](https://github.com/Dirgha-AI/dirgha-code/commit/c734d976b0cf5953518b19d74148ef19d6fe04de))
+* **tui:** upgrade ink 5→7 + react 18→19 for synchronized output (DECSET 2026) ([cf9eb4f](https://github.com/Dirgha-AI/dirgha-code/commit/cf9eb4f3beb50ac7517c6aa4b10114b3c6b6739c))
+* **tui:** warming-up hint after 5s on slow free-tier first-token ([3670adb](https://github.com/Dirgha-AI/dirgha-code/commit/3670adba78a811f0f0270a88b8cc0e64a4f14db1))
+* unused variable + undefined reference in compaction.ts ([e45d6f1](https://github.com/Dirgha-AI/dirgha-code/commit/e45d6f140f3a8f4827d49af72c88cdce750ec5c2))
+* update bug-regression expectations for mode enforcement ([c032a0e](https://github.com/Dirgha-AI/dirgha-code/commit/c032a0ebe405494925cd6b97028c60aad061f956))
+* UX scorer non-blocking — recording infra broken in CI (0 chars captured) ([aee9678](https://github.com/Dirgha-AI/dirgha-code/commit/aee96780f76fc616ac4cb33aed8601cf968f4d69))
+
 ## [1.21.0](https://github.com/Dirgha-AI/dirgha-code/compare/v1.20.39...v1.21.0) (2026-05-08)
 
 
