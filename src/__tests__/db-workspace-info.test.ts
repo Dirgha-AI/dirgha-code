@@ -53,7 +53,16 @@ describe("db_workspace_info tool", () => {
     if (originalUserProfile !== undefined)
       process.env["USERPROFILE"] = originalUserProfile;
     else delete process.env["USERPROFILE"];
-    await rm(tempHome, { recursive: true, force: true });
+    // Windows EBUSY: better-sqlite3 holds the file handle past db.close().
+    // Retry with backoff; swallow on final failure (test artifacts are tmp).
+    for (let i = 0; i < 3; i++) {
+      try {
+        await rm(tempHome, { recursive: true, force: true });
+        break;
+      } catch {
+        await new Promise((r) => setTimeout(r, 100 * (i + 1)));
+      }
+    }
   });
 
   test("returns a content string with all expected sections", async () => {
