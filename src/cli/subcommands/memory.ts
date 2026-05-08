@@ -80,6 +80,30 @@ export const memorySubcommand: Subcommand = {
       const [, id, ...descParts] = argv;
       if (!id) { stderr.write(`Missing id.\n${HELP}\n`); return 2; }
       const now = new Date().toISOString();
+
+      // Single-arg slugify path
+      if (descParts.length === 0) {
+        let slug = id.toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+        if (!slug) slug = `memory-${Date.now()}`;
+        const wasSlugified = slug !== id;
+        await store.upsert({
+          id: slug,
+          type: 'user',
+          name: slug,
+          description: id,
+          body: '',
+          createdAt: now,
+          updatedAt: now,
+        });
+        stdout.write(style(defaultTheme.success, `✓ added memory "${slug}"\n`));
+        if (wasSlugified) {
+          stdout.write(style(defaultTheme.muted, `  (slugified from "${id}")\n`));
+        }
+        stdout.write(style(defaultTheme.muted, `  edit ~/.dirgha/memory/${slug}.md to fill the body\n`));
+        return 0;
+      }
+
+      // Two-arg form: <id> <description>
       await store.upsert({
         id,
         type: 'user',
