@@ -109,22 +109,27 @@ function makeSlashCtx(
 }
 
 let originalHome: string | undefined;
+let originalUserProfile: string | undefined;
 let tempHome: string;
 
 beforeEach(async () => {
-  // Each test gets a fresh HOME so /sandbox config writes don't bleed.
+  // Each test gets a fresh home dir so /sandbox config writes don't
+  // bleed. Node's `os.homedir()` reads HOME on POSIX and USERPROFILE
+  // on Windows — set both so the test passes on every platform.
   tempHome = await mkdtemp(join(tmpdir(), "dirgha-sb-"));
   originalHome = process.env["HOME"];
+  originalUserProfile = process.env["USERPROFILE"];
   process.env["HOME"] = tempHome;
+  process.env["USERPROFILE"] = tempHome;
   await mkdir(join(tempHome, ".dirgha"), { recursive: true });
 });
 
 afterEach(async () => {
-  if (originalHome !== undefined) {
-    process.env["HOME"] = originalHome;
-  } else {
-    delete process.env["HOME"];
-  }
+  if (originalHome !== undefined) process.env["HOME"] = originalHome;
+  else delete process.env["HOME"];
+  if (originalUserProfile !== undefined)
+    process.env["USERPROFILE"] = originalUserProfile;
+  else delete process.env["USERPROFILE"];
   await rm(tempHome, { recursive: true, force: true });
 });
 
