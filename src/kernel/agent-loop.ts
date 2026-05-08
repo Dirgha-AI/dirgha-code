@@ -92,7 +92,13 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
   let stopReason: StopReason = "end_turn";
   let turnCount = 0;
   let retriesForTurn = 0;
-  const MAX_RETRIES = 3;
+  const DEFAULT_MAX_RETRIES = 3;
+  // Per-reason caps override the default. TTFT timeouts have already
+  // waited 90 s — retrying once is sufficient evidence the provider is
+  // wedged; burning 3× retries wastes ~4.5 min for no benefit.
+  const PER_REASON_MAX_RETRIES: Record<string, number> = {
+    timeout: 1,
+  };
 
   events.emit({
     type: "agent_start",
@@ -226,7 +232,13 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
           ...(failover !== undefined ? { failoverModel: failover } : {}),
         });
 
-        if (classified?.retryable && retriesForTurn < MAX_RETRIES) {
+        const reasonMaxRetries =
+          PER_REASON_MAX_RETRIES[classified?.reason ?? ""] ??
+          DEFAULT_MAX_RETRIES;
+        if (
+          classified?.retryable &&
+          retriesForTurn < reasonMaxRetries
+        ) {
           retriesForTurn++;
           const backoff = classified.backoffMs ?? 1000;
           await new Promise((r) => setTimeout(r, backoff));

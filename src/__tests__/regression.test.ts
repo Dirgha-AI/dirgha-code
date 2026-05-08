@@ -15,6 +15,7 @@ import { describe, it, expect, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import type { Provider, AgentEvent } from "../kernel/types.js";
 
 // ============================================================================
 // regression: reasoning_content echo-back for deepseek-v4-flash multi-turn
@@ -196,5 +197,80 @@ describe("regression: /keys set hydrates process.env", () => {
     delete cleanStore[keyName];
     // We can't easily remove a key from the file, so just unset env
     delete process.env[keyName];
+  });
+});
+
+// ============================================================================
+// regression: TTFT timeout retries at most once per turn (was 3×, ~5 min)
+// issue: https://github.com/Dirgha-AI/dirgha-code/issues/1152
+// fixed: 2026-05-08
+// ============================================================================
+
+describe("regression: TTFT timeout retries at most once", () => {
+  it("returns error stopReason after at most 1 retry when provider times out", async () => {
+    const { runAgentLoop } = await import("../kernel/agent-loop.js");
+    const { createEventStream } = await import("../kernel/event-stream.js");
+    const { createErrorClassifier } = await import(
+      "../intelligence/error-classifier.js"
+    );
+    const { MockToolExecutor } = await import("./fixtures/mock-executor.js");
+
+    const classifier = createErrorClassifier();
+
+    // Count how many times stream() is called on this provider.
+    let streamCalls = 0;
+    const ttftError = new Error("Request timed out after 90000ms");
+    const throwingProvider: Provider = {
+      id: "deepseek",
+      supportsTools: () => true,
+      supportsThinking: () => false,
+      async *stream() {
+        streamCalls++;
+        throw ttftError;
+      },
+    };
+
+    const executor = new MockToolExecutor();
+    const events = createEventStream();
+    const collected: AgentEvent[] = [];
+    events.subscribe((ev) => collected.push(ev));
+
+    const result = await runAgentLoop({
+      sessionId: "regression-ttft",
+      model: "deepseek-chat",
+      messages: [{ role: "user", content: "hello" }],
+      tools: [],
+      maxTurns: 5,
+      provider: throwingProvider,
+      toolExecutor: executor,
+      events,
+      errorClassifier: classifier,
+    });
+
+    // Must bail with error stop reason.
+    expect(result.stopReason).toBe("error");
+
+    // At most 1 retry: initial call + 1 retry = max 2 stream() calls
+    // (the old bug would have been 3 calls — initial + 2 retries).
+    expect(streamCalls).toBeLessThanOrEqual(2);
+
+    // Verify agent_end event was emitted with error reason.
+    const agentEnd = collected.find((ev) => ev.type === "agent_end");
+    expect(agentEnd).toBeDefined();
+    if (agentEnd && agentEnd.type === "agent_end") {
+      expect(agentEnd.stopReason).toBe("error");
+    }
+
+    // Verify we got error events — one per attempt. With cap=1 we expect
+    // exactly 2 error events (initial + one retry) before bailing.
+    const errorEvents = collected.filter((ev) => ev.type === "error");
+    expect(errorEvents.length).toBe(2);
+
+    // Verify the emitted error events carry the timeout reason.
+    for (const ev of errorEvents) {
+      if (ev.type === "error") {
+        expect(ev.reason).toBe("timeout");
+      }
+    }
   });
 });
