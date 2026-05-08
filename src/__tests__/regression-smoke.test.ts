@@ -162,7 +162,14 @@ afterAll(async () => {
     if (SAVED_ENV[k] === undefined) delete process.env[k];
     else process.env[k] = SAVED_ENV[k];
   }
-  await rm(TMP_HOME, { recursive: true, force: true });
+  for (let i = 0; i < 3; i++) {
+    try {
+      await rm(TMP_HOME, { recursive: true, force: true });
+      break;
+    } catch {
+      await new Promise((r) => setTimeout(r, 100 * (i + 1)));
+    }
+  }
 });
 
 // Sanity: confirm HOME was actually redirected. If a parallel test file
@@ -479,7 +486,14 @@ describe("agent-DB regression smoke (Wave 1-3 coverage)", () => {
 
     afterEach(async () => {
       db.close();
-      await rm(workdir, { recursive: true, force: true });
+      for (let i = 0; i < 3; i++) {
+        try {
+          await rm(workdir, { recursive: true, force: true });
+          break;
+        } catch {
+          await new Promise((r) => setTimeout(r, 100 * (i + 1)));
+        }
+      }
     });
 
     async function syncIndex(rootDir: string): Promise<{
