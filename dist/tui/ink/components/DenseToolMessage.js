@@ -45,7 +45,7 @@ export const DenseToolMessage = React.memo(function DenseToolMessage(props) {
         : props.status === "error"
             ? palette.status.error
             : palette.text.primary;
-    const liveElapsed = useElapsed(props.startedAt ?? 0);
+    const liveElapsed = useElapsed(props.startedAt ?? 0, props.status === "running" && props.startedAt !== undefined);
     const elapsed = props.status === "running" && props.startedAt
         ? liveElapsed
         : props.durationMs !== undefined
