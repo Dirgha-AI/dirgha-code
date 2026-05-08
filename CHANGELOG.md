@@ -2,6 +2,13 @@
 
 All notable changes are tracked here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); we use [Semantic Versioning](https://semver.org/).
 
+## [1.20.38](https://github.com/Dirgha-AI/dirgha-code/compare/v1.20.37...v1.20.38) (2026-05-08)
+
+
+### Bug Fixes
+
+* **tui:** upgrade ink 5→7 + react 18→19 for synchronized output (DECSET 2026) ([cf9eb4f](https://github.com/Dirgha-AI/dirgha-code/commit/cf9eb4f3beb50ac7517c6aa4b10114b3c6b6739c))
+
 ## [1.20.37](https://github.com/Dirgha-AI/dirgha-code/compare/v1.20.36...v1.20.37) (2026-05-08)
 
 
