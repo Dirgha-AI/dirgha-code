@@ -25,6 +25,7 @@ import { kbSearchTool } from "./kb-search.js";
 import { graphNeighborsTool } from "./graph-neighbors.js";
 import { graphTraverseTool } from "./graph-traverse.js";
 import { transactionalWriteTool } from "./transactional-write.js";
+import { dbWorkspaceInfoTool } from "./db-workspace-info.js";
 export { createMultimodalTool } from "./multimodal.js";
 export { createCronTool } from "./cron.js";
 export { createCheckpointTool } from "./checkpoint.js";
@@ -62,6 +63,7 @@ export const builtInTools = [
     graphNeighborsTool,
     graphTraverseTool,
     transactionalWriteTool,
+    dbWorkspaceInfoTool,
 ];
-export { fsReadTool, fsWriteTool, fsEditTool, fsLsTool, shellTool, searchGrepTool, searchGlobTool, gitTool, githubTool, browserTool, checkpointTool, cronTool, lspGoToDefinitionTool, lspFindReferencesTool, lspHoverTool, lspDocumentSymbolsTool, rtkTool, qmdTool, kbSearchTool, graphNeighborsTool, graphTraverseTool, transactionalWriteTool, };
+export { fsReadTool, fsWriteTool, fsEditTool, fsLsTool, shellTool, searchGrepTool, searchGlobTool, gitTool, githubTool, browserTool, checkpointTool, cronTool, lspGoToDefinitionTool, lspFindReferencesTool, lspHoverTool, lspDocumentSymbolsTool, rtkTool, qmdTool, kbSearchTool, graphNeighborsTool, graphTraverseTool, transactionalWriteTool, dbWorkspaceInfoTool, };
 //# sourceMappingURL=index.js.map
