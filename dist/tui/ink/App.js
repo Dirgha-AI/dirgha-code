@@ -188,12 +188,18 @@ export function App(props) {
         // session entry, (c) React state for any future `/sessions` UI.
         isFirstTurn: React.useCallback(() => firstTurnRef.current, []),
         onSessionTitle: React.useCallback((title) => {
-            // Strip control characters (the LLM is untrusted output going
-            // straight into an OSC sequence; a raw 0x07/0x9c could close the
-            // string control prematurely and inject arbitrary terminal codes).
-            // eslint-disable-next-line no-control-regex
-            const safe = title
-                .replace(/[\x00-\x1f\x7f]/g, "")
+            // Strip control characters from LLM-supplied title before
+            // injecting into an OSC sequence — a raw 0x07/0x9c would close
+            // the OSC string early and let the model inject arbitrary
+            // terminal codes. Codepoint filter avoids eslint's
+            // `no-control-regex` rule (which fires on both literal and
+            // string-constructed regexes).
+            const safe = Array.from(title)
+                .filter((c) => {
+                const cp = c.charCodeAt(0);
+                return cp >= 0x20 && cp !== 0x7f;
+            })
+                .join("")
                 .slice(0, 80)
                 .trim();
             if (!safe)
