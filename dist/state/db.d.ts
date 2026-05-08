@@ -9,6 +9,8 @@
  * Uses better-sqlite3 for synchronous, zero-config SQLite.
  */
 import type { Message } from "../kernel/types.js";
+/** Return the shared SQLite database handle, opening it if needed. */
+export declare function openDb(): import("better-sqlite3").Database;
 export declare function dbOpenSession(id: string, model?: string, cwd?: string): void;
 export declare function dbCloseSession(id: string): void;
 export declare function dbAppendMessage(sessionId: string, message: Message): void;
