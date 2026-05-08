@@ -2,6 +2,13 @@
 
 All notable changes are tracked here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); we use [Semantic Versioning](https://semver.org/).
 
+## [1.21.0](https://github.com/Dirgha-AI/dirgha-code/compare/v1.20.39...v1.21.0) (2026-05-08)
+
+
+### Features
+
+* **tui:** LLM-emitted session title on first response ([bd4906d](https://github.com/Dirgha-AI/dirgha-code/commit/bd4906d6fdbc133442a553d66b280d354beba7f3))
+
 ## [1.20.39](https://github.com/Dirgha-AI/dirgha-code/compare/v1.20.38...v1.20.39) (2026-05-08)
 
 
