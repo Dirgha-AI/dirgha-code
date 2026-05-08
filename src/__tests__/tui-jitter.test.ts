@@ -529,3 +529,89 @@ describe("renderLogoString", () => {
     expect(a).toBe(b);
   });
 });
+
+// ──────────────────────────────────────────────────────────
+// TEST: useElapsed `isLive` gate — pins the body-flicker fix
+// ──────────────────────────────────────────────────────────
+//
+// Before v1.20.37 the hook subscribed unconditionally to a global 1 s
+// tick. ToolBox / DenseToolMessage instances stayed mounted in the
+// transcript after their tool finished, so each one re-rendered every
+// second forever — the steady-pulse body flicker users reported even
+// while idle. The fix gates subscription on `isLive`. These tests pin
+// that the hook does NOT register a listener when isLive is false.
+describe("useElapsed isLive gate (body-flicker regression)", () => {
+  test("isLive=false adds no listener; isLive=true adds one and removes on unmount", async () => {
+    const mod = await import("../tui/ink/use-elapsed.js");
+    const { Text } = await import("ink");
+
+    function ElapsedProbe(p: { startedAt: number; live: boolean }) {
+      mod.useElapsed(p.startedAt, p.live);
+      return React.createElement(Text, null, " ");
+    }
+
+    const before = mod._listenerCountForTests();
+
+    // Frozen mount — must NOT subscribe.
+    const stdout1 = new CaptureStream();
+    const stdin1 = new FakeStdin();
+    const ink1 = render(
+      React.createElement(ElapsedProbe, {
+        startedAt: Date.now() - 5000,
+        live: false,
+      }),
+      { stdout: stdout1 as any, stdin: stdin1 as any, debug: true },
+    );
+    await sleep(60); // give useEffect time to run
+    expect(mod._listenerCountForTests()).toBe(before);
+    ink1.unmount();
+    await sleep(60);
+    expect(mod._listenerCountForTests()).toBe(before);
+
+    // Live mount — must subscribe; unmount must clean up.
+    const stdout2 = new CaptureStream();
+    const stdin2 = new FakeStdin();
+    const ink2 = render(
+      React.createElement(ElapsedProbe, {
+        startedAt: Date.now(),
+        live: true,
+      }),
+      { stdout: stdout2 as any, stdin: stdin2 as any, debug: true },
+    );
+    await sleep(60);
+    expect(mod._listenerCountForTests()).toBe(before + 1);
+    ink2.unmount();
+    await sleep(60);
+    expect(mod._listenerCountForTests()).toBe(before);
+  });
+
+  test("many frozen instances stay at zero listeners (transcript-history scenario)", async () => {
+    const mod = await import("../tui/ink/use-elapsed.js");
+    const { Text, Box } = await import("ink");
+
+    // Simulates 6 finished tool boxes lingering in the transcript —
+    // this is the steady-pulse repro: prior versions had 6 listeners.
+    function FrozenList() {
+      return React.createElement(
+        Box as any,
+        { flexDirection: "column" },
+        Array.from({ length: 6 }, (_, i) => {
+          mod.useElapsed(Date.now() - (i + 1) * 1000, false);
+          return React.createElement(Text, { key: i }, ".");
+        }),
+      );
+    }
+
+    const before = mod._listenerCountForTests();
+    const stdout = new CaptureStream();
+    const stdin = new FakeStdin();
+    const ink = render(React.createElement(FrozenList), {
+      stdout: stdout as any,
+      stdin: stdin as any,
+      debug: true,
+    });
+    await sleep(80);
+    expect(mod._listenerCountForTests()).toBe(before);
+    ink.unmount();
+  });
+});

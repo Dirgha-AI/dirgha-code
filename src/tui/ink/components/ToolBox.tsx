@@ -138,7 +138,7 @@ export const ToolBox = React.memo(function ToolBox(
           ? palette.border.default
           : palette.ui.focus;
 
-  const liveElapsed = useElapsed(props.startedAt);
+  const liveElapsed = useElapsed(props.startedAt, props.status === "running");
   const elapsedLabel =
     props.status === "blocked"
       ? ""
