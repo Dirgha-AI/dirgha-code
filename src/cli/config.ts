@@ -136,6 +136,21 @@ export interface DirghaConfig {
     before_tool_call?: Array<{ command: string; matcher?: string }>;
     after_tool_call?: Array<{ command: string; matcher?: string }>;
   };
+  /**
+   * Optional remote endpoint for text embeddings. When set, kb_search
+   * and any other embedding consumer POST `{texts: string[]}` here and
+   * expect `{vectors: number[][]}` back. Leave unset to use the local
+   * Xenova/transformers.js adapter (requires the optional
+   * `@xenova/transformers` package). Override at runtime via the
+   * `DIRGHA_EMBEDDINGS_ENDPOINT` env var.
+   */
+  embeddingsEndpoint?: string;
+  /**
+   * Optional bearer token for the embeddings endpoint. Sent as
+   * `Authorization: Bearer <token>`. Override via the
+   * `DIRGHA_EMBEDDINGS_TOKEN` env var.
+   */
+  embeddingsBearerToken?: string;
 }
 
 const CURRENT_SCHEMA = 1;
@@ -225,6 +240,12 @@ function readEnvOverrides(): Partial<DirghaConfig> {
     )
   ) {
     out.mode = modeEnv as "plan" | "act" | "yolo" | "verify" | "ask";
+  }
+  if (process.env.DIRGHA_EMBEDDINGS_ENDPOINT) {
+    out.embeddingsEndpoint = process.env.DIRGHA_EMBEDDINGS_ENDPOINT;
+  }
+  if (process.env.DIRGHA_EMBEDDINGS_TOKEN) {
+    out.embeddingsBearerToken = process.env.DIRGHA_EMBEDDINGS_TOKEN;
   }
   return out;
 }

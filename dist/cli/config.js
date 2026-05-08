@@ -78,6 +78,12 @@ function readEnvOverrides() {
         ["plan", "act", "yolo", "verify", "ask"].includes(modeEnv)) {
         out.mode = modeEnv;
     }
+    if (process.env.DIRGHA_EMBEDDINGS_ENDPOINT) {
+        out.embeddingsEndpoint = process.env.DIRGHA_EMBEDDINGS_ENDPOINT;
+    }
+    if (process.env.DIRGHA_EMBEDDINGS_TOKEN) {
+        out.embeddingsBearerToken = process.env.DIRGHA_EMBEDDINGS_TOKEN;
+    }
     return out;
 }
 function merge(...partials) {
