@@ -30,6 +30,7 @@ let telemetry: DbTelemetryData = {
 
 let warned = false;
 let loaded = false;
+let firstSuccess = true;
 
 async function ensureLoaded(): Promise<void> {
   if (loaded) return;
@@ -78,8 +79,11 @@ export function recordDbError(err: unknown): void {
 
   if (!warned && telemetry.failedWrites >= 10) {
     warned = true;
+    const suffix = telemetry.lastError
+      ? ` (${telemetry.lastError})`
+      : "";
     process.stderr.write(
-      "[Dirgha] DB writes failing — session data may not persist.\n",
+      `[Dirgha] DB writes failing — session data may not persist.${suffix}\n`,
     );
   }
 
@@ -88,6 +92,12 @@ export function recordDbError(err: unknown): void {
 
 export function recordDbSuccess(): void {
   void ensureLoaded();
+  if (firstSuccess) {
+    firstSuccess = false;
+    telemetry.failedWrites = 0;
+    // Do not reset `warned` — once printed, the warning stays printed
+    // to avoid re-arming on subsequent failure periods.
+  }
   telemetry.totalWrites++;
   schedulePersist();
 }

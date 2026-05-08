@@ -17,7 +17,7 @@
  * tools so the user knows what to install.
  */
 import { spawnSync } from "node:child_process";
-import { writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, mkdirSync, statSync } from "node:fs";
 import { homedir, tmpdir, platform } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -30,8 +30,7 @@ function readClipboardImage() {
         const png = spawnSync("pngpaste", [tmp]);
         if (png.status === 0) {
             try {
-                const fs = require("node:fs");
-                const st = fs.statSync(tmp);
+                const st = statSync(tmp);
                 return { ok: true, path: tmp, bytes: st.size, mime: "image/png" };
             }
             catch {
@@ -55,8 +54,7 @@ function readClipboardImage() {
         const wl = spawnSync("wl-paste", ["--type", "image/png", "-o", tmp]);
         if (wl.status === 0) {
             try {
-                const fs = require("node:fs");
-                const st = fs.statSync(tmp);
+                const st = statSync(tmp);
                 if (st.size > 0)
                     return { ok: true, path: tmp, bytes: st.size, mime: "image/png" };
             }
@@ -105,8 +103,7 @@ function readClipboardImage() {
         ], { encoding: "utf8" });
         if (ps.status === 0 && /OK/.test(ps.stdout || "")) {
             try {
-                const fs = require("node:fs");
-                const st = fs.statSync(tmp);
+                const st = statSync(tmp);
                 return { ok: true, path: tmp, bytes: st.size, mime: "image/png" };
             }
             catch {

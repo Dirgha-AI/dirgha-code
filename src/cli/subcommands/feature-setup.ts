@@ -99,7 +99,7 @@ async function extractNodeFromTarGz(tarGzPath: string, outDir: string): Promise<
 
   // Fallback: streaming zlib parse.
   return new Promise((resolve, reject) => {
-    const { createReadStream } = require('node:fs') as typeof import('node:fs');
+    const { createReadStream } = _require('node:fs') as typeof import('node:fs');
     const gunzip = createGunzip();
     const rs = createReadStream(tarGzPath);
     const chunks: Uint8Array[] = [];
@@ -125,7 +125,7 @@ async function extractNodeFromTarGz(tarGzPath: string, outDir: string): Promise<
         if (name.endsWith('.node')) {
           const fileData = buf.slice(offset, offset + size);
           const outFile = join(outDir, 'better_sqlite3.node');
-          require('node:fs').writeFileSync(outFile, fileData);
+          _require('node:fs').writeFileSync(outFile, fileData);
           foundPath = outFile;
         }
         // Advance past file content (rounded up to 512-byte boundary).
@@ -151,7 +151,7 @@ async function detectFeatures(): Promise<FeatureStatus> {
   // SQLite: try to require better-sqlite3.
   let sqliteAvailable = false;
   try {
-    require('better-sqlite3');
+    _require('better-sqlite3');
     sqliteAvailable = true;
   } catch {
     // Not available or native addon missing.
@@ -297,8 +297,8 @@ async function installSqlitePrebuilt(): Promise<InstallResult> {
   } catch {
     // rename across devices fails — try copy.
     try {
-      const data = require('node:fs').readFileSync(nodePath);
-      require('node:fs').writeFileSync(dest, data);
+      const data = _require('node:fs').readFileSync(nodePath);
+      _require('node:fs').writeFileSync(dest, data);
     } catch (cpErr) {
       await rm(tmpDir, { recursive: true, force: true }).catch(() => {});
       return {
@@ -377,7 +377,7 @@ function verifySqlite(): boolean {
     const id = 'better-sqlite3';
     // Delete from require cache so the updated .node is picked up.
     try {
-      delete require.cache[_require.resolve(id)];
+      delete _require.cache[_require.resolve(id)];
     } catch { /* resolve may fail if not installed */ }
     _require(id);
     return true;
