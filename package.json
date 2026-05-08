@@ -26,6 +26,7 @@
     "test:cli:offline": "node scripts/qa-app/run-all.mjs --offline",
     "test:tui": "bash scripts/qa-app/picker-flow.sh",
     "test:smoke": "bash scripts/smoke-matrix.sh all",
+    "test:agent-db-smoke": "vitest run --dir src regression-smoke",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "verify-install": "bash scripts/verify-install.sh",
     "prepublish-guard": "bash scripts/prepublish-guard.sh",
