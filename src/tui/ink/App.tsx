@@ -83,6 +83,7 @@ import { getUpdateBannerVersion } from "../../cli/update-check.js";
 import { AtFileComplete } from "./components/AtFileComplete.js";
 import { SlashComplete } from "./components/SlashComplete.js";
 import { ThemePicker } from "./components/ThemePicker.js";
+import { SandboxPicker } from "./components/SandboxPicker.js";
 import { ThemeProvider, useTheme } from "./theme-context.js";
 import { SpinnerContext } from "./spinner-context.js";
 import { SpinnerGlyph } from "./components/SpinnerGlyph.js";
@@ -169,6 +170,12 @@ export function App(props: AppProps): React.JSX.Element {
     !(props.initialMessages ?? []).some(
       (m) => m.role === "user" || m.role === "assistant",
     ),
+  );
+  // Live sandbox mode — initialised from config, mutated by /sandbox.
+  // Read by the executor wiring on every tool dispatch so the toggle
+  // takes effect on the next tool call without re-mounting the App.
+  const sandboxModeRef = React.useRef<"off" | "auto" | "strict">(
+    props.config.sandbox ?? "off",
   );
 
   React.useEffect(() => {
@@ -650,6 +657,11 @@ export function App(props: AppProps): React.JSX.Element {
         overlays.openOverlay("theme");
         return;
       }
+      // `/sandbox` with no args opens the picker; `/sandbox <mode>` sets directly.
+      if (value === "/sandbox") {
+        overlays.openOverlay("sandbox");
+        return;
+      }
       // /upgrade and /self-update trigger npm install + restart.
       if (
         value === "/upgrade" ||
@@ -765,6 +777,10 @@ export function App(props: AppProps): React.JSX.Element {
           getTheme: () =>
             (props.config.theme as ThemeName | undefined) ?? "readable",
           setTheme: () => undefined,
+          getSandbox: () => sandboxModeRef.current,
+          setSandbox: (next: "off" | "auto" | "strict") => {
+            sandboxModeRef.current = next;
+          },
           getSession: () => null,
           getSessionStore: () => props.sessions,
           getProvider: () => props.providers.forModel(currentModel),
@@ -886,6 +902,7 @@ export function App(props: AppProps): React.JSX.Element {
         registry: props.registry,
         cwd: props.cwd,
         sessionId: sessionIdRef.current,
+        sandboxMode: sandboxModeRef.current,
         onProgress: (toolId: string, message: string): void => {
           props.events.emit({
             type: "tool_exec_progress",
@@ -1195,6 +1212,33 @@ export function App(props: AppProps): React.JSX.Element {
     (props.config.theme ?? "readable") as ThemeName,
   );
 
+  const handleSandboxPick = React.useCallback(
+    (next: "off" | "auto" | "strict"): void => {
+      overlays.closeOverlay();
+      sandboxModeRef.current = next;
+      const note: TranscriptItem = {
+        kind: "notice",
+        id: randomUUID(),
+        text: `Sandbox mode → ${next}`,
+      };
+      setTranscript((t) => [...t, note]);
+      void (async (): Promise<void> => {
+        try {
+          const dir = pathJoin(homedir(), ".dirgha");
+          await mkdir(dir, { recursive: true });
+          const path = pathJoin(dir, "config.json");
+          const text = await readFile(path, "utf8").catch(() => "");
+          const cfg = text ? (JSON.parse(text) as Record<string, unknown>) : {};
+          cfg.sandbox = next;
+          await writeFile(path, `${JSON.stringify(cfg, null, 2)}\n`, "utf8");
+        } catch {
+          /* best-effort persistence */
+        }
+      })();
+    },
+    [overlays],
+  );
+
   const handleThemePick = React.useCallback(
     (name: ThemeName): void => {
       overlays.closeOverlay();
@@ -1394,6 +1438,13 @@ export function App(props: AppProps): React.JSX.Element {
             <ThemePicker
               current={themeName}
               onPick={handleThemePick}
+              onCancel={overlays.closeOverlay}
+            />
+          )}
+          {overlays.active === "sandbox" && (
+            <SandboxPicker
+              current={sandboxModeRef.current}
+              onPick={handleSandboxPick}
               onCancel={overlays.closeOverlay}
             />
           )}

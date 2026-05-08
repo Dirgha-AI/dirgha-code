@@ -10,6 +10,13 @@
  */
 import type { JsonSchema, ToolDefinition, ToolResult } from "../kernel/types.js";
 import type { SandboxAdapter } from "../safety/sandbox/iface.js";
+/**
+ * User-controlled sandbox mode. `off` runs tools with no containment
+ * (current default — backwards compatible). `auto` confines spawnable
+ * tools (shell/git/lsp) to the cwd via the platform sandbox adapter
+ * with network allowed. `strict` adds a network ban on top.
+ */
+export type SandboxMode = "off" | "auto" | "strict";
 export interface ToolContext {
     cwd: string;
     env: Record<string, string>;
@@ -17,6 +24,9 @@ export interface ToolContext {
     signal: AbortSignal;
     /** Platform sandbox adapter, or null when sandbox is unavailable. */
     sandbox: SandboxAdapter | null;
+    /** Selected sandbox mode. Tools that spawn external commands honour
+     *  this — fs-* tools currently do not (path allowlist work TBD). */
+    sandboxMode: SandboxMode;
     log?: (level: "debug" | "info" | "warn" | "error", msg: string, meta?: Record<string, unknown>) => void;
     onProgress?: (message: string) => void;
 }

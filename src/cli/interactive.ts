@@ -120,6 +120,7 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
   let currentThemeName: ThemeName =
     (opts.config.theme as ThemeName | undefined) ?? "readable";
   let currentTheme: Theme = getTheme(currentThemeName);
+  let currentSandboxMode: "off" | "auto" | "strict" = opts.config.sandbox ?? "off";
 
   const initial: Message[] = [...(opts.initialMessages ?? [])];
   // System prompt is rebuilt per turn below so mode changes apply live.
@@ -311,6 +312,14 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
               rl.setPrompt(style(currentTheme.userPrompt, "❯ "));
             },
           },
+          sandboxRef: {
+            get mode() {
+              return currentSandboxMode;
+            },
+            set mode(v) {
+              currentSandboxMode = v;
+            },
+          },
           providerForCurrent: () => opts.providers.forModel(currentModel),
           summaryModel: opts.config.summaryModel,
         });
@@ -346,6 +355,7 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
         registry: opts.registry,
         cwd: opts.cwd,
         sessionId,
+        sandboxMode: currentSandboxMode,
       });
       const sanitized = opts.registry.sanitize({ descriptionLimit: 200 });
       const provider = opts.providers.forModel(currentModel);
@@ -433,6 +443,7 @@ interface SlashCtxArgs {
   status: (message: string) => void;
   modeRef: { mode: Mode };
   themeRef: { name: ThemeName };
+  sandboxRef: { mode: "off" | "auto" | "strict" };
   providerForCurrent: () => Provider;
   summaryModel: string;
 }
@@ -557,6 +568,12 @@ function buildSlashCtx(a: SlashCtxArgs): SlashContext {
     },
     setTheme(value: ThemeName): void {
       a.themeRef.name = value;
+    },
+    getSandbox(): "off" | "auto" | "strict" {
+      return a.sandboxRef.mode;
+    },
+    setSandbox(mode: "off" | "auto" | "strict"): void {
+      a.sandboxRef.mode = mode;
     },
     getSession(): Session {
       return a.session;

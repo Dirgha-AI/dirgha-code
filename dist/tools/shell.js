@@ -105,6 +105,70 @@ export const shellTool = {
                 return { content: `cwd escapes workspace: ${cwd}`, isError: true };
             }
         }
+        // Sandbox routing — when the user enabled `auto` or `strict` mode
+        // via `/sandbox`, forward the command to the platform sandbox
+        // adapter (bwrap / sandbox-exec / Job Object) so the spawned
+        // child can only write inside `cwd`. `strict` additionally bans
+        // network. `off` keeps the legacy direct-spawn path below.
+        const sandboxActive = (ctx.sandboxMode === "auto" || ctx.sandboxMode === "strict") &&
+            ctx.sandbox !== null;
+        const sandbox = ctx.sandbox;
+        if (sandboxActive &&
+            sandbox !== null &&
+            (await sandbox.available().catch(() => false))) {
+            const cmd = process.platform === "win32"
+                ? (await resolveWindowsShell()).args(input.command)
+                : ["/bin/sh", "-c", input.command];
+            const fullCmd = process.platform === "win32"
+                ? [(await resolveWindowsShell()).cmd, ...cmd]
+                : cmd;
+            try {
+                const result = await sandbox.exec({
+                    command: fullCmd,
+                    cwd,
+                    env: ctx.env,
+                    writablePaths: [cwd],
+                    networkAllowed: ctx.sandboxMode !== "strict",
+                    timeoutMs,
+                    signal: ctx.signal,
+                });
+                const stdout = result.stdout.length > MAX_OUTPUT_BYTES
+                    ? result.stdout.slice(0, MAX_OUTPUT_BYTES)
+                    : result.stdout;
+                const stderr = result.stderr.length > MAX_OUTPUT_BYTES
+                    ? result.stderr.slice(0, MAX_OUTPUT_BYTES)
+                    : result.stderr;
+                const truncated = result.stdout.length > MAX_OUTPUT_BYTES ||
+                    result.stderr.length > MAX_OUTPUT_BYTES;
+                const sandboxLabel = `[sandbox: ${result.platform}/${ctx.sandboxMode}]`;
+                const content = [
+                    sandboxLabel,
+                    stdout && `STDOUT:\n${stdout}`,
+                    stderr && `STDERR:\n${stderr}`,
+                    `Exit: ${result.exitCode}${result.timedOut ? " (timeout)" : ""}`,
+                    truncated && "(output truncated)",
+                ]
+                    .filter(Boolean)
+                    .join("\n\n") || sandboxLabel;
+                return {
+                    content,
+                    isError: result.exitCode !== 0,
+                    data: {
+                        exitCode: result.exitCode,
+                        stdoutBytes: stdout.length,
+                        stderrBytes: stderr.length,
+                        truncated,
+                    },
+                };
+            }
+            catch (err) {
+                const msg = err instanceof Error ? err.message : String(err);
+                return {
+                    content: `Sandbox exec failed (${ctx.sandboxMode}): ${msg}`,
+                    isError: true,
+                };
+            }
+        }
         const child = process.platform === "win32"
             ? (async () => {
                 const shell = await resolveWindowsShell();

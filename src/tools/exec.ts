@@ -11,7 +11,12 @@
  */
 
 import type { ToolCall, ToolResult, ToolExecutor } from "../kernel/types.js";
-import type { Tool, ToolContext, ToolRegistry } from "./registry.js";
+import type {
+  Tool,
+  ToolContext,
+  ToolRegistry,
+  SandboxMode,
+} from "./registry.js";
 import type { SandboxAdapter } from "../safety/sandbox/iface.js";
 import type { PermissionEngine } from "./permission.js";
 import { selectSandbox } from "../safety/sandbox/select.js";
@@ -26,6 +31,9 @@ export interface ToolExecutorOptions {
   log?: ToolContext["log"];
   onProgress?: (toolId: string, message: string) => void;
   permission?: PermissionEngine;
+  /** User-selected sandbox mode (config + /sandbox slash command).
+   *  Defaults to "off" when omitted (backwards compatible). */
+  sandboxMode?: SandboxMode;
 }
 
 export function createToolExecutor(opts: ToolExecutorOptions): ToolExecutor {
@@ -71,6 +79,7 @@ export function createToolExecutor(opts: ToolExecutorOptions): ToolExecutor {
         sessionId: opts.sessionId,
         signal,
         sandbox,
+        sandboxMode: opts.sandboxMode ?? "off",
         log: opts.log,
         onProgress: opts.onProgress
           ? (msg: string) => opts.onProgress!(call.id, msg)

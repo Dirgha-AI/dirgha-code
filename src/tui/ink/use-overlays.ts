@@ -15,6 +15,7 @@ export type OverlayKind =
   | "atfile"
   | "slash"
   | "theme"
+  | "sandbox"
   | null;
 
 export interface OverlayApi {
@@ -24,7 +25,7 @@ export interface OverlayApi {
   setAtQuery: (q: string | null) => void;
   slashQuery: string | null;
   setSlashQuery: (q: string | null) => void;
-  openOverlay: (k: "models" | "help" | "theme") => void;
+  openOverlay: (k: "models" | "help" | "theme" | "sandbox") => void;
   closeOverlay: () => void;
   /**
    * Splice a selected @-file path back into `value`, replacing the
@@ -62,7 +63,7 @@ export function useOverlays(): OverlayApi {
   }, [atQuery, slashQuery, active]);
 
   const openOverlay = React.useCallback(
-    (k: "models" | "help" | "theme"): void => {
+    (k: "models" | "help" | "theme" | "sandbox"): void => {
       setActive(k);
     },
     [],

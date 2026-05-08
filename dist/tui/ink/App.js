@@ -53,6 +53,7 @@ import { getUpdateBannerVersion } from "../../cli/update-check.js";
 import { AtFileComplete } from "./components/AtFileComplete.js";
 import { SlashComplete } from "./components/SlashComplete.js";
 import { ThemePicker } from "./components/ThemePicker.js";
+import { SandboxPicker } from "./components/SandboxPicker.js";
 import { ThemeProvider, useTheme } from "./theme-context.js";
 import { SpinnerContext } from "./spinner-context.js";
 import { SpinnerGlyph } from "./components/SpinnerGlyph.js";
@@ -101,6 +102,10 @@ export function App(props) {
     // instruction only on the first turn; after the first agent_end the
     // instruction is stripped out so it does not appear on every turn.
     const firstTurnRef = React.useRef(!(props.initialMessages ?? []).some((m) => m.role === "user" || m.role === "assistant"));
+    // Live sandbox mode — initialised from config, mutated by /sandbox.
+    // Read by the executor wiring on every tool dispatch so the toggle
+    // takes effect on the next tool call without re-mounting the App.
+    const sandboxModeRef = React.useRef(props.config.sandbox ?? "off");
     React.useEffect(() => {
         const id = sessionIdRef.current;
         void props.sessions.create(id).then((s) => {
@@ -557,6 +562,11 @@ export function App(props) {
             overlays.openOverlay("theme");
             return;
         }
+        // `/sandbox` with no args opens the picker; `/sandbox <mode>` sets directly.
+        if (value === "/sandbox") {
+            overlays.openOverlay("sandbox");
+            return;
+        }
         // /upgrade and /self-update trigger npm install + restart.
         if (value === "/upgrade" ||
             value === "/self-update" ||
@@ -659,6 +669,10 @@ export function App(props) {
                 setMode: (m) => setMode(m),
                 getTheme: () => props.config.theme ?? "readable",
                 setTheme: () => undefined,
+                getSandbox: () => sandboxModeRef.current,
+                setSandbox: (next) => {
+                    sandboxModeRef.current = next;
+                },
                 getSession: () => null,
                 getSessionStore: () => props.sessions,
                 getProvider: () => props.providers.forModel(currentModel),
@@ -775,6 +789,7 @@ export function App(props) {
                 registry: props.registry,
                 cwd: props.cwd,
                 sessionId: sessionIdRef.current,
+                sandboxMode: sandboxModeRef.current,
                 onProgress: (toolId, message) => {
                     props.events.emit({
                         type: "tool_exec_progress",
@@ -1061,6 +1076,30 @@ export function App(props) {
     // live. Initial value comes from config; subsequent changes are
     // persisted to ~/.dirgha/config.json so future sessions pick it up.
     const [themeName, setThemeName] = React.useState((props.config.theme ?? "readable"));
+    const handleSandboxPick = React.useCallback((next) => {
+        overlays.closeOverlay();
+        sandboxModeRef.current = next;
+        const note = {
+            kind: "notice",
+            id: randomUUID(),
+            text: `Sandbox mode → ${next}`,
+        };
+        setTranscript((t) => [...t, note]);
+        void (async () => {
+            try {
+                const dir = pathJoin(homedir(), ".dirgha");
+                await mkdir(dir, { recursive: true });
+                const path = pathJoin(dir, "config.json");
+                const text = await readFile(path, "utf8").catch(() => "");
+                const cfg = text ? JSON.parse(text) : {};
+                cfg.sandbox = next;
+                await writeFile(path, `${JSON.stringify(cfg, null, 2)}\n`, "utf8");
+            }
+            catch {
+                /* best-effort persistence */
+            }
+        })();
+    }, [overlays]);
     const handleThemePick = React.useCallback((name) => {
         overlays.closeOverlay();
         setThemeName(name);
@@ -1151,7 +1190,7 @@ export function App(props) {
                             // Esc inside ModelPicker → back to ProviderPicker (NOT close).
                             setPickerStage("provider");
                             setPickerProvider(null);
-                        } })), overlays.active === "help" && (_jsx(HelpOverlay, { slashCommands: slashCommands, onClose: overlays.closeOverlay })), overlays.active === "theme" && (_jsx(ThemePicker, { current: themeName, onPick: handleThemePick, onCancel: overlays.closeOverlay })), pendingKey && (_jsx(KeySetOverlay, { keyName: pendingKey.keyName, onSave: handleKeySetSave, onCancel: () => setPendingKey(null) })), updateVersion !== null && (_jsx(Box, { paddingX: 1, children: _jsxs(Text, { color: "yellow", children: ["[v", updateVersion, " available \u2014 press Ctrl+U or /upgrade to upgrade]"] }) })), _jsx(StatusBar, { model: currentModel, provider: providerIdForModel(currentModel), inputTokens: projection.totals.inputTokens, outputTokens: projection.totals.outputTokens, costUsd: projection.totals.costUsd, cwd: props.cwd, busy: busy, mode: mode, contextWindow: contextWindowFor(currentModel), liveOutputTokens: liveOutputTokens, liveDurationMs: liveDurationMs, overflowDetected: flicker.overflowDetected, showMetrics: showRenderMetrics, renderMetrics: renderMetrics })] }) }) }));
+                        } })), overlays.active === "help" && (_jsx(HelpOverlay, { slashCommands: slashCommands, onClose: overlays.closeOverlay })), overlays.active === "theme" && (_jsx(ThemePicker, { current: themeName, onPick: handleThemePick, onCancel: overlays.closeOverlay })), overlays.active === "sandbox" && (_jsx(SandboxPicker, { current: sandboxModeRef.current, onPick: handleSandboxPick, onCancel: overlays.closeOverlay })), pendingKey && (_jsx(KeySetOverlay, { keyName: pendingKey.keyName, onSave: handleKeySetSave, onCancel: () => setPendingKey(null) })), updateVersion !== null && (_jsx(Box, { paddingX: 1, children: _jsxs(Text, { color: "yellow", children: ["[v", updateVersion, " available \u2014 press Ctrl+U or /upgrade to upgrade]"] }) })), _jsx(StatusBar, { model: currentModel, provider: providerIdForModel(currentModel), inputTokens: projection.totals.inputTokens, outputTokens: projection.totals.outputTokens, costUsd: projection.totals.costUsd, cwd: props.cwd, busy: busy, mode: mode, contextWindow: contextWindowFor(currentModel), liveOutputTokens: liveOutputTokens, liveDurationMs: liveDurationMs, overflowDetected: flicker.overflowDetected, showMetrics: showRenderMetrics, renderMetrics: renderMetrics })] }) }) }));
 }
 /**
  * Walk the transcript and fold consecutive `tool` items into a single

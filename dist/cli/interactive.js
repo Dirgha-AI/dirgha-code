@@ -90,6 +90,7 @@ export async function runInteractive(opts) {
     let currentMode = await resolveMode();
     let currentThemeName = opts.config.theme ?? "readable";
     let currentTheme = getTheme(currentThemeName);
+    let currentSandboxMode = opts.config.sandbox ?? "off";
     const initial = [...(opts.initialMessages ?? [])];
     // System prompt is rebuilt per turn below so mode changes apply live.
     const history = [...initial];
@@ -264,6 +265,14 @@ export async function runInteractive(opts) {
                             rl.setPrompt(style(currentTheme.userPrompt, "❯ "));
                         },
                     },
+                    sandboxRef: {
+                        get mode() {
+                            return currentSandboxMode;
+                        },
+                        set mode(v) {
+                            currentSandboxMode = v;
+                        },
+                    },
                     providerForCurrent: () => opts.providers.forModel(currentModel),
                     summaryModel: opts.config.summaryModel,
                 });
@@ -296,6 +305,7 @@ export async function runInteractive(opts) {
                 registry: opts.registry,
                 cwd: opts.cwd,
                 sessionId,
+                sandboxMode: currentSandboxMode,
             });
             const sanitized = opts.registry.sanitize({ descriptionLimit: 200 });
             const provider = opts.providers.forModel(currentModel);
@@ -465,6 +475,12 @@ function buildSlashCtx(a) {
         },
         setTheme(value) {
             a.themeRef.name = value;
+        },
+        getSandbox() {
+            return a.sandboxRef.mode;
+        },
+        setSandbox(mode) {
+            a.sandboxRef.mode = mode;
         },
         getSession() {
             return a.session;
