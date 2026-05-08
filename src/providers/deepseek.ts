@@ -42,7 +42,7 @@ export class DeepSeekProvider implements Provider {
     this.baseUrl = (config.baseUrl ?? DEFAULT_BASE).replace(/\/+$/, "");
     // Reasoning models can take 30–60 s on first-token. Match OpenRouter's
     // headroom so multi-turn coding sprints don't cancel themselves.
-    this.timeoutMs = config.timeoutMs ?? 300_000;
+    this.timeoutMs = config.timeoutMs ?? 90_000;
   }
 
   supportsTools(): boolean {
