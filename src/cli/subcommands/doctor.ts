@@ -81,6 +81,7 @@ const LOCAL_CHECK_NAMES = new Set([
   "session-store",
   "memory-store",
   "db-errors",
+  "sqlite-vec",
   "Ollama",
   "llama.cpp",
 ]);
@@ -463,6 +464,29 @@ async function checkCron(): Promise<CheckResult> {
   }
 }
 
+async function checkVecExtension(): Promise<CheckResult> {
+  try {
+    const { openDb } = await import("../../state/db.js");
+    const { vecVersion } = await import("../../state/vec.js");
+    const db = openDb();
+    const version = vecVersion(db);
+    if (version) {
+      return {
+        name: "sqlite-vec",
+        status: "pass",
+        detail: `v${version} loaded`,
+      };
+    }
+  } catch {
+    /* extension not available */
+  }
+  return {
+    name: "sqlite-vec",
+    status: "warn",
+    detail: "vec extension not loaded (vector search disabled, optional)",
+  };
+}
+
 async function probeLocal(p: LocalProbe): Promise<CheckResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -535,6 +559,9 @@ export const doctorSubcommand: Subcommand = {
     results.push(await checkPlaywright());
     results.push(await checkLsp());
     results.push(await checkCron());
+
+    // sqlite-vec extension status
+    results.push(await checkVecExtension());
 
     // New self-diagnostics
     results.push(await checkDiskSpace());

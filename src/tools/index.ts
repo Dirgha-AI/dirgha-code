@@ -23,6 +23,7 @@ import { lspDocumentSymbolsTool } from "./lsp-symbols.js";
 import { rtkTool } from "./rtk.js";
 import { qmdTool } from "./qmd.js";
 import { githubTool } from "./github.js";
+import { kbSearchTool } from "./kb-search.js";
 export { createMultimodalTool } from "./multimodal.js";
 
 export { createCronTool } from "./cron.js";
@@ -61,6 +62,7 @@ export const builtInTools: Tool[] = [
   lspDocumentSymbolsTool,
   rtkTool,
   qmdTool,
+  kbSearchTool,
 ];
 
 export {
@@ -82,4 +84,5 @@ export {
   lspDocumentSymbolsTool,
   rtkTool,
   qmdTool,
+  kbSearchTool,
 };

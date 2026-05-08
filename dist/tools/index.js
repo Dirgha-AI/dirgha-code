@@ -21,6 +21,7 @@ import { lspDocumentSymbolsTool } from "./lsp-symbols.js";
 import { rtkTool } from "./rtk.js";
 import { qmdTool } from "./qmd.js";
 import { githubTool } from "./github.js";
+import { kbSearchTool } from "./kb-search.js";
 export { createMultimodalTool } from "./multimodal.js";
 export { createCronTool } from "./cron.js";
 export { createCheckpointTool } from "./checkpoint.js";
@@ -54,6 +55,7 @@ export const builtInTools = [
     lspDocumentSymbolsTool,
     rtkTool,
     qmdTool,
+    kbSearchTool,
 ];
-export { fsReadTool, fsWriteTool, fsEditTool, fsLsTool, shellTool, searchGrepTool, searchGlobTool, gitTool, githubTool, browserTool, checkpointTool, cronTool, lspGoToDefinitionTool, lspFindReferencesTool, lspHoverTool, lspDocumentSymbolsTool, rtkTool, qmdTool, };
+export { fsReadTool, fsWriteTool, fsEditTool, fsLsTool, shellTool, searchGrepTool, searchGlobTool, gitTool, githubTool, browserTool, checkpointTool, cronTool, lspGoToDefinitionTool, lspFindReferencesTool, lspHoverTool, lspDocumentSymbolsTool, rtkTool, qmdTool, kbSearchTool, };
 //# sourceMappingURL=index.js.map

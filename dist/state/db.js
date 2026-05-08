@@ -13,6 +13,7 @@ import { homedir } from "node:os";
 import { mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { recordDbError, recordDbSuccess } from "./db-telemetry.js";
+import { loadVecExtension } from "./vec.js";
 const _require = createRequire(import.meta.url);
 const DB_DIR = join(homedir(), ".dirgha");
 const DB_PATH = join(DB_DIR, "dirgha.db");
@@ -27,9 +28,11 @@ function getDb() {
         _db = new Database(DB_PATH);
         _db.pragma("journal_mode = WAL");
         _db.pragma("synchronous = NORMAL");
-        initSchema(_db);
-        migrateSchema(_db);
-        return _db;
+        const db = _db;
+        initSchema(db);
+        migrateSchema(db);
+        loadVecExtension(db);
+        return db;
     }
     catch {
         throw new Error(`SQLite unavailable (optional feature) — run "dirgha setup --features" to install.`);
@@ -111,6 +114,10 @@ function migrateSchema(db) {
     catch (err) {
         recordDbError(err);
     }
+}
+/** Return the shared SQLite database handle, opening it if needed. */
+export function openDb() {
+    return getDb();
 }
 export function dbOpenSession(id, model, cwd) {
     try {

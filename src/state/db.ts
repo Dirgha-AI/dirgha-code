@@ -15,6 +15,7 @@ import { mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import type { Message } from "../kernel/types.js";
 import { recordDbError, recordDbSuccess } from "./db-telemetry.js";
+import { loadVecExtension } from "./vec.js";
 
 const _require = createRequire(import.meta.url);
 
@@ -37,9 +38,11 @@ function getDb(): import("better-sqlite3").Database {
     ) => import("better-sqlite3").Database)(DB_PATH);
     (_db as import("better-sqlite3").Database).pragma("journal_mode = WAL");
     (_db as import("better-sqlite3").Database).pragma("synchronous = NORMAL");
-    initSchema(_db as import("better-sqlite3").Database);
-    migrateSchema(_db as import("better-sqlite3").Database);
-    return _db as import("better-sqlite3").Database;
+    const db = _db as import("better-sqlite3").Database;
+    initSchema(db);
+    migrateSchema(db);
+    loadVecExtension(db);
+    return db;
   } catch {
     throw new Error(
       `SQLite unavailable (optional feature) — run "dirgha setup --features" to install.`,
@@ -139,6 +142,11 @@ function migrateSchema(db: import("better-sqlite3").Database): void {
   } catch (err) {
     recordDbError(err);
   }
+}
+
+/** Return the shared SQLite database handle, opening it if needed. */
+export function openDb(): import("better-sqlite3").Database {
+  return getDb();
 }
 
 export function dbOpenSession(id: string, model?: string, cwd?: string): void {
