@@ -59,7 +59,23 @@ export interface EventProjectionOptions {
    *  split at a safe markdown boundary. The older portion is committed
    *  to static history; the caller should append it to the transcript. */
   onCommitSplit?: (item: TranscriptItem) => void;
+  /** Returns true while the next agent_start should be treated as the
+   *  first response of the session — the projection scans the first
+   *  text_delta line for `[session-title] <summary>` and, if found,
+   *  strips it from display and reports via onSessionTitle. */
+  isFirstTurn?: () => boolean;
+  /** Called once when the marker is detected. Caller updates the OSC
+   *  terminal title + persists to the session JSONL. */
+  onSessionTitle?: (title: string) => void;
 }
+
+/**
+ * Marker the model is asked to emit on the first line of its first
+ * response. See `sessionTitleInstruction()` in src/context/primer.ts.
+ * Match is anchored to the start of accumulated text — only the very
+ * first character of the very first response can match.
+ */
+const SESSION_TITLE_MARKER_RX = /^\[session-title\]\s*([^\n]+)\n+/;
 
 export function useEventProjection(
   events: EventStream,
@@ -100,6 +116,16 @@ export function useEventProjection(
   // functional-updater side-channel pattern (which only runs synchronously
   // from React event handlers, not from async finally blocks).
   const liveItemsRef = React.useRef<TranscriptItem[]>([]);
+
+  // Per-turn state for the `[session-title]` marker scan.
+  //   "scanning" — set on text_start when isFirstTurn() returned true.
+  //                The flush path withholds the live update until either
+  //                a newline arrives (so we can match the regex) or the
+  //                accumulated content is clearly not the marker (then
+  //                we fall through to a normal flush and never look
+  //                again). Always transitions to "done" once decided.
+  //   "done"     — no more scanning for this turn or session.
+  const titleScanRef = React.useRef<"scanning" | "done">("done");
 
   // Adaptive flush: longer text → slower flush to keep rendering smooth.
   // Short responses stay snappy; long responses avoid terminal flicker.
@@ -184,6 +210,18 @@ export function useEventProjection(
         case "text_start":
           currentTextId = randomUUID();
           currentThinkingId = null;
+          // Only the FIRST text_start of the session enters scan mode.
+          // After agent_end the App refreshes the system prompt without
+          // the title instruction, so subsequent turns won't emit the
+          // marker — but to be safe we also clear the scan flag so a
+          // user message that legitimately starts with `[session-title]`
+          // text can never be intercepted on turn 2+.
+          if (
+            titleScanRef.current === "done" &&
+            opts.isFirstTurn?.() === true
+          ) {
+            titleScanRef.current = "scanning";
+          }
           setLive((prev) => [
             ...prev,
             { kind: "text", id: currentTextId!, content: "" },
@@ -204,18 +242,69 @@ export function useEventProjection(
                 if (!p) return;
                 if (p.content === lastFlushedTextRef.current) return;
 
+                // Session-title scan (first turn only). Three outcomes:
+                //   1. Marker matched: extract title, strip the marker
+                //      line + trailing newlines from p.content, fire
+                //      onSessionTitle, mark scan done, fall through
+                //      to the normal flush with the cleaned content.
+                //   2. No newline yet AND content still looks like the
+                //      start of a marker: keep buffering (return early
+                //      without flushing — the user shouldn't see the
+                //      marker letters appear character-by-character).
+                //   3. Content does NOT start like a marker: give up
+                //      scanning, fall through to normal flush.
+                if (titleScanRef.current === "scanning") {
+                  const m = SESSION_TITLE_MARKER_RX.exec(p.content);
+                  if (m) {
+                    const title = (m[1] ?? "").trim();
+                    titleScanRef.current = "done";
+                    if (title.length > 0) {
+                      try {
+                        opts.onSessionTitle?.(title);
+                      } catch {
+                        /* listener errors must not crash projection */
+                      }
+                    }
+                    const stripped = p.content.slice(m[0].length);
+                    pendingTextRef.current = { id: p.id, content: stripped };
+                    if (stripped.length === 0) {
+                      // Nothing else to flush yet — the marker was the
+                      // entire delta so far. Wait for the next chunk.
+                      lastFlushedTextRef.current = "";
+                      return;
+                    }
+                    // Fall through with the cleaned content.
+                  } else if (
+                    !p.content.length ||
+                    "[session-title]".startsWith(p.content) ||
+                    (p.content.startsWith("[session-title]") &&
+                      !p.content.includes("\n"))
+                  ) {
+                    // Still potentially a marker, just incomplete.
+                    return;
+                  } else {
+                    // Doesn't match and never will.
+                    titleScanRef.current = "done";
+                  }
+                }
+
+                const flushTarget = pendingTextRef.current;
+                if (!flushTarget) return;
+
                 // Gemini CLI message splitting: when accumulated text
                 // grows beyond MAX_LIVE_CHUNK_CHARS, find a safe split
                 // point and push the older portion to committed (Static)
                 // history, keeping only the trailing chunk dynamic.
                 if (
-                  p.content.length > MAX_LIVE_CHUNK_CHARS &&
+                  flushTarget.content.length > MAX_LIVE_CHUNK_CHARS &&
                   opts.onCommitSplit
                 ) {
-                  const splitAt = findLastSafeSplitPoint(p.content);
-                  if (splitAt < p.content.length) {
-                    const committed = p.content.slice(0, splitAt).trimEnd();
-                    const pending = p.content.slice(splitAt);
+                  const splitAt = findLastSafeSplitPoint(flushTarget.content);
+                  if (splitAt < flushTarget.content.length) {
+                    const committed = flushTarget.content
+                      .slice(0, splitAt)
+                      .trimEnd();
+                    const pending = flushTarget.content.slice(splitAt);
                     if (committed.length > 0) {
                       opts.onCommitSplit({
                         kind: "text",
@@ -223,12 +312,15 @@ export function useEventProjection(
                         content: committed,
                       });
                     }
-                    pendingTextRef.current = { id: p.id, content: pending };
+                    pendingTextRef.current = {
+                      id: flushTarget.id,
+                      content: pending,
+                    };
                     lastFlushedTextRef.current = pending;
                     setLive((prev) =>
                       Array.isArray(prev)
                         ? prev.map((it) =>
-                            it.kind === "text" && it.id === p.id
+                            it.kind === "text" && it.id === flushTarget.id
                               ? { ...it, content: pending }
                               : it,
                           )
@@ -238,12 +330,12 @@ export function useEventProjection(
                   }
                 }
 
-                lastFlushedTextRef.current = p.content;
+                lastFlushedTextRef.current = flushTarget.content;
                 setLive((prev) =>
                   Array.isArray(prev)
                     ? prev.map((it) =>
-                        it.kind === "text" && it.id === p.id
-                          ? { ...it, content: p.content }
+                        it.kind === "text" && it.id === flushTarget.id
+                          ? { ...it, content: flushTarget.content }
                           : it,
                       )
                     : prev,

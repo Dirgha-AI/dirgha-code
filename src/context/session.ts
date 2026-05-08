@@ -18,6 +18,11 @@ export type SessionEntry =
   | { type: "model_change"; ts: string; from: string; to: string }
   | { type: "compaction"; ts: string; keptFrom: string; summary: string }
   | { type: "branch"; ts: string; parentId: string; name: string }
+  // Session label used in the terminal title (OSC 0), the future
+  // `/sessions` list, and the JSONL filename's display name. The
+  // model emits a `[session-title] X` marker on its first response;
+  // the projection extracts it and the TUI persists it here.
+  | { type: "title"; ts: string; title: string }
   | {
       type: "system";
       ts: string;

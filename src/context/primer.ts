@@ -73,6 +73,38 @@ export function loadProjectPrimer(startDir: string): PrimerResult {
 }
 
 /**
+ * First-turn-only addendum that asks the model to emit a session
+ * title marker on the first line of its first response. The TUI
+ * parser strips the line from display and updates the OSC 0
+ * terminal title + persists the value to the session JSONL.
+ *
+ * Format chosen for parser stability:
+ *   `[session-title] Three to five word summary`
+ *
+ * Plain text (no XML/JSON), one line, distinctive prefix that real
+ * model output rarely starts with. Strict regex match in the
+ * projection — malformed marker is treated as no-op (model output
+ * passes through unchanged).
+ */
+export function sessionTitleInstruction(): string {
+  return [
+    "## Session title (first response only)",
+    "",
+    "This is the user's first message in the session. Begin your reply",
+    "with EXACTLY one line in this format, followed by a blank line,",
+    "followed by your normal answer:",
+    "",
+    "    [session-title] <three to five word summary of the user's request>",
+    "",
+    "The marker line is metadata for the user's session list and the",
+    "terminal title. It will be hidden from the rendered transcript. Do",
+    "not include the brackets in the summary itself, do not use emojis,",
+    "do not exceed five words, do not add quote marks. After the blank",
+    "line, write your normal response.",
+  ].join("\n");
+}
+
+/**
  * Compose the full boot system prompt. Order:
  *
  *   1. soul          — who dirgha is and how it should behave
@@ -82,6 +114,7 @@ export function loadProjectPrimer(startDir: string): PrimerResult {
  *   5. kbContext     — top-K KB articles relevant to the current turn
  *   6. gitState      — workspace snapshot (interactive only)
  *   7. userSystem    — caller-supplied --system flag (escape hatch)
+ *   8. firstTurn     — session title instruction (only on first turn)
  *
  * Empty sections drop out — no leading/trailing blank lines.
  */
@@ -93,6 +126,7 @@ export function composeSystemPrompt(parts: {
   kbContext?: string;
   gitState?: string;
   userSystem?: string | undefined;
+  firstTurn?: boolean;
 }): string {
   if (!parts.modePreamble?.trim()) {
     throw new Error("modePreamble is required and must be non-empty");
@@ -118,6 +152,9 @@ export function composeSystemPrompt(parts: {
   }
   if (parts.userSystem && parts.userSystem.trim()) {
     sections.push(parts.userSystem.trim());
+  }
+  if (parts.firstTurn) {
+    sections.push(sessionTitleInstruction());
   }
   return sections.filter((s) => s.length > 0).join("\n\n");
 }

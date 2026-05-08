@@ -59,5 +59,13 @@ export interface EventProjectionOptions {
      *  split at a safe markdown boundary. The older portion is committed
      *  to static history; the caller should append it to the transcript. */
     onCommitSplit?: (item: TranscriptItem) => void;
+    /** Returns true while the next agent_start should be treated as the
+     *  first response of the session — the projection scans the first
+     *  text_delta line for `[session-title] <summary>` and, if found,
+     *  strips it from display and reports via onSessionTitle. */
+    isFirstTurn?: () => boolean;
+    /** Called once when the marker is detected. Caller updates the OSC
+     *  terminal title + persists to the session JSONL. */
+    onSessionTitle?: (title: string) => void;
 }
 export declare function useEventProjection(events: EventStream, opts?: EventProjectionOptions): EventProjection;
