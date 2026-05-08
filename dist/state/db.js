@@ -11,7 +11,9 @@
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { mkdirSync } from "node:fs";
+import { createRequire } from "node:module";
 import { recordDbError, recordDbSuccess } from "./db-telemetry.js";
+const _require = createRequire(import.meta.url);
 const DB_DIR = join(homedir(), ".dirgha");
 const DB_PATH = join(DB_DIR, "dirgha.db");
 // Lazy singleton — only opened when first needed.
@@ -20,7 +22,7 @@ function getDb() {
     if (_db)
         return _db;
     try {
-        const Database = require("better-sqlite3");
+        const Database = _require("better-sqlite3");
         mkdirSync(DB_DIR, { recursive: true });
         _db = new Database(DB_PATH);
         _db.pragma("journal_mode = WAL");

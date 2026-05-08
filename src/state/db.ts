@@ -12,8 +12,11 @@
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { mkdirSync } from "node:fs";
+import { createRequire } from "node:module";
 import type { Message } from "../kernel/types.js";
 import { recordDbError, recordDbSuccess } from "./db-telemetry.js";
+
+const _require = createRequire(import.meta.url);
 
 const DB_DIR = join(homedir(), ".dirgha");
 const DB_PATH = join(DB_DIR, "dirgha.db");
@@ -26,7 +29,7 @@ function getDb(): import("better-sqlite3").Database {
 
   try {
     const Database =
-      require("better-sqlite3") as typeof import("better-sqlite3");
+      _require("better-sqlite3") as typeof import("better-sqlite3");
     mkdirSync(DB_DIR, { recursive: true });
     _db = new (Database as unknown as new (
       path: string,
