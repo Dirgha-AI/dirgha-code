@@ -33,20 +33,20 @@ log() { echo "$@" | tee -a "$REPORT"; }
 # Each cell: provider_id model_id required_env required_key
 # free=true means the model costs $0 via OpenRouter or a native free tier.
 CELLS=(
-  "anthropic|anthropic/claude-3-haiku:free|OPENROUTER_API_KEY|sk-or-v1-|true"
-  "openai|openai/chatgpt-4o-latest|OPENROUTER_API_KEY|sk-or-v1-|true"
+  "anthropic|anthropic/claude-haiku-4-5|ANTHROPIC_API_KEY|sk-ant-|false"
+  "openai|gpt-5-mini|OPENAI_API_KEY|sk-|false"
   "gemini|google/gemini-2.0-flash-001|OPENROUTER_API_KEY|sk-or-v1-|true"
   "openrouter|tencent/hy3-preview:free|OPENROUTER_API_KEY|sk-or-v1-|true"
-  "nvidia|nvidia/llama-3.1-nemotron-70b-instruct:free|OPENROUTER_API_KEY|sk-or-v1-|true"
-  "deepseek|deepseek/deepseek-chat:free|OPENROUTER_API_KEY|sk-or-v1-|true"
-  "mistral|mistralai/mistral-7b-instruct:free|OPENROUTER_API_KEY|sk-or-v1-|true"
-  "cohere|cohere/command-r7b-12-2024:free|OPENROUTER_API_KEY|sk-or-v1-|true"
-  "cerebras|cerebras/llama3.1-8b:free|OPENROUTER_API_KEY|sk-or-v1-|true"
-  "together|together/deepseek-r1-distill-llama-70b:free|OPENROUTER_API_KEY|sk-or-v1-|true"
-  "perplexity|perplexity/llama-3.1-sonar-small-128k-online|OPENROUTER_API_KEY|sk-or-v1-|true"
-  "xai|nousresearch/hermes-3-llama-3.1-405b:free|OPENROUTER_API_KEY|sk-or-v1-|true"
+  "nvidia|deepseek-ai/deepseek-v4-pro|NVIDIA_API_KEY|nvapi-|true"
+  "deepseek|deepseek-chat|DEEPSEEK_API_KEY|sk-|false"
+  "mistral|mistral-large-latest|MISTRAL_API_KEY|<no-prefix>|false"
+  "cohere|command-r-plus|COHERE_API_KEY|<no-prefix>|false"
+  "cerebras|llama3.1-70b|CEREBRAS_API_KEY|<no-prefix>|false"
+  "together|deepseek-ai/DeepSeek-V3|TOGETHER_API_KEY|<no-prefix>|false"
+  "perplexity|sonar-pro|PERPLEXITY_API_KEY|pplx-|false"
+  "xai|grok-2-1212|XAI_API_KEY|xai-|false"
   "groq|groq/llama-3.3-70b-versatile|GROQ_API_KEY|gsk_|false"
-  "zai|z-ai/glm-4-9b-chat:free|OPENROUTER_API_KEY|sk-or-v1-|true"
+  "zai|glm-4-9b-chat|ZAI_API_KEY|<no-prefix>|false"
   "fireworks|accounts/fireworks/models/llama-v3p2-3b-instruct|FIREWORKS_API_KEY|fw_|false"
 )
 
