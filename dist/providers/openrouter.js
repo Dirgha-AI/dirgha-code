@@ -47,7 +47,7 @@ export class OpenRouterProvider {
         // first byte on long prompts; multi-turn coding sprints need more
         // headroom. 300 s leaves the timer well above legitimate latency
         // without making a genuine hang invisible.
-        this.timeoutMs = config.timeoutMs ?? 300_000;
+        this.timeoutMs = config.timeoutMs ?? 90_000;
         this.appName = config.appName ?? "dirgha-cli";
         this.appUrl = config.appUrl ?? "https://dirgha.ai";
     }

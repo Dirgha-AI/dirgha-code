@@ -60,7 +60,7 @@ export class NvidiaProvider {
         // NVIDIA NIM has long tail latency on multi-turn tool followups +
         // reasoning models can stream their chain-of-thought for 2–3 min.
         // 300s absorbs that without making a genuine hang invisible.
-        this.timeoutMs = config.timeoutMs ?? 300_000;
+        this.timeoutMs = config.timeoutMs ?? 90_000;
     }
     supportsTools(modelId) {
         return TOOLS_SUPPORTED.has(modelId);
