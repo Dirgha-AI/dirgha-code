@@ -2,6 +2,16 @@
 
 All notable changes are tracked here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); we use [Semantic Versioning](https://semver.org/).
 
+## [1.20.34] — 2026-05-08
+
+### Fixed
+
+- **5-min total-request timeout was too lenient.** `nvidia.ts`, `openrouter.ts`, and `deepseek.ts` defaulted `timeoutMs` to 300_000. Combined with the 30 s mid-stream stall detector that's effectively the worst-case wait a user can hit on a stuck upstream — verified live: `meta/llama-4-maverick-17b-128e-instruct` on NIM hangs 300 s on tool-call requests before erroring out. Lowered to 90_000 across all three adapters: enough headroom for any single-turn LLM response, but the user now waits ≤90 s on a wedged provider instead of 5 min.
+- **`buildFailoverChain` could auto-pick known-broken free models.** Two free NIM models reliably hung in the 2026-05-08 audit: `minimaxai/minimax-m2.7` (60 s timeout, 0 bytes) and `meta/llama-4-maverick-17b-128e-instruct` (300 s on tool calls). `src/intelligence/failover-chain.ts` now soft-blacklists both from the free-fallback tier so a primary failure doesn't auto-route onto a wedged model. They remain in `dirgha models list` for manual `--model` selection.
+- **`dirgha doctor` cleans up legacy `doctor-probe-<ts>` pollution on first run.** v1.20.33 stopped *creating* timestamped probe entries (singleton id now), but machines upgraded from earlier versions still carried the old pile. `checkMemoryStore` now sweeps any id matching `^doctor-probe-\d+` before writing the singleton, so a single doctor invocation cleans up the backlog.
+- **`dirgha doctor` exit code now gates on local checks only by default.** Pre-fix, an invalid Anthropic key (or any remote-auth failure) caused exit 1, breaking the use of `dirgha doctor` as a CI smoke probe. Now: default exit considers only local checks (`node`, `git`, `dirgha-home`, `terminal`, `lsp`, `cron`, `disk-space`, `session-store`, `memory-store`, `db-errors`); pass `--strict` to restore the union behaviour.
+- **TUI spinner now shows "warming up" hint on slow first-token.** The `GeneratingIndicator` rendered a static `generating…` for the entire duration of the agent turn. On free-tier NIM models with 10-30 s time-to-first-token (Kimi K2.6 routinely) new users assumed the CLI was stuck. The indicator now shows elapsed seconds and, after 5 s of zero output tokens, switches to `warming up · 12s · first token can take 10-30s on free models`. Flips back to `generating · Xs` once tokens flow.
+
 ## [1.20.33] — 2026-05-08
 
 ### Fixed
