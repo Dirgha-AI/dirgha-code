@@ -26,6 +26,7 @@ import { githubTool } from "./github.js";
 import { kbSearchTool } from "./kb-search.js";
 import { graphNeighborsTool } from "./graph-neighbors.js";
 import { graphTraverseTool } from "./graph-traverse.js";
+import { transactionalWriteTool } from "./transactional-write.js";
 export { createMultimodalTool } from "./multimodal.js";
 
 export { createCronTool } from "./cron.js";
@@ -67,6 +68,7 @@ export const builtInTools: Tool[] = [
   kbSearchTool,
   graphNeighborsTool,
   graphTraverseTool,
+  transactionalWriteTool,
 ];
 
 export {
@@ -91,4 +93,5 @@ export {
   kbSearchTool,
   graphNeighborsTool,
   graphTraverseTool,
+  transactionalWriteTool,
 };
