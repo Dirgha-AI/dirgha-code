@@ -2,6 +2,14 @@
 
 All notable changes are tracked here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); we use [Semantic Versioning](https://semver.org/).
 
+## [1.20.35](https://github.com/Dirgha-AI/dirgha-code/compare/v1.20.34...v1.20.35) (2026-05-08)
+
+
+### Bug Fixes
+
+* **cli:** YOLO mode interactive env propagation + jitter stability test harness ([6a5aec0](https://github.com/Dirgha-AI/dirgha-code/commit/6a5aec038e17a5cc9c913a6045a967788f939789))
+* **smoke:** repair nightly Provider Smoke matrix ([a59469f](https://github.com/Dirgha-AI/dirgha-code/commit/a59469f42ca81948cc95803f0d6d1352a187e141))
+
 ## [1.20.34] — 2026-05-08
 
 ### Fixed
