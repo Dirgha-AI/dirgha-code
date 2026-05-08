@@ -53,6 +53,7 @@ import { getUpdateBannerVersion } from "../../cli/update-check.js";
 import { AtFileComplete } from "./components/AtFileComplete.js";
 import { SlashComplete } from "./components/SlashComplete.js";
 import { ThemePicker } from "./components/ThemePicker.js";
+import { SandboxPicker } from "./components/SandboxPicker.js";
 import { ThemeProvider, useTheme } from "./theme-context.js";
 import { SpinnerContext } from "./spinner-context.js";
 import { SpinnerGlyph } from "./components/SpinnerGlyph.js";
@@ -559,6 +560,11 @@ export function App(props) {
         // `/theme` with no args opens the picker; `/theme <name>` sets directly.
         if (value === "/theme" || value === "/themes") {
             overlays.openOverlay("theme");
+            return;
+        }
+        // `/sandbox` with no args opens the picker; `/sandbox <mode>` sets directly.
+        if (value === "/sandbox") {
+            overlays.openOverlay("sandbox");
             return;
         }
         // /upgrade and /self-update trigger npm install + restart.
@@ -1070,6 +1076,30 @@ export function App(props) {
     // live. Initial value comes from config; subsequent changes are
     // persisted to ~/.dirgha/config.json so future sessions pick it up.
     const [themeName, setThemeName] = React.useState((props.config.theme ?? "readable"));
+    const handleSandboxPick = React.useCallback((next) => {
+        overlays.closeOverlay();
+        sandboxModeRef.current = next;
+        const note = {
+            kind: "notice",
+            id: randomUUID(),
+            text: `Sandbox mode → ${next}`,
+        };
+        setTranscript((t) => [...t, note]);
+        void (async () => {
+            try {
+                const dir = pathJoin(homedir(), ".dirgha");
+                await mkdir(dir, { recursive: true });
+                const path = pathJoin(dir, "config.json");
+                const text = await readFile(path, "utf8").catch(() => "");
+                const cfg = text ? JSON.parse(text) : {};
+                cfg.sandbox = next;
+                await writeFile(path, `${JSON.stringify(cfg, null, 2)}\n`, "utf8");
+            }
+            catch {
+                /* best-effort persistence */
+            }
+        })();
+    }, [overlays]);
     const handleThemePick = React.useCallback((name) => {
         overlays.closeOverlay();
         setThemeName(name);
@@ -1160,7 +1190,7 @@ export function App(props) {
                             // Esc inside ModelPicker → back to ProviderPicker (NOT close).
                             setPickerStage("provider");
                             setPickerProvider(null);
-                        } })), overlays.active === "help" && (_jsx(HelpOverlay, { slashCommands: slashCommands, onClose: overlays.closeOverlay })), overlays.active === "theme" && (_jsx(ThemePicker, { current: themeName, onPick: handleThemePick, onCancel: overlays.closeOverlay })), pendingKey && (_jsx(KeySetOverlay, { keyName: pendingKey.keyName, onSave: handleKeySetSave, onCancel: () => setPendingKey(null) })), updateVersion !== null && (_jsx(Box, { paddingX: 1, children: _jsxs(Text, { color: "yellow", children: ["[v", updateVersion, " available \u2014 press Ctrl+U or /upgrade to upgrade]"] }) })), _jsx(StatusBar, { model: currentModel, provider: providerIdForModel(currentModel), inputTokens: projection.totals.inputTokens, outputTokens: projection.totals.outputTokens, costUsd: projection.totals.costUsd, cwd: props.cwd, busy: busy, mode: mode, contextWindow: contextWindowFor(currentModel), liveOutputTokens: liveOutputTokens, liveDurationMs: liveDurationMs, overflowDetected: flicker.overflowDetected, showMetrics: showRenderMetrics, renderMetrics: renderMetrics })] }) }) }));
+                        } })), overlays.active === "help" && (_jsx(HelpOverlay, { slashCommands: slashCommands, onClose: overlays.closeOverlay })), overlays.active === "theme" && (_jsx(ThemePicker, { current: themeName, onPick: handleThemePick, onCancel: overlays.closeOverlay })), overlays.active === "sandbox" && (_jsx(SandboxPicker, { current: sandboxModeRef.current, onPick: handleSandboxPick, onCancel: overlays.closeOverlay })), pendingKey && (_jsx(KeySetOverlay, { keyName: pendingKey.keyName, onSave: handleKeySetSave, onCancel: () => setPendingKey(null) })), updateVersion !== null && (_jsx(Box, { paddingX: 1, children: _jsxs(Text, { color: "yellow", children: ["[v", updateVersion, " available \u2014 press Ctrl+U or /upgrade to upgrade]"] }) })), _jsx(StatusBar, { model: currentModel, provider: providerIdForModel(currentModel), inputTokens: projection.totals.inputTokens, outputTokens: projection.totals.outputTokens, costUsd: projection.totals.costUsd, cwd: props.cwd, busy: busy, mode: mode, contextWindow: contextWindowFor(currentModel), liveOutputTokens: liveOutputTokens, liveDurationMs: liveDurationMs, overflowDetected: flicker.overflowDetected, showMetrics: showRenderMetrics, renderMetrics: renderMetrics })] }) }) }));
 }
 /**
  * Walk the transcript and fold consecutive `tool` items into a single

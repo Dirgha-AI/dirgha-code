@@ -83,6 +83,7 @@ import { getUpdateBannerVersion } from "../../cli/update-check.js";
 import { AtFileComplete } from "./components/AtFileComplete.js";
 import { SlashComplete } from "./components/SlashComplete.js";
 import { ThemePicker } from "./components/ThemePicker.js";
+import { SandboxPicker } from "./components/SandboxPicker.js";
 import { ThemeProvider, useTheme } from "./theme-context.js";
 import { SpinnerContext } from "./spinner-context.js";
 import { SpinnerGlyph } from "./components/SpinnerGlyph.js";
@@ -656,6 +657,11 @@ export function App(props: AppProps): React.JSX.Element {
         overlays.openOverlay("theme");
         return;
       }
+      // `/sandbox` with no args opens the picker; `/sandbox <mode>` sets directly.
+      if (value === "/sandbox") {
+        overlays.openOverlay("sandbox");
+        return;
+      }
       // /upgrade and /self-update trigger npm install + restart.
       if (
         value === "/upgrade" ||
@@ -1206,6 +1212,33 @@ export function App(props: AppProps): React.JSX.Element {
     (props.config.theme ?? "readable") as ThemeName,
   );
 
+  const handleSandboxPick = React.useCallback(
+    (next: "off" | "auto" | "strict"): void => {
+      overlays.closeOverlay();
+      sandboxModeRef.current = next;
+      const note: TranscriptItem = {
+        kind: "notice",
+        id: randomUUID(),
+        text: `Sandbox mode → ${next}`,
+      };
+      setTranscript((t) => [...t, note]);
+      void (async (): Promise<void> => {
+        try {
+          const dir = pathJoin(homedir(), ".dirgha");
+          await mkdir(dir, { recursive: true });
+          const path = pathJoin(dir, "config.json");
+          const text = await readFile(path, "utf8").catch(() => "");
+          const cfg = text ? (JSON.parse(text) as Record<string, unknown>) : {};
+          cfg.sandbox = next;
+          await writeFile(path, `${JSON.stringify(cfg, null, 2)}\n`, "utf8");
+        } catch {
+          /* best-effort persistence */
+        }
+      })();
+    },
+    [overlays],
+  );
+
   const handleThemePick = React.useCallback(
     (name: ThemeName): void => {
       overlays.closeOverlay();
@@ -1405,6 +1438,13 @@ export function App(props: AppProps): React.JSX.Element {
             <ThemePicker
               current={themeName}
               onPick={handleThemePick}
+              onCancel={overlays.closeOverlay}
+            />
+          )}
+          {overlays.active === "sandbox" && (
+            <SandboxPicker
+              current={sandboxModeRef.current}
+              onPick={handleSandboxPick}
               onCancel={overlays.closeOverlay}
             />
           )}
