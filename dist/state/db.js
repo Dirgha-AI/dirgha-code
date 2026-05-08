@@ -84,12 +84,28 @@ function migrateSchema(db) {
             // Backfill ts from legacy text timestamp (once, for rows still at 0).
             db.exec("UPDATE messages SET ts = CAST(strftime('%s', created_at) * 1000 AS INTEGER) WHERE ts = 0 AND created_at IS NOT NULL");
         }
-        // sessions: add started_at if it doesn't exist (defensive — no known
-        // users hit this, but keeps the pattern consistent).
+        // sessions: align legacy schemas (some predate the current column set).
+        // Earlier CLI versions wrote sessions(id, title, model, tokens,
+        // created_at, updated_at, working_dir, ...) — but dbOpenSession's
+        // INSERT lists `cwd` and `started_at`. Add any missing columns.
         const sessCols = db.pragma("table_info(sessions)");
-        const hasStartedAt = sessCols.some((c) => c.name === "started_at");
-        if (!hasStartedAt) {
+        const sessNames = new Set(sessCols.map((c) => c.name));
+        if (!sessNames.has("started_at")) {
             db.exec("ALTER TABLE sessions ADD COLUMN started_at INTEGER NOT NULL DEFAULT 0");
+        }
+        if (!sessNames.has("cwd")) {
+            // Default to '' so the NOT-NULL semantics aren't a problem; if the
+            // legacy column `working_dir` exists, copy it across as a one-shot.
+            db.exec("ALTER TABLE sessions ADD COLUMN cwd TEXT");
+            if (sessNames.has("working_dir")) {
+                db.exec("UPDATE sessions SET cwd = working_dir WHERE cwd IS NULL AND working_dir IS NOT NULL");
+            }
+        }
+        if (!sessNames.has("model")) {
+            db.exec("ALTER TABLE sessions ADD COLUMN model TEXT");
+        }
+        if (!sessNames.has("ended_at")) {
+            db.exec("ALTER TABLE sessions ADD COLUMN ended_at INTEGER");
         }
     }
     catch (err) {
