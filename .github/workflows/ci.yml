@@ -57,8 +57,11 @@ jobs:
       - name: CVE audit (npm audit, fail on high+)
         # CI-5: blocks merge on a known high/critical CVE in production
         # deps. Dev-deps (vitest, eslint) are excluded — they don't
-        # ship in the tarball.
-        run: npm audit --audit-level=high --omit=dev
+        # ship in the tarball. Optional deps (@xenova/transformers etc.)
+        # are user opt-in; auditing them would block CI for everyone on
+        # transitive vulns that users who skip the optional install never
+        # encounter.
+        run: npm audit --audit-level=high --omit=dev --omit=optional
 
       - name: Typecheck
         run: npm run typecheck

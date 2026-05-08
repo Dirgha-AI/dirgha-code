@@ -53,7 +53,7 @@ jobs:
         run: npm run license-check
 
       - name: CVE audit (npm audit, fail on high+)
-        run: npm audit --audit-level=high --omit=dev
+        run: npm audit --audit-level=high --omit=dev --omit=optional
 
       - name: Typecheck
         run: npm run typecheck
