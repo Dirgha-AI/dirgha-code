@@ -31,6 +31,8 @@ export interface OpenAICompatSpec {
   defaultBaseUrl: string;
   /** Env var consulted when ProviderConfig.apiKey isn't passed. */
   apiKeyEnv: string;
+  /** Secondary env var tried if apiKeyEnv is unset (e.g. GLM_API_KEY for ZAI). */
+  apiKeyEnvFallback?: string;
   /** Default request timeout in milliseconds. */
   defaultTimeoutMs?: number;
   /**
@@ -65,8 +67,14 @@ export function defineOpenAICompatProvider(spec: OpenAICompatSpec): new (config?
     private readonly extraHeaders: Record<string, string>;
 
     constructor(config: ProviderConfig = {}) {
-      this.apiKey = config.apiKey ?? process.env[spec.apiKeyEnv] ?? '';
-      if (!this.apiKey) throw new ProviderError(`${spec.apiKeyEnv} is required`, spec.id);
+      this.apiKey = config.apiKey
+        ?? process.env[spec.apiKeyEnv]
+        ?? (spec.apiKeyEnvFallback ? process.env[spec.apiKeyEnvFallback] : undefined)
+        ?? '';
+      const keyNames = spec.apiKeyEnvFallback
+        ? `${spec.apiKeyEnv} or ${spec.apiKeyEnvFallback}`
+        : spec.apiKeyEnv;
+      if (!this.apiKey) throw new ProviderError(`${keyNames} is required`, spec.id);
       this.baseUrl = (config.baseUrl ?? spec.defaultBaseUrl).replace(/\/+$/, '');
       this.timeoutMs = config.timeoutMs ?? spec.defaultTimeoutMs ?? 60_000;
       this.extraHeaders = { ...(spec.extraHeaders ?? {}) };

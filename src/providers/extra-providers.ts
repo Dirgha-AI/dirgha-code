@@ -87,7 +87,8 @@ export const ZaiProvider = defineOpenAICompatProvider({
   id: 'zai',
   defaultBaseUrl: 'https://api.z.ai/api/paas/v4',
   // Z.AI publishes both ZAI_API_KEY and GLM_API_KEY in user docs.
-  // The CLI accepts either; ZAI_API_KEY takes precedence per process.env.
+  // The CLI accepts either; ZAI_API_KEY takes precedence.
   apiKeyEnv: 'ZAI_API_KEY',
+  apiKeyEnvFallback: 'GLM_API_KEY',
   modelPrefixToStrip: /^(z-ai|glm)\//,
 });
