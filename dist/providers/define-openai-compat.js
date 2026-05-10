@@ -28,9 +28,15 @@ export function defineOpenAICompatProvider(spec) {
         timeoutMs;
         extraHeaders;
         constructor(config = {}) {
-            this.apiKey = config.apiKey ?? process.env[spec.apiKeyEnv] ?? '';
+            this.apiKey = config.apiKey
+                ?? process.env[spec.apiKeyEnv]
+                ?? (spec.apiKeyEnvFallback ? process.env[spec.apiKeyEnvFallback] : undefined)
+                ?? '';
+            const keyNames = spec.apiKeyEnvFallback
+                ? `${spec.apiKeyEnv} or ${spec.apiKeyEnvFallback}`
+                : spec.apiKeyEnv;
             if (!this.apiKey)
-                throw new ProviderError(`${spec.apiKeyEnv} is required`, spec.id);
+                throw new ProviderError(`${keyNames} is required`, spec.id);
             this.baseUrl = (config.baseUrl ?? spec.defaultBaseUrl).replace(/\/+$/, '');
             this.timeoutMs = config.timeoutMs ?? spec.defaultTimeoutMs ?? 60_000;
             this.extraHeaders = { ...(spec.extraHeaders ?? {}) };

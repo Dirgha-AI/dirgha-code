@@ -10,8 +10,8 @@
  * the same way openai.ts and nvidia.ts do. Model IDs use the bare
  * `deepseek-chat` / `deepseek-reasoner` family — DeepSeek's own
  * canonical ids. Vendor-prefixed ids like `deepseek/deepseek-v4-flash`
- * (an OpenRouter routing slug) still go through the OR provider unless
- * the user explicitly forces DIRGHA_PROVIDER=deepseek.
+ * are deterministically routed here (first segment = provider); the
+ * `deepseek/` prefix is stripped before forwarding to api.deepseek.com.
  */
 import type { AgentEvent } from "../kernel/types.js";
 import type { Provider, StreamRequest, ProviderConfig } from "./iface.js";

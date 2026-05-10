@@ -26,6 +26,8 @@ export interface OpenAICompatSpec {
     defaultBaseUrl: string;
     /** Env var consulted when ProviderConfig.apiKey isn't passed. */
     apiKeyEnv: string;
+    /** Secondary env var tried if apiKeyEnv is unset (e.g. GLM_API_KEY for ZAI). */
+    apiKeyEnvFallback?: string;
     /** Default request timeout in milliseconds. */
     defaultTimeoutMs?: number;
     /**

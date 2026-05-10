@@ -29,4 +29,4 @@ export interface StatusBarProps {
     /** Active tool info — shows tool name and elapsed time when defined. */
     activeTool?: ActiveTool;
 }
-export declare const StatusBar: React.MemoExoticComponent<(props: StatusBarProps) => React.JSX.Element>;
+export declare const StatusBar: React.NamedExoticComponent<StatusBarProps>;

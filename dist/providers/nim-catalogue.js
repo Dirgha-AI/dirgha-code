@@ -105,7 +105,7 @@ export const NIM_CATALOGUE = [
         tools: true,
         vision: false,
         thinkingMode: "opt-in",
-        thinkingParam: null,
+        thinkingParam: { chat_template_kwargs: { enable_thinking: true } },
         tags: ["reasoning", "rag"],
     },
 ];

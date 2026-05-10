@@ -29,7 +29,7 @@ export async function* streamChatCompletions(opts) {
                 // skip setting tool_choice (default behavior)
             }
             else if (opts.toolChoice === "required") {
-                body.tool_choice = "any"; // OpenAI extension: 'any' means force a tool call
+                body.tool_choice = "required";
             }
             else {
                 body.tool_choice = opts.toolChoice; // 'none'
@@ -106,9 +106,10 @@ function toOpenAIMessages(messages) {
                 role: "assistant",
                 content: texts.length > 0 ? texts.join("") : null,
                 ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
-                // DeepSeek / OpenAI-compat thinking models require reasoning_content
-                // to be echoed back verbatim in multi-turn — omitting it causes 400.
-                ...(thinkings.length > 0
+                // reasoning_content must be echoed for multi-turn reasoning models.
+                // OMIT when tool_calls are present — DeepSeek (and compatible providers)
+                // return HTTP 400 if both fields appear in the same assistant message.
+                ...(thinkings.length > 0 && toolCalls.length === 0
                     ? { reasoning_content: thinkings.join("") }
                     : {}),
             };

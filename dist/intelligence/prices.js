@@ -371,13 +371,13 @@ export const PRICES = [
         outputPerM: 2.4,
     },
     {
-        provider: "openrouter",
+        provider: "xai",
         model: "x-ai/grok-4.20-multi-agent",
         inputPerM: 2,
         outputPerM: 6,
     },
     {
-        provider: "openrouter",
+        provider: "xai",
         model: "x-ai/grok-4.20",
         inputPerM: 2,
         outputPerM: 6,
