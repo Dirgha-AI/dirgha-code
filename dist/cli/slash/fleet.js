@@ -55,6 +55,13 @@ export const fleetCommand = {
         };
         const origOut = process.stdout.write;
         const origErr = process.stderr.write;
+        // Restore write functions synchronously — covers both normal return and
+        // any process.exit() call inside runFleet that would skip the finally block.
+        const restoreWrites = () => {
+            process.stdout.write = origOut;
+            process.stderr.write = origErr;
+        };
+        process.on("exit", restoreWrites);
         process.stdout.write = sink;
         process.stderr.write = sink;
         try {
@@ -68,8 +75,8 @@ export const fleetCommand = {
             return `${text}\n(fleet exit=${code})`;
         }
         finally {
-            process.stdout.write = origOut;
-            process.stderr.write = origErr;
+            restoreWrites();
+            process.removeListener("exit", restoreWrites);
         }
     },
 };

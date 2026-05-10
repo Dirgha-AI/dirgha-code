@@ -41,5 +41,9 @@ export interface InputBoxProps {
     onRequestUpgrade?: () => void;
     /** Prior submitted prompts, newest first (for up/down arrow recall). */
     promptHistory?: readonly string[];
+    /** Number of messages currently in the prompt queue (shown to user). */
+    queueLength?: number;
+    /** Pop the last queued message back into the input for editing. */
+    onDequeueForEdit?: () => void;
 }
 export declare function InputBox(props: InputBoxProps): React.JSX.Element;

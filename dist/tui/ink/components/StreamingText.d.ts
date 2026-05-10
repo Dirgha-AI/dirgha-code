@@ -13,4 +13,4 @@ import * as React from "react";
 export interface StreamingTextProps {
     content: string;
 }
-export declare const StreamingText: React.NamedExoticComponent<StreamingTextProps>;
+export declare const StreamingText: React.MemoExoticComponent<({ content, }: StreamingTextProps) => React.JSX.Element | null>;

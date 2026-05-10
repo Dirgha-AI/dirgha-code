@@ -24,12 +24,19 @@ import { IncrementalParser } from "./parser.js";
 import { RenderInline } from "./inline.js";
 import { CodeColorizer } from "./colorizer.js";
 import { TableRenderer } from "./table.js";
-const incremental = new IncrementalParser();
 export const MarkdownDisplay = React.memo(function MarkdownDisplay(props) {
     const { text, palette, width = 80 } = props;
+    // Per-instance incremental parser — a module-level singleton would be shared
+    // across all MarkdownDisplay instances (multiple message blocks) and corrupt
+    // each other's cached state during concurrent streaming.
+    const parserRef = React.useRef(null);
+    if (parserRef.current === null)
+        parserRef.current = new IncrementalParser();
+    // useMemo keeps parse() out of the render body so it doesn't mutate mutable
+    // parser state during React's render phase (purity requirement).
+    const blocks = React.useMemo(() => (text ? parserRef.current.parse(text) : []), [text]);
     if (!text)
         return null;
-    const blocks = incremental.parse(text);
     return (_jsx(Box, { flexDirection: "column", children: blocks.map((b, i) => (_jsx(BlockView, { block: b, palette: palette, width: width, idx: i }, i))) }));
 });
 function BlockView({ block, palette, width, idx, }) {

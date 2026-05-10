@@ -7,6 +7,9 @@
 import type { Provider, ProviderConfig } from "./iface.js";
 import { type ProviderId } from "./dispatch.js";
 import { type RateLimitOptions } from "./rate-limiter.js";
+import { CUSTOM_PROVIDERS } from "./custom-provider.js";
+export type { CustomProviderEntry } from "./custom-provider.js";
+export { CUSTOM_PROVIDERS };
 export * from "./iface.js";
 export * from "./dispatch.js";
 export { NvidiaProvider } from "./nvidia.js";
@@ -16,6 +19,7 @@ export { AnthropicProvider } from "./anthropic.js";
 export { GeminiProvider } from "./gemini.js";
 export { OllamaProvider } from "./ollama.js";
 export { LlamaCppProvider } from "./llamacpp.js";
+export { Machine1Provider } from "./machine1.js";
 export { FireworksProvider } from "./fireworks.js";
 export { DeepSeekProvider } from "./deepseek.js";
 export interface ProviderRegistryConfig {
@@ -43,6 +47,7 @@ export interface ProviderRegistryConfig {
     xai?: ProviderConfig;
     groq?: ProviderConfig;
     zai?: ProviderConfig;
+    machine1?: ProviderConfig;
     rateLimit?: RateLimitOptions;
 }
 export declare class ProviderRegistry {

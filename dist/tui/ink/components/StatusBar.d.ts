@@ -1,11 +1,5 @@
-/**
- * Status bar rendered below the input box.
- *
- * Left cluster: cwd basename + provider id.
- * Right cluster: model label + cumulative tokens + cost.
- * When busy, a subtle spinner frame appears on the right.
- */
 import * as React from "react";
+import type { ActiveTool } from "../use-tool-progress.js";
 import type { RenderMetricsGetters } from "../use-render-metrics.js";
 export interface StatusBarProps {
     model: string;
@@ -32,5 +26,7 @@ export interface StatusBarProps {
     showMetrics?: boolean;
     /** Render-metrics getters — populated when showMetrics is true. */
     renderMetrics?: RenderMetricsGetters;
+    /** Active tool info — shows tool name and elapsed time when defined. */
+    activeTool?: ActiveTool;
 }
-export declare const StatusBar: React.NamedExoticComponent<StatusBarProps>;
+export declare const StatusBar: React.MemoExoticComponent<(props: StatusBarProps) => React.JSX.Element>;

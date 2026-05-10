@@ -36,7 +36,7 @@ CELLS=(
   "anthropic|anthropic/claude-haiku-4-5|ANTHROPIC_API_KEY|sk-ant-|false"
   "openai|gpt-5-mini|OPENAI_API_KEY|sk-|false"
   "gemini|google/gemini-2.0-flash-001|OPENROUTER_API_KEY|sk-or-v1-|true"
-  "openrouter|tencent/hy3-preview:free|OPENROUTER_API_KEY|sk-or-v1-|true"
+  "openrouter|inclusionai/ring-2.6-1t:free|OPENROUTER_API_KEY|sk-or-v1-|true"
   "nvidia|deepseek-ai/deepseek-v4-pro|NVIDIA_API_KEY|nvapi-|true"
   "deepseek|deepseek-chat|DEEPSEEK_API_KEY|sk-|false"
   "mistral|mistral-large-latest|MISTRAL_API_KEY|<no-prefix>|false"

@@ -24,8 +24,17 @@ export async function* streamChatCompletions(opts) {
         body.max_tokens = opts.maxTokens;
     if (opts.tools && opts.tools.length > 0) {
         body.tools = toOpenAITools(opts.tools, opts.sanitizeToolDescriptions);
-        if (opts.toolChoice && opts.toolChoice !== "auto")
-            body.tool_choice = opts.toolChoice;
+        if (opts.toolChoice) {
+            if (opts.toolChoice === "auto") {
+                // skip setting tool_choice (default behavior)
+            }
+            else if (opts.toolChoice === "required") {
+                body.tool_choice = "any"; // OpenAI extension: 'any' means force a tool call
+            }
+            else {
+                body.tool_choice = opts.toolChoice; // 'none'
+            }
+        }
     }
     if (opts.extraBody)
         Object.assign(body, opts.extraBody);
@@ -39,6 +48,7 @@ export async function* streamChatCompletions(opts) {
             extraHeaders: opts.extraHeaders,
             signal: opts.signal,
             timeoutMs: opts.timeoutMs,
+            stallTimeoutMs: opts.stallTimeoutMs,
         })) {
             if (payload === "[DONE]")
                 break;
@@ -109,11 +119,9 @@ function toOpenAIMessages(messages) {
         const texts = parts
             .filter((p) => p.type === "text")
             .map((p) => p.text);
-        if (texts.length > 0)
-            out.push({
-                role: msg.role === "system" ? "system" : "user",
-                content: texts.join(""),
-            });
+        // Tool messages must immediately follow the assistant message that issued
+        // the tool calls. Push role:"tool" messages BEFORE any user text so
+        // OpenAI doesn't return HTTP 400 ("tool messages must follow assistant").
         for (const r of results) {
             if (r.type !== "tool_result")
                 continue;
@@ -123,6 +131,11 @@ function toOpenAIMessages(messages) {
                 content: r.content,
             });
         }
+        if (texts.length > 0)
+            out.push({
+                role: msg.role === "system" ? "system" : "user",
+                content: texts.join(""),
+            });
     }
     return out;
 }
@@ -150,8 +163,9 @@ class StreamState {
     static THINK_CLOSE_RE = /<\/(?:think|thinking|reasoning|thought|REASONING_SCRATCHPAD)>/i;
     // includeThinking is accepted but not used to gate event emission —
     // reasoning content is always yielded so assembleTurn can echo it back
-    // on multi-turn DeepSeek API calls (omitting it causes HTTP 400).
-    // The display preference is handled by the TUI layer (showThinking flag).
+    // on multi-turn DeepSeek API calls (omitting it causes HTTP 400
+    // ("reasoning_content must be passed back to the API"). The display
+    // preference is handled by the TUI layer (showThinking flag).
     constructor(_includeThinking) { }
     /** Split a content delta into text + thinking pieces, honoring open <think> blocks across chunks. */
     routeContent(input) {
@@ -207,6 +221,13 @@ class StreamState {
                 (typeof d.reasoning === "string" && d.reasoning) ||
                 "";
             if (r.length > 0) {
+                // Close any open text stream before starting thinking — otherwise
+                // consumers see thinking_start while textOpen is still true, producing
+                // an overlapping/invalid event sequence.
+                if (this.textOpen) {
+                    yield { type: "text_end" };
+                    this.textOpen = false;
+                }
                 if (!this.thinkingOpen) {
                     yield { type: "thinking_start" };
                     this.thinkingOpen = true;

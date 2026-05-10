@@ -43,6 +43,7 @@ import {
 import { drainPending } from "../safety/audit-log.js";
 import { pushAuditEntries } from "../telemetry/gateway-push.js";
 import { loadToken } from "../integrations/device-auth.js";
+import { raceSignals } from "./abort-utils.js";
 
 export interface AgentLoopConfig {
   sessionId: string;
@@ -98,6 +99,7 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
   // wedged; burning 3× retries wastes ~4.5 min for no benefit.
   const PER_REASON_MAX_RETRIES: Record<string, number> = {
     timeout: 1,
+    rate_limit: 1,
   };
 
   events.emit({
@@ -242,6 +244,11 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
           retriesForTurn++;
           const backoff = classified.backoffMs ?? 1000;
           await new Promise((r) => setTimeout(r, backoff));
+          // Bug 5 fix: decrement turnIndex before continue so the for-loop's
+          // post-increment restores it to the same value. Without this, every
+          // retry consumed a turn budget slot — with maxTurns=3 and 3 retries
+          // on turn 0, the loop exited before any real agent work happened.
+          turnIndex--;
           continue;
         }
 
@@ -431,19 +438,51 @@ async function executeToolCalls(
       name: call.name,
       input,
     });
+
+    const toolTimeoutMs = 300_000;
+    const toolTimeoutCtrl = new AbortController();
+    const toolTimer = setTimeout(() => toolTimeoutCtrl.abort(), toolTimeoutMs);
+    const { signal: toolSignal, cancel: cancelToolRace } = raceSignals(
+      cfg.signal!,
+      toolTimeoutCtrl.signal,
+    );
+
     const started = Date.now();
     let result: ToolResult;
     try {
-      result = await cfg.toolExecutor.execute({ ...call, input }, cfg.signal!);
+      result = await cfg.toolExecutor.execute({ ...call, input }, toolSignal);
     } catch (err) {
-      result = {
-        content: `Tool execution failed: ${String(err)}`,
-        isError: true,
-      };
+      if (toolTimeoutCtrl.signal.aborted) {
+        result = {
+          content: "[TIMEOUT] Tool exceeded 300s",
+          isError: true,
+        };
+      } else {
+        result = {
+          content: `Tool execution failed: ${String(err)}`,
+          isError: true,
+        };
+      }
+    } finally {
+      clearTimeout(toolTimer);
+      cancelToolRace();
     }
+
     const durationMs = Date.now() - started;
-    result =
-      (await cfg.hooks?.afterToolCall?.({ ...call, input }, result)) ?? result;
+    let afterResult: ToolResult = result!;
+    try {
+      afterResult =
+        (await cfg.hooks?.afterToolCall?.({ ...call, input }, result!)) ??
+        result!;
+    } catch (hookErr) {
+      // afterToolCall hook errors must not crash the agent loop — treat as
+      // a no-op and continue with the original result.
+      console.error(
+        `[agent-loop] afterToolCall hook threw for tool ${call.name}:`,
+        hookErr,
+      );
+    }
+    result = afterResult;
     events.emit({
       type: "tool_exec_end",
       id: call.id,

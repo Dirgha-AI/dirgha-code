@@ -149,6 +149,19 @@ function makeTimeoutSignal(timeoutMs, external) {
     };
 }
 function buildGeminiBody(req, thinkingParam = null) {
+    // Build toolUseId → toolName map from all assistant messages so tool_result
+    // parts can emit the correct functionResponse.name (Gemini requires the
+    // function name, not the call ID, to correlate responses to declarations).
+    const toolIdToName = new Map();
+    for (const msg of req.messages) {
+        if (msg.role !== 'assistant')
+            continue;
+        const raw = typeof msg.content === 'string' ? [] : msg.content;
+        for (const p of raw) {
+            if (p.type === 'tool_use')
+                toolIdToName.set(p.id, p.name);
+        }
+    }
     const contents = [];
     let systemInstruction;
     for (const msg of req.messages) {
@@ -162,10 +175,27 @@ function buildGeminiBody(req, thinkingParam = null) {
         const parts = [];
         const raw = typeof msg.content === 'string' ? [{ type: 'text', text: msg.content }] : msg.content;
         for (const p of raw) {
-            if (p.type === 'text')
+            if (p.type === 'text') {
                 parts.push({ text: p.text });
-            else if (p.type === 'tool_result')
-                parts.push({ text: p.content });
+            }
+            else if (p.type === 'tool_use') {
+                // Bug 2: assistant tool_use parts must become functionCall entries;
+                // previously they were silently dropped, producing parts:[] → HTTP 400.
+                parts.push({ functionCall: { name: p.name, args: p.input ?? {} } });
+            }
+            else if (p.type === 'tool_result') {
+                // Bug 3: tool results must be functionResponse, not plain text.
+                // Gemini requires the original function declaration name (e.g. "get_weather"),
+                // not the call ID (e.g. "toolu_01ABC"), to correlate the response.
+                // Fall back to toolUseId if the map has no entry (graceful degradation).
+                const resolvedName = toolIdToName.get(p.toolUseId ?? '') ?? p.toolUseId ?? '';
+                parts.push({
+                    functionResponse: {
+                        name: resolvedName,
+                        response: { result: p.content },
+                    },
+                });
+            }
         }
         contents.push({ role: msg.role === 'assistant' ? 'model' : 'user', parts });
     }

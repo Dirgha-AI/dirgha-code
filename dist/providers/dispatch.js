@@ -56,6 +56,14 @@ const RULES = [
     // Specific NVIDIA NIM models — after explicit prefixes so vendor-prefix
     // deepseek/ai/, anthropic/, etc. are never hijacked by the NIM catalogue.
     { match: (id) => NVIDIA_NIM_MODELS.has(id), provider: "nvidia" },
+    // Machine 1 — Dirgha's local industrial intelligence model.
+    // Matches "machine1", "machine1:latest", and the explicit "machine1/" prefix.
+    {
+        match: (id) => id === "machine1" ||
+            id === "machine1:latest" ||
+            id.startsWith("machine1/"),
+        provider: "machine1",
+    },
     // Local & explicit-prefix providers.
     { match: (id) => id.startsWith("ollama/"), provider: "ollama" },
     { match: (id) => id.startsWith("llamacpp/"), provider: "llamacpp" },
@@ -117,6 +125,7 @@ export function isKnownProvider(id) {
         id === "perplexity" ||
         id === "xai" ||
         id === "groq" ||
-        id === "zai");
+        id === "zai" ||
+        id === "machine1");
 }
 //# sourceMappingURL=dispatch.js.map

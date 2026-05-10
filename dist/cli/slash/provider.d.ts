@@ -8,6 +8,7 @@
  *                                    `add-provider` skill so the agent can
  *                                    do the file edits if asked.
  *   /provider doctor [name]        — quick reachability check
+ *   /provider add-custom           — instructions for adding a custom provider
  *
  * Adding a provider is a one-time operation that spans 6 files; the
  * skill doc at src/skills/add-provider.md is the canonical recipe so a

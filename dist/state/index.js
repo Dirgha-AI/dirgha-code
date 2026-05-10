@@ -3,8 +3,8 @@
  * cross-references sessions, checkpoints, and cron jobs by session ID.
  * All writes are atomic (write to tmp, rename).
  */
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
-import { homedir, tmpdir } from 'node:os';
+import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 const STATE_DIR = join(homedir(), '.dirgha');
@@ -20,9 +20,13 @@ async function readIndex() {
 }
 async function writeIndex(index) {
     await mkdir(STATE_DIR, { recursive: true });
-    const tmp = join(tmpdir(), `dirgha-state-${randomUUID()}.json`);
+    // Write to a tmp file in the SAME directory as INDEX_PATH so that the
+    // subsequent rename(2) is within one filesystem. Writing to os.tmpdir()
+    // would cause an EXDEV error on Linux when /tmp is a tmpfs while ~/.dirgha
+    // is on the root filesystem.
+    const tmp = join(STATE_DIR, `.dirgha-state-${randomUUID()}.tmp`);
     await writeFile(tmp, JSON.stringify(index, null, 2), 'utf8');
-    await writeFile(INDEX_PATH, JSON.stringify(index, null, 2), 'utf8');
+    await rename(tmp, INDEX_PATH);
 }
 export async function registerSession(sessionId, model) {
     try {

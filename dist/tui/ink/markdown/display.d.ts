@@ -24,5 +24,5 @@ interface MarkdownProps {
     palette: Palette;
     width?: number;
 }
-export declare const MarkdownDisplay: React.NamedExoticComponent<MarkdownProps>;
+export declare const MarkdownDisplay: React.MemoExoticComponent<(props: MarkdownProps) => React.ReactElement | null>;
 export {};

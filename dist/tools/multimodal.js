@@ -23,7 +23,7 @@
  * pull in any streaming/chat-completions internals.
  */
 import { readFile, stat, writeFile, mkdir } from "node:fs/promises";
-import { resolve, extname, dirname } from "node:path";
+import { resolve, extname, dirname, sep } from "node:path";
 import { isValidCwdPath } from "../utils/fs.js";
 import { OpenAIProvider } from "../providers/openai.js";
 import { NvidiaProvider } from "../providers/nvidia.js";
@@ -332,7 +332,16 @@ async function generateImage(a) {
             isError: true,
         };
     }
-    const outputPath = resolveOutputPath(a.input.outputPath, a.ctx.cwd);
+    let outputPath;
+    try {
+        outputPath = resolveOutputPath(a.input.outputPath, a.ctx.cwd);
+    }
+    catch (err) {
+        return {
+            content: `generate_image: invalid outputPath — ${err instanceof Error ? err.message : String(err)}`,
+            isError: true,
+        };
+    }
     try {
         await mkdir(dirname(outputPath), { recursive: true });
         await writeFile(outputPath, new Uint8Array(Buffer.from(result.base64, "base64")));
@@ -423,9 +432,16 @@ function tryBuildOpenAI(env) {
     }
 }
 function resolveOutputPath(requested, cwd) {
-    if (requested && requested.length > 0)
-        return resolve(cwd, requested);
+    const base = resolve(cwd);
+    const baseSep = base.endsWith(sep) ? base : base + sep;
+    if (requested && requested.length > 0) {
+        const abs = resolve(base, requested);
+        if (abs !== base && !abs.startsWith(baseSep)) {
+            throw new Error('Output path escapes workspace');
+        }
+        return abs;
+    }
     const ts = new Date().toISOString().replace(/[:.]/g, "-");
-    return resolve(cwd, `dirgha-image-${ts}.png`);
+    return resolve(base, `dirgha-image-${ts}.png`);
 }
 //# sourceMappingURL=multimodal.js.map

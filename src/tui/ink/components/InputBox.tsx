@@ -57,6 +57,10 @@ export interface InputBoxProps {
   onRequestUpgrade?: () => void;
   /** Prior submitted prompts, newest first (for up/down arrow recall). */
   promptHistory?: readonly string[];
+  /** Number of messages currently in the prompt queue (shown to user). */
+  queueLength?: number;
+  /** Pop the last queued message back into the input for editing. */
+  onDequeueForEdit?: () => void;
 }
 
 const CTRL_C_TIMEOUT_MS = 1500;
@@ -182,9 +186,35 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
     [props.onChange],
   );
 
+  // Always-active: Ctrl+Y must work even while agent is busy.
+  // Also handles up-arrow dequeue-for-edit while busy — that key event can
+  // never arrive in the focus-gated useInput below because focus=!busy.
+  useInput(
+    (_ch, key) => {
+      if (key.ctrl && _ch === "y") {
+        if (props.onRequestYoloToggle) props.onRequestYoloToggle();
+        return;
+      }
+      // Up arrow on empty input while busy: pull last queued message back for
+      // editing. Must live here (isActive: true) because the focus-gated handler
+      // below is inactive whenever busy=true.
+      if (
+        key.upArrow &&
+        props.busy &&
+        props.value === "" &&
+        (props.queueLength ?? 0) > 0
+      ) {
+        if (props.onDequeueForEdit) props.onDequeueForEdit();
+      }
+    },
+    { isActive: true },
+  );
+
   useInput(
     (inputCh, key) => {
       // Up/down arrow prompt-history recall (Gemini CLI parity).
+      // (Up-arrow dequeue-for-edit while busy is handled in the always-active
+      // useInput above, because this handler is inactive when busy=true.)
       if (key.upArrow && history.length > 0) {
         if (historyIdx === null) {
           savedInputRef.current = props.value;
@@ -239,12 +269,6 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
           () => setCtrlCArmed(false),
           CTRL_C_TIMEOUT_MS,
         );
-        return;
-      }
-
-      // Ctrl+Y — toggle YOLO mode at any time.
-      if (key.ctrl && inputCh === "y") {
-        if (props.onRequestYoloToggle) props.onRequestYoloToggle();
         return;
       }
 

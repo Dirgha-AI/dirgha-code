@@ -31,7 +31,7 @@ export function PromptQueueIndicator(props: Props): React.JSX.Element | null {
   return (
     <Box flexDirection="column" paddingX={1}>
       <Text color={palette.textMuted}>
-        queued ({props.queued.length}) — runs after current turn
+        queued ({props.queued.length}) — runs after current turn · ↑ to edit last
       </Text>
       {visible.map((p, i) => (
         <Text key={i} color={palette.textMuted}>

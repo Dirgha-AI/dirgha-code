@@ -9,7 +9,7 @@ export function PromptQueueIndicator(props) {
         return null;
     const visible = props.queued.slice(0, MAX_VISIBLE);
     const overflow = Math.max(0, props.queued.length - MAX_VISIBLE);
-    return (_jsxs(Box, { flexDirection: "column", paddingX: 1, children: [_jsxs(Text, { color: palette.textMuted, children: ["queued (", props.queued.length, ") \u2014 runs after current turn"] }), visible.map((p, i) => (_jsxs(Text, { color: palette.textMuted, children: ['  ', "\u2022 ", truncate(p)] }, i))), overflow > 0 && (_jsxs(Text, { color: palette.textMuted, dimColor: true, children: ['  ', "+", overflow, " more"] }))] }));
+    return (_jsxs(Box, { flexDirection: "column", paddingX: 1, children: [_jsxs(Text, { color: palette.textMuted, children: ["queued (", props.queued.length, ") \u2014 runs after current turn \u00B7 \u2191 to edit last"] }), visible.map((p, i) => (_jsxs(Text, { color: palette.textMuted, children: ['  ', "\u2022 ", truncate(p)] }, i))), overflow > 0 && (_jsxs(Text, { color: palette.textMuted, dimColor: true, children: ['  ', "+", overflow, " more"] }))] }));
 }
 function truncate(s) {
     const flat = s.replace(/\s+/g, ' ').trim();

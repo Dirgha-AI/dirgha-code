@@ -36,8 +36,10 @@ export function createTuiApprovalBus(
           return "deny_always";
         case "n":
           return "deny";
+        case "y":
+          return "approve_once";
         default:
-          return "approve";
+          return "approve_once";
       }
     },
   };
@@ -50,9 +52,20 @@ function readOneChar(): Promise<string> {
         input: process.stdin,
         output: process.stdout,
       });
+
+      let rlSettled = false;
+
+      // Resolve with empty string if the readline interface closes before a response.
+      rl.once("close", () => {
+        if (!rlSettled) { rlSettled = true; resolve(""); }
+      });
+
+      rl.once("error", (err: Error) => {
+        if (!rlSettled) { rlSettled = true; rl.close(); reject(err); }
+      });
+
       rl.question("", (ans) => {
-        rl.close();
-        resolve(ans.trim());
+        if (!rlSettled) { rlSettled = true; rl.close(); resolve(ans.trim()); }
       });
       return;
     }
@@ -60,16 +73,28 @@ function readOneChar(): Promise<string> {
     const onData = (buf: Buffer): void => {
       if (settled) return;
       settled = true;
+
+      // Stop listening for further data events and put stdin back to normal mode.
       process.stdin.setRawMode(false);
       process.stdin.pause();
       process.stdin.off("data", onData);
       process.stdin.off("error", onError);
+
+      // Drain any bytes that were already buffered (e.g. the rest of "yes\n"
+      // after the initial 'y').  read() returns null when the internal buffer
+      // is empty.
+      let chunk: Buffer | null;
+      while ((chunk = process.stdin.read()) !== null) {
+        // discard – we only need the first character.
+      }
+
       resolve(buf.toString("utf8"));
     };
     const onError = (err: Error): void => {
       if (settled) return;
       settled = true;
       process.stdin.setRawMode(false);
+      process.stdin.pause();
       process.stdin.off("data", onData);
       process.stdin.off("error", onError);
       reject(err);

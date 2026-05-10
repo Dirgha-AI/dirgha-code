@@ -18,7 +18,7 @@ interface Input {
 }
 
 const DEFAULT_LIMIT = 500;
-const DEFAULT_MAX_DEPTH = 64;
+const DEFAULT_MAX_DEPTH = 20;
 const DEFAULT_SKIP = new Set([
   "node_modules",
   ".git",
@@ -41,7 +41,7 @@ export const searchGlobTool: Tool = {
       maxDepth: {
         type: "integer",
         minimum: 1,
-        description: "Maximum recursion depth. Default 64.",
+        description: "Maximum recursion depth. Default 20.",
       },
     },
     required: ["pattern"],
@@ -60,18 +60,19 @@ export const searchGlobTool: Tool = {
     const files: string[] = [];
     let truncated = false;
 
-    async function walk(dir: string, depth: number): Promise<void> {
-      if (depth > maxDepth || files.length >= limit) {
+    async function walk(dir: string, depth: number, signal: AbortSignal): Promise<void> {
+      if (signal.aborted || depth > maxDepth || files.length >= limit) {
         truncated = true;
         return;
       }
       const names = await readdir(dir).catch(() => [] as string[]);
       for (const name of names) {
+        if (signal.aborted) { truncated = true; return; }
         if (DEFAULT_SKIP.has(name)) continue;
         const abs = join(dir, name);
         const info = await stat(abs).catch(() => undefined);
         if (!info) continue;
-        if (info.isDirectory()) await walk(abs, depth + 1);
+        if (info.isDirectory()) await walk(abs, depth + 1, signal);
         else if (info.isFile()) {
           const rel = relative(root, abs);
           if (matcher.test(rel)) {
@@ -85,7 +86,7 @@ export const searchGlobTool: Tool = {
       }
     }
 
-    await walk(root, 0);
+    await walk(root, 0, ctx.signal ?? new AbortController().signal);
     files.sort();
     return {
       content: files.length > 0 ? files.join("\n") : "(no matches)",

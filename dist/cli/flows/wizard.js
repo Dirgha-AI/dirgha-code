@@ -370,6 +370,7 @@ function modelsForProvider(providerId) {
             "gemini",
             "flash",
             "llama",
+            "ring",
             "ling",
             "hy3",
         ];

@@ -7,7 +7,7 @@ import { readdir, stat } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { isValidCwdPath } from "../utils/fs.js";
 const DEFAULT_LIMIT = 500;
-const DEFAULT_MAX_DEPTH = 64;
+const DEFAULT_MAX_DEPTH = 20;
 const DEFAULT_SKIP = new Set([
     "node_modules",
     ".git",
@@ -28,7 +28,7 @@ export const searchGlobTool = {
             maxDepth: {
                 type: "integer",
                 minimum: 1,
-                description: "Maximum recursion depth. Default 64.",
+                description: "Maximum recursion depth. Default 20.",
             },
         },
         required: ["pattern"],
@@ -44,13 +44,17 @@ export const searchGlobTool = {
         const matcher = globToRegex(input.pattern);
         const files = [];
         let truncated = false;
-        async function walk(dir, depth) {
-            if (depth > maxDepth || files.length >= limit) {
+        async function walk(dir, depth, signal) {
+            if (signal.aborted || depth > maxDepth || files.length >= limit) {
                 truncated = true;
                 return;
             }
             const names = await readdir(dir).catch(() => []);
             for (const name of names) {
+                if (signal.aborted) {
+                    truncated = true;
+                    return;
+                }
                 if (DEFAULT_SKIP.has(name))
                     continue;
                 const abs = join(dir, name);
@@ -58,7 +62,7 @@ export const searchGlobTool = {
                 if (!info)
                     continue;
                 if (info.isDirectory())
-                    await walk(abs, depth + 1);
+                    await walk(abs, depth + 1, signal);
                 else if (info.isFile()) {
                     const rel = relative(root, abs);
                     if (matcher.test(rel)) {
@@ -71,7 +75,7 @@ export const searchGlobTool = {
                 }
             }
         }
-        await walk(root, 0);
+        await walk(root, 0, ctx.signal ?? new AbortController().signal);
         files.sort();
         return {
             content: files.length > 0 ? files.join("\n") : "(no matches)",

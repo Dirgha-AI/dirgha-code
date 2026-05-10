@@ -14,8 +14,8 @@ REPORT="$OUT/REPORT.md"
 SESSION="smoke"
 
 export PATH=$PATH:$(go env GOPATH)/bin
-# Pin every smoke run to hy3-free via openrouter — zero quota burn
-export DIRGHA_MODEL="tencent/hy3-preview:free"
+# Pin every smoke run to ring-free via openrouter — zero quota burn
+export DIRGHA_MODEL="inclusionai/ring-2.6-1t:free"
 export DIRGHA_PROVIDER="openrouter"
 [[ -z "${OPENROUTER_API_KEY:-}" ]] && export OPENROUTER_API_KEY="$(grep -E '^OPENROUTER_API_KEY' ~/.dirgha/.env 2>/dev/null | cut -d= -f2- | tr -d '\"')"
 
@@ -129,7 +129,7 @@ tool_smoke() {
     log "FAIL (rc=$rc, no /$expect_re/) → $(basename $out)"
   fi
 }
-tool_smoke "shell-tool" "DIRGHA_MODEL=tencent/hy3-preview:free DIRGHA_PROVIDER=openrouter dirgha ask --max-turns 3 --print 'use the shell tool to run echo TOOL_OK and report the exact output'" "TOOL_OK"
+tool_smoke "shell-tool" "DIRGHA_MODEL=inclusionai/ring-2.6-1t:free DIRGHA_PROVIDER=openrouter dirgha ask --max-turns 3 --print 'use the shell tool to run echo TOOL_OK and report the exact output'" "TOOL_OK"
 
 if [[ "$TIER" == "all" ]]; then
   # /mode toggles ACT↔PLAN inline (hardcoded branch in App.tsx)

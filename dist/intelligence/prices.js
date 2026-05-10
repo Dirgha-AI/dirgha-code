@@ -521,6 +521,12 @@ export const PRICES = [
     },
     {
         provider: "openrouter",
+        model: "inclusionai/ring-2.6-1t:free",
+        inputPerM: 0,
+        outputPerM: 0,
+    },
+    {
+        provider: "openrouter",
         model: "tencent/hy3-preview:free",
         inputPerM: 0,
         outputPerM: 0,
@@ -915,7 +921,7 @@ function inferFamily(id) {
         return "glm";
     if (/hunyuan/.test(id) || /tencent\//.test(id))
         return "hunyuan";
-    if (/ling/.test(id) || /inclusionai/.test(id))
+    if (/ling/.test(id) || /ring/.test(id) || /inclusionai/.test(id))
         return "ling";
     return "other";
 }
@@ -994,6 +1000,7 @@ const CONTEXT_WINDOWS = {
     "z-ai/glm-4.7-flash": 32_000,
     // OpenRouter — free
     "inclusionai/ling-2.6-1t:free": 32_000,
+    "inclusionai/ring-2.6-1t:free": 1_000_000,
     "tencent/hy3-preview:free": 32_000,
     "minimax/minimax-m2.5:free": 200_000,
     "qwen/qwen3-coder:free": 32_000,
@@ -1102,6 +1109,7 @@ const MODEL_ALIASES = {
     "deepseek-flash": "deepseek-ai/deepseek-v4-flash",
     // OpenRouter free tier
     ling: "inclusionai/ling-2.6-1t:free",
+    ring: "inclusionai/ring-2.6-1t:free",
     hy3: "tencent/hy3-preview:free",
 };
 export function resolveModelAlias(input) {

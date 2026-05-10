@@ -13,11 +13,11 @@ export interface ThinkingBlockProps {
     content: string;
     isStreaming?: boolean;
 }
-export declare const ThinkingBlock: React.NamedExoticComponent<ThinkingBlockProps>;
+export declare const ThinkingBlock: React.MemoExoticComponent<({ content, }: ThinkingBlockProps) => React.JSX.Element | null>;
 export interface ThinkingBlockGroupProps {
     blocks: {
         id: string;
         content: string;
     }[];
 }
-export declare const ThinkingBlockGroup: React.NamedExoticComponent<ThinkingBlockGroupProps>;
+export declare const ThinkingBlockGroup: React.MemoExoticComponent<({ blocks, }: ThinkingBlockGroupProps) => React.JSX.Element | null>;

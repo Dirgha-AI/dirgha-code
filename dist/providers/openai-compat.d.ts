@@ -23,6 +23,7 @@ export interface OpenAICompatCallOptions {
     extraBody?: Record<string, unknown>;
     signal?: AbortSignal;
     timeoutMs?: number;
+    stallTimeoutMs?: number;
     sanitizeToolDescriptions?: (desc: string) => string;
     includeThinking?: boolean;
 }

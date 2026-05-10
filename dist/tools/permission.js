@@ -7,6 +7,7 @@
  * outside-cwd access all require approval). The production engine is
  * injected from L6 (safety/policy.ts) which reads declarative rules.
  */
+import { resolve, sep } from 'node:path';
 export class DefaultPermissionEngine {
     cwd;
     constructor(cwd) {
@@ -35,9 +36,9 @@ export class DefaultPermissionEngine {
 function isInside(root, target) {
     if (!target)
         return false;
-    const normRoot = root.replace(/\/+$/, '');
-    if (!target.startsWith('/'))
-        return true;
-    return target === normRoot || target.startsWith(`${normRoot}/`);
+    const abs = resolve(root, target);
+    const normRoot = resolve(root);
+    const baseSep = normRoot.endsWith(sep) ? normRoot : normRoot + sep;
+    return abs === normRoot || abs.startsWith(baseSep);
 }
 //# sourceMappingURL=permission.js.map

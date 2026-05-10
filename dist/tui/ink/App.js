@@ -20,7 +20,7 @@ import { randomUUID } from "node:crypto";
 import { VirtualTranscript } from "./components/VirtualTranscript.js";
 import { appendAudit } from "../../audit/writer.js";
 import { maybeCompact } from "../../context/compaction.js";
-import { contextWindowFor } from "../../intelligence/prices.js";
+import { contextWindowFor, resolveModelAlias } from "../../intelligence/prices.js";
 import { buildAgentHooksFromConfig } from "../../hooks/config-bridge.js";
 import { enforceMode, composeHooks } from "../../context/mode-enforcement.js";
 import { loadProjectPrimer, composeSystemPrompt, } from "../../context/primer.js";
@@ -63,6 +63,7 @@ import { homedir } from "node:os";
 import { join as pathJoin } from "node:path";
 import { useEventProjection, } from "./use-event-projection.js";
 import { useOverlays } from "./use-overlays.js";
+import { useToolProgress } from "./use-tool-progress.js";
 import { useDeclinedVersions } from "./use-declined-versions.js";
 import { useStartupHealth } from "./use-startup-health.js";
 import { useFlickerDetector } from "./use-flicker-detector.js";
@@ -134,6 +135,11 @@ export function App(props) {
     // press Enter. Submissions land here instead of being dropped, then
     // drain FIFO when the turn finishes (see useEffect below).
     const [promptQueue, setPromptQueue] = React.useState([]);
+    // Mirror promptQueue in a ref so callbacks can read the latest value
+    // without capturing stale closures and without causing dependency cycles.
+    const promptQueueRef = React.useRef([]);
+    promptQueueRef.current = promptQueue;
+    const activeTools = useToolProgress(props.events);
     const [currentModel, setCurrentModel] = React.useState(props.config.model);
     // Inline key entry: set when a provider throws "X_API_KEY is required"
     // (either at model-pick time or when a turn fires). Cleared on save/cancel.
@@ -168,7 +174,9 @@ export function App(props) {
     // Windows). See `ink-approval-bus.ts` for the full rationale.
     const approvalBusRef = React.useRef(null);
     if (!approvalBusRef.current) {
-        approvalBusRef.current = createInkApprovalBus(new Set(props.config.autoApproveTools));
+        const autoApproveSet = new Set(props.config.autoApproveTools);
+        autoApproveSet.add("rtk"); // RTK is a safe shell wrapper, never needs approval
+        approvalBusRef.current = createInkApprovalBus(autoApproveSet);
     }
     const [pendingApproval, setPendingApproval] = React.useState(null);
     React.useEffect(() => {
@@ -517,8 +525,11 @@ export function App(props) {
             return;
         }
         if (value.startsWith("/model ")) {
-            const id = value.slice("/model ".length).trim();
-            if (id !== "") {
+            const rawId = value.slice("/model ".length).trim();
+            if (rawId !== "") {
+                // Resolve aliases (e.g. "ring" → "inclusionai/ring-2.6-1t:free")
+                // before matching against the catalogue, mirroring the CLI flag path.
+                const id = resolveModelAlias(rawId);
                 // Exact match first, then suffix fallback — mirrors slash.ts /model handler.
                 const exactMatch = PRICES.find((p) => p.model === id);
                 if (exactMatch) {
@@ -545,7 +556,7 @@ export function App(props) {
                         const note = {
                             kind: "notice",
                             id: randomUUID(),
-                            text: `Invalid model: ${id}. Use /models to see the catalogue.`,
+                            text: `Invalid model: ${rawId}. Use /models to see the catalogue.`,
                         };
                         setTranscript((prev) => [...prev, note]);
                     }
@@ -1151,6 +1162,9 @@ export function App(props) {
                         } })), _jsx(PromptQueueIndicator, { queued: promptQueue }), _jsx(InputBox, { value: input, onChange: setInput, onSubmit: handleSubmit, busy: busy, liveDurationMs: liveDurationMs, vimMode: props.config.vimMode === true, onAtQueryChange: overlays.setAtQuery, onSlashQueryChange: overlays.setSlashQuery, onRequestOverlay: overlays.openOverlay, promptHistory: promptHistory, onRequestYoloToggle: () => {
                             const next = mode === "yolo" ? "act" : "yolo";
                             setMode(next);
+                            // Wire the approval bus so mid-turn tool calls are immediately
+                            // affected — not just the next turn's autoApprove flag.
+                            approvalBusRef.current?.setApproveAll(next === "yolo");
                             setTranscript((prev) => [
                                 ...prev,
                                 {
@@ -1161,7 +1175,17 @@ export function App(props) {
                                         : "YOLO mode OFF — back to standard confirmation.",
                                 },
                             ]);
-                        }, onRequestUpgrade: handleUpgrade, inputFocus: inputFocus }), healthResult !== null && !healthResult.allOk && (_jsx(Box, { paddingX: 1, children: _jsxs(Text, { color: "yellow", children: ["[! System check: ", healthResult.failures.length, " issue", healthResult.failures.length !== 1 ? "s" : "", " found \u2014 run 'dirgha doctor' for details]"] }) })), overlays.active === "atfile" && overlays.atQuery !== null && (_jsx(AtFileComplete, { cwd: props.cwd, query: overlays.atQuery, onPick: handleAtPick, onCancel: () => {
+                        }, onRequestUpgrade: handleUpgrade, inputFocus: inputFocus, queueLength: promptQueue.length, onDequeueForEdit: () => {
+                            // Read from ref so we get the latest queue without capturing a
+                            // stale closure. Calling setInput inside a setState updater would
+                            // violate React's purity requirement for updater functions.
+                            const q = promptQueueRef.current;
+                            if (q.length === 0)
+                                return;
+                            const last = q[q.length - 1];
+                            setInput(last);
+                            setPromptQueue((prev) => prev.slice(0, -1));
+                        } }), healthResult !== null && !healthResult.allOk && (_jsx(Box, { paddingX: 1, children: _jsxs(Text, { color: "yellow", children: ["[! System check: ", healthResult.failures.length, " issue", healthResult.failures.length !== 1 ? "s" : "", " found \u2014 run 'dirgha doctor' for details]"] }) })), overlays.active === "atfile" && overlays.atQuery !== null && (_jsx(AtFileComplete, { cwd: props.cwd, query: overlays.atQuery, onPick: handleAtPick, onCancel: () => {
                             overlays.setAtQuery(null);
                             overlays.setActive(null);
                         } })), overlays.active === "slash" && overlays.slashQuery !== null && (_jsx(SlashComplete, { commands: slashCommands, query: overlays.slashQuery, onPick: handleSlashPick, onCancel: () => {
@@ -1190,7 +1214,7 @@ export function App(props) {
                             // Esc inside ModelPicker → back to ProviderPicker (NOT close).
                             setPickerStage("provider");
                             setPickerProvider(null);
-                        } })), overlays.active === "help" && (_jsx(HelpOverlay, { slashCommands: slashCommands, onClose: overlays.closeOverlay })), overlays.active === "theme" && (_jsx(ThemePicker, { current: themeName, onPick: handleThemePick, onCancel: overlays.closeOverlay })), overlays.active === "sandbox" && (_jsx(SandboxPicker, { current: sandboxModeRef.current, onPick: handleSandboxPick, onCancel: overlays.closeOverlay })), pendingKey && (_jsx(KeySetOverlay, { keyName: pendingKey.keyName, onSave: handleKeySetSave, onCancel: () => setPendingKey(null) })), updateVersion !== null && (_jsx(Box, { paddingX: 1, children: _jsxs(Text, { color: "yellow", children: ["[v", updateVersion, " available \u2014 press Ctrl+U or /upgrade to upgrade]"] }) })), _jsx(StatusBar, { model: currentModel, provider: providerIdForModel(currentModel), inputTokens: projection.totals.inputTokens, outputTokens: projection.totals.outputTokens, costUsd: projection.totals.costUsd, cwd: props.cwd, busy: busy, mode: mode, contextWindow: contextWindowFor(currentModel), liveOutputTokens: liveOutputTokens, liveDurationMs: liveDurationMs, overflowDetected: flicker.overflowDetected, showMetrics: showRenderMetrics, renderMetrics: renderMetrics })] }) }) }));
+                        } })), overlays.active === "help" && (_jsx(HelpOverlay, { slashCommands: slashCommands, onClose: overlays.closeOverlay })), overlays.active === "theme" && (_jsx(ThemePicker, { current: themeName, onPick: handleThemePick, onCancel: overlays.closeOverlay })), overlays.active === "sandbox" && (_jsx(SandboxPicker, { current: sandboxModeRef.current, onPick: handleSandboxPick, onCancel: overlays.closeOverlay })), pendingKey && (_jsx(KeySetOverlay, { keyName: pendingKey.keyName, onSave: handleKeySetSave, onCancel: () => setPendingKey(null) })), updateVersion !== null && (_jsx(Box, { paddingX: 1, children: _jsxs(Text, { color: "yellow", children: ["[v", updateVersion, " available \u2014 press Ctrl+U or /upgrade to upgrade]"] }) })), _jsx(StatusBar, { model: currentModel, provider: providerIdForModel(currentModel), inputTokens: projection.totals.inputTokens, outputTokens: projection.totals.outputTokens, costUsd: projection.totals.costUsd, cwd: props.cwd, busy: busy, mode: mode, contextWindow: contextWindowFor(currentModel), liveOutputTokens: liveOutputTokens, liveDurationMs: liveDurationMs, overflowDetected: flicker.overflowDetected, showMetrics: showRenderMetrics, renderMetrics: renderMetrics, activeTool: activeTools[0] })] }) }) }));
 }
 /**
  * Walk the transcript and fold consecutive `tool` items into a single

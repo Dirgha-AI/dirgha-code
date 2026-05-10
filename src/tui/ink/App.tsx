@@ -22,7 +22,7 @@ import type { Message } from "../../kernel/types.js";
 import type { EventStream } from "../../kernel/event-stream.js";
 import { appendAudit } from "../../audit/writer.js";
 import { maybeCompact } from "../../context/compaction.js";
-import { contextWindowFor } from "../../intelligence/prices.js";
+import { contextWindowFor, resolveModelAlias } from "../../intelligence/prices.js";
 import { buildAgentHooksFromConfig } from "../../hooks/config-bridge.js";
 import { enforceMode, composeHooks } from "../../context/mode-enforcement.js";
 import {
@@ -97,6 +97,7 @@ import {
   type TranscriptItem,
 } from "./use-event-projection.js";
 import { useOverlays } from "./use-overlays.js";
+import { useToolProgress } from "./use-tool-progress.js";
 import { useDeclinedVersions } from "./use-declined-versions.js";
 import { useStartupHealth, type HealthResult } from "./use-startup-health.js";
 import { useFlickerDetector } from "./use-flicker-detector.js";
@@ -204,6 +205,11 @@ export function App(props: AppProps): React.JSX.Element {
   // press Enter. Submissions land here instead of being dropped, then
   // drain FIFO when the turn finishes (see useEffect below).
   const [promptQueue, setPromptQueue] = React.useState<string[]>([]);
+  // Mirror promptQueue in a ref so callbacks can read the latest value
+  // without capturing stale closures and without causing dependency cycles.
+  const promptQueueRef = React.useRef<string[]>([]);
+  promptQueueRef.current = promptQueue;
+  const activeTools = useToolProgress(props.events);
   const [currentModel, setCurrentModel] = React.useState(props.config.model);
   // Inline key entry: set when a provider throws "X_API_KEY is required"
   // (either at model-pick time or when a turn fires). Cleared on save/cancel.
@@ -250,9 +256,9 @@ export function App(props: AppProps): React.JSX.Element {
   // Windows). See `ink-approval-bus.ts` for the full rationale.
   const approvalBusRef = React.useRef<InkApprovalBus | null>(null);
   if (!approvalBusRef.current) {
-    approvalBusRef.current = createInkApprovalBus(
-      new Set(props.config.autoApproveTools),
-    );
+    const autoApproveSet = new Set(props.config.autoApproveTools);
+    autoApproveSet.add("rtk"); // RTK is a safe shell wrapper, never needs approval
+    approvalBusRef.current = createInkApprovalBus(autoApproveSet);
   }
   const [pendingApproval, setPendingApproval] =
     React.useState<ApprovalRequest | null>(null);
@@ -614,8 +620,11 @@ export function App(props: AppProps): React.JSX.Element {
         return;
       }
       if (value.startsWith("/model ")) {
-        const id = value.slice("/model ".length).trim();
-        if (id !== "") {
+        const rawId = value.slice("/model ".length).trim();
+        if (rawId !== "") {
+          // Resolve aliases (e.g. "ring" → "inclusionai/ring-2.6-1t:free")
+          // before matching against the catalogue, mirroring the CLI flag path.
+          const id = resolveModelAlias(rawId);
           // Exact match first, then suffix fallback — mirrors slash.ts /model handler.
           const exactMatch = PRICES.find((p) => p.model === id);
           if (exactMatch) {
@@ -640,7 +649,7 @@ export function App(props: AppProps): React.JSX.Element {
               const note: TranscriptItem = {
                 kind: "notice",
                 id: randomUUID(),
-                text: `Invalid model: ${id}. Use /models to see the catalogue.`,
+                text: `Invalid model: ${rawId}. Use /models to see the catalogue.`,
               };
               setTranscript((prev) => [...prev, note]);
             }
@@ -1344,6 +1353,9 @@ export function App(props: AppProps): React.JSX.Element {
             onRequestYoloToggle={(): void => {
               const next: Mode = mode === "yolo" ? "act" : "yolo";
               setMode(next);
+              // Wire the approval bus so mid-turn tool calls are immediately
+              // affected — not just the next turn's autoApprove flag.
+              approvalBusRef.current?.setApproveAll(next === "yolo");
               setTranscript((prev) => [
                 ...prev,
                 {
@@ -1358,6 +1370,17 @@ export function App(props: AppProps): React.JSX.Element {
             }}
             onRequestUpgrade={handleUpgrade}
             inputFocus={inputFocus}
+            queueLength={promptQueue.length}
+            onDequeueForEdit={(): void => {
+              // Read from ref so we get the latest queue without capturing a
+              // stale closure. Calling setInput inside a setState updater would
+              // violate React's purity requirement for updater functions.
+              const q = promptQueueRef.current;
+              if (q.length === 0) return;
+              const last = q[q.length - 1];
+              setInput(last);
+              setPromptQueue((prev) => prev.slice(0, -1));
+            }}
           />
           {healthResult !== null && !healthResult.allOk && (
             <Box paddingX={1}>
@@ -1478,6 +1501,7 @@ export function App(props: AppProps): React.JSX.Element {
             overflowDetected={flicker.overflowDetected}
             showMetrics={showRenderMetrics}
             renderMetrics={renderMetrics}
+            activeTool={activeTools[0]}
           />
         </Box>
       </SpinnerContext.Provider>

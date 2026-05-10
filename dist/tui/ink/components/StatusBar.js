@@ -1,11 +1,4 @@
 import { jsxs as _jsxs, jsx as _jsx } from "react/jsx-runtime";
-/**
- * Status bar rendered below the input box.
- *
- * Left cluster: cwd basename + provider id.
- * Right cluster: model label + cumulative tokens + cost.
- * When busy, a subtle spinner frame appears on the right.
- */
 import * as React from "react";
 import { Box, Text, useStdout } from "ink";
 import { useTheme } from "../theme-context.js";
@@ -99,8 +92,8 @@ export const StatusBar = React.memo(function StatusBar(props) {
     })();
     // Slim status bar — only what's load-bearing:
     //   left:  ⏵⏵ MODE · cwd  [overflow]
-    //   right: spinner (when busy) · short model · context-meter or cost
-    return (_jsxs(Box, { width: cols, paddingX: 1, justifyContent: "space-between", children: [_jsxs(Box, { gap: 1, children: [_jsxs(Text, { color: modeColour, bold: true, children: [ms.symbol, " ", ms.label] }), _jsx(Text, { color: palette.textMuted, dimColor: true, children: "\u00B7" }), _jsx(Text, { color: palette.textMuted, children: cwdLabel(props.cwd) }), props.overflowDetected && (_jsx(Text, { color: palette.status.warning, children: "[!]" }))] }), _jsxs(Box, { gap: 1, children: [props.busy && _jsx(SpinnerGlyph, { isActive: true }), typeof props.turnCount === "number" &&
+    //   right: spinner (when busy) · tool name + elapsed · short model · context-meter or cost
+    return (_jsxs(Box, { width: cols, paddingX: 1, justifyContent: "space-between", children: [_jsxs(Box, { gap: 1, children: [_jsxs(Text, { color: modeColour, bold: true, children: [ms.symbol, " ", ms.label] }), _jsx(Text, { color: palette.textMuted, dimColor: true, children: "\u00B7" }), _jsx(Text, { color: palette.textMuted, children: cwdLabel(props.cwd) }), props.overflowDetected && (_jsx(Text, { color: palette.status.warning, children: "[!]" }))] }), _jsxs(Box, { gap: 1, children: [props.busy && _jsx(SpinnerGlyph, { isActive: true }), props.activeTool && (_jsxs(Text, { color: palette.textMuted, dimColor: true, children: [props.activeTool.name, " (", Math.round(props.activeTool.elapsedMs / 1000), "s)"] })), typeof props.turnCount === "number" &&
                         typeof props.maxTurns === "number" && (_jsx(Text, { color: palette.textMuted, dimColor: true, children: `Turn ${props.turnCount}/${props.maxTurns}` })), _jsx(Text, { color: palette.brand, children: modelDisplay }), props.busy && (_jsx(Text, { color: palette.textMuted, dimColor: true, children: "\u00B7 Ctrl+C to stop" })), metricsLabel !== "" && (_jsx(Text, { color: palette.textMuted, dimColor: true, children: metricsLabel })), tokRateLabel !== "" && (_jsx(Text, { color: palette.textMuted, dimColor: true, children: tokRateLabel })), contextMeter !== "" && (_jsx(Text, { color: palette.textMuted, dimColor: true, children: contextMeter })), costLabel !== "" && (_jsx(Text, { color: palette.textMuted, dimColor: true, children: costLabel }))] })] }));
 });
 //# sourceMappingURL=StatusBar.js.map

@@ -106,7 +106,7 @@ jobs:
           # Tool-call round trip — confirms shell tool dispatches and the
           # provider chain works in CI. Skip when no API key.
           if [ -n "${OPENROUTER_API_KEY:-}" ]; then
-            DIRGHA_MODEL=tencent/hy3-preview:free DIRGHA_PROVIDER=openrouter \
+            DIRGHA_MODEL=inclusionai/ring-2.6-1t:free DIRGHA_PROVIDER=openrouter \
               dirgha ask --max-turns 3 --print 'use the shell tool to run echo TOOL_OK and report the exact output' \
               | grep -q TOOL_OK
           else

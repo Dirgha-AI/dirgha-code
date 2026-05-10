@@ -8,6 +8,7 @@
  *                                    `add-provider` skill so the agent can
  *                                    do the file edits if asked.
  *   /provider doctor [name]        — quick reachability check
+ *   /provider add-custom           — instructions for adding a custom provider
  *
  * Adding a provider is a one-time operation that spans 6 files; the
  * skill doc at src/skills/add-provider.md is the canonical recipe so a
@@ -17,6 +18,7 @@ import { readFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isKnownProvider } from '../../providers/dispatch.js';
+import { CUSTOM_PROVIDERS } from '../../providers/custom-provider.js';
 /**
  * Provider id → human label + best-for blurb. Source of truth for the
  * /provider list output; kept here (not in dispatch.ts) because dispatch
@@ -61,10 +63,26 @@ export const providerCommand = {
             }
             return await formatAdd(name);
         }
+        if (sub === 'add-custom') {
+            return ('Create ~/.dirgha/providers.json (array format):\n\n' +
+                '[\n' +
+                '  {\n' +
+                '    "id": "my-vllm",\n' +
+                '    "label": "My vLLM Server",\n' +
+                '    "baseUrl": "http://localhost:8000/v1",\n' +
+                '    "apiKey": "sk-optional",\n' +
+                '    "models": ["llama-3-8b", "codellama-13b"],\n' +
+                '    "supportsTools": true,\n' +
+                '    "supportsThinking": false\n' +
+                '  }\n' +
+                ']\n\n' +
+                'Use it: /model my-vllm/llama-3-8b\n' +
+                'Loaded once at startup — restart dirgha to pick up changes.');
+        }
         if (sub === 'doctor' || sub === 'check') {
             return 'Run `dirgha doctor` for a full health report (reachability + auth per provider).';
         }
-        return `unknown subcommand: ${sub}\nTry: /provider list | /provider add <name> | /provider doctor`;
+        return `unknown subcommand: ${sub}\nTry: /provider list | /provider add <name> | /provider add-custom | /provider doctor`;
     },
 };
 function formatList() {
@@ -90,10 +108,24 @@ function formatList() {
         const envCell = (meta.env ?? '— (local)').padEnd(20);
         out.push(`  ${badge}  ${idCell} ${labelCell} ${envCell} ${meta.blurb}`);
     }
+    // Custom providers section
+    if (CUSTOM_PROVIDERS.size > 0) {
+        out.push('');
+        out.push('Custom providers:');
+        for (const [id, cfg] of CUSTOM_PROVIDERS.entries()) {
+            const badge = '\x1b[32m✓\x1b[0m';
+            const idCell = id.padEnd(12);
+            const labelCell = (cfg.entry.label ?? '').padEnd(20);
+            const baseUrlCell = (cfg.entry.baseUrl ?? '').padEnd(30);
+            const models = (cfg.entry.models ?? []).join(', ');
+            out.push(`  ${badge}  ${idCell} ${labelCell} ${baseUrlCell} models: ${models}`);
+        }
+    }
     out.push('');
     out.push('Legend: ✓ = configured (env var set or local), ⚠ = key not set.');
     out.push('Add a key:  dirgha keys add <ENV_VAR> <key>');
     out.push('Add a new provider:  /provider add <name>');
+    out.push('Add a custom provider: /provider add-custom');
     return out.join('\n');
 }
 function isConfigured(id) {

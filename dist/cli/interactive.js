@@ -316,7 +316,16 @@ export async function runInteractive(opts) {
             const sigintHandler = () => {
                 abortController.abort();
                 process.stdout.write(style(currentTheme.muted, "\n[Interrupted]\n"));
+                // Re-register the out-of-turn graceful shutdown handler for the
+                // next SIGINT (after the turn has been cancelled and control
+                // returns to the prompt).
+                process.once("SIGINT", gracefulShutdown);
             };
+            // Remove gracefulShutdown before registering sigintHandler so only
+            // ONE listener is active at a time. Without this removal, both fire
+            // simultaneously on Ctrl+C: gracefulShutdown exits the process
+            // immediately and sigintHandler (the abort) never has a chance to run.
+            process.removeListener("SIGINT", gracefulShutdown);
             process.once("SIGINT", sigintHandler);
             try {
                 const result = await runAgentLoop({
@@ -359,7 +368,14 @@ export async function runInteractive(opts) {
                 process.stdout.write(style(currentTheme.danger, `\n[fatal] ${err instanceof Error ? err.message : String(err)}\n`));
             }
             finally {
+                // Remove sigintHandler if the turn finished before the user pressed
+                // Ctrl+C (if SIGINT fired it already removed itself via `once`).
                 process.removeListener("SIGINT", sigintHandler);
+                // Ensure exactly one gracefulShutdown listener is active between
+                // turns. Remove first to guard against the interrupted path (where
+                // sigintHandler already re-registered it), then re-add unconditionally.
+                process.removeListener("SIGINT", gracefulShutdown);
+                process.once("SIGINT", gracefulShutdown);
                 abortRef.current = null;
             }
             rl.prompt();

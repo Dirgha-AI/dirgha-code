@@ -53,12 +53,11 @@ function isIndexInsideCodeBlock(content: string, index: number): boolean {
     const fenceStart = fenceMatch.index;
     if (fenceStart >= index) break;
     const hasLanguage = fenceMatch[2].length > 0;
-    const line = fenceMatch[0];
-    // A fence with language or other content is an opener
-    if (hasLanguage || line.trimEnd().length > 3) {
+    // A bare ``` is an opener when blockDepth==0, a closer when blockDepth>0.
+    if (hasLanguage || blockDepth === 0) {
       blockDepth++;
     } else {
-      if (blockDepth > 0) blockDepth--;
+      blockDepth--;
     }
   }
   return blockDepth > 0;
@@ -76,16 +75,13 @@ function findEnclosingCodeBlockStart(content: string, cursor: number): number {
   while ((match = pattern.exec(content)) !== null) {
     if (match.index >= cursor) break;
     const hasLanguage = match[2].length > 0;
-    const line = match[0];
-    // A fence with language or other content is an opener
-    if (hasLanguage || line.trimEnd().length > 3) {
+    // A bare ``` is an opener when blockDepth==0, a closer when blockDepth>0.
+    if (hasLanguage || blockDepth === 0) {
       if (blockDepth === 0) blockStart = match.index;
       blockDepth++;
     } else {
-      if (blockDepth > 0) {
-        blockDepth--;
-        if (blockDepth === 0) blockStart = -1;
-      }
+      blockDepth--;
+      if (blockDepth === 0) blockStart = -1;
     }
   }
   return blockDepth > 0 ? blockStart : -1;

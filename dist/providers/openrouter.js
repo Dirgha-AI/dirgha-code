@@ -10,6 +10,7 @@ import { streamChatCompletions } from "./openai-compat.js";
 const DEFAULT_BASE = "https://openrouter.ai/api/v1";
 const TOOL_SUPPORT = [
     /^inclusionai\/ling/,
+    /^inclusionai\/ring/,
     /^anthropic\//,
     /^openai\//,
     /^google\/gemini/,
@@ -18,7 +19,8 @@ const TOOL_SUPPORT = [
     /^qwen\//,
     /^deepseek\//,
     /^moonshotai\//,
-    /^minimaxai?\//, // matches both `minimaxai/` (legacy) and `minimax/` (current OR slug)
+    // minimax intentionally omitted: OR's minimax emits XML tool calls (<minimax:tool_call>)
+    // instead of the standard JSON delta.tool_calls protocol, which leaks raw XML into the TUI.
     /^z-ai\//,
     /^tencent\//,
 ];
@@ -72,6 +74,7 @@ export class OpenRouterProvider {
             maxTokens: req.maxTokens,
             signal: req.signal,
             timeoutMs: this.timeoutMs,
+            stallTimeoutMs: this.timeoutMs,
             includeThinking: this.supportsThinking(req.model),
             extraHeaders: {
                 "HTTP-Referer": this.appUrl,

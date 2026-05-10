@@ -23,12 +23,16 @@ export function createInkApprovalBus(autoApprove = new Set()) {
     const resolvers = new Map();
     const listeners = new Set();
     let denied = false;
+    let approveAll = false;
     const emit = (req) => {
         for (const l of listeners)
             l(req);
     };
     return {
         requiresApproval(toolName) {
+            // When approveAll is set, skip approval gate entirely.
+            if (approveAll)
+                return false;
             // When denyAll() was called, return true so the kernel calls request(),
             // which returns 'deny'. Returning false would skip the approval gate
             // entirely and let the tool execute unconditionally.
@@ -37,6 +41,9 @@ export function createInkApprovalBus(autoApprove = new Set()) {
             return !autoApprove.has(toolName);
         },
         async request(req) {
+            // Honor approve-all without prompting (mid-turn YOLO toggle).
+            if (approveAll)
+                return 'approve';
             // Honor deny-all without prompting.
             if (denied)
                 return 'deny';
@@ -72,6 +79,9 @@ export function createInkApprovalBus(autoApprove = new Set()) {
         },
         alwaysApprove(toolName) {
             autoApprove.add(toolName);
+        },
+        setApproveAll(enabled) {
+            approveAll = enabled;
         },
         denyAll() {
             denied = true;

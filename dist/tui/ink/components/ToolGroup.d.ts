@@ -27,4 +27,4 @@ export interface ToolItem {
 export interface ToolGroupProps {
     tools: ToolItem[];
 }
-export declare const ToolGroup: React.NamedExoticComponent<ToolGroupProps>;
+export declare const ToolGroup: React.MemoExoticComponent<(props: ToolGroupProps) => React.JSX.Element | null>;

@@ -8,7 +8,6 @@
 import * as React from "react";
 import { render } from "ink";
 import { createEventStream } from "../../kernel/event-stream.js";
-import { closeSession } from "../../state/index.js";
 import { App, VERSION } from "./App.js";
 import { renderLogoString } from "./components/Logo.js";
 import { createDefaultSlashRegistry, registerBuiltinSlashCommands, } from "../../cli/slash.js";
@@ -52,27 +51,31 @@ export async function runInkTUI(opts) {
             process.stdout.write("\x1b[?1049l");
         }
     };
-    const doExit = () => {
-        const s = opts.sessionHandle?.session;
+    const sessionHandle = { session: null };
+    // Register alt-buffer restore + session flush on the synchronous `exit`
+    // event so the terminal is always left in a usable state regardless of
+    // how the process terminates (SIGINT via main.ts's mcpShutdownOnSignal,
+    // SIGTERM, uncaught exception, or normal exit). Writing the escape
+    // sequence twice is harmless — `restore()` is idempotent.
+    //
+    // We do NOT register our own SIGINT/SIGTERM `process.once` handlers here:
+    // main.ts already owns signal dispatch. Registering a second `once` for
+    // the same signal would cause the second handler to fire on the *next*
+    // signal (after the first listener was consumed), producing confusing
+    // double-exit behaviour. The `exit` listener below is sufficient.
+    const onProcessExit = () => {
+        restore();
+        const s = sessionHandle.session;
         if (s) {
             try {
                 s.close();
-                void closeSession(s.id);
             }
             catch {
                 /* best-effort */
             }
         }
-        restore();
-        process.exit(s ? 0 : 1);
     };
-    process.once("SIGINT", () => {
-        doExit();
-    });
-    process.once("SIGTERM", () => {
-        doExit();
-    });
-    const sessionHandle = { session: null };
+    process.on("exit", onProcessExit);
     const element = React.createElement(App, {
         events,
         registry: opts.registry,
@@ -101,6 +104,9 @@ export async function runInkTUI(opts) {
     }
     finally {
         events.close();
+        // Remove the exit listener — normal teardown through waitUntilExit
+        // handles cleanup here; we don't need the safety-net to fire too.
+        process.removeListener("exit", onProcessExit);
         restore();
     }
 }

@@ -56,7 +56,7 @@ const RECOMMENDED = new Set([
 ]);
 function configured(provider) {
     const env = ENV_FOR_PROVIDER[provider] ?? "";
-    return !env || Boolean(process.env[env]?.length);
+    return !env || Boolean(process.env[env]?.trim().length);
 }
 function contextLabel(tokens) {
     if (tokens >= 1_000_000)
@@ -121,7 +121,7 @@ function enrichCatalogue() {
             id: pp.model,
             provider: pp.provider,
             contextWindow: pp.contextWindow ?? 128_000,
-            tools: pp.supportsTools !== false,
+            tools: pp.supportsTools === true,
             thinkingMode: pp.supportsThinking ? "opt-in" : "none",
             inputPerM: pp.inputPerM,
             outputPerM: pp.outputPerM,
@@ -129,29 +129,359 @@ function enrichCatalogue() {
     }
     return [...byId.values()];
 }
+const KNOWN_PREFIXES = [
+    "anthropic.",
+    "openai.",
+    "google/",
+    "gemini-",
+    "nvidia.",
+    "deepseek.",
+    "mistral.",
+    "cohere.",
+    "cerebras.",
+    "together.",
+    "perplexity.",
+    "xai-",
+    "groq.",
+    "ollama.",
+    "llamacpp.",
+];
+// Explicit vendor→provider map for vendor/model-style IDs.
+// These vendors' models live on NVIDIA NIM (or another specific provider)
+// and would otherwise fall through to openrouter incorrectly.
+const VENDOR_TO_PROVIDER = {
+    "deepseek-ai": "nvidia",
+    "moonshotai": "nvidia",
+    "qwen": "nvidia",
+    "mistralai": "nvidia",
+    "meta": "nvidia",
+    "nvidia": "nvidia",
+    "nv-mistralai": "nvidia",
+    "google": "gemini",
+    "openai": "openai",
+    "anthropic": "anthropic",
+    "cohere": "cohere",
+    "mistral": "mistral",
+};
+function detectProvider(id) {
+    if (id.endsWith(":free"))
+        return "openrouter";
+    if (id.includes("/")) {
+        const vendor = id.split("/")[0].toLowerCase();
+        if (VENDOR_TO_PROVIDER[vendor])
+            return VENDOR_TO_PROVIDER[vendor];
+        const lower = id.toLowerCase();
+        for (const prefix of KNOWN_PREFIXES) {
+            if (lower.startsWith(prefix)) {
+                return prefix.replace(/[.\-/]/g, "");
+            }
+        }
+        return "openrouter";
+    }
+    for (const prefix of KNOWN_PREFIXES) {
+        if (id.toLowerCase().startsWith(prefix)) {
+            return prefix.replace(/[.\-/]/g, "");
+        }
+    }
+    return "openrouter";
+}
+async function testModel(id) {
+    const provider = detectProvider(id);
+    const envKey = ENV_FOR_PROVIDER[provider];
+    const apiKey = envKey ? process.env[envKey]?.trim() : undefined;
+    if (!apiKey) {
+        const needed = envKey ?? "OPENROUTER_API_KEY";
+        return `⚠ Cannot test model — ${needed} is not set. Use /keys set ${needed} <key> first.`;
+    }
+    const start = performance.now();
+    let url;
+    let body;
+    let headers;
+    if (provider === "openrouter") {
+        url = "https://openrouter.ai/api/v1/chat/completions";
+        headers = {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://openrouter.ai",
+            "X-Title": "Dirgha",
+        };
+        body = {
+            model: id,
+            messages: [{ role: "user", content: "hi" }],
+            max_tokens: 1,
+        };
+    }
+    else if (provider === "openai") {
+        url = "https://api.openai.com/v1/chat/completions";
+        headers = {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+        };
+        body = {
+            model: id,
+            messages: [{ role: "user", content: "hi" }],
+            max_tokens: 1,
+        };
+    }
+    else if (provider === "anthropic") {
+        url = "https://api.anthropic.com/v1/messages";
+        headers = {
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+            "Content-Type": "application/json",
+        };
+        body = {
+            model: id,
+            max_tokens: 1,
+            messages: [{ role: "user", content: "hi" }],
+        };
+    }
+    else if (provider === "gemini") {
+        const geminiModel = id.replace(/^google\//, "");
+        url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(geminiModel)}:generateContent?key=${apiKey}`;
+        headers = { "Content-Type": "application/json" };
+        body = {
+            contents: [{ role: "user", parts: [{ text: "hi" }] }],
+            generationConfig: { maxOutputTokens: 1 },
+        };
+    }
+    else if (provider === "deepseek") {
+        url = "https://api.deepseek.com/v1/chat/completions";
+        headers = {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+        };
+        body = {
+            model: id,
+            messages: [{ role: "user", content: "hi" }],
+            max_tokens: 1,
+        };
+    }
+    else if (provider === "groq") {
+        url = "https://api.groq.com/openai/v1/chat/completions";
+        headers = {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+        };
+        body = {
+            model: id,
+            messages: [{ role: "user", content: "hi" }],
+            max_tokens: 1,
+        };
+    }
+    else if (provider === "mistral") {
+        url = "https://api.mistral.ai/v1/chat/completions";
+        headers = {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+        };
+        body = {
+            model: id,
+            messages: [{ role: "user", content: "hi" }],
+            max_tokens: 1,
+        };
+    }
+    else if (provider === "cohere") {
+        url = "https://api.cohere.ai/v1/chat";
+        headers = {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+        };
+        body = {
+            model: id,
+            message: "hi",
+            max_tokens: 1,
+        };
+    }
+    else if (provider === "nvidia") {
+        url = "https://integrate.api.nvidia.com/v1/chat/completions";
+        headers = {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+        };
+        body = {
+            model: id,
+            messages: [{ role: "user", content: "hi" }],
+            max_tokens: 1,
+        };
+    }
+    else if (provider === "cerebras") {
+        url = "https://api.cerebras.ai/v1/chat/completions";
+        headers = {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+        };
+        body = {
+            model: id,
+            messages: [{ role: "user", content: "hi" }],
+            max_tokens: 1,
+        };
+    }
+    else if (provider === "together") {
+        url = "https://api.together.xyz/v1/chat/completions";
+        headers = {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+        };
+        body = {
+            model: id,
+            messages: [{ role: "user", content: "hi" }],
+            max_tokens: 1,
+        };
+    }
+    else if (provider === "xai") {
+        url = "https://api.x.ai/v1/chat/completions";
+        headers = {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+        };
+        body = {
+            model: id,
+            messages: [{ role: "user", content: "hi" }],
+            max_tokens: 1,
+        };
+    }
+    else if (provider === "perplexity") {
+        url = "https://api.perplexity.ai/chat/completions";
+        headers = {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+        };
+        body = {
+            model: id,
+            messages: [{ role: "user", content: "hi" }],
+            max_tokens: 1,
+        };
+    }
+    else {
+        // Unknown provider — try OpenRouter as default
+        url = "https://openrouter.ai/api/v1/chat/completions";
+        headers = {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://openrouter.ai",
+            "X-Title": "Dirgha",
+        };
+        body = {
+            model: id,
+            messages: [{ role: "user", content: "hi" }],
+            max_tokens: 1,
+        };
+    }
+    try {
+        const res = await fetch(url, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(body),
+        });
+        const elapsed = Math.round(performance.now() - start);
+        if (!res.ok) {
+            const text = await res.text().catch(() => "");
+            let detail;
+            try {
+                const json = JSON.parse(text);
+                detail = json.error?.message ?? json.detail ?? text;
+            }
+            catch {
+                detail = text || res.statusText;
+            }
+            return `❌ Model test failed (${elapsed}ms) — ${res.status} ${res.statusText}\n${detail}`;
+        }
+        return `✅ Model "${id}" responded successfully in ${elapsed}ms.`;
+    }
+    catch (err) {
+        const elapsed = Math.round(performance.now() - start);
+        const msg = err instanceof Error ? err.message : String(err);
+        return `❌ Model test error (${elapsed}ms) — ${msg}`;
+    }
+}
 export const modelsCommand = {
     name: "models",
+    aliases: ["mod"],
     description: "List models and optionally switch the current one",
     async execute(args, ctx) {
         const all = enrichCatalogue();
         const ordered = [...all];
         if (args.length > 0) {
             const first = args[0];
+            // "test" subcommand
+            if (first === "test") {
+                if (args.length < 2) {
+                    return "Usage: /models test <model-id>";
+                }
+                const testId = args.slice(1).join(" ");
+                return testModel(testId);
+            }
+            // "search" subcommand
+            if (first === "search") {
+                if (args.length < 2) {
+                    return "Usage: /models search <query>";
+                }
+                const query = args.slice(1).join(" ");
+                const apiKey = process.env.OPENROUTER_API_KEY?.trim();
+                if (!apiKey) {
+                    return "⚠ OPENROUTER_API_KEY is not set. Use /keys set OPENROUTER_API_KEY <key> first to search models.";
+                }
+                try {
+                    const res = await fetch("https://openrouter.ai/api/v1/models", {
+                        headers: {
+                            Authorization: `Bearer ${apiKey}`,
+                        },
+                    });
+                    if (!res.ok) {
+                        return `Failed to fetch models: ${res.status} ${res.statusText}`;
+                    }
+                    const json = await res.json();
+                    const models = json.data ?? [];
+                    const lowerQ = query.toLowerCase();
+                    const filtered = models
+                        .filter((m) => m.id.toLowerCase().includes(lowerQ))
+                        .slice(0, 15);
+                    if (filtered.length === 0) {
+                        return `No models found matching "${query}".`;
+                    }
+                    const lines = [];
+                    lines.push(`  ${"ID".padEnd(42)}  ${"Context".padEnd(10)}  ${"Prompt/1M tokens"}`);
+                    lines.push(`  ${"─".repeat(42)}  ${"─".repeat(10)}  ${"─".repeat(16)}`);
+                    for (const m of filtered) {
+                        const ctxStr = m.context_length
+                            ? contextLabel(m.context_length)
+                            : "—";
+                        const priceStr = m.pricing?.prompt ?? "—";
+                        lines.push(`  ${m.id.padEnd(42)}  ${ctxStr.padEnd(10)}  ${priceStr}`);
+                    }
+                    return lines.join("\n");
+                }
+                catch (err) {
+                    const msg = err instanceof Error ? err.message : String(err);
+                    return `Search failed: ${msg}`;
+                }
+            }
             if (/^\d+$/.test(first)) {
                 const idx = Number.parseInt(first, 10) - 1;
                 if (idx >= 0 && idx < ordered.length) {
                     const chosen = ordered[idx];
-                    ctx.setModel(chosen.id);
+                    await ctx.setModel(chosen.id);
                     return `Model set to ${chosen.id} (${chosen.provider}).`;
                 }
                 return `Index out of range. There are ${ordered.length} models.`;
             }
             const match = ordered.find((p) => p.id === first);
             if (match) {
-                ctx.setModel(match.id);
+                await ctx.setModel(match.id);
                 return `Model set to ${match.id} (${match.provider}).`;
             }
-            return `Invalid model: ${first}. Not found in the price catalogue. Use /models without arguments to browse.`;
+            // Unknown model ID — set it anyway and detect the provider
+            const provider = detectProvider(first);
+            const envKey = ENV_FOR_PROVIDER[provider];
+            const keySet = envKey ? Boolean(process.env[envKey]?.trim().length) : true;
+            await ctx.setModel(first);
+            if (keySet) {
+                return `Model set to ${first} via ${provider}.\nNote: not in catalogue — no pricing data.`;
+            }
+            else {
+                return `Model set to ${first} via ${provider}.\nNote: not in catalogue — no pricing data.\n⚠ Set ${envKey ?? "OPENROUTER_API_KEY"} first: /keys set ${envKey ?? "OPENROUTER_API_KEY"} <key>`;
+            }
         }
         const lines = [];
         lines.push("  Rec  Model                          Provider     Context    Tools  Thinking    Price (in/out per 1M)");

@@ -173,6 +173,28 @@ function migrateSchema(db) {
         if (!sessNames.has("ended_at")) {
             db.exec("ALTER TABLE sessions ADD COLUMN ended_at INTEGER");
         }
+        // Ensure graph tables exist for DBs created before Sprint 3.
+        db.exec(`
+      CREATE TABLE IF NOT EXISTS graph_nodes (
+        id    TEXT PRIMARY KEY,
+        type  TEXT NOT NULL,
+        props TEXT,
+        ts    INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+      );
+      CREATE TABLE IF NOT EXISTS graph_edges (
+        src   TEXT NOT NULL,
+        dst   TEXT NOT NULL,
+        rel   TEXT NOT NULL,
+        props TEXT,
+        ts    INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+        PRIMARY KEY (src, dst, rel),
+        FOREIGN KEY (src) REFERENCES graph_nodes(id) ON DELETE CASCADE,
+        FOREIGN KEY (dst) REFERENCES graph_nodes(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_edges_src ON graph_edges(src, rel);
+      CREATE INDEX IF NOT EXISTS idx_edges_dst ON graph_edges(dst, rel);
+      CREATE INDEX IF NOT EXISTS idx_nodes_type ON graph_nodes(type);
+    `);
     }
     catch (err) {
         recordDbError(err);

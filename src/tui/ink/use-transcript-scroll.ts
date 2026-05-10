@@ -28,7 +28,7 @@ export function useTranscriptScroll(
 ): TranscriptScrollState {
   const { stdout } = useStdout();
   const rows = stdout?.rows ?? 24;
-  const pageStep = Math.max(1, Math.floor(rows / 2));
+  const pageStep = Math.max(1, Math.floor(rows / 6));
 
   const [scrollOffset, setScrollOffset] = React.useState(0);
   const userScrolledRef = React.useRef(false);
@@ -39,15 +39,19 @@ export function useTranscriptScroll(
     prevItemCountRef.current = itemCount;
     if (itemCount > prev && autoScroll && !userScrolledRef.current) {
       setScrollOffset(0);
+      // keep the ref in sync with the state we just set
+      userScrolledRef.current = false;
     }
   }, [itemCount, autoScroll]);
 
   const isAtBottom = scrollOffset === 0;
 
   const doScrollUp = React.useCallback(() => {
-    setScrollOffset((prev) => Math.min(itemCount - 1, prev + 1));
+    // Clamp to 0 so an empty transcript (itemCount === 0) never sets
+    // scrollOffset to -1, which would break the isAtBottom invariant.
+    setScrollOffset((prev) => Math.max(0, Math.min(Math.max(0, itemCount - rows), prev + 1)));
     userScrolledRef.current = true;
-  }, [itemCount]);
+  }, [itemCount, rows]);
 
   const doScrollDown = React.useCallback(() => {
     setScrollOffset((prev) => {
@@ -58,9 +62,11 @@ export function useTranscriptScroll(
   }, []);
 
   const pageUp = React.useCallback(() => {
-    setScrollOffset((prev) => Math.min(itemCount - 1, prev + pageStep));
+    setScrollOffset((prev) =>
+      Math.max(0, Math.min(Math.max(0, itemCount - rows), prev + pageStep)),
+    );
     userScrolledRef.current = true;
-  }, [itemCount, pageStep]);
+  }, [itemCount, rows, pageStep]);
 
   const pageDown = React.useCallback(() => {
     setScrollOffset((prev) => {
@@ -75,7 +81,8 @@ export function useTranscriptScroll(
     setScrollOffset(0);
   }, []);
 
-  useInput(
+  // Register the page‑up / page‑down listener and clean it up on unmount.
+  const unsubscribeInput = useInput(
     (_ch, key) => {
       if (inputFocus) {
         if (key.ctrl && key.pageUp) {
@@ -93,6 +100,10 @@ export function useTranscriptScroll(
     },
     { isActive: true },
   );
+
+  React.useEffect(() => {
+    return unsubscribeInput;
+  }, [unsubscribeInput]);
 
   return {
     scrollOffset,

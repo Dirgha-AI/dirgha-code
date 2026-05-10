@@ -34,12 +34,15 @@ export interface InkApprovalBus extends ApprovalBus {
   alwaysApprove(toolName: string): void;
   /** Mark deny-all so future requests resolve as deny without prompting. */
   denyAll(): void;
+  /** Toggle global auto-approve on (true) or off (false) for mid-turn YOLO. */
+  setApproveAll(enabled: boolean): void;
 }
 
 export function createInkApprovalBus(autoApprove: Set<string> = new Set()): InkApprovalBus {
   const resolvers = new Map<string, (d: ApprovalDecision) => void>();
   const listeners = new Set<Listener>();
   let denied = false;
+  let approveAll = false;
 
   const emit = (req: ApprovalRequest | null): void => {
     for (const l of listeners) l(req);
@@ -47,6 +50,8 @@ export function createInkApprovalBus(autoApprove: Set<string> = new Set()): InkA
 
   return {
     requiresApproval(toolName: string): boolean {
+      // When approveAll is set, skip approval gate entirely.
+      if (approveAll) return false;
       // When denyAll() was called, return true so the kernel calls request(),
       // which returns 'deny'. Returning false would skip the approval gate
       // entirely and let the tool execute unconditionally.
@@ -55,6 +60,8 @@ export function createInkApprovalBus(autoApprove: Set<string> = new Set()): InkA
     },
 
     async request(req): Promise<ApprovalDecision> {
+      // Honor approve-all without prompting (mid-turn YOLO toggle).
+      if (approveAll) return 'approve';
       // Honor deny-all without prompting.
       if (denied) return 'deny';
       // Defensive: if the tool was added to autoApprove between
@@ -89,6 +96,10 @@ export function createInkApprovalBus(autoApprove: Set<string> = new Set()): InkA
 
     alwaysApprove(toolName: string): void {
       autoApprove.add(toolName);
+    },
+
+    setApproveAll(enabled: boolean): void {
+      approveAll = enabled;
     },
 
     denyAll(): void {

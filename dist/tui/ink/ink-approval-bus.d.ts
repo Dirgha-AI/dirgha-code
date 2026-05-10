@@ -31,6 +31,8 @@ export interface InkApprovalBus extends ApprovalBus {
     alwaysApprove(toolName: string): void;
     /** Mark deny-all so future requests resolve as deny without prompting. */
     denyAll(): void;
+    /** Toggle global auto-approve on (true) or off (false) for mid-turn YOLO. */
+    setApproveAll(enabled: boolean): void;
 }
 export declare function createInkApprovalBus(autoApprove?: Set<string>): InkApprovalBus;
 export {};
