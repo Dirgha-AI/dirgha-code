@@ -80,9 +80,8 @@ function readOneChar() {
             // Drain any bytes that were already buffered (e.g. the rest of "yes\n"
             // after the initial 'y').  read() returns null when the internal buffer
             // is empty.
-            let chunk;
-            while ((chunk = process.stdin.read()) !== null) {
-                // discard – we only need the first character.
+            while (process.stdin.read() !== null) {
+                // discard – drain buffered bytes after the initial keypress.
             }
             resolve(buf.toString("utf8"));
         };
