@@ -106,12 +106,9 @@ function toOpenAIMessages(messages) {
                 role: "assistant",
                 content: texts.length > 0 ? texts.join("") : null,
                 ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
-                // reasoning_content must be echoed for multi-turn reasoning models.
-                // OMIT when tool_calls are present — DeepSeek (and compatible providers)
-                // return HTTP 400 if both fields appear in the same assistant message.
-                ...(thinkings.length > 0 && toolCalls.length === 0
-                    ? { reasoning_content: thinkings.join("") }
-                    : {}),
+                // Always echo reasoning_content when present — required for multi-turn
+                // reasoning models (DeepSeek, NIM). Both fields may coexist.
+                ...(thinkings.length > 0 ? { reasoning_content: thinkings.join("") } : {}),
             };
             out.push(assistantMsg);
             continue;
