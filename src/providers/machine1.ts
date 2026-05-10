@@ -310,31 +310,24 @@ async function* streamLlamaCli(
     }
   } finally {
     clearTimeout(timer);
-
-    // Bug 4 fix: text_end, proc.close, and usage yield must be inside
-    // finally so they run even when the for-await loop throws. Previously
-    // an exception would leave the subprocess zombied and the stream open.
     yield { type: 'text_end' };
-
-    // Wait for process exit
     await new Promise<void>((resolve) => {
       if (proc.exitCode !== null) { resolve(); return; }
       proc.once('close', resolve);
     });
-
-    if (spawnErrRef.value) {
-      throw new ProviderError(
-        `llama-cli not found or not executable: ${spawnErrRef.value.message}. ` +
-        'Install llama.cpp and add llama-cli to your PATH, or set LLAMA_CLI_PATH.',
-        'machine1',
-        0,
-        false,
-      );
-    }
-
     if (outputTokens > 0) {
       yield { type: 'usage', inputTokens: 0, outputTokens };
     }
+  }
+  // Throw spawn error AFTER finally so it doesn't mask try-block exceptions.
+  if (spawnErrRef.value) {
+    throw new ProviderError(
+      `llama-cli not found or not executable: ${spawnErrRef.value.message}. ` +
+      'Install llama.cpp and add llama-cli to your PATH, or set LLAMA_CLI_PATH.',
+      'machine1',
+      0,
+      false,
+    );
   }
 }
 

@@ -68,7 +68,6 @@ export function useOverlays(): OverlayApi {
     } else {
       setActive((cur) => (cur === "slash" ? null : cur));
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [atQuery, slashQuery]);
 
   const openOverlay = React.useCallback(
