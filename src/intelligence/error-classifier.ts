@@ -131,7 +131,11 @@ function diagnose(err: unknown): { reason: ErrorReason; backoffMs?: number } {
       return { reason: "content_filter" };
     if (msg.includes("tool") && msg.includes("schema"))
       return { reason: "tool_schema" };
-    if (msg.includes("context length")) return { reason: "context_overflow" };
+    if (msg.includes("context length") || msg.includes("too long") ||
+        msg.includes("maximum context") || msg.includes("context_length"))
+      return { reason: "context_overflow" };
+    // HTTP 400: tool-role ordering errors and other format errors
+    if (status === 400) return { reason: "format_error" };
     return { reason: "unknown" };
   }
   const message =
