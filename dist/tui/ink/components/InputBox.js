@@ -64,6 +64,9 @@ export function InputBox(props) {
     const [historyIdx, setHistoryIdx] = React.useState(null);
     const savedInputRef = React.useRef("");
     const history = props.promptHistory ?? [];
+    // Incremented whenever value is set externally (history recall, dequeue).
+    // Passed as `key` to TextInput so it remounts and cursor resets to end.
+    const [textInputKey, setTextInputKey] = React.useState(0);
     const focus = props.inputFocus ?? !props.busy;
     const vimActive = props.vimMode === true && vimState.mode === "NORMAL";
     React.useEffect(() => {
@@ -153,8 +156,10 @@ export function InputBox(props) {
             props.busy &&
             props.value === "" &&
             (props.queueLength ?? 0) > 0) {
-            if (props.onDequeueForEdit)
+            if (props.onDequeueForEdit) {
                 props.onDequeueForEdit();
+                setTextInputKey((k) => k + 1);
+            }
         }
     }, { isActive: true });
     useInput((inputCh, key) => {
@@ -166,11 +171,13 @@ export function InputBox(props) {
                 savedInputRef.current = props.value;
                 setHistoryIdx(0);
                 props.onChange(history[0]);
+                setTextInputKey((k) => k + 1);
             }
             else if (historyIdx < history.length - 1) {
                 const next = historyIdx + 1;
                 setHistoryIdx(next);
                 props.onChange(history[next]);
+                setTextInputKey((k) => k + 1);
             }
             return;
         }
@@ -178,11 +185,13 @@ export function InputBox(props) {
             if (historyIdx === 0) {
                 setHistoryIdx(null);
                 props.onChange(savedInputRef.current);
+                setTextInputKey((k) => k + 1);
             }
             else {
                 const prev = historyIdx - 1;
                 setHistoryIdx(prev);
                 props.onChange(history[prev]);
+                setTextInputKey((k) => k + 1);
             }
             return;
         }
@@ -271,7 +280,7 @@ export function InputBox(props) {
     const borderColour = props.busy ? palette.brand : palette.accent;
     const promptColour = props.busy ? palette.brand : palette.accent;
     const collapsed = pasteSegment !== null && !pasteExpanded;
-    return (_jsxs(Box, { flexDirection: "column", width: cols, children: [_jsx(Box, { borderStyle: "single", borderColor: borderColour, paddingX: 1, children: _jsxs(Box, { gap: 1, flexGrow: 1, children: [_jsx(Text, { color: promptColour, children: "\u276F" }), collapsed && pasteSegment !== null ? (_jsx(PasteCollapseView, { value: props.value, segment: pasteSegment, expanded: false, palette: palette })) : (_jsx(TextInput, { value: props.value, onChange: handleChange, onSubmit: props.onSubmit, placeholder: props.placeholder ?? "Ask dirgha anything…", showCursor: !props.busy && !vimActive, focus: focus && !vimActive }))] }) }), _jsxs(Box, { paddingX: 1, justifyContent: "space-between", children: [_jsxs(Box, { gap: 1, children: [props.vimMode === true && (_jsxs(Text, { color: vimActive ? palette.accent : palette.brand, bold: true, children: ["[", vimModeLabel(vimState.mode), "]"] })), pasteSegment !== null && pasteExpanded && (_jsx(Text, { color: palette.textMuted, dimColor: true, children: "pasted block expanded (Ctrl+E collapse)" })), props.busy && (_jsx(BusyHint, { palette: palette, liveDurationMs: props.liveDurationMs, vimMode: props.vimMode === true }))] }), ctrlCArmed && (_jsx(Text, { color: palette.accent, bold: true, children: "Press Ctrl+C again to exit." }))] })] }));
+    return (_jsxs(Box, { flexDirection: "column", width: cols, children: [_jsx(Box, { borderStyle: "single", borderColor: borderColour, paddingX: 1, children: _jsxs(Box, { gap: 1, flexGrow: 1, children: [_jsx(Text, { color: promptColour, children: "\u276F" }), collapsed && pasteSegment !== null ? (_jsx(PasteCollapseView, { value: props.value, segment: pasteSegment, expanded: false, palette: palette })) : (_jsx(TextInput, { value: props.value, onChange: handleChange, onSubmit: props.onSubmit, placeholder: props.placeholder ?? "Ask dirgha anything…", showCursor: !props.busy && !vimActive, focus: focus && !vimActive }, textInputKey))] }) }), _jsxs(Box, { paddingX: 1, justifyContent: "space-between", children: [_jsxs(Box, { gap: 1, children: [props.vimMode === true && (_jsxs(Text, { color: vimActive ? palette.accent : palette.brand, bold: true, children: ["[", vimModeLabel(vimState.mode), "]"] })), pasteSegment !== null && pasteExpanded && (_jsx(Text, { color: palette.textMuted, dimColor: true, children: "pasted block expanded (Ctrl+E collapse)" })), props.busy && (_jsx(BusyHint, { palette: palette, liveDurationMs: props.liveDurationMs, vimMode: props.vimMode === true }))] }), ctrlCArmed && (_jsx(Text, { color: palette.accent, bold: true, children: "Press Ctrl+C again to exit." }))] })] }));
 }
 function vimModeLabel(m) {
     return m === "NORMAL" ? "NORMAL" : "INSERT";

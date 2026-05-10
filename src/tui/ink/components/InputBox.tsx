@@ -107,6 +107,9 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
   const [historyIdx, setHistoryIdx] = React.useState<number | null>(null);
   const savedInputRef = React.useRef<string>("");
   const history = props.promptHistory ?? [];
+  // Incremented whenever value is set externally (history recall, dequeue).
+  // Passed as `key` to TextInput so it remounts and cursor resets to end.
+  const [textInputKey, setTextInputKey] = React.useState(0);
 
   const focus = props.inputFocus ?? !props.busy;
   const vimActive = props.vimMode === true && vimState.mode === "NORMAL";
@@ -204,7 +207,10 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
         props.value === "" &&
         (props.queueLength ?? 0) > 0
       ) {
-        if (props.onDequeueForEdit) props.onDequeueForEdit();
+        if (props.onDequeueForEdit) {
+          props.onDequeueForEdit();
+          setTextInputKey((k) => k + 1);
+        }
       }
     },
     { isActive: true },
@@ -220,10 +226,12 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
           savedInputRef.current = props.value;
           setHistoryIdx(0);
           props.onChange(history[0]);
+          setTextInputKey((k) => k + 1);
         } else if (historyIdx < history.length - 1) {
           const next = historyIdx + 1;
           setHistoryIdx(next);
           props.onChange(history[next]);
+          setTextInputKey((k) => k + 1);
         }
         return;
       }
@@ -231,10 +239,12 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
         if (historyIdx === 0) {
           setHistoryIdx(null);
           props.onChange(savedInputRef.current);
+          setTextInputKey((k) => k + 1);
         } else {
           const prev = historyIdx - 1;
           setHistoryIdx(prev);
           props.onChange(history[prev]);
+          setTextInputKey((k) => k + 1);
         }
         return;
       }
@@ -346,6 +356,7 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
             />
           ) : (
             <TextInput
+              key={textInputKey}
               value={props.value}
               onChange={handleChange}
               onSubmit={props.onSubmit}
