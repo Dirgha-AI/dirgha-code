@@ -10,8 +10,8 @@
  * the same way openai.ts and nvidia.ts do. Model IDs use the bare
  * `deepseek-chat` / `deepseek-reasoner` family — DeepSeek's own
  * canonical ids. Vendor-prefixed ids like `deepseek/deepseek-v4-flash`
- * (an OpenRouter routing slug) still go through the OR provider unless
- * the user explicitly forces DIRGHA_PROVIDER=deepseek.
+ * are deterministically routed here (first segment = provider); the
+ * `deepseek/` prefix is stripped before forwarding to api.deepseek.com.
  */
 
 import type { AgentEvent } from "../kernel/types.js";
@@ -50,12 +50,12 @@ export class DeepSeekProvider implements Provider {
   }
 
   supportsThinking(modelId: string): boolean {
-    const base = modelId.replace(/^deepseek(?:-ai|-native)?\//, "");
+    const base = modelId.replace(/^deepseek(?:-ai|-native)?\//, "").replace(/^deepseek\//, "");
     return (DEEPSEEK_BY_ID.get(base)?.thinkingMode ?? "none") !== "none";
   }
 
   stream(req: StreamRequest): AsyncIterable<AgentEvent> {
-    const model = req.model.replace(/^deepseek(?:-ai|-native)?\//, "");
+    const model = req.model.replace(/^deepseek(?:-ai|-native)?\//, "").replace(/^deepseek\//, "");
     return streamChatCompletions({
       providerName: this.id,
       endpoint: `${this.baseUrl}/chat/completions`,

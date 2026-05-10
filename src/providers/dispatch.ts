@@ -121,8 +121,12 @@ const RULES: RoutingRule[] = [
       id.startsWith("zai/") || id.startsWith("z-ai/") || id.startsWith("glm/"),
     provider: "zai",
   },
+  // deepseek/ prefix → native DeepSeek API (not OpenRouter)
+  { match: (id) => id.startsWith("deepseek/"), provider: "deepseek" },
+  // openrouter/ prefix → explicit OpenRouter routing
+  { match: (id) => id.startsWith("openrouter/"), provider: "openrouter" },
   // Catch-all: any vendor-prefixed slug or `:free` variant goes via
-  // OpenRouter (anthropic/, openai/, google/, deepseek/, moonshotai/,
+  // OpenRouter (anthropic/, openai/, google/, moonshotai/,
   // minimax/, qwen/, tencent/, z-ai/, inclusionai/, etc.).
   {
     match: (id) => id.includes("/") || id.endsWith(":free"),
