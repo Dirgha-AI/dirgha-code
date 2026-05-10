@@ -67,6 +67,13 @@ export const fleetCommand: SlashCommand = {
     };
     const origOut = process.stdout.write;
     const origErr = process.stderr.write;
+    // Restore write functions synchronously — covers both normal return and
+    // any process.exit() call inside runFleet that would skip the finally block.
+    const restoreWrites = (): void => {
+      process.stdout.write = origOut;
+      process.stderr.write = origErr;
+    };
+    process.on("exit", restoreWrites);
     process.stdout.write = sink as typeof process.stdout.write;
     process.stderr.write = sink as typeof process.stderr.write;
     try {
@@ -78,8 +85,8 @@ export const fleetCommand: SlashCommand = {
       if (code === 0) return text || "(fleet ok)";
       return `${text}\n(fleet exit=${code})`;
     } finally {
-      process.stdout.write = origOut;
-      process.stderr.write = origErr;
+      restoreWrites();
+      process.removeListener("exit", restoreWrites);
     }
   },
 };

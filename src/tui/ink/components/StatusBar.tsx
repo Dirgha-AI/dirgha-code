@@ -1,15 +1,8 @@
-/**
- * Status bar rendered below the input box.
- *
- * Left cluster: cwd basename + provider id.
- * Right cluster: model label + cumulative tokens + cost.
- * When busy, a subtle spinner frame appears on the right.
- */
-
 import * as React from "react";
 import { Box, Text, useStdout } from "ink";
 import { useTheme } from "../theme-context.js";
 import { SpinnerGlyph } from "./SpinnerGlyph.js";
+import type { ActiveTool } from "../use-tool-progress.js";
 import type { RenderMetricsGetters } from "../use-render-metrics.js";
 
 export interface StatusBarProps {
@@ -37,6 +30,8 @@ export interface StatusBarProps {
   showMetrics?: boolean;
   /** Render-metrics getters — populated when showMetrics is true. */
   renderMetrics?: RenderMetricsGetters;
+  /** Active tool info — shows tool name and elapsed time when defined. */
+  activeTool?: ActiveTool;
 }
 
 function formatTokens(n: number): string {
@@ -139,7 +134,7 @@ export const StatusBar = React.memo(function StatusBar(
 
   // Slim status bar — only what's load-bearing:
   //   left:  ⏵⏵ MODE · cwd  [overflow]
-  //   right: spinner (when busy) · short model · context-meter or cost
+  //   right: spinner (when busy) · tool name + elapsed · short model · context-meter or cost
   return (
     <Box width={cols} paddingX={1} justifyContent="space-between">
       <Box gap={1}>
@@ -156,6 +151,11 @@ export const StatusBar = React.memo(function StatusBar(
       </Box>
       <Box gap={1}>
         {props.busy && <SpinnerGlyph isActive={true} />}
+        {props.activeTool && (
+          <Text color={palette.textMuted} dimColor>
+            {props.activeTool.name} ({Math.round(props.activeTool.elapsedMs / 1000)}s)
+          </Text>
+        )}
         {typeof props.turnCount === "number" &&
           typeof props.maxTurns === "number" && (
             <Text

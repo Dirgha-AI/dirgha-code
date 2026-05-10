@@ -291,6 +291,12 @@ async function main(): Promise<void> {
         ? flags.m
         : config.model;
   const model = resolveModelAlias(rawModel);
+  // Propagate the resolved --model flag back into config so that the Ink
+  // TUI (which reads props.config.model for its initial state, status bar,
+  // and remote-config hasDefault guard) uses the CLI-supplied model rather
+  // than the stored config default. Without this, `dirgha --model X` shows
+  // and uses the config default inside the TUI.
+  config.model = model;
   const json = flags.json === true;
   const print = flags.print === true;
   const system =
@@ -363,15 +369,17 @@ async function main(): Promise<void> {
     }
   }
   const registry = createToolRegistry(allTools);
-  process.once("exit", () => {
-    void mcpShutdown();
-  });
-  process.once("SIGINT", () => {
+  // `exit` fires synchronously — async operations (like mcpShutdown) cannot
+  // complete there. Register on SIGTERM/SIGINT instead so we can await the
+  // shutdown promise before the process terminates.
+  const mcpShutdownOnSignal = (code: number): void => {
     Promise.race([
       mcpShutdown(),
       new Promise<void>((r) => setTimeout(r, 5000)),
-    ]).finally(() => process.exit(130));
-  });
+    ]).finally(() => process.exit(code));
+  };
+  process.once("SIGTERM", () => mcpShutdownOnSignal(143));
+  process.once("SIGINT", () => mcpShutdownOnSignal(130));
 
   // Subagent dispatch: register `task` so the model can spawn a fresh
   // agent for a sub-goal. Built lazily so the

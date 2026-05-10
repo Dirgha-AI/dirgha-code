@@ -49,11 +49,12 @@ export const gitTool: Tool = {
       };
     }
     const full = [...base, ...(input.args ?? [])];
+    let cwd = ctx.cwd;
     if (input.cwd) {
       const check = isValidCwdPath(ctx.cwd, input.cwd);
       if (!check.valid) return { content: check.error, isError: true };
+      cwd = check.resolved;
     }
-    const cwd = input.cwd ? ctx.cwd : ctx.cwd;
     const result = await run("git", full, cwd, ctx.env);
     return {
       content: [result.stdout, result.stderr]

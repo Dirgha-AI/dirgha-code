@@ -14,6 +14,7 @@ import { AnthropicProvider } from "./anthropic.js";
 import { GeminiProvider } from "./gemini.js";
 import { OllamaProvider } from "./ollama.js";
 import { LlamaCppProvider } from "./llamacpp.js";
+import { Machine1Provider } from "./machine1.js";
 import { FireworksProvider } from "./fireworks.js";
 import { DeepSeekProvider } from "./deepseek.js";
 import {
@@ -27,6 +28,9 @@ import {
   ZaiProvider,
 } from "./extra-providers.js";
 import { withRateLimit, type RateLimitOptions } from "./rate-limiter.js";
+import { CUSTOM_PROVIDERS } from "./custom-provider.js";
+export type { CustomProviderEntry } from "./custom-provider.js";
+export { CUSTOM_PROVIDERS };
 
 export * from "./iface.js";
 export * from "./dispatch.js";
@@ -37,6 +41,7 @@ export { AnthropicProvider } from "./anthropic.js";
 export { GeminiProvider } from "./gemini.js";
 export { OllamaProvider } from "./ollama.js";
 export { LlamaCppProvider } from "./llamacpp.js";
+export { Machine1Provider } from "./machine1.js";
 export { FireworksProvider } from "./fireworks.js";
 export { DeepSeekProvider } from "./deepseek.js";
 
@@ -58,6 +63,7 @@ export interface ProviderRegistryConfig {
   xai?: ProviderConfig;
   groq?: ProviderConfig;
   zai?: ProviderConfig;
+  machine1?: ProviderConfig;
   rateLimit?: RateLimitOptions;
 }
 
@@ -85,6 +91,13 @@ export class ProviderRegistry {
   }
 
   forModel(modelId: string): Provider {
+    // Custom providers: keyed by prefix "<customId>/" — check before built-in routing.
+    const slash = modelId.indexOf("/");
+    if (slash !== -1) {
+      const prefix = modelId.slice(0, slash);
+      const custom = CUSTOM_PROVIDERS.get(prefix);
+      if (custom) return custom;
+    }
     const id = routeModel(modelId);
     const cached = this.cache.get(id);
     if (cached) {
@@ -145,6 +158,8 @@ export class ProviderRegistry {
         return new GroqProvider(this.config.groq ?? {});
       case "zai":
         return new ZaiProvider(this.config.zai ?? {});
+      case "machine1":
+        return new Machine1Provider(this.config.machine1 ?? {});
     }
   }
 }

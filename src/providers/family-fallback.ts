@@ -48,6 +48,10 @@ const FAMILIES: Record<
     { provider: "openrouter", model: "minimax/minimax-m2.7" },
     { provider: "openrouter", model: "minimax/minimax-m2.5:free" },
   ],
+  ring: [
+    { provider: "openrouter", model: "inclusionai/ring-2.6-1t:free" },
+    { provider: "openrouter", model: "inclusionai/ling-2.6-1t:free" },
+  ],
   mistral: [
     { provider: "mistral", model: "mistral-large-2" },
     { provider: "openrouter", model: "mistralai/mistral-large-2512" },
@@ -70,6 +74,7 @@ const FAMILY_PATTERNS: Array<{
   },
   { family: "qwen", test: (id) => id.includes("qwen") },
   { family: "minimax", test: (id) => id.includes("minimax") },
+  { family: "ring", test: (id) => id.includes("ring") && id.includes("inclusionai") },
   { family: "mistral", test: (id) => id.includes("mistral") },
 ];
 

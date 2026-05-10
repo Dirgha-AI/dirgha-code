@@ -162,11 +162,13 @@ export async function openFtsIndex(opts: OpenFtsOptions): Promise<FtsIndex | nul
       for (const row of rows) {
         const r = row as { id?: unknown; title?: unknown; snippet?: unknown; score?: unknown };
         if (typeof r.id !== 'string' || typeof r.title !== 'string') continue;
+        const score = typeof r.score === 'number' ? r.score : 0;
+        if (score >= 0) continue; // bm25 scores are always negative; 0 means no real hit
         hits.push({
           id: r.id,
           title: r.title,
           snippet: typeof r.snippet === 'string' ? r.snippet : '',
-          score: typeof r.score === 'number' ? r.score : 0,
+          score,
         });
       }
       return hits;

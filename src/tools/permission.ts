@@ -8,6 +8,8 @@
  * injected from L6 (safety/policy.ts) which reads declarative rules.
  */
 
+import { resolve, sep } from 'node:path';
+
 export interface PermissionCheck {
   tool: string;
   action: 'read' | 'write' | 'exec' | 'delete' | 'network';
@@ -50,7 +52,8 @@ export class DefaultPermissionEngine implements PermissionEngine {
 
 function isInside(root: string, target: string): boolean {
   if (!target) return false;
-  const normRoot = root.replace(/\/+$/, '');
-  if (!target.startsWith('/')) return true;
-  return target === normRoot || target.startsWith(`${normRoot}/`);
+  const abs = resolve(root, target);
+  const normRoot = resolve(root);
+  const baseSep = normRoot.endsWith(sep) ? normRoot : normRoot + sep;
+  return abs === normRoot || abs.startsWith(baseSep);
 }

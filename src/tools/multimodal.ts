@@ -24,7 +24,7 @@
  */
 
 import { readFile, stat, writeFile, mkdir } from "node:fs/promises";
-import { resolve, extname, dirname } from "node:path";
+import { resolve, extname, dirname, sep } from "node:path";
 import type { Tool, ToolContext } from "./registry.js";
 import type {
   ImageGenRequest,
@@ -482,7 +482,15 @@ async function generateImage(a: GenerateArgs): Promise<ToolResult> {
     };
   }
 
-  const outputPath = resolveOutputPath(a.input.outputPath, a.ctx.cwd);
+  let outputPath: string;
+  try {
+    outputPath = resolveOutputPath(a.input.outputPath, a.ctx.cwd);
+  } catch (err) {
+    return {
+      content: `generate_image: invalid outputPath — ${err instanceof Error ? err.message : String(err)}`,
+      isError: true,
+    };
+  }
   try {
     await mkdir(dirname(outputPath), { recursive: true });
     await writeFile(
@@ -587,7 +595,15 @@ function tryBuildOpenAI(env: Record<string, string>): Provider | undefined {
 }
 
 function resolveOutputPath(requested: string | undefined, cwd: string): string {
-  if (requested && requested.length > 0) return resolve(cwd, requested);
+  const base = resolve(cwd);
+  const baseSep = base.endsWith(sep) ? base : base + sep;
+  if (requested && requested.length > 0) {
+    const abs = resolve(base, requested);
+    if (abs !== base && !abs.startsWith(baseSep)) {
+      throw new Error('Output path escapes workspace');
+    }
+    return abs;
+  }
   const ts = new Date().toISOString().replace(/[:.]/g, "-");
-  return resolve(cwd, `dirgha-image-${ts}.png`);
+  return resolve(base, `dirgha-image-${ts}.png`);
 }

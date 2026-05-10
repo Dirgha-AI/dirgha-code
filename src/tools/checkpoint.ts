@@ -30,7 +30,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join, basename } from "node:path";
+import { join, basename, sep } from "node:path";
 import type { Tool, ToolContext } from "./registry.js";
 import type { ToolResult } from "../kernel/types.js";
 import type { Message } from "../kernel/types.js";
@@ -78,7 +78,13 @@ async function ensureDir(): Promise<void> {
 }
 
 function checkpointPath(id: string): string {
-  return join(CHECKPOINT_DIR, `${id}.json`);
+  const safe = basename(id).replace(/[^a-zA-Z0-9_-]/g, '_');
+  const p = join(CHECKPOINT_DIR, `${safe}.json`);
+  const dirWithSep = CHECKPOINT_DIR.endsWith(sep) ? CHECKPOINT_DIR : CHECKPOINT_DIR + sep;
+  if (p !== CHECKPOINT_DIR && !p.startsWith(dirWithSep)) {
+    throw new Error('Invalid checkpoint id');
+  }
+  return p;
 }
 
 function newCheckpointId(sessionId: string): string {
@@ -129,6 +135,13 @@ async function summarise(
   };
 }
 
+function sanitiseId(id: string): string {
+  if (!id) throw new Error(`Invalid checkpoint id: ${id}`);
+  // Delegate to checkpointPath which enforces basename + allowlist + prefix check.
+  checkpointPath(id);
+  return id;
+}
+
 async function doSave(
   input: Input,
   ctx: ToolContext,
@@ -177,6 +190,7 @@ async function doRestore(
   store: SessionStore,
 ): Promise<ToolResult<CheckpointSummary>> {
   if (!input.id) return fail("id required for restore");
+  sanitiseId(input.id);
   const cp = await readCheckpoint(input.id);
   if (!cp) return fail(`checkpoint not found: ${input.id}`);
 

@@ -472,6 +472,7 @@ function modelsForProvider(providerId: string): string[] {
       "gemini",
       "flash",
       "llama",
+      "ring",
       "ling",
       "hy3",
     ];

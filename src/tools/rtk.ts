@@ -100,8 +100,14 @@ export const rtkTool: Tool = {
       let bin: string;
       let args: string[];
       if (rtkBin) {
-        bin = rtkBin;
-        args = command.split(/\s+/);
+        // Pass the command to rtk via the shell so quoted arguments are
+        // parsed correctly (e.g. --format="%H %s" stays as one token).
+        bin = process.platform === "win32"
+          ? (process.env.ComSpec ?? "cmd.exe")
+          : "/bin/sh";
+        args = process.platform === "win32"
+          ? ["/d", "/s", "/c", `"${rtkBin}" ${command}`]
+          : ["-c", `'${rtkBin.replace(/'/g, "'\\''")}' ${command}`];
         rtkUsed = true;
       } else {
         bin =

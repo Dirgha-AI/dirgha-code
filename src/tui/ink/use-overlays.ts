@@ -48,19 +48,28 @@ export function useOverlays(): OverlayApi {
 
   // Single effect for @-file and slash overlays to avoid racing reads/writes
   // on `active` when both tokens appear simultaneously (e.g. "/command @file").
+  // `active` is intentionally excluded from the dependency array: the effect
+  // only writes to it, never reads it in a way that requires re-running on
+  // every active change. Including it caused two renders per overlay activation
+  // (the setActive call triggers a re-run, which calls setActive again with the
+  // same value). The functional-update form with same-value guards prevents
+  // React from scheduling a redundant re-render.
   React.useEffect(() => {
     if (atQuery !== null) {
       // Only activate atfile if no higher-priority overlay is open.
-      if (active === null || active === "slash") setActive("atfile");
-    } else if (active === "atfile") {
-      setActive(null);
+      setActive((cur) =>
+        cur === null || cur === "slash" ? "atfile" : cur,
+      );
+    } else {
+      setActive((cur) => (cur === "atfile" ? null : cur));
     }
     if (slashQuery !== null) {
-      if (active === null) setActive("slash");
-    } else if (active === "slash") {
-      setActive(null);
+      setActive((cur) => (cur === null ? "slash" : cur));
+    } else {
+      setActive((cur) => (cur === "slash" ? null : cur));
     }
-  }, [atQuery, slashQuery, active]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [atQuery, slashQuery]);
 
   const openOverlay = React.useCallback(
     (k: "models" | "help" | "theme" | "sandbox"): void => {

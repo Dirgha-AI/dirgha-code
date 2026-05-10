@@ -131,11 +131,11 @@ export const shellTool: Tool = {
     const timeoutMs = input.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const streamOutput = input.streamOutput ?? false;
 
-    if (cwd !== ctx.cwd) {
-      const resolved = resolve(cwd);
-      const base = resolve(ctx.cwd);
-      const baseSep = base.endsWith(sep) ? base : base + sep;
-      if (resolved !== base && !resolved.startsWith(baseSep)) {
+    {
+      const resolvedCwd = resolve(cwd);
+      const resolvedCtx = resolve(ctx.cwd);
+      const baseSep = resolvedCtx.endsWith(sep) ? resolvedCtx : resolvedCtx + sep;
+      if (resolvedCwd !== resolvedCtx && !resolvedCwd.startsWith(baseSep)) {
         return { content: `cwd escapes workspace: ${cwd}`, isError: true };
       }
     }

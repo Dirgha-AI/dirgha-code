@@ -276,6 +276,7 @@ export class DaemonServer {
 
     const done = (async (): Promise<void> => {
       try {
+        const savedCount = active.history.length;
         const result = await runAgentLoop({
           sessionId: params.sessionId,
           model: this.opts.config.model,
@@ -287,10 +288,23 @@ export class DaemonServer {
           events,
           signal: this.abort.signal,
         });
-        const savedCount = active.history.length;
         active.history.length = 0;
         active.history.push(...result.messages);
-        for (const msg of result.messages.slice(savedCount)) {
+        // If compaction occurred inside runAgentLoop, result.messages may be
+        // shorter than savedCount (old index is invalid). In that case persist
+        // the entire post-compaction history so nothing is lost.
+        //
+        // Length comparison alone is unreliable: compaction could remove N
+        // messages while the loop adds N new ones, leaving result.messages.length
+        // equal to savedCount even though the content changed entirely (Q3 case).
+        // Safe rule: only take the slice when result strictly grew (pure append).
+        // If result.messages.length <= savedCount, either compaction occurred or
+        // the turn produced zero net messages — re-persist everything to be safe.
+        // The session append is idempotent for duplicates, so the cost is low.
+        const newMessages = result.messages.length > savedCount
+          ? result.messages.slice(savedCount)
+          : result.messages;  // compaction or no-op: re-persist full post-loop history
+        for (const msg of newMessages) {
           await active.session.append({
             type: "message",
             ts: new Date().toISOString(),
@@ -309,10 +323,10 @@ export class DaemonServer {
       }
     })();
     const tracked = done;
+    this.inFlight.add(tracked);
     tracked.finally(() => {
       this.inFlight.delete(tracked);
     });
-    this.inFlight.add(tracked);
     return { streamId };
   }
 
