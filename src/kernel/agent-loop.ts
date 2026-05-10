@@ -278,15 +278,17 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
           assembled.cachedTokens,
         );
       }
-      // Skip empty assistant messages — providers reject content:[].
+      const toolUses = extractToolUses(assembled.message);
+      // Always push the assistant message when there are tool calls — the
+      // provider requires tool results to follow an assistant message with
+      // tool_calls. For pure-text turns with no content, skip to avoid
+      // sending content:[] which some providers also reject.
       const parts = Array.isArray(assembled.message.content)
         ? assembled.message.content
         : [];
-      if (parts.length > 0) {
+      if (parts.length > 0 || toolUses.length > 0) {
         history.push(assembled.message);
       }
-
-      const toolUses = extractToolUses(assembled.message);
       try {
         cfg.loopDetector?.track({
           toolCalls: toolUses.map((t) => ({ name: t.name, args: t.input })),
