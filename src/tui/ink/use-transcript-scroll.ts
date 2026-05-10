@@ -81,8 +81,7 @@ export function useTranscriptScroll(
     setScrollOffset(0);
   }, []);
 
-  // Register the page‑up / page‑down listener and clean it up on unmount.
-  const unsubscribeInput = useInput(
+  useInput(
     (_ch, key) => {
       if (inputFocus) {
         if (key.ctrl && key.pageUp) {
@@ -100,10 +99,6 @@ export function useTranscriptScroll(
     },
     { isActive: true },
   );
-
-  React.useEffect(() => {
-    return unsubscribeInput;
-  }, [unsubscribeInput]);
 
   return {
     scrollOffset,

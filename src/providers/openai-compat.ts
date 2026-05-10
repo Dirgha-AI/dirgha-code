@@ -55,7 +55,7 @@ export async function* streamChatCompletions(
       if (opts.toolChoice === "auto") {
         // skip setting tool_choice (default behavior)
       } else if (opts.toolChoice === "required") {
-        body.tool_choice = "any"; // OpenAI extension: 'any' means force a tool call
+        body.tool_choice = "required";
       } else {
         body.tool_choice = opts.toolChoice; // 'none'
       }

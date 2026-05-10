@@ -36,6 +36,10 @@ export function useToolProgress(events: EventStream): ActiveTool[] {
   // Update elapsed times every second
   useEffect(() => {
     const interval = setInterval(() => {
+      if (activeRef.current.size === 0) {
+        setTools((prev) => (prev.length === 0 ? prev : []))
+        return
+      }
       const now = Date.now()
       const entries: { id: string; name: string; elapsedMs: number; startedAt: number }[] = []
 
