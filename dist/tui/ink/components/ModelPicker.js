@@ -33,7 +33,7 @@ export function ModelPicker(props) {
     const { stdout } = useStdout();
     const palette = useTheme();
     const cols = stdout?.columns ?? 80;
-    const width = Math.min(cols - 4, 80);
+    const width = Math.max(40, cols - 4);
     // Tier colors derived from the active theme palette instead of
     // hardcoded Ink color names so they respect the user's theme choice.
     const tierColor = {
@@ -122,11 +122,11 @@ export function ModelPicker(props) {
                                 const truncatedTitle = title.length > titleWidth
                                     ? `${title.slice(0, titleWidth - 1)}…`
                                     : title;
-                                return (_jsxs(Box, { flexDirection: "row", paddingLeft: 1, children: [_jsx(Box, { minWidth: 2, children: _jsx(Text, { color: isCursor
+                                return (_jsxs(Box, { flexDirection: "row", paddingLeft: 1, children: [_jsx(Box, { minWidth: 2, flexShrink: 0, children: _jsx(Text, { color: isCursor
                                                     ? palette.text.accent
                                                     : isCurrent
                                                         ? palette.text.accent
-                                                        : palette.text.secondary, children: lead }) }), _jsx(Box, { minWidth: 2, children: _jsx(Text, { color: palette.text.secondary, dimColor: true, children: num }) }), _jsx(Box, { flexGrow: 1, children: _jsx(Text, { color: titleColor, bold: isCursor, children: truncatedTitle }) }), m.tier !== undefined && (_jsx(Box, { minWidth: 8, justifyContent: "flex-end", children: _jsx(Text, { color: tierLabel, dimColor: !isCursor, children: m.tier }) }))] }, m.id));
+                                                        : palette.text.secondary, children: lead }) }), _jsx(Box, { minWidth: 2, flexShrink: 0, children: _jsx(Text, { color: palette.text.secondary, dimColor: true, children: num }) }), _jsx(Box, { flexGrow: 1, flexShrink: 1, children: _jsx(Text, { color: titleColor, bold: isCursor, wrap: "wrap", children: truncatedTitle }) }), m.tier !== undefined && (_jsx(Box, { minWidth: 6, flexShrink: 0, justifyContent: "flex-end", children: _jsx(Text, { color: tierLabel, dimColor: !isCursor, children: m.tier }) }))] }, m.id));
                             })] }, group.provider)))] }), _jsxs(Box, { borderStyle: "single", borderTop: true, borderBottom: false, borderLeft: false, borderRight: false, borderColor: palette.border.default, flexDirection: "column", children: [_jsxs(Box, { children: [_jsxs(Text, { color: palette.text.secondary, dimColor: true, children: ["\u2192", " "] }), _jsx(Text, { color: palette.text.accent, children: selected?.id ?? props.current })] }), _jsxs(Box, { justifyContent: "space-between", children: [_jsxs(Text, { color: palette.text.secondary, dimColor: true, children: [_jsx(Text, { bold: true, color: palette.text.primary, children: "\u2191\u2193" }), " ", "nav", "   ", _jsx(Text, { bold: true, color: palette.text.primary, children: "enter" }), " ", "pick", "   ", _jsx(Text, { bold: true, color: palette.text.primary, children: "1-9" }), " ", "jump"] }), _jsxs(Text, { color: palette.text.secondary, dimColor: true, children: [_jsx(Text, { bold: true, color: palette.text.primary, children: "type" }), " ", "filter", "   ", _jsx(Text, { bold: true, color: palette.text.primary, children: "esc" }), " ", filter ? "clear" : "cancel"] })] })] })] }));
 }
 //# sourceMappingURL=ModelPicker.js.map

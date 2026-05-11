@@ -51,7 +51,7 @@ export function ModelPicker(props: ModelPickerProps): React.JSX.Element {
   const { stdout } = useStdout();
   const palette = useTheme();
   const cols = stdout?.columns ?? 80;
-  const width = Math.min(cols - 4, 80);
+  const width = Math.max(40, cols - 4);
 
   // Tier colors derived from the active theme palette instead of
   // hardcoded Ink color names so they respect the user's theme choice.
@@ -200,7 +200,7 @@ export function ModelPicker(props: ModelPickerProps): React.JSX.Element {
                   : title;
               return (
                 <Box key={m.id} flexDirection="row" paddingLeft={1}>
-                  <Box minWidth={2}>
+                  <Box minWidth={2} flexShrink={0}>
                     <Text
                       color={
                         isCursor
@@ -213,18 +213,18 @@ export function ModelPicker(props: ModelPickerProps): React.JSX.Element {
                       {lead}
                     </Text>
                   </Box>
-                  <Box minWidth={2}>
+                  <Box minWidth={2} flexShrink={0}>
                     <Text color={palette.text.secondary} dimColor>
                       {num}
                     </Text>
                   </Box>
-                  <Box flexGrow={1}>
-                    <Text color={titleColor} bold={isCursor}>
+                  <Box flexGrow={1} flexShrink={1}>
+                    <Text color={titleColor} bold={isCursor} wrap="wrap">
                       {truncatedTitle}
                     </Text>
                   </Box>
                   {m.tier !== undefined && (
-                    <Box minWidth={8} justifyContent="flex-end">
+                    <Box minWidth={6} flexShrink={0} justifyContent="flex-end">
                       <Text color={tierLabel} dimColor={!isCursor}>
                         {m.tier}
                       </Text>

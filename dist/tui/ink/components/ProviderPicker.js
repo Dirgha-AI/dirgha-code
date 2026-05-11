@@ -26,7 +26,7 @@ export function ProviderPicker(props) {
     const { stdout } = useStdout();
     const palette = useTheme();
     const cols = stdout?.columns ?? 80;
-    const width = Math.min(cols - 4, 80);
+    const width = Math.max(40, cols - 4);
     const [filter, setFilter] = React.useState('');
     const filtered = React.useMemo(() => {
         if (!filter)
@@ -92,7 +92,7 @@ export function ProviderPicker(props) {
                                 : palette.text.secondary;
                         const keyBadge = p.hasKey ? '✓' : '⚠';
                         const keyBadgeColour = p.hasKey ? palette.status.success : palette.status.warning;
-                        return (_jsxs(Box, { flexDirection: "row", paddingLeft: 1, children: [_jsx(Box, { minWidth: 2, children: _jsx(Text, { color: isCursor ? palette.text.accent : p.isCurrent ? palette.text.accent : palette.text.secondary, children: lead }) }), _jsx(Box, { minWidth: 2, children: _jsx(Text, { color: palette.text.secondary, dimColor: true, children: num }) }), _jsx(Box, { minWidth: 2, children: _jsx(Text, { color: keyBadgeColour, children: keyBadge }) }), _jsx(Box, { minWidth: 14, children: _jsx(Text, { color: labelColour, bold: isCursor, children: p.label }) }), _jsx(Box, { flexGrow: 1, children: _jsx(Text, { color: palette.text.secondary, dimColor: true, children: p.blurb ?? '' }) }), _jsx(Box, { minWidth: 10, justifyContent: "flex-end", children: _jsxs(Text, { color: palette.text.secondary, dimColor: true, children: [p.modelCount, " model", p.modelCount === 1 ? '' : 's'] }) })] }, p.id));
+                        return (_jsxs(Box, { flexDirection: "row", paddingLeft: 1, children: [_jsx(Box, { minWidth: 2, flexShrink: 0, children: _jsx(Text, { color: isCursor ? palette.text.accent : p.isCurrent ? palette.text.accent : palette.text.secondary, children: lead }) }), _jsx(Box, { minWidth: 2, flexShrink: 0, children: _jsx(Text, { color: palette.text.secondary, dimColor: true, children: num }) }), _jsx(Box, { minWidth: 2, flexShrink: 0, children: _jsx(Text, { color: keyBadgeColour, children: keyBadge }) }), _jsx(Box, { flexShrink: 1, children: _jsx(Text, { color: labelColour, bold: isCursor, wrap: "wrap", children: p.label }) }), _jsx(Box, { flexGrow: 1, flexShrink: 1, children: _jsx(Text, { color: palette.text.secondary, dimColor: true, wrap: "wrap", children: p.blurb ?? '' }) }), _jsx(Box, { minWidth: 8, flexShrink: 0, justifyContent: "flex-end", children: _jsxs(Text, { color: palette.text.secondary, dimColor: true, children: [p.modelCount, " model", p.modelCount === 1 ? '' : 's'] }) })] }, p.id));
                     })] }), _jsx(Box, { borderStyle: "single", borderTop: true, borderBottom: false, borderLeft: false, borderRight: false, borderColor: palette.border.default, flexDirection: "column", children: _jsxs(Box, { justifyContent: "space-between", children: [_jsxs(Text, { color: palette.text.secondary, dimColor: true, children: [_jsx(Text, { bold: true, color: palette.text.primary, children: "\u2191\u2193" }), " nav", '   ', _jsx(Text, { bold: true, color: palette.text.primary, children: "enter" }), " models", '   ', _jsx(Text, { bold: true, color: palette.text.primary, children: "1-9" }), " jump"] }), _jsxs(Text, { color: palette.text.secondary, dimColor: true, children: [_jsx(Text, { bold: true, color: palette.text.primary, children: "type" }), " filter", '   ', _jsx(Text, { bold: true, color: palette.text.primary, children: "esc" }), " ", filter ? 'clear' : 'cancel'] })] }) })] }));
 }
 //# sourceMappingURL=ProviderPicker.js.map

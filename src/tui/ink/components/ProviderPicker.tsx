@@ -45,7 +45,7 @@ export function ProviderPicker(props: ProviderPickerProps): React.JSX.Element {
   const { stdout } = useStdout();
   const palette = useTheme();
   const cols = stdout?.columns ?? 80;
-  const width = Math.min(cols - 4, 80);
+  const width = Math.max(40, cols - 4);
 
   const [filter, setFilter] = React.useState('');
   const filtered = React.useMemo(() => {
@@ -129,22 +129,22 @@ export function ProviderPicker(props: ProviderPickerProps): React.JSX.Element {
           const keyBadgeColour = p.hasKey ? palette.status.success : palette.status.warning;
           return (
             <Box key={p.id} flexDirection="row" paddingLeft={1}>
-              <Box minWidth={2}>
+              <Box minWidth={2} flexShrink={0}>
                 <Text color={isCursor ? palette.text.accent : p.isCurrent ? palette.text.accent : palette.text.secondary}>{lead}</Text>
               </Box>
-              <Box minWidth={2}>
+              <Box minWidth={2} flexShrink={0}>
                 <Text color={palette.text.secondary} dimColor>{num}</Text>
               </Box>
-              <Box minWidth={2}>
+              <Box minWidth={2} flexShrink={0}>
                 <Text color={keyBadgeColour}>{keyBadge}</Text>
               </Box>
-              <Box minWidth={14}>
-                <Text color={labelColour} bold={isCursor}>{p.label}</Text>
+              <Box flexShrink={1}>
+                <Text color={labelColour} bold={isCursor} wrap="wrap">{p.label}</Text>
               </Box>
-              <Box flexGrow={1}>
-                <Text color={palette.text.secondary} dimColor>{p.blurb ?? ''}</Text>
+              <Box flexGrow={1} flexShrink={1}>
+                <Text color={palette.text.secondary} dimColor wrap="wrap">{p.blurb ?? ''}</Text>
               </Box>
-              <Box minWidth={10} justifyContent="flex-end">
+              <Box minWidth={8} flexShrink={0} justifyContent="flex-end">
                 <Text color={palette.text.secondary} dimColor>{p.modelCount} model{p.modelCount === 1 ? '' : 's'}</Text>
               </Box>
             </Box>

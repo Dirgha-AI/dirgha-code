@@ -62,7 +62,7 @@ export function HelpOverlay(props) {
     const palette = useTheme();
     const cols = stdout?.columns ?? 80;
     const rows = stdout?.rows ?? 24;
-    const width = Math.min(cols - 2, 100);
+    const width = Math.max(40, cols - 2);
     const [filter, setFilter] = React.useState('');
     const [scroll, setScroll] = React.useState(0);
     useInput((input, key) => {
