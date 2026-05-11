@@ -11,10 +11,13 @@
  * the cheapest available GPU that meets the requirements.
  */
 import { RunPodProvider } from "../gpu/runpod.js";
+import { SpheronProvider } from "../gpu/spheron.js";
+import { AkashProvider } from "../gpu/akash.js";
+import { checkBudget, registerGPUJob } from "../gpu/jobs.js";
 let _providers = null;
 function getProviders() {
     if (!_providers) {
-        _providers = [new RunPodProvider()];
+        _providers = [new RunPodProvider(), new SpheronProvider(), new AkashProvider()];
     }
     return _providers;
 }
@@ -108,9 +111,8 @@ Get a key at https://runpod.io`,
     },
     async execute(rawInput, _ctx) {
         const input = rawInput;
-        const provider = new RunPodProvider();
-        // Pick GPU
-        const allTypes = await provider.listGPUTypes();
+        // Pick cheapest GPU across ALL providers
+        const allTypes = await listAllGPUTypes();
         let chosenGPU = null;
         if (input.gpuType) {
             chosenGPU = allTypes.find((g) => g.name.includes(input.gpuType) || g.id.includes(input.gpuType)) ?? null;
@@ -122,17 +124,42 @@ Get a key at https://runpod.io`,
             chosenGPU = allTypes[0] ?? null;
         }
         if (!chosenGPU)
-            return { isError: true, content: "No suitable GPU available." };
-        // Provision
-        const instance = await provider.provision({
-            gpuType: chosenGPU.id,
-            imageName: input.imageName ?? "nvidia/cuda:12.4.0-base",
-            containerDiskGb: input.containerDiskGb ?? 20,
-            env: input.env,
-            startSsh: true,
+            return { isError: true, content: "No suitable GPU available across any provider." };
+        // Budget check
+        const budgetErr = await checkBudget(chosenGPU.costPerHr, 1);
+        if (budgetErr)
+            return { isError: true, content: budgetErr };
+        // Try each provider in order of cheapest-first until one works
+        const providers = getProviders().filter(p => p.name === chosenGPU.provider);
+        let instance = null;
+        let lastError = "";
+        for (const provider of providers) {
+            try {
+                instance = await provider.provision({
+                    gpuType: chosenGPU.id,
+                    imageName: input.imageName ?? "nvidia/cuda:12.4.0-base",
+                    containerDiskGb: input.containerDiskGb ?? 20,
+                    env: input.env,
+                    startSsh: true,
+                });
+                break;
+            }
+            catch (err) {
+                lastError = err.message;
+            }
+        }
+        if (!instance) {
+            return { isError: true, content: `Failed to provision GPU. Last error: ${lastError}` };
+        }
+        // Register job for tracking + budget
+        const job = await registerGPUJob({
+            provider: instance.provider,
+            gpuType: chosenGPU.name,
+            costPerHr: chosenGPU.costPerHr,
+            instanceId: instance.id,
         });
         const autoDestroy = input.autoDestroy !== false;
-        let result = `✅ GPU instance provisioned on ${provider.name}:
+        let result = `✅ GPU job ${job.id} — provisioned on ${instance.provider} via ${chosenGPU.provider} (cheapest match):
   GPU:     ${chosenGPU.name} (${chosenGPU.vramGb}GB VRAM)
   Cost:    $${chosenGPU.costPerHr.toFixed(2)}/hr
   ID:      ${instance.id}
@@ -167,23 +194,26 @@ export const gpuStatusTool = {
     },
     async execute(rawInput, _ctx) {
         const input = rawInput;
-        const provider = new RunPodProvider();
-        try {
-            const status = await provider.getStatus(input.instanceId);
-            const elapsed = ((Date.now() - new Date(status.startedAt).getTime()) / 3600000).toFixed(2);
-            return {
-                isError: false,
-                content: `GPU Instance ${input.instanceId.slice(0, 12)}:
+        let status = null;
+        for (const p of getProviders()) {
+            try {
+                status = await p.getStatus(input.instanceId);
+                break;
+            }
+            catch { }
+        }
+        if (!status)
+            return { isError: true, content: "Instance not found on any provider." };
+        const elapsed = ((Date.now() - new Date(status.startedAt).getTime()) / 3600000).toFixed(2);
+        return {
+            isError: false,
+            content: `GPU Instance ${input.instanceId.slice(0, 12)}:
   Status:    ${status.status}
   Uptime:    ${elapsed}h
   Cost:      $${status.totalCost.toFixed(4)} ($${status.costPerHr.toFixed(2)}/hr)
   IP:        ${status.ipAddress ?? "N/A"}
   SSH:       ${status.sshCommand ?? "N/A"}`,
-            };
-        }
-        catch (err) {
-            return { isError: true, content: `Failed to get status: ${err.message}` };
-        }
+        };
     },
 };
 export const gpuDestroyTool = {
@@ -198,21 +228,26 @@ export const gpuDestroyTool = {
     },
     async execute(rawInput, _ctx) {
         const input = rawInput;
-        const provider = new RunPodProvider();
-        try {
-            const status = await provider.getStatus(input.instanceId);
-            const totalCost = status.totalCost;
-            await provider.destroy(input.instanceId);
-            return {
-                isError: false,
-                content: `✅ GPU instance ${input.instanceId.slice(0, 12)} destroyed.
+        let totalCost = 0;
+        let destroyed = false;
+        for (const p of getProviders()) {
+            try {
+                const status = await p.getStatus(input.instanceId);
+                totalCost = status.totalCost;
+                await p.destroy(input.instanceId);
+                destroyed = true;
+                break;
+            }
+            catch { }
+        }
+        if (!destroyed)
+            return { isError: true, content: "Instance not found on any provider." };
+        return {
+            isError: false,
+            content: `✅ GPU instance ${input.instanceId.slice(0, 12)} destroyed.
   Total cost: $${totalCost.toFixed(4)}
   Instance terminated. No further billing.`,
-            };
-        }
-        catch (err) {
-            return { isError: true, content: `Failed to destroy: ${err.message}` };
-        }
+        };
     },
 };
 //# sourceMappingURL=gpu-compute.js.map

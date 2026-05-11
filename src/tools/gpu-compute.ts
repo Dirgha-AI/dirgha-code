@@ -14,13 +14,16 @@
 import type { Tool, ToolContext } from "./registry.js";
 import type { ToolResult } from "../kernel/types.js";
 import { RunPodProvider } from "../gpu/runpod.js";
+import { SpheronProvider } from "../gpu/spheron.js";
+import { AkashProvider } from "../gpu/akash.js";
 import type { GPUProvider, GPUType } from "../gpu/providers.js";
+import { checkBudget, registerGPUJob, completeGPUJob } from "../gpu/jobs.js";
 
 let _providers: GPUProvider[] | null = null;
 
 function getProviders(): GPUProvider[] {
   if (!_providers) {
-    _providers = [new RunPodProvider()];
+    _providers = [new RunPodProvider(), new SpheronProvider(), new AkashProvider()];
   }
   return _providers;
 }
@@ -126,10 +129,8 @@ Get a key at https://runpod.io`,
       autoDestroy?: boolean;
     };
 
-    const provider = new RunPodProvider();
-
-    // Pick GPU
-    const allTypes = await provider.listGPUTypes();
+    // Pick cheapest GPU across ALL providers
+    const allTypes = await listAllGPUTypes();
     let chosenGPU: GPUType | null = null;
 
     if (input.gpuType) {
@@ -140,20 +141,47 @@ Get a key at https://runpod.io`,
       chosenGPU = allTypes[0] ?? null;
     }
 
-    if (!chosenGPU) return { isError: true, content: "No suitable GPU available." };
+    if (!chosenGPU) return { isError: true, content: "No suitable GPU available across any provider." };
 
-    // Provision
-    const instance = await provider.provision({
-      gpuType: chosenGPU.id,
-      imageName: input.imageName ?? "nvidia/cuda:12.4.0-base",
-      containerDiskGb: input.containerDiskGb ?? 20,
-      env: input.env,
-      startSsh: true,
+    // Budget check
+    const budgetErr = await checkBudget(chosenGPU.costPerHr, 1);
+    if (budgetErr) return { isError: true, content: budgetErr };
+
+    // Try each provider in order of cheapest-first until one works
+    const providers = getProviders().filter(p => p.name === chosenGPU!.provider);
+    let instance: Awaited<ReturnType<GPUProvider["provision"]>> | null = null;
+    let lastError = "";
+
+    for (const provider of providers) {
+      try {
+        instance = await provider.provision({
+          gpuType: chosenGPU.id,
+          imageName: input.imageName ?? "nvidia/cuda:12.4.0-base",
+          containerDiskGb: input.containerDiskGb ?? 20,
+          env: input.env,
+          startSsh: true,
+        });
+        break;
+      } catch (err: any) {
+        lastError = err.message;
+      }
+    }
+
+    if (!instance) {
+      return { isError: true, content: `Failed to provision GPU. Last error: ${lastError}` };
+    }
+
+    // Register job for tracking + budget
+    const job = await registerGPUJob({
+      provider: instance.provider,
+      gpuType: chosenGPU.name,
+      costPerHr: chosenGPU.costPerHr,
+      instanceId: instance.id,
     });
 
     const autoDestroy = input.autoDestroy !== false;
 
-    let result = `✅ GPU instance provisioned on ${provider.name}:
+    let result = `✅ GPU job ${job.id} — provisioned on ${instance.provider} via ${chosenGPU.provider} (cheapest match):
   GPU:     ${chosenGPU.name} (${chosenGPU.vramGb}GB VRAM)
   Cost:    $${chosenGPU.costPerHr.toFixed(2)}/hr
   ID:      ${instance.id}
@@ -192,23 +220,23 @@ export const gpuStatusTool: Tool = {
   },
   async execute(rawInput: unknown, _ctx: ToolContext): Promise<ToolResult> {
     const input = rawInput as { instanceId: string };
-    const provider = new RunPodProvider();
 
-    try {
-      const status = await provider.getStatus(input.instanceId);
-      const elapsed = ((Date.now() - new Date(status.startedAt).getTime()) / 3600000).toFixed(2);
-      return {
-        isError: false,
-        content: `GPU Instance ${input.instanceId.slice(0, 12)}:
+    let status: Awaited<ReturnType<GPUProvider["getStatus"]>> | null = null;
+    for (const p of getProviders()) {
+      try { status = await p.getStatus(input.instanceId); break; } catch {}
+    }
+    if (!status) return { isError: true, content: "Instance not found on any provider." };
+
+    const elapsed = ((Date.now() - new Date(status.startedAt).getTime()) / 3600000).toFixed(2);
+    return {
+      isError: false,
+      content: `GPU Instance ${input.instanceId.slice(0, 12)}:
   Status:    ${status.status}
   Uptime:    ${elapsed}h
   Cost:      $${status.totalCost.toFixed(4)} ($${status.costPerHr.toFixed(2)}/hr)
   IP:        ${status.ipAddress ?? "N/A"}
   SSH:       ${status.sshCommand ?? "N/A"}`,
-      };
-    } catch (err: any) {
-      return { isError: true, content: `Failed to get status: ${err.message}` };
-    }
+    };
   },
 };
 
@@ -224,20 +252,25 @@ export const gpuDestroyTool: Tool = {
   },
   async execute(rawInput: unknown, _ctx: ToolContext): Promise<ToolResult> {
     const input = rawInput as { instanceId: string };
-    const provider = new RunPodProvider();
 
-    try {
-      const status = await provider.getStatus(input.instanceId);
-      const totalCost = status.totalCost;
-      await provider.destroy(input.instanceId);
-      return {
-        isError: false,
-        content: `✅ GPU instance ${input.instanceId.slice(0, 12)} destroyed.
+    let totalCost = 0;
+    let destroyed = false;
+    for (const p of getProviders()) {
+      try {
+        const status = await p.getStatus(input.instanceId);
+        totalCost = status.totalCost;
+        await p.destroy(input.instanceId);
+        destroyed = true;
+        break;
+      } catch {}
+    }
+    if (!destroyed) return { isError: true, content: "Instance not found on any provider." };
+
+    return {
+      isError: false,
+      content: `✅ GPU instance ${input.instanceId.slice(0, 12)} destroyed.
   Total cost: $${totalCost.toFixed(4)}
   Instance terminated. No further billing.`,
-      };
-    } catch (err: any) {
-      return { isError: true, content: `Failed to destroy: ${err.message}` };
-    }
+    };
   },
 };
