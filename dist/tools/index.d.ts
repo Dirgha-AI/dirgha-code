@@ -27,7 +27,7 @@ import { transactionalWriteTool } from "./transactional-write.js";
 import { dbWorkspaceInfoTool } from "./db-workspace-info.js";
 import { agentServerTool } from "./agent-server.js";
 import { imageGenerateTool, videoGenerateTool, audioGenerateTool, speechToTextTool } from "./studio.js";
-import { gpuListTool, gpuComputeTool, gpuStatusTool, gpuDestroyTool } from "./gpu-compute.js";
+import { gpuListTool, gpuComputeTool, gpuStatusTool, gpuDestroyTool, gpuMarketListTool, gpuMarketPostTool } from "./gpu-compute.js";
 export { createMultimodalTool } from "./multimodal.js";
 export { createCronTool } from "./cron.js";
 export { createCheckpointTool } from "./checkpoint.js";
