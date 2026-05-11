@@ -13,12 +13,26 @@
 
 import type { Tool, ToolContext } from "./registry.js";
 import type { ToolResult } from "../kernel/types.js";
+import { readFileSync, existsSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { RunPodProvider } from "../gpu/runpod.js";
 import { SpheronProvider } from "../gpu/spheron.js";
 import { AkashProvider } from "../gpu/akash.js";
 import type { GPUProvider, GPUType } from "../gpu/providers.js";
 import { checkBudget, registerGPUJob, completeGPUJob } from "../gpu/jobs.js";
 import { postGPUListing, listGPUListings, postGPUJob, getGPUJobStatus, settleGPUJob } from "../gpu/market.js";
+
+/** Try to load a gateway token for managed billing path */
+function getGatewayToken(): string | null {
+  try {
+    const p = join(homedir(), ".dirgha", "credentials.json");
+    if (!existsSync(p)) return null;
+    return JSON.parse(readFileSync(p, "utf-8")).token ?? null;
+  } catch { return null; }
+}
+
+const GATEWAY = "https://api.dirgha.ai";
 
 let _providers: GPUProvider[] | null = null;
 
@@ -148,10 +162,53 @@ Get a key at https://runpod.io`,
     const budgetErr = await checkBudget(chosenGPU.costPerHr, 1);
     if (budgetErr) return { isError: true, content: budgetErr };
 
-    // Try each provider in order of cheapest-first until one works
-    const providers = getProviders().filter(p => p.name === chosenGPU!.provider);
+    // Try gateway path first (user is logged in, has credits)
     let instance: Awaited<ReturnType<GPUProvider["provision"]>> | null = null;
-    let lastError = "";
+    const token = getGatewayToken();
+    if (token) {
+      try {
+        // Find the short GPU type ID
+        const gpuId = Object.entries({
+          "A100-80GB": "NVIDIA A100 80GB",
+          "RTX-4090": "NVIDIA RTX 4090",
+        }).find(([, v]) => chosenGPU!.name.includes(v))?.[0] ?? "A100-80GB";
+
+        const res = await fetch(`${GATEWAY}/api/billing/gpu/provision`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            gpuType: gpuId,
+            imageName: input.imageName,
+            containerDiskGb: input.containerDiskGb,
+          }),
+          signal: AbortSignal.timeout(60_000),
+        });
+        if (res.ok) {
+          const data = await res.json() as any;
+          const job = await registerGPUJob({
+            provider: "gateway",
+            gpuType: chosenGPU.name,
+            costPerHr: chosenGPU.costPerHr,
+            instanceId: data.instanceId,
+          });
+          return {
+            isError: false,
+            content: `✅ GPU provisioned via Dirgha gateway (managed billing):
+  GPU:     ${chosenGPU.name}
+  Cost:    $${chosenGPU.costPerHr.toFixed(2)}/hr
+  ID:      ${data.instanceId}
+  SSH:     ${data.sshCommand ?? "waiting..."}
+  Balance: $${((data.balanceAfterCents ?? 0) / 100).toFixed(2)}
+  Job:     ${job.id}`,
+            metadata: { instanceId: data.instanceId, provider: "gateway", gpuType: chosenGPU.name, costPerHr: chosenGPU.costPerHr },
+          };
+        }
+      } catch { /* fall through to BYOK */ }
+    }
+
+    // Fallback: BYOK — call provider directly with user's key
+    const providers = getProviders().filter(p => p.name === chosenGPU!.provider);
+    let lastError = "No provider available. Set an API key (e.g. RUNPOD_API_KEY) or run dirgha login.";
 
     for (const provider of providers) {
       try {
@@ -169,7 +226,7 @@ Get a key at https://runpod.io`,
     }
 
     if (!instance) {
-      return { isError: true, content: `Failed to provision GPU. Last error: ${lastError}` };
+      return { isError: true, content: `Failed to provision GPU. ${lastError}` };
     }
 
     // Register job for tracking + budget
