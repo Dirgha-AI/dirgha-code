@@ -372,7 +372,12 @@ export function App(props: AppProps): React.JSX.Element {
   // EMA (alpha=0.3) smooths out single-frame spikes to avoid thrashing.
   // When frames are slow (> minFlushMs * 1.5): raise floor toward lastFrameMs * 1.2.
   // When frames recovered (< minFlushMs * 0.8): decay floor back toward minFlushMs.
+  // Guarded on `busy || isStreaming` so keystroke renders (very fast, ~5ms) do NOT
+  // pollute the EMA and cause the flush floor to oscillate — without this guard
+  // every keystroke pulled the EMA down, then the next streaming flush pulled it
+  // back up, producing inconsistent flush timing → visible jitter/flicker.
   React.useEffect(() => {
+    if (!busy && projection.liveItems.length === 0) return;
     const lastMs = renderMetrics.lastFrameTimeMs();
     if (lastMs <= 0) return;
     frameEmaRef.current = 0.3 * lastMs + 0.7 * frameEmaRef.current;
@@ -388,6 +393,7 @@ export function App(props: AppProps): React.JSX.Element {
       );
     }
   });
+
 
   // Alt+M toggles the render-metrics display in the StatusBar.
   useInput((ch, key) => {
