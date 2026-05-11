@@ -26,7 +26,8 @@ import { graphNeighborsTool } from "./graph-neighbors.js";
 import { graphTraverseTool } from "./graph-traverse.js";
 import { transactionalWriteTool } from "./transactional-write.js";
 import { dbWorkspaceInfoTool } from "./db-workspace-info.js";
-import { taskCreateTool, taskUpdateTool, taskListTool, taskDeleteTool, taskSummaryTool, } from "./task-manager.js";
+import { agentServerTool } from "./agent-server.js";
+import { imageGenerateTool, videoGenerateTool, audioGenerateTool, speechToTextTool } from "./studio.js";
 export { createMultimodalTool } from "./multimodal.js";
 export { createCronTool } from "./cron.js";
 export { createCheckpointTool } from "./checkpoint.js";
@@ -66,11 +67,11 @@ export const builtInTools = [
     graphTraverseTool,
     transactionalWriteTool,
     dbWorkspaceInfoTool,
-    taskCreateTool,
-    taskUpdateTool,
-    taskListTool,
-    taskDeleteTool,
-    taskSummaryTool,
+    agentServerTool,
+    imageGenerateTool,
+    videoGenerateTool,
+    audioGenerateTool,
+    speechToTextTool,
 ];
-export { fsReadTool, fsWriteTool, fsEditTool, fsLsTool, shellTool, searchGrepTool, searchGlobTool, gitTool, githubTool, browserTool, checkpointTool, cronTool, lspGoToDefinitionTool, lspFindReferencesTool, lspHoverTool, lspDocumentSymbolsTool, rtkTool, qmdTool, kbSearchTool, graphNeighborsTool, graphTraverseTool, transactionalWriteTool, dbWorkspaceInfoTool, };
+export { fsReadTool, fsWriteTool, fsEditTool, fsLsTool, shellTool, searchGrepTool, searchGlobTool, gitTool, githubTool, browserTool, checkpointTool, cronTool, lspGoToDefinitionTool, lspFindReferencesTool, lspHoverTool, lspDocumentSymbolsTool, rtkTool, qmdTool, kbSearchTool, graphNeighborsTool, graphTraverseTool, transactionalWriteTool, dbWorkspaceInfoTool, agentServerTool, imageGenerateTool, videoGenerateTool, audioGenerateTool, speechToTextTool, };
 //# sourceMappingURL=index.js.map

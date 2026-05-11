@@ -35,6 +35,8 @@ import {
   taskDeleteTool,
   taskSummaryTool,
 } from "./task-manager.js";
+import { agentServerTool } from "./agent-server.js";
+import { imageGenerateTool, videoGenerateTool, audioGenerateTool, speechToTextTool } from "./studio.js";
 
 export { createMultimodalTool } from "./multimodal.js";
 
@@ -85,11 +87,11 @@ export const builtInTools: Tool[] = [
   graphTraverseTool,
   transactionalWriteTool,
   dbWorkspaceInfoTool,
-  taskCreateTool,
-  taskUpdateTool,
-  taskListTool,
-  taskDeleteTool,
-  taskSummaryTool,
+  agentServerTool,
+  imageGenerateTool,
+  videoGenerateTool,
+  audioGenerateTool,
+  speechToTextTool,
 ];
 
 export {
@@ -116,4 +118,9 @@ export {
   graphTraverseTool,
   transactionalWriteTool,
   dbWorkspaceInfoTool,
+  agentServerTool,
+  imageGenerateTool,
+  videoGenerateTool,
+  audioGenerateTool,
+  speechToTextTool,
 };
