@@ -93,6 +93,7 @@ The interactive TUI is `dirgha` with no args. Resume a session with `dirgha resu
 | 17 providers                             | Multi-key BYOK pool with cooldown rotation, 4-tier failover cascade, health scoring with compaction.                                                                                |
 | 18 built-in tools                        | Per-tool timeout enforcement. Shell 300s (PTY streaming via `streamOutput`), reads 30s, default 60s.                                                                               |
 | Mode enforcement                         | `git`, `shell`, `fs_write`, `fs_edit`, `browser` are write-gated in `plan` / `verify` / `ask` modes at the kernel hook layer — not just prompt nudging.                           |
+| **GPU compute**                          | 4 providers (Vast, Akash, Spheron, RunPod), cheapest-auto-select, budget caps, audit log, agent tools, CLI subcommand, web UI at [`dirgha.ai/app/gpu`](https://dirgha.ai/app/gpu) |
 
 ## Why this exists
 
@@ -110,6 +111,7 @@ The opposite assumption is the right one. Your laptop is the unit of sovereignty
 | Architecture efficiency | [`docs/memory/architecture-efficiency.md`](./docs/memory/architecture-efficiency.md) |
 | Skill security          | [`docs/agents/skill-security.md`](./docs/agents/skill-security.md)                   |
 | Files & search contract | [`docs/agents/files-and-search.md`](./docs/agents/files-and-search.md)               |
+| GPU marketplace         | [`docs/GPU_MARKETPLACE.md`](./docs/GPU_MARKETPLACE.md)                               |
 | Per-release notes       | [`changelog/`](./changelog)                                                          |
 
 ## Contributing
