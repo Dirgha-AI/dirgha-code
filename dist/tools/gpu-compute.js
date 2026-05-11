@@ -16,6 +16,7 @@ import { join } from "node:path";
 import { RunPodProvider } from "../gpu/runpod.js";
 import { SpheronProvider } from "../gpu/spheron.js";
 import { AkashProvider } from "../gpu/akash.js";
+import { VastProvider } from "../gpu/vast.js";
 import { checkBudget, registerGPUJob } from "../gpu/jobs.js";
 import { postGPUListing, listGPUListings } from "../gpu/market.js";
 /** Try to load a gateway token for managed billing path */
@@ -34,7 +35,7 @@ const GATEWAY = "https://api.dirgha.ai";
 let _providers = null;
 function getProviders() {
     if (!_providers) {
-        _providers = [new RunPodProvider(), new SpheronProvider(), new AkashProvider()];
+        _providers = [new RunPodProvider(), new SpheronProvider(), new AkashProvider(), new VastProvider()];
     }
     return _providers;
 }
