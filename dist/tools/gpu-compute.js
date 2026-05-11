@@ -51,7 +51,7 @@ async function listAllGPUTypes() {
     }));
     return results.flat().sort((a, b) => a.costPerHr - b.costPerHr);
 }
-function findCheapest(gpus, minVramGb, preferProvider) {
+function _findCheapest(gpus, minVramGb, preferProvider) {
     let filtered = gpus;
     if (minVramGb)
         filtered = filtered.filter((g) => g.vramGb >= minVramGb);
@@ -328,7 +328,7 @@ Requires login (dirgha login) and enough ai_credits to cover escrow.`,
     async execute(rawInput, _ctx) {
         const input = rawInput;
         try {
-            const listing = await postGPUListing({
+            await postGPUListing({
                 gpuType: input.gpuType,
                 vramGb: input.vramGb,
                 pricePerHr: input.pricePerHr,

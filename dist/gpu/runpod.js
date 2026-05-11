@@ -36,7 +36,7 @@ const GPU_MAP = {
     "NVIDIA L40S": { name: "NVIDIA L40S", vramGb: 48 },
     "NVIDIA H100 80GB HBM3": { name: "NVIDIA H100 80GB", vramGb: 80 },
 };
-function parseGpuType(rawId) {
+function _parseGpuType(rawId) {
     const mapped = GPU_MAP[rawId] || { name: rawId, vramGb: 0 };
     return {
         id: rawId,

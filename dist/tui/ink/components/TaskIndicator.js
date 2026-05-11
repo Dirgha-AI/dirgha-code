@@ -46,9 +46,9 @@ function TaskRow({ task, palette, }) {
     const label = `${icon} [${task.id.slice(0, 8)}] ${task.title}`;
     // Show a simple progress bar for in_progress tasks
     const hasProgress = task.status === "in_progress" && task.progress !== undefined;
-    return (_jsxs(Box, { flexDirection: "column", children: [_jsxs(Text, { color: palette.text.primary, children: ["  ", label] }), hasProgress && (_jsx(Box, { marginLeft: 4, children: _jsx(ProgressBar, { value: task.progress, palette: palette }) }))] }));
+    return (_jsxs(Box, { flexDirection: "column", children: [_jsxs(Text, { color: palette.text.primary, children: ["  ", label] }), hasProgress && (_jsx(Box, { marginLeft: 4, children: _jsx(ProgressBar, { value: task.progress }) }))] }));
 }
-function ProgressBar({ value, palette, }) {
+function ProgressBar({ value, }) {
     const barW = 20;
     const filled = Math.round((value / 100) * barW);
     const empty = barW - filled;

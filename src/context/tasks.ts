@@ -9,7 +9,6 @@ import { readFile, writeFile, mkdir, rename } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
-import { existsSync, renameSync, writeFileSync } from "node:fs";
 
 const DIR = () => join(homedir(), ".dirgha");
 const FILE = () => join(DIR(), "tasks.json");

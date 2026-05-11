@@ -7,7 +7,7 @@
  */
 
 import { readFile, writeFile, mkdir, rename, appendFile } from "node:fs/promises";
-import { readFileSync, existsSync, writeFileSync, renameSync, appendFileSync } from "node:fs";
+import { readFileSync, existsSync, writeFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";

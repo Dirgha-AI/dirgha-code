@@ -15,7 +15,6 @@ import {
   updateTask,
   listTasks,
   deleteTask,
-  getTask,
   taskSummary,
   type TaskStatus,
 } from "../context/tasks.js";

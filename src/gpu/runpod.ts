@@ -41,7 +41,7 @@ const GPU_MAP: Record<string, { name: string; vramGb: number }> = {
   "NVIDIA H100 80GB HBM3": { name: "NVIDIA H100 80GB", vramGb: 80 },
 };
 
-function parseGpuType(rawId: string): GPUType {
+function _parseGpuType(rawId: string): GPUType {
   const mapped = GPU_MAP[rawId] || { name: rawId, vramGb: 0 };
   return {
     id: rawId,

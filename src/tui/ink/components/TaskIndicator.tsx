@@ -84,7 +84,7 @@ function TaskRow({
       </Text>
       {hasProgress && (
         <Box marginLeft={4}>
-          <ProgressBar value={task.progress!} palette={palette} />
+          <ProgressBar value={task.progress!} />
         </Box>
       )}
     </Box>
@@ -93,10 +93,8 @@ function TaskRow({
 
 function ProgressBar({
   value,
-  palette,
 }: {
   value: number;
-  palette: ReturnType<typeof useTheme>;
 }): React.JSX.Element {
   const barW = 20;
   const filled = Math.round((value / 100) * barW);

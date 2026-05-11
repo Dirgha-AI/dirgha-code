@@ -5,14 +5,13 @@
  * `getSummaryModel()` + `getSession()` + `getSessionStore()` for this.
  */
 
-import { stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, basename } from 'node:path';
 import type { SlashCommand } from './types.js';
 import { branchSession } from '../../context/branch.js';
 import { renameSession } from '../../state/index.js';
 
-function sessionPath(id: string): string {
+function _sessionPath(id: string): string {
   if (!id || basename(id) !== id || id.includes('\0')) {
     throw new Error(`Invalid session id: "${id}"`);
   }

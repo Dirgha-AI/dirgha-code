@@ -28,13 +28,7 @@ import { graphNeighborsTool } from "./graph-neighbors.js";
 import { graphTraverseTool } from "./graph-traverse.js";
 import { transactionalWriteTool } from "./transactional-write.js";
 import { dbWorkspaceInfoTool } from "./db-workspace-info.js";
-import {
-  taskCreateTool,
-  taskUpdateTool,
-  taskListTool,
-  taskDeleteTool,
-  taskSummaryTool,
-} from "./task-manager.js";
+
 import { agentServerTool } from "./agent-server.js";
 import { imageGenerateTool, videoGenerateTool, audioGenerateTool, speechToTextTool } from "./studio.js";
 import { gpuListTool, gpuComputeTool, gpuStatusTool, gpuDestroyTool, gpuMarketListTool, gpuMarketPostTool } from "./gpu-compute.js";

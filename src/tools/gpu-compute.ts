@@ -21,8 +21,8 @@ import { SpheronProvider } from "../gpu/spheron.js";
 import { AkashProvider } from "../gpu/akash.js";
 import { VastProvider } from "../gpu/vast.js";
 import type { GPUProvider, GPUType } from "../gpu/providers.js";
-import { checkBudget, registerGPUJob, completeGPUJob } from "../gpu/jobs.js";
-import { postGPUListing, listGPUListings, postGPUJob, getGPUJobStatus, settleGPUJob } from "../gpu/market.js";
+import { checkBudget, registerGPUJob } from "../gpu/jobs.js";
+import { postGPUListing, listGPUListings } from "../gpu/market.js";
 
 /** Try to load a gateway token for managed billing path */
 function getGatewayToken(): string | null {
@@ -58,7 +58,7 @@ async function listAllGPUTypes(): Promise<GPUType[]> {
   return results.flat().sort((a, b) => a.costPerHr - b.costPerHr);
 }
 
-function findCheapest(gpus: GPUType[], minVramGb?: number, preferProvider?: string): GPUType | null {
+function _findCheapest(gpus: GPUType[], minVramGb?: number, preferProvider?: string): GPUType | null {
   let filtered = gpus;
   if (minVramGb) filtered = filtered.filter((g) => g.vramGb >= minVramGb);
   if (preferProvider) {
@@ -352,7 +352,7 @@ Requires login (dirgha login) and enough ai_credits to cover escrow.`,
   async execute(rawInput: unknown, _ctx: ToolContext): Promise<ToolResult> {
     const input = rawInput as { gpuType: string; vramGb: number; pricePerHr: number; provider?: string; region?: string };
     try {
-      const listing = await postGPUListing({
+      await postGPUListing({
         gpuType: input.gpuType,
         vramGb: input.vramGb,
         pricePerHr: input.pricePerHr,

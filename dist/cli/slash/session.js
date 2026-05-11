@@ -8,7 +8,7 @@ import { homedir } from 'node:os';
 import { join, basename } from 'node:path';
 import { branchSession } from '../../context/branch.js';
 import { renameSession } from '../../state/index.js';
-function sessionPath(id) {
+function _sessionPath(id) {
     if (!id || basename(id) !== id || id.includes('\0')) {
         throw new Error(`Invalid session id: "${id}"`);
     }

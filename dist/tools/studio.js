@@ -90,7 +90,7 @@ Examples:
         },
         required: ["prompt"],
     },
-    async execute(rawInput, ctx) {
+    async execute(rawInput, _ctx) {
         const input = rawInput;
         const model = input.model ?? "nvidia-sd3-medium";
         try {
@@ -208,9 +208,9 @@ Usage: speech_to_text path=/path/to/audio.mp3
     async execute(rawInput, _ctx) {
         const input = rawInput;
         const provider = input.provider ?? "groq";
-        const { readFileSync, statSync } = await import("node:fs");
+        const { readFileSync: _readFileSync, statSync: _statSync } = await import("node:fs");
         try {
-            const stats = statSync(input.path);
+            const stats = _statSync(input.path);
             if (!stats.isFile())
                 return { isError: true, content: "File not found." };
             if (stats.size > 25_000_000)
@@ -219,7 +219,7 @@ Usage: speech_to_text path=/path/to/audio.mp3
         catch {
             return { isError: true, content: "File not found." };
         }
-        const fileBuf = readFileSync(input.path);
+        const fileBuf = _readFileSync(input.path);
         const fileName = input.path.split("/").pop() ?? "audio.mp3";
         const blob = new Blob([fileBuf], { type: "audio/mpeg" });
         const formData = new FormData();
@@ -290,7 +290,7 @@ Models:
         },
         required: ["prompt"],
     },
-    async execute(rawInput, _ctx) {
+    async execute(_rawInput, _ctx) {
         return { isError: false, content: "Video generation requires Fal.ai or Replicate API key. Install one and it will work." };
     },
 };
@@ -337,10 +337,10 @@ Also supports OpenAI TTS if OPENAI_API_KEY is set:
                     return { isError: true, content: `OpenAI TTS ${res.status}` };
                 const buf = new Uint8Array(await res.arrayBuffer());
                 const { writeFileSync } = await import("node:fs");
-                const { join } = await import("node:path");
+                const { join: _join } = await import("node:path");
                 const { tmpdir } = await import("node:os");
                 const { randomUUID } = await import("node:crypto");
-                const path = join(tmpdir(), `dirgha-tts-${randomUUID().slice(0, 8)}.mp3`);
+                const path = _join(tmpdir(), `dirgha-tts-${randomUUID().slice(0, 8)}.mp3`);
                 writeFileSync(path, Buffer.from(buf.buffer));
                 return { isError: false, content: `Speech saved to: ${path}` };
             }
@@ -351,7 +351,7 @@ Also supports OpenAI TTS if OPENAI_API_KEY is set:
         // kokoro-js: free, on-device TTS
         try {
             const { writeFileSync } = await import("node:fs");
-            const { join } = await import("node:path");
+            const { join: _join } = await import("node:path");
             const { tmpdir } = await import("node:os");
             const { randomUUID } = await import("node:crypto");
             // Dynamic import of kokoro-js
@@ -390,7 +390,7 @@ No API key, no internet needed after first download.`,
             for (let i = 0; i < numSamples; i++) {
                 buffer.writeInt16LE(Math.max(-32768, Math.min(32767, Math.round(audio[i] * 32768))), 44 + i * 2);
             }
-            const path = join(tmpdir(), `dirgha-tts-${randomUUID().slice(0, 8)}.wav`);
+            const path = _join(tmpdir(), `dirgha-tts-${randomUUID().slice(0, 8)}.wav`);
             writeFileSync(path, buffer);
             return { isError: false, content: `Speech saved to: ${path} (kokoro-js, ${(buffer.length / 1024).toFixed(0)}KB)` };
         }
