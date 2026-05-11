@@ -2,7 +2,7 @@ class Dirgha < Formula
   desc "CLI coding agent — 17 providers, BYOK, local models, voice, image gen"
   homepage "https://dirgha.ai"
   license "FSL-1.1-MIT"
-  version "1.25.9"
+  version "1.33.0"
 
   depends_on "node"
 
