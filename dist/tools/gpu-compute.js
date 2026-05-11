@@ -14,6 +14,7 @@ import { RunPodProvider } from "../gpu/runpod.js";
 import { SpheronProvider } from "../gpu/spheron.js";
 import { AkashProvider } from "../gpu/akash.js";
 import { checkBudget, registerGPUJob } from "../gpu/jobs.js";
+import { postGPUListing, listGPUListings } from "../gpu/market.js";
 let _providers = null;
 function getProviders() {
     if (!_providers) {
@@ -214,6 +215,73 @@ export const gpuStatusTool = {
   IP:        ${status.ipAddress ?? "N/A"}
   SSH:       ${status.sshCommand ?? "N/A"}`,
         };
+    },
+};
+export const gpuMarketListTool = {
+    name: "gpu_market_list",
+    description: `List GPU compute available on the Abundance marketplace.
+Shows GPUs listed by other users at prices they set — often cheaper than providers.
+
+Results update in real-time as new listings appear.
+
+Example: "gpu_market_list min_vram=24 max_price=0.50"`,
+    inputSchema: {
+        type: "object",
+        properties: {
+            minVramGb: { type: "integer", description: "Minimum VRAM in GB." },
+            maxPrice: { type: "number", description: "Maximum price per hour in USD." },
+        },
+    },
+    async execute(rawInput, _ctx) {
+        const input = rawInput;
+        try {
+            const listings = await listGPUListings(input.minVramGb, input.maxPrice);
+            if (listings.length === 0)
+                return { isError: false, content: "No GPU listings found on the marketplace." };
+            const lines = listings.map((l) => `  ${l.gpuType.padEnd(24)} ${String(l.vramGb).padStart(3)}GB  $${l.pricePerHr.toFixed(2)}/hr  ${l.provider.padEnd(8)} ${l.region ?? ""}`);
+            return { isError: false, content: `Marketplace GPU listings (${listings.length}):\n${lines.join("\n")}` };
+        }
+        catch (err) {
+            return { isError: true, content: `Marketplace unavailable: ${err.message}. Run dirgha login to authenticate.` };
+        }
+    },
+};
+export const gpuMarketPostTool = {
+    name: "gpu_market_post",
+    description: `List your GPU compute on the Abundance marketplace.
+Other users can find and rent your GPU at your price.
+
+Example: "gpu_market_post gpu_type='RTX 4090' vram=24 price=0.35"
+This posts: "RTX 4090 GPU compute — 24GB VRAM — $0.35/hr"
+
+Requires login (dirgha login) and enough ai_credits to cover escrow.`,
+    inputSchema: {
+        type: "object",
+        properties: {
+            gpuType: { type: "string", description: "GPU model name (required)." },
+            vramGb: { type: "integer", description: "VRAM in GB (required)." },
+            pricePerHr: { type: "number", description: "Price per hour in USD (required)." },
+            provider: { type: "string", description: "Provider name (runpod, spheron, akash, self). Default: self." },
+            region: { type: "string", description: "Optional region." },
+        },
+        required: ["gpuType", "vramGb", "pricePerHr"],
+    },
+    async execute(rawInput, _ctx) {
+        const input = rawInput;
+        try {
+            const listing = await postGPUListing({
+                gpuType: input.gpuType,
+                vramGb: input.vramGb,
+                pricePerHr: input.pricePerHr,
+                provider: input.provider ?? "self",
+                region: input.region,
+                available: true,
+            });
+            return { isError: false, content: `✅ GPU listed on marketplace: ${input.gpuType} at $${input.pricePerHr.toFixed(2)}/hr` };
+        }
+        catch (err) {
+            return { isError: true, content: `Failed to post listing: ${err.message}. Run dirgha login first.` };
+        }
     },
 };
 export const gpuDestroyTool = {

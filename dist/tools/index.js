@@ -77,6 +77,8 @@ export const builtInTools = [
     gpuComputeTool,
     gpuStatusTool,
     gpuDestroyTool,
+    gpuMarketListTool,
+    gpuMarketPostTool,
 ];
-export { fsReadTool, fsWriteTool, fsEditTool, fsLsTool, shellTool, searchGrepTool, searchGlobTool, gitTool, githubTool, browserTool, checkpointTool, cronTool, lspGoToDefinitionTool, lspFindReferencesTool, lspHoverTool, lspDocumentSymbolsTool, rtkTool, qmdTool, kbSearchTool, graphNeighborsTool, graphTraverseTool, transactionalWriteTool, dbWorkspaceInfoTool, agentServerTool, imageGenerateTool, videoGenerateTool, audioGenerateTool, speechToTextTool, gpuListTool, gpuComputeTool, gpuStatusTool, gpuDestroyTool, };
+export { fsReadTool, fsWriteTool, fsEditTool, fsLsTool, shellTool, searchGrepTool, searchGlobTool, gitTool, githubTool, browserTool, checkpointTool, cronTool, lspGoToDefinitionTool, lspFindReferencesTool, lspHoverTool, lspDocumentSymbolsTool, rtkTool, qmdTool, kbSearchTool, graphNeighborsTool, graphTraverseTool, transactionalWriteTool, dbWorkspaceInfoTool, agentServerTool, imageGenerateTool, videoGenerateTool, audioGenerateTool, speechToTextTool, gpuListTool, gpuComputeTool, gpuStatusTool, gpuDestroyTool, gpuMarketListTool, gpuMarketPostTool, };
 //# sourceMappingURL=index.js.map

@@ -14,4 +14,6 @@ import type { Tool } from "./registry.js";
 export declare const gpuListTool: Tool;
 export declare const gpuComputeTool: Tool;
 export declare const gpuStatusTool: Tool;
+export declare const gpuMarketListTool: Tool;
+export declare const gpuMarketPostTool: Tool;
 export declare const gpuDestroyTool: Tool;

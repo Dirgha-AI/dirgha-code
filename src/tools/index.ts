@@ -97,6 +97,8 @@ export const builtInTools: Tool[] = [
   gpuComputeTool,
   gpuStatusTool,
   gpuDestroyTool,
+  gpuMarketListTool,
+  gpuMarketPostTool,
 ];
 
 export {
@@ -132,4 +134,6 @@ export {
   gpuComputeTool,
   gpuStatusTool,
   gpuDestroyTool,
+  gpuMarketListTool,
+  gpuMarketPostTool,
 };
