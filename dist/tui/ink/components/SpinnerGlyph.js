@@ -2,10 +2,13 @@ import { jsx as _jsx } from "react/jsx-runtime";
 /**
  * Self-contained spinner glyph component.
  *
- * All instances share a single module-level 80ms interval (one per process)
+ * All instances share a single module-level interval (one per process)
  * so invisible or off-screen instances do not waste CPU on redundant timers.
  * A global frame counter increments each tick; each component subscribes
  * and gates rendering on its `isActive` prop.
+ *
+ * The interval is torn down and recreated on terminal resize so the tick
+ * rate adapts to the new terminal size (mobile rotation, window resize).
  *
  * Usage:
  *   <SpinnerGlyph isActive={busy} />
@@ -13,7 +16,7 @@ import { jsx as _jsx } from "react/jsx-runtime";
 import * as React from "react";
 import { Text } from "ink";
 import { SPINNER_FRAMES } from "../spinner-context.js";
-const SPINNER_INTERVAL_MS = 80;
+import { spinnerIntervalMs } from "../is-small-terminal.js";
 let _globalFrame = 0;
 let _globalInterval = null;
 const _subscribers = new Set();
@@ -24,13 +27,24 @@ function startGlobalInterval() {
         _globalFrame = (_globalFrame + 1) % SPINNER_FRAMES.length;
         for (const notify of _subscribers)
             notify();
-    }, SPINNER_INTERVAL_MS);
+    }, spinnerIntervalMs());
 }
 function stopGlobalInterval() {
     if (_globalInterval === null)
         return;
     clearInterval(_globalInterval);
     _globalInterval = null;
+}
+// Restart the interval at the new rate when terminal size changes.
+if (typeof process !== "undefined" && process.stdout) {
+    process.stdout.on("resize", () => {
+        if (_globalInterval !== null) {
+            clearInterval(_globalInterval);
+            _globalInterval = null;
+            if (_subscribers.size > 0)
+                startGlobalInterval();
+        }
+    });
 }
 export function SpinnerGlyph({ isActive, color, bold, }) {
     const [, setTick] = React.useState(0);

@@ -8,6 +8,7 @@
  * ThinkingSpan; each tool invocation produces a ToolRecord that
  * starts in 'running' and flips to 'done' or 'error' on exec_end.
  */
+import * as React from "react";
 import type { UsageTotal } from "../../kernel/types.js";
 import type { EventStream } from "../../kernel/event-stream.js";
 import type { ToolStatus } from "./components/ToolBox.js";
@@ -67,5 +68,12 @@ export interface EventProjectionOptions {
     /** Called once when the marker is detected. Caller updates the OSC
      *  terminal title + persists to the session JSONL. */
     onSessionTitle?: (title: string) => void;
+    /** Adaptive backpressure ref — when provided, flushDelay uses
+     *  `adaptiveFlushRef.current.floorMs` as the flush floor instead of
+     *  the static `minFlushMs()` value. App.tsx updates this based on
+     *  observed render frame times so slow frames automatically back off. */
+    adaptiveFlushRef?: React.RefObject<{
+        floorMs: number;
+    }>;
 }
 export declare function useEventProjection(events: EventStream, opts?: EventProjectionOptions): EventProjection;

@@ -7,7 +7,6 @@
  *   2. secondary    — same-family fallback (tier 2)
  *   3. tertiary     — family-alternatives registry (tier 3)
  *   4. freeFallback — always-available free-tier model (tier 4)
- *   5. lastResort   — tencent/hy3-preview:free (always present, tier 5)
  *
  * Health-aware: skips tiers whose provider health score is below
  * the minimum threshold.
@@ -15,8 +14,8 @@
  * Self-healing features:
  *   - Blacklists a model for the session after 5 consecutive failovers.
  *   - Logs every failover event via the injected session logger.
- *   - Guarantees tencent/hy3-preview:free is always in the chain as
- *     the absolute last resort when no other fallbacks are found.
+ *   - Falls through to the cheapest free model from the catalog when
+ *     no paid or family-alternative model is available.
  */
 export interface FailoverTier {
     model: string;

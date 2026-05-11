@@ -13,6 +13,7 @@ import { GeminiProvider } from "./gemini.js";
 import { OllamaProvider } from "./ollama.js";
 import { LlamaCppProvider } from "./llamacpp.js";
 import { Machine1Provider } from "./machine1.js";
+import { DirghaProvider } from "./dirgha.js";
 import { FireworksProvider } from "./fireworks.js";
 import { DeepSeekProvider } from "./deepseek.js";
 import { MistralProvider, CohereProvider, CerebrasProvider, TogetherProvider, PerplexityProvider, XaiProvider, GroqProvider, ZaiProvider, } from "./extra-providers.js";
@@ -31,6 +32,7 @@ export { LlamaCppProvider } from "./llamacpp.js";
 export { Machine1Provider } from "./machine1.js";
 export { FireworksProvider } from "./fireworks.js";
 export { DeepSeekProvider } from "./deepseek.js";
+export { DirghaProvider } from "./dirgha.js";
 export class ProviderRegistry {
     config;
     cache = new Map();
@@ -124,6 +126,8 @@ export class ProviderRegistry {
                 return new ZaiProvider(this.config.zai ?? {});
             case "machine1":
                 return new Machine1Provider(this.config.machine1 ?? {});
+            case "dirgha":
+                return new DirghaProvider(this.config.dirgha ?? {});
         }
     }
 }

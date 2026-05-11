@@ -41,9 +41,7 @@ export const PROVIDERS: ProviderEntry[] = [
     env: "OPENROUTER_API_KEY",
     helpUrl: "https://openrouter.ai/keys",
     suggested: [
-      "tencent/hy3-preview:free",
       "inclusionai/ring-2.6-1t:free",
-      "inclusionai/ling-2.6-1t:free",
       "qwen/qwen3-coder:free",
       "moonshotai/kimi-k2.6",
       "deepseek/deepseek-v3.2-exp",

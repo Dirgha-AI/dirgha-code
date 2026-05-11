@@ -2,6 +2,23 @@
 
 All notable changes are tracked here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); we use [Semantic Versioning](https://semver.org/).
 
+## [1.25.0] — 2026-05-11
+
+### Features
+
+* **providers:** DirghaProvider — sign in once with `dirgha login`, get access to 300+ OpenRouter models without managing an API key ([`~/.dirgha/credentials.json`](src/providers/dirgha.ts))
+* **cli:** cold-start wizard blocks on unconfigured installs and guides user through login or BYOK setup (`first-run.ts`, `wizard.ts`, `setup.ts`)
+
+### Bug Fixes
+
+* **tui:** mobile jitter — `isSmallTerminal()` now re-evaluates on SIGWINCH instead of caching at startup; flush floor auto-adapts to 200ms, spinner to 200ms, statusbar tick to 3s on terminals <80 cols or <30 rows
+* **tui:** SIGWINCH debounced in `index.ts` — phone rotation no longer triggers immediate full Ink repaint, debounced by `minFlushMs()`
+* **tui:** `use-elapsed` interval now uses `statusbarTickMs()` instead of hardcoded 1000ms; restarts on resize
+* **tui:** tool lifecycle events (`toolcall_start/end`, `tool_exec_start/end`) batched through microtask queue — 4 repaints per tool call reduced to 1
+* **tui:** adaptive backpressure — `flushDelay()` raises floor automatically when actual frame render time exceeds `minFlushMs() × 1.5` (EMA smoothed, 500ms cap)
+* **providers:** `deepseek/` prefix routes to native DeepSeek direct API (not NVIDIA NIM) — flash model no longer hangs
+* **providers:** `ring-2.6-1t:free` replaces retired `ling-2.6-1t:free` across fallback chain, E2E tests, and CI judge fleet
+
 ## [1.23.0](https://github.com/Dirgha-AI/dirgha-code/compare/v1.22.0...v1.23.0) (2026-05-08)
 
 

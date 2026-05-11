@@ -1,6 +1,6 @@
 /**
  * Shared elapsed-time hook — replaces in-render Date.now() calls with a
- * single module-level 1s interval so that all live elapsed displays tick
+ * single module-level interval so that all live elapsed displays tick
  * together instead of each running their own timer.
  *
  * `isLive` gates the tick subscription. When false (tool finished, value
@@ -9,8 +9,12 @@
  * once per second for a value that is no longer changing. Mounted-but-
  * idle tool boxes were the source of the 1 Hz body flicker users saw
  * after a few tool calls.
+ *
+ * The interval is restarted on terminal resize so the tick rate adapts
+ * to the new terminal size (mobile rotation, window resize).
  */
 import * as React from "react";
+import { statusbarTickMs } from "./is-small-terminal.js";
 let _tick = 0;
 let _interval = null;
 const _listeners = new Set();
@@ -21,7 +25,18 @@ function ensureTick() {
         _tick++;
         for (const fn of _listeners)
             fn();
-    }, 1000);
+    }, statusbarTickMs());
+}
+// Restart the interval at the new rate when terminal size changes.
+if (typeof process !== "undefined" && process.stdout) {
+    process.stdout.on("resize", () => {
+        if (_interval !== null) {
+            clearInterval(_interval);
+            _interval = null;
+            if (_listeners.size > 0)
+                ensureTick();
+        }
+    });
 }
 function formatElapsed(ms) {
     if (ms < 1000)

@@ -22,6 +22,7 @@ export { LlamaCppProvider } from "./llamacpp.js";
 export { Machine1Provider } from "./machine1.js";
 export { FireworksProvider } from "./fireworks.js";
 export { DeepSeekProvider } from "./deepseek.js";
+export { DirghaProvider } from "./dirgha.js";
 export interface ProviderRegistryConfig {
     nvidia?: ProviderConfig;
     openrouter?: ProviderConfig & {
@@ -48,6 +49,7 @@ export interface ProviderRegistryConfig {
     groq?: ProviderConfig;
     zai?: ProviderConfig;
     machine1?: ProviderConfig;
+    dirgha?: ProviderConfig;
     rateLimit?: RateLimitOptions;
 }
 export declare class ProviderRegistry {

@@ -7,7 +7,7 @@ describe('aggregateCost', () => {
       { ts: '2026-04-26T10:00:00Z', kind: 'turn-end', model: 'claude-opus-4-7', usage: { inputTokens: 1000, outputTokens: 500 } },
       { ts: '2026-04-26T11:00:00Z', kind: 'turn-end', model: 'claude-opus-4-7', usage: { inputTokens: 2000, outputTokens: 800 } },
       { ts: '2026-04-26T12:00:00Z', kind: 'tool',     model: 'claude-opus-4-7', usage: { inputTokens: 99999, outputTokens: 99999 } },
-      { ts: '2026-04-26T13:00:00Z', kind: 'turn-end', model: 'tencent/hy3-preview:free', usage: { inputTokens: 5000, outputTokens: 1000 } },
+      { ts: '2026-04-26T13:00:00Z', kind: 'turn-end', model: 'inclusionai/ling-2.6-1t:free', usage: { inputTokens: 5000, outputTokens: 1000 } },
     ];
     const s = aggregateCost(entries);
     expect(s.totalTurns).toBe(3);
@@ -21,7 +21,7 @@ describe('aggregateCost', () => {
 
   it('zero cost for free models (no price entry)', () => {
     const s = aggregateCost([
-      { ts: '2026-04-26T10:00:00Z', kind: 'turn-end', model: 'tencent/hy3-preview:free', usage: { inputTokens: 1_000_000, outputTokens: 1_000_000 } },
+      { ts: '2026-04-26T10:00:00Z', kind: 'turn-end', model: 'inclusionai/ling-2.6-1t:free', usage: { inputTokens: 1_000_000, outputTokens: 1_000_000 } },
     ]);
     expect(s.totalCostUsd).toBe(0);
     expect(s.totals[0]?.costUsd).toBe(0);
@@ -47,11 +47,11 @@ describe('aggregateCost', () => {
 
   it('totals sorted descending by cost', () => {
     const s = aggregateCost([
-      { ts: '2026-04-26T10:00:00Z', kind: 'turn-end', model: 'tencent/hy3-preview:free', usage: { inputTokens: 1_000_000, outputTokens: 1_000_000 } },
+      { ts: '2026-04-26T10:00:00Z', kind: 'turn-end', model: 'inclusionai/ling-2.6-1t:free', usage: { inputTokens: 1_000_000, outputTokens: 1_000_000 } },
       { ts: '2026-04-26T11:00:00Z', kind: 'turn-end', model: 'claude-opus-4-7',          usage: { inputTokens: 1_000_000, outputTokens: 1_000_000 } },
     ]);
     expect(s.totals[0]?.model).toBe('claude-opus-4-7');
-    expect(s.totals[1]?.model).toBe('tencent/hy3-preview:free');
+    expect(s.totals[1]?.model).toBe('inclusionai/ling-2.6-1t:free');
   });
 
   it('survives unknown bare model id (routeModel throws → cost = 0)', () => {

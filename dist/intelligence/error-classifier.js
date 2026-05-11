@@ -38,7 +38,7 @@ function composeUserMessage(reason, err, provider, model) {
                 return `No API key configured for ${provider}.
   Get one at: https://dirgha.ai/models (or bring your own key)
   Add it:  /keys set ${label} <your-key>
-  Free model:  /model tencent/hy3-preview:free`;
+  Free model:  /model inclusionai/ling-2.6-1t:free`;
             }
             if (label) {
                 return `Your ${label} was rejected by ${provider} (401/403).
@@ -58,7 +58,7 @@ function composeUserMessage(reason, err, provider, model) {
   Try an alternative: /model deepseek-ai/deepseek-v4-pro`;
         case "billing":
             return `Billing issue with ${provider}.
-  Check your account balance or switch to a free model: /model tencent/hy3-preview:free`;
+  Check your account balance or switch to a free model: /model inclusionai/ling-2.6-1t:free`;
         case "context_overflow":
             return `Message too long for ${model}. Try /compact or switch to a long-context model.`;
         case "content_filter":

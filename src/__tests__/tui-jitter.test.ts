@@ -22,6 +22,8 @@ import { createEventStream } from "../kernel/event-stream.js";
 import { ProviderRegistry } from "../providers/index.js";
 import { createToolRegistry, builtInTools } from "../tools/index.js";
 import { createSessionStore } from "../context/session.js";
+import { SlashRegistry } from "../cli/slash.js";
+import { minFlushMs } from "../tui/ink/is-small-terminal.js";
 
 const ANSI = /\x1b\[[0-9;?]*[A-Za-z]|\x1b\][^\x07]*\x07|\x1b[=>]/g;
 const strip = (s: string): string => s.replace(ANSI, "").replace(/\r/g, "");
@@ -56,8 +58,8 @@ class FakeStdin extends EventEmitter {
   }
   ref() {}
   unref() {}
-  on(ev: string, ...args: any[]): this {
-    return super.on(ev, ...args);
+  on(ev: string, listener: (...args: any[]) => void): this {
+    return super.on(ev, listener);
   }
   pushChunk(chunk: string): void {
     const buf = Buffer.from(chunk, "utf8");
@@ -73,6 +75,7 @@ function mount(): {
   ink: ReturnType<typeof render>;
   lastFrame: () => string;
   everSeen: () => string;
+  cleanup: () => Promise<void>;
 } {
   const stdout = new CaptureStream();
   const stderr = new CaptureStream();
@@ -84,10 +87,16 @@ function mount(): {
 
   const config = {
     model: "inclusionai/ling-2.6-1t:free",
+    cheapModel: "deepseek-ai/deepseek-v4-flash",
+    summaryModel: "moonshotai/kimi-k2.5",
     maxTurns: 8,
     showThinking: false,
     vimMode: false,
     autoApproveTools: <string[]>["shell"],
+    skills: { enabled: true },
+    smartRoute: { enabled: false },
+    compaction: { triggerTokens: 120_000, preserveLastTurns: 6 },
+    telemetry: { enabled: false },
   };
 
   const element = React.createElement(App, {
@@ -98,12 +107,13 @@ function mount(): {
     config,
     cwd: "/tmp",
     slashCommands: [],
+    slashRegistry: new SlashRegistry(),
   });
 
   const ink = render(element, {
-    stdout,
-    stderr,
-    stdin,
+    stdout: stdout as unknown as NodeJS.WriteStream,
+    stderr: stderr as unknown as NodeJS.WriteStream,
+    stdin: stdin as unknown as NodeJS.ReadStream,
     exitOnCtrlC: false,
     patchConsole: false,
     debug: true,
@@ -127,7 +137,9 @@ function mount(): {
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 const flush = async () => {
-  await sleep(80);
+  // Use minFlushMs() + a small buffer so flush always covers the debounce
+  // window regardless of terminal size (small-terminal mode raises it to 200ms).
+  await sleep(minFlushMs() + 50);
 };
 
 // ──────────────────────────────────────────────────────────

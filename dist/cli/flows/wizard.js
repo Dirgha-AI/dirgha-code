@@ -161,7 +161,7 @@ export const DEFAULT_MODEL_PER_PROVIDER = {
     openai: "gpt-5",
     gemini: "gemini-2.5-pro",
     nvidia: "moonshotai/kimi-k2.6",
-    openrouter: "tencent/hy3-preview:free",
+    openrouter: "inclusionai/ring-2.6-1t:free",
     fireworks: "accounts/fireworks/models/deepseek-v3",
     dirgha: "deepseek",
     deepseek: "deepseek-chat",

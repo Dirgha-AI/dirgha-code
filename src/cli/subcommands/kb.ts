@@ -50,7 +50,7 @@ async function ensureKbRoot(): Promise<void> {
   // for free-tier coding sprints. Users can swap by editing the file.
   const yaml = [
     'language: en',
-    'model: openrouter/tencent/hy3-preview:free',
+    'model: openrouter/inclusionai/ling-2.6-1t:free',
     'pageindex_threshold: 20',
     '',
   ].join('\n');

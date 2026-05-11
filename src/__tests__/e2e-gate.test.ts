@@ -29,7 +29,8 @@ describe("e2e: login flow (Dirgha API)", () => {
     expect(body).toBeTruthy();
     expect(body).toHaveProperty("device_code");
     expect(body).toHaveProperty("user_code");
-    expect(body).toHaveProperty("verification_uri");
+    // API returns verification_url (not verification_uri per RFC 8628)
+    expect(body).toHaveProperty("verification_url");
     expect(body).toHaveProperty("expires_in");
     expect(typeof body.expires_in).toBe("number");
   });
@@ -64,11 +65,10 @@ describe("e2e: login flow (Dirgha API)", () => {
 describe("e2e: OpenRouter free model chat", () => {
   const apiKey = process.env.OPENROUTER_API_KEY;
   const itOrSkip = apiKey ? it : it.skip;
-  const skipReason = apiKey ? "" : "OPENROUTER_API_KEY not set";
 
   itOrSkip(
-    "tencent/hy3-preview:free responds with text",
-    { skipReason, timeout: 60_000 },
+    "inclusionai/ring-2.6-1t:free responds with text",
+    { timeout: 60_000 },
     async () => {
       const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
@@ -79,7 +79,7 @@ describe("e2e: OpenRouter free model chat", () => {
           "X-Title": "dirgha-e2e-test",
         },
         body: JSON.stringify({
-          model: "tencent/hy3-preview:free",
+          model: "inclusionai/ring-2.6-1t:free",
           messages: [{ role: "user", content: "Say exactly: HELLO DIRGHA" }],
           max_tokens: 50,
         }),
@@ -122,6 +122,8 @@ describe("e2e: shell tool round-trip", () => {
         sessionId: randomUUID(),
         env: process.env as Record<string, string>,
         signal: new AbortController().signal,
+        sandbox: null,
+        sandboxMode: "off",
         onProgress: undefined,
       },
     );
@@ -224,7 +226,7 @@ describe("e2e: provider catalogue integrity", () => {
           ).toHaveProperty(key);
         }
         expect(typeof model.id).toBe("string");
-        expect(model.id.length).toBeGreaterThan(0);
+        expect((model.id as string).length).toBeGreaterThan(0);
         expect(typeof model.label).toBe("string");
         expect(typeof model.contextWindow).toBe("number");
         expect(model.contextWindow).toBeGreaterThan(0);
@@ -267,6 +269,8 @@ describe("e2e: dispatch routing integrity", () => {
     "xai",
     "groq",
     "zai",
+    "machine1",
+    "dirgha",
   ]);
 
   const catalogueModules = [

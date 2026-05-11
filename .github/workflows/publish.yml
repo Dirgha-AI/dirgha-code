@@ -157,7 +157,7 @@ jobs:
         # binary, records 5 scripted journeys via tmux, asks each judge
         # to score against the rubric (tools/ux-scorer/rubric.md). Median
         # across journeys × judges must be ≥ 7.0. Default fleet is the
-        # `ling-2.6-1t:free` judge — free, reliable JSON output.
+        # `ring-2.6-1t:free` judge — free, reliable JSON output.
         # NVIDIA_API_KEY and GROQ_API_KEY auto-add deepseek-v4 / kimi-k2
         # judges to the fleet. Missing all keys → run records but skips
         # scoring (gate auto-passes for forks without secrets).

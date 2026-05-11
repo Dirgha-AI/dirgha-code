@@ -548,19 +548,7 @@ export const PRICES: PricePoint[] = [
   },
   {
     provider: "openrouter",
-    model: "inclusionai/ling-2.6-1t:free",
-    inputPerM: 0,
-    outputPerM: 0,
-  },
-  {
-    provider: "openrouter",
     model: "inclusionai/ring-2.6-1t:free",
-    inputPerM: 0,
-    outputPerM: 0,
-  },
-  {
-    provider: "openrouter",
-    model: "tencent/hy3-preview:free",
     inputPerM: 0,
     outputPerM: 0,
   },
@@ -1045,9 +1033,7 @@ const CONTEXT_WINDOWS: Record<string, number> = {
   "z-ai/glm-4.7": 128_000,
   "z-ai/glm-4.7-flash": 32_000,
   // OpenRouter — free
-  "inclusionai/ling-2.6-1t:free": 32_000,
   "inclusionai/ring-2.6-1t:free": 1_000_000,
-  "tencent/hy3-preview:free": 32_000,
   "minimax/minimax-m2.5:free": 200_000,
   "qwen/qwen3-coder:free": 32_000,
   "z-ai/glm-4.5-air:free": 128_000,
@@ -1160,9 +1146,9 @@ const MODEL_ALIASES: Record<string, string> = {
   "deepseek-pro": "deepseek-ai/deepseek-v4-pro",
   "deepseek-flash": "deepseek-ai/deepseek-v4-flash",
   // OpenRouter free tier
-  ling: "inclusionai/ling-2.6-1t:free",
+  ling: "inclusionai/ring-2.6-1t:free",
   ring: "inclusionai/ring-2.6-1t:free",
-  hy3: "tencent/hy3-preview:free",
+  hy3: "inclusionai/ring-2.6-1t:free",
 };
 
 export function resolveModelAlias(input: string): string {

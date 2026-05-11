@@ -10,6 +10,7 @@ import { render } from "ink";
 import { createEventStream } from "../../kernel/event-stream.js";
 import { App, VERSION } from "./App.js";
 import { renderLogoString } from "./components/Logo.js";
+import { minFlushMs } from "./is-small-terminal.js";
 import { createDefaultSlashRegistry, registerBuiltinSlashCommands, } from "../../cli/slash.js";
 export { App } from "./App.js";
 export { Logo } from "./components/Logo.js";
@@ -76,6 +77,23 @@ export async function runInkTUI(opts) {
         }
     };
     process.on("exit", onProcessExit);
+    // Debounce resize events so phone rotation doesn't trigger immediate full
+    // repaints. The shim is installed just before render() and restored in the
+    // finally block below.
+    const _origEmit = process.stdout.emit.bind(process.stdout);
+    let _resizeDebounce = null;
+    process.stdout.emit = (event, ...args) => {
+        if (event === "resize") {
+            if (_resizeDebounce)
+                clearTimeout(_resizeDebounce);
+            _resizeDebounce = setTimeout(() => {
+                _resizeDebounce = null;
+                _origEmit("resize", ...args);
+            }, minFlushMs());
+            return true;
+        }
+        return _origEmit(event, ...args);
+    };
     const element = React.createElement(App, {
         events,
         registry: opts.registry,
@@ -107,6 +125,10 @@ export async function runInkTUI(opts) {
         // Remove the exit listener — normal teardown through waitUntilExit
         // handles cleanup here; we don't need the safety-net to fire too.
         process.removeListener("exit", onProcessExit);
+        // Restore the original stdout.emit (undo resize debounce shim).
+        if (_resizeDebounce)
+            clearTimeout(_resizeDebounce);
+        process.stdout.emit = _origEmit;
         restore();
     }
 }

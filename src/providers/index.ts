@@ -15,6 +15,7 @@ import { GeminiProvider } from "./gemini.js";
 import { OllamaProvider } from "./ollama.js";
 import { LlamaCppProvider } from "./llamacpp.js";
 import { Machine1Provider } from "./machine1.js";
+import { DirghaProvider } from "./dirgha.js";
 import { FireworksProvider } from "./fireworks.js";
 import { DeepSeekProvider } from "./deepseek.js";
 import {
@@ -44,6 +45,7 @@ export { LlamaCppProvider } from "./llamacpp.js";
 export { Machine1Provider } from "./machine1.js";
 export { FireworksProvider } from "./fireworks.js";
 export { DeepSeekProvider } from "./deepseek.js";
+export { DirghaProvider } from "./dirgha.js";
 
 export interface ProviderRegistryConfig {
   nvidia?: ProviderConfig;
@@ -64,6 +66,7 @@ export interface ProviderRegistryConfig {
   groq?: ProviderConfig;
   zai?: ProviderConfig;
   machine1?: ProviderConfig;
+  dirgha?: ProviderConfig;
   rateLimit?: RateLimitOptions;
 }
 
@@ -160,6 +163,8 @@ export class ProviderRegistry {
         return new ZaiProvider(this.config.zai ?? {});
       case "machine1":
         return new Machine1Provider(this.config.machine1 ?? {});
+      case "dirgha":
+        return new DirghaProvider(this.config.dirgha ?? {});
     }
   }
 }

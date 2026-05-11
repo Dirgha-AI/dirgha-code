@@ -7,7 +7,6 @@
  *   2. secondary    — same-family fallback (tier 2)
  *   3. tertiary     — family-alternatives registry (tier 3)
  *   4. freeFallback — always-available free-tier model (tier 4)
- *   5. lastResort   — tencent/hy3-preview:free (always present, tier 5)
  *
  * Health-aware: skips tiers whose provider health score is below
  * the minimum threshold.
@@ -15,12 +14,11 @@
  * Self-healing features:
  *   - Blacklists a model for the session after 5 consecutive failovers.
  *   - Logs every failover event via the injected session logger.
- *   - Guarantees tencent/hy3-preview:free is always in the chain as
- *     the absolute last resort when no other fallbacks are found.
+ *   - Falls through to the cheapest free model from the catalog when
+ *     no paid or family-alternative model is available.
  */
 import { lookupModel, PRICES } from "../intelligence/prices.js";
 import { familyAlternatives } from "../providers/family-fallback.js";
-const LAST_RESORT_MODEL = "tencent/hy3-preview:free";
 // Demoted 2026-05-08 — both models hang on NIM (verified live). Still
 // in the catalogue for manual `--model` selection; just not auto-picked.
 const AUTO_FAILOVER_BLACKLIST = new Set([
@@ -129,14 +127,6 @@ export function buildFailoverChain(modelId, opts = {}) {
         seen.add(free.model);
         if (tiers.length >= maxTiers)
             return finalize(tiers, seen);
-    }
-    // Tier 5 — guaranteed last-resort: tencent/hy3-preview:free
-    // Always available via OpenRouter when OPENROUTER_API_KEY is set.
-    // Always added as the absolute last stop so no session is left without
-    // any fallback, even if the catalogue has no free models.
-    if (!isBlacklisted(LAST_RESORT_MODEL) && !seen.has(LAST_RESORT_MODEL)) {
-        tiers.push({ model: LAST_RESORT_MODEL, reason: "last-resort" });
-        seen.add(LAST_RESORT_MODEL);
     }
     return finalize(tiers, seen);
 }

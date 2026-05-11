@@ -3,13 +3,13 @@
  *
  * If no API key is found, shows an interactive wizard that lets the user
  * paste a key immediately (no restart needed). After saving, launches the
- * TUI with a recommended free model so the first chat works in < 30 seconds.
+ * TUI with a reliable default model for the detected provider.
  *
- * Also detects: OpenRouter free tokens, NVIDIA free tier, environment vars.
+ * Also detects: OpenRouter, NVIDIA, DeepSeek, and other provider env vars.
  */
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { stdout, stdin } from "node:process";
 import { createInterface } from "node:readline";
 import { saveKey } from "../auth/keystore.js";
@@ -32,6 +32,33 @@ const ENV_KEYS = [
     "ZAI_API_KEY",
 ];
 const KEYSTORE_PATH = join(homedir(), ".dirgha", "keys.json");
+const CONFIG_PATH = join(homedir(), ".dirgha", "config.json");
+// Provider-specific reliable default models (no free-tier fallbacks)
+const PROVIDER_DEFAULTS = {
+    NVIDIA_API_KEY: "deepseek-ai/deepseek-v4-pro",
+    OPENROUTER_API_KEY: "openai/gpt-5-mini",
+    DEEPSEEK_API_KEY: "deepseek-v4-flash",
+    ANTHROPIC_API_KEY: "claude-sonnet-4-6",
+    OPENAI_API_KEY: "gpt-5-mini",
+    GEMINI_API_KEY: "gemini-2.5-flash",
+    FIREWORKS_API_KEY: "accounts/fireworks/models/kimi-k2p5",
+    GROQ_API_KEY: "llama-3.3-70b-versatile",
+    MISTRAL_API_KEY: "mistral-large-2411",
+};
+function setDefaultModel(envVar) {
+    const model = PROVIDER_DEFAULTS[envVar];
+    if (!model)
+        return;
+    try {
+        let config = {};
+        if (existsSync(CONFIG_PATH)) {
+            config = JSON.parse(readFileSync(CONFIG_PATH, "utf8"));
+        }
+        config.model = model;
+        writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+    }
+    catch { }
+}
 export function checkFirstRun() {
     if (existsSync(KEYSTORE_PATH)) {
         try {
@@ -64,7 +91,7 @@ const KEY_PREFIXES = {
         url: "https://platform.openai.com/api-keys",
     },
     "nvapi-": {
-        name: "NVIDIA NIM (free)",
+        name: "NVIDIA",
         url: "https://build.nvidia.com/settings/api-keys",
     },
     gsk_: { name: "Gemini", url: "https://aistudio.google.com/apikey" },
@@ -92,9 +119,9 @@ export async function showWelcomeWizard() {
     stdout.write(`\n`);
     stdout.write(`  ${bold("Welcome!")} Paste an API key to get started.\n`);
     stdout.write(`\n`);
-    stdout.write(`  ${accent("Quick start options:")}\n`);
+    stdout.write(`  ${accent("Get a key from any provider:")}\n`);
     stdout.write(`  ${success("OpenRouter")} (200+ models): ${accent("https://openrouter.ai/keys")}\n`);
-    stdout.write(`  ${success("NVIDIA NIM")} (free tier):    ${accent("https://build.nvidia.com")}\n`);
+    stdout.write(`  ${success("NVIDIA")} (free tier):       ${accent("https://build.nvidia.com")}\n`);
     stdout.write(`  ${success("DeepSeek")} (cheap + fast):    ${accent("https://platform.deepseek.com")}\n`);
     stdout.write(`\n`);
     stdout.write(`  Paste your key below (or press Enter to skip):\n`);
@@ -108,14 +135,17 @@ export async function showWelcomeWizard() {
     });
     if (key.length === 0) {
         stdout.write(`\n  ${warning("Skipped.")} Run ${accent("dirgha")} and use ${success("/keys set")} to add a key later.\n`);
-        stdout.write(`  Free models available: ${accent("/model tencent/hy3-preview:free")}\n\n`);
+        stdout.write(`\n`);
         return;
     }
     // Auto-detect provider from key prefix.
     const envVar = detectProviderFromKey(key);
     await saveKey(envVar, key);
+    setDefaultModel(envVar);
+    const modelName = PROVIDER_DEFAULTS[envVar] || "configured";
     stdout.write(`\n  ${success("Key saved")} as ${bold(envVar)}.\n`);
-    stdout.write(`  Starting Dirgha with a free model...\n\n`);
+    stdout.write(`  Default model set to ${accent(modelName)}.\n`);
+    stdout.write(`  Type ${success("/model <name>")} to change it anytime.\n\n`);
 }
 function detectProviderFromKey(key) {
     for (const [prefix, info] of Object.entries(KEY_PREFIXES)) {
@@ -126,7 +156,7 @@ function detectProviderFromKey(key) {
                 return "ANTHROPIC_API_KEY";
             if (info.name === "OpenAI")
                 return "OPENAI_API_KEY";
-            if (info.name.includes("NVIDIA"))
+            if (info.name === "NVIDIA")
                 return "NVIDIA_API_KEY";
             if (info.name === "Gemini")
                 return "GEMINI_API_KEY";

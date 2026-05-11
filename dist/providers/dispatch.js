@@ -91,6 +91,8 @@ const RULES = [
     },
     // deepseek/ prefix → native DeepSeek API (not OpenRouter)
     { match: (id) => id.startsWith("deepseek/"), provider: "deepseek" },
+    // dirgha/ prefix → Dirgha gateway (proxies to OpenRouter with auth token)
+    { match: (id) => id.startsWith("dirgha/"), provider: "dirgha" },
     // openrouter/ prefix → explicit OpenRouter routing
     { match: (id) => id.startsWith("openrouter/"), provider: "openrouter" },
     // Catch-all: any vendor-prefixed slug or `:free` variant goes via
@@ -130,6 +132,7 @@ export function isKnownProvider(id) {
         id === "xai" ||
         id === "groq" ||
         id === "zai" ||
-        id === "machine1");
+        id === "machine1" ||
+        id === "dirgha");
 }
 //# sourceMappingURL=dispatch.js.map

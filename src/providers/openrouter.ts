@@ -30,7 +30,7 @@ const TOOL_SUPPORT = [
   /^tencent\//,
 ];
 
-// tencent/hy3-preview:free emits chain-of-thought as plain delta.content
+// free-tier models emit chain-of-thought as plain delta.content
 // prose with no XML tags — it must be handled as a thinking model so the
 // content is routed to thinking_delta rather than surfacing as visible text.
 const THINKING_PATTERNS = [

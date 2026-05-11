@@ -18,6 +18,7 @@ import {
   findLastSafeSplitPoint,
   MAX_LIVE_CHUNK_CHARS,
 } from "./markdown/split-point.js";
+import { minFlushMs } from "./is-small-terminal.js";
 
 export type TranscriptItem =
   | { kind: "user"; id: string; text: string }
@@ -67,6 +68,11 @@ export interface EventProjectionOptions {
   /** Called once when the marker is detected. Caller updates the OSC
    *  terminal title + persists to the session JSONL. */
   onSessionTitle?: (title: string) => void;
+  /** Adaptive backpressure ref — when provided, flushDelay uses
+   *  `adaptiveFlushRef.current.floorMs` as the flush floor instead of
+   *  the static `minFlushMs()` value. App.tsx updates this based on
+   *  observed render frame times so slow frames automatically back off. */
+  adaptiveFlushRef?: React.RefObject<{ floorMs: number }>;
 }
 
 /**
@@ -129,11 +135,14 @@ export function useEventProjection(
 
   // Adaptive flush: longer text → slower flush to keep rendering smooth.
   // Short responses stay snappy; long responses avoid terminal flicker.
-  // Minimum 80ms (12.5 FPS) — 30ms caused screen tearing on most terminals.
+  // The floor is either the static minFlushMs() or the adaptive backpressure
+  // floor from opts.adaptiveFlushRef (updated by App.tsx based on render
+  // frame timing). Minimum 80ms (12.5 FPS) on desktop, 200ms on mobile.
   function flushDelay(totalChars: number): number {
-    if (totalChars < 500) return 80;
-    if (totalChars < 2000) return 120;
-    return 200;
+    const floor = opts.adaptiveFlushRef?.current.floorMs ?? minFlushMs();
+    if (totalChars < 500) return floor;
+    if (totalChars < 2000) return Math.max(120, floor);
+    return Math.max(200, floor);
   }
 
   const setLive = React.useCallback(
@@ -150,6 +159,27 @@ export function useEventProjection(
     },
     [],
   );
+
+  // Tool lifecycle microtask queue — batches toolcall_start/end and
+  // tool_exec_start/end updaters so clustered tool events produce one
+  // Ink repaint instead of 3-4 separate ones. Text/thinking deltas are
+  // NOT batched here (they have their own setTimeout debounce). Approval
+  // state is also NOT batched (must appear immediately).
+  const pendingToolUpdatesRef = React.useRef<
+    Array<(prev: TranscriptItem[]) => TranscriptItem[]>
+  >([]);
+  const toolFlushScheduledRef = React.useRef(false);
+
+  const scheduleToolFlush = React.useCallback(() => {
+    if (toolFlushScheduledRef.current) return;
+    toolFlushScheduledRef.current = true;
+    queueMicrotask(() => {
+      toolFlushScheduledRef.current = false;
+      const updates = pendingToolUpdatesRef.current.splice(0);
+      if (updates.length === 0) return;
+      setLive((prev) => updates.reduce((acc, fn) => fn(acc), prev));
+    });
+  }, [setLive]);
 
   React.useEffect(() => {
     // Local ids used to attribute in-flight deltas to the right span.
@@ -401,7 +431,8 @@ export function useEventProjection(
             outputPreview: "",
             startedAt: Date.now(),
           };
-          setLive((prev) => [...prev, item]);
+          pendingToolUpdatesRef.current.push((prev) => [...prev, item]);
+          scheduleToolFlush();
           return;
         }
         case "toolcall_delta": {
@@ -419,22 +450,25 @@ export function useEventProjection(
           );
           return;
         }
-        case "toolcall_end":
+        case "toolcall_end": {
           // Remove the pending "generating..." placeholder when the
           // tool call JSON is fully received. tool_exec_start follows
           // with the real item.
-          toolcallArgBuffers.delete(event.id);
-          setLive((prev) =>
+          const endId = event.id;
+          toolcallArgBuffers.delete(endId);
+          pendingToolUpdatesRef.current.push((prev) =>
             prev.filter(
               (it) =>
                 !(
                   it.kind === "tool" &&
-                  it.id === event.id &&
+                  it.id === endId &&
                   it.status === "pending"
                 ),
             ),
           );
+          scheduleToolFlush();
           return;
+        }
         case "tool_exec_start": {
           const item: TranscriptItem = {
             kind: "tool",
@@ -445,7 +479,8 @@ export function useEventProjection(
             outputPreview: "",
             startedAt: Date.now(),
           };
-          setLive((prev) => [...prev, item]);
+          pendingToolUpdatesRef.current.push((prev) => [...prev, item]);
+          scheduleToolFlush();
           return;
         }
         case "tool_exec_progress": {
@@ -517,19 +552,25 @@ export function useEventProjection(
                 : "text";
           const outputText =
             outputKind === "diff" && diff !== undefined ? diff : rawOutput;
-          setLive((prev) =>
+          const execEndId = event.id;
+          const execEndStatus = status;
+          const execEndOutput = outputText.slice(0, 2000);
+          const execEndKind = outputKind;
+          const execEndDuration = event.durationMs;
+          pendingToolUpdatesRef.current.push((prev) =>
             prev.map((it) =>
-              it.kind === "tool" && it.id === event.id
+              it.kind === "tool" && it.id === execEndId
                 ? {
                     ...it,
-                    status,
-                    outputPreview: outputText.slice(0, 2000),
-                    outputKind,
-                    durationMs: event.durationMs,
+                    status: execEndStatus,
+                    outputPreview: execEndOutput,
+                    outputKind: execEndKind,
+                    durationMs: execEndDuration,
                   }
                 : it,
             ),
           );
+          scheduleToolFlush();
           return;
         }
         case "usage":

@@ -87,6 +87,7 @@ import { SandboxPicker } from "./components/SandboxPicker.js";
 import { ThemeProvider, useTheme } from "./theme-context.js";
 import { SpinnerContext } from "./spinner-context.js";
 import { SpinnerGlyph } from "./components/SpinnerGlyph.js";
+import { statusbarTickMs, minFlushMs } from "./is-small-terminal.js";
 import type { ThemeName } from "../theme.js";
 import { writeFile, mkdir, readFile } from "node:fs/promises";
 import { readFileSync, existsSync } from "node:fs";
@@ -272,6 +273,13 @@ export function App(props: AppProps): React.JSX.Element {
   const [mode, setMode] = React.useState<Mode>(
     (props.config.mode as Mode | undefined) ?? "act",
   );
+
+  // Adaptive backpressure ref: declared here (before useEventProjection) so
+  // the projection can read it from the first render. Updated by the effect
+  // below that watches render frame times from useRenderMetrics().
+  const adaptiveFlushRef = React.useRef({ floorMs: minFlushMs() });
+  const frameEmaRef = React.useRef(minFlushMs());
+
   const projection = useEventProjection(props.events, {
     // Gemini CLI parity: when streamed text exceeds 5000 chars, split it
     // at a safe markdown boundary and push the older portion to committed
@@ -279,6 +287,7 @@ export function App(props: AppProps): React.JSX.Element {
     onCommitSplit: React.useCallback((item: TranscriptItem) => {
       setTranscript((prev) => [...prev, item]);
     }, []),
+    adaptiveFlushRef,
     // First-turn `[session-title] X` marker support. The projection
     // strips the marker line from the transcript; here we surface the
     // captured title as: (a) the OSC 0 terminal title, (b) a persisted
@@ -358,6 +367,27 @@ export function App(props: AppProps): React.JSX.Element {
   // Render performance metrics — track frame timing, expose for StatusBar.
   const renderMetrics: RenderMetricsGetters = useRenderMetrics();
   const [showRenderMetrics, setShowRenderMetrics] = React.useState(false);
+
+  // Update adaptiveFlushRef on every render based on observed frame times.
+  // EMA (alpha=0.3) smooths out single-frame spikes to avoid thrashing.
+  // When frames are slow (> minFlushMs * 1.5): raise floor toward lastFrameMs * 1.2.
+  // When frames recovered (< minFlushMs * 0.8): decay floor back toward minFlushMs.
+  React.useEffect(() => {
+    const lastMs = renderMetrics.lastFrameTimeMs();
+    if (lastMs <= 0) return;
+    frameEmaRef.current = 0.3 * lastMs + 0.7 * frameEmaRef.current;
+    const ema = frameEmaRef.current;
+    const floor = minFlushMs();
+    if (ema > floor * 1.5) {
+      adaptiveFlushRef.current.floorMs = Math.min(ema * 1.2, 500);
+    } else if (ema < floor * 0.8) {
+      const current = adaptiveFlushRef.current.floorMs;
+      adaptiveFlushRef.current.floorMs = Math.max(
+        floor,
+        current - (current - floor) * 0.1,
+      );
+    }
+  });
 
   // Alt+M toggles the render-metrics display in the StatusBar.
   useInput((ch, key) => {
@@ -522,7 +552,7 @@ export function App(props: AppProps): React.JSX.Element {
       if (turnStartRef.current > 0)
         setLiveDurationMs(Date.now() - turnStartRef.current);
       setLiveOutputTokens(liveOutputTokensAccRef.current);
-    }, 1000);
+    }, statusbarTickMs());
     return () => clearInterval(t);
   }, [busy]);
 
@@ -1645,7 +1675,7 @@ function GeneratingIndicator(props: {
   const palette = useTheme();
   const [now, setNow] = React.useState(Date.now());
   React.useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
+    const t = setInterval(() => setNow(Date.now()), statusbarTickMs());
     return () => clearInterval(t);
   }, []);
   const elapsedSec =

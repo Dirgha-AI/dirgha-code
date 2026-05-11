@@ -16,6 +16,7 @@ import type { SessionStore, Session } from "../../context/session.js";
 import type { DirghaConfig } from "../../cli/config.js";
 import { App, VERSION } from "./App.js";
 import { renderLogoString } from "./components/Logo.js";
+import { minFlushMs } from "./is-small-terminal.js";
 import {
   createDefaultSlashRegistry,
   registerBuiltinSlashCommands,
@@ -120,6 +121,23 @@ export async function runInkTUI(opts: RunInkTUIOptions): Promise<void> {
   };
   process.on("exit", onProcessExit);
 
+  // Debounce resize events so phone rotation doesn't trigger immediate full
+  // repaints. The shim is installed just before render() and restored in the
+  // finally block below.
+  const _origEmit = process.stdout.emit.bind(process.stdout);
+  let _resizeDebounce: ReturnType<typeof setTimeout> | null = null;
+  (process.stdout as any).emit = (event: string, ...args: unknown[]) => {
+    if (event === "resize") {
+      if (_resizeDebounce) clearTimeout(_resizeDebounce);
+      _resizeDebounce = setTimeout(() => {
+        _resizeDebounce = null;
+        _origEmit("resize", ...args);
+      }, minFlushMs());
+      return true;
+    }
+    return _origEmit(event, ...args);
+  };
+
   const element = React.createElement(App, {
     events,
     registry: opts.registry,
@@ -150,6 +168,9 @@ export async function runInkTUI(opts: RunInkTUIOptions): Promise<void> {
     // Remove the exit listener — normal teardown through waitUntilExit
     // handles cleanup here; we don't need the safety-net to fire too.
     process.removeListener("exit", onProcessExit);
+    // Restore the original stdout.emit (undo resize debounce shim).
+    if (_resizeDebounce) clearTimeout(_resizeDebounce);
+    process.stdout.emit = _origEmit;
     restore();
   }
 }
