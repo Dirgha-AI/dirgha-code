@@ -1,15 +1,67 @@
 /**
- * studio.ts — Image, video, and audio generation tools for the CLI agent.
+ * studio.ts — Image, video, audio, and speech tools.
  *
- * The agent can generate images (NVIDIA SD3 free, OpenRouter paid),
- * videos (Fal.ai/Replicate), and audio (TTS) using API keys from the
- * key store. Billing is handled by the provider for paid models.
+ * Two auth modes:
+ *   1. GATEWAY — user is logged in (has ~/.dirgha/credentials.json).
+ *      Calls go through api.dirgha.ai which handles billing via checkBilling().
+ *   2. BYOK — user has provider API keys set via `dirgha keys set`.
+ *      Calls go directly to the provider. User pays provider directly.
  *
- * Free models (NVIDIA SD3/SDXL) require only the NVIDIA_API_KEY.
+ * Gateway is tried first. Falls back to BYOK if no token found.
  */
 
 import type { Tool, ToolContext } from "./registry.js";
 import type { ToolResult } from "../kernel/types.js";
+import { readFileSync, statSync, existsSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+
+/** Try to load a gateway token from ~/.dirgha/credentials.json */
+function getGatewayToken(): string | null {
+  try {
+    const credPath = join(homedir(), ".dirgha", "credentials.json");
+    if (!existsSync(credPath)) return null;
+    const creds = JSON.parse(readFileSync(credPath, "utf-8"));
+    return creds.token ?? null;
+  } catch {
+    return null;
+  }
+}
+
+const GATEWAY = "https://api.dirgha.ai";
+
+/** Fetch helper: gateway first, then fall back to direct provider call */
+async function gatewayOrDirect<T>(
+  gatewayPath: string,
+  gatewayBody: unknown,
+  directFn: () => Promise<T>,
+): Promise<T> {
+  const token = getGatewayToken();
+  if (token) {
+    try {
+      const res = await fetch(`${GATEWAY}${gatewayPath}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(gatewayBody),
+        signal: AbortSignal.timeout(60_000),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as any;
+        // Gateway returns { image, url, data, ... } depending on the endpoint
+        if (data?.image || data?.data || data?.url) {
+          return data as T;
+        }
+        // Fall through to direct if gateway response didn't include expected data
+      }
+    } catch {
+      // Gateway failed — fall through to BYOK
+    }
+  }
+  return directFn();
+}
 
 // ── Image Generation ──────────────────────────────────────────────────────────
 
@@ -75,14 +127,28 @@ async function generateNvidiaImage(
   input: { prompt: string; negativePrompt?: string; style?: string; width?: number; height?: number },
   model: string,
 ): Promise<ToolResult> {
+  const prompt = input.style ? `${input.prompt}, style: ${input.style}` : input.prompt;
+
+  // Try gateway first (paid users on our billing)
+  const gwResult = await gatewayOrDirect(
+    "/api/studio/generate",
+    { prompt, modelId: model, negativePrompt: input.negativePrompt },
+    async () => {
+      throw new Error("gateway_fallback"); // trigger fallback to BYOK
+    },
+  ).catch(() => null);
+
+  if (gwResult && (gwResult as any).image) {
+    return { isError: false, content: `Image generated: ${(gwResult as any).image}` };
+  }
+
+  // Fallback: BYOK — call NVIDIA directly
   const key = process.env.NVIDIA_API_KEY;
-  if (!key) return { isError: true, content: "NVIDIA_API_KEY not set. Add it with: dirgha keys set NVIDIA_API_KEY" };
+  if (!key) return { isError: true, content: "No gateway session and NVIDIA_API_KEY not set. Run `dirgha login` or `dirgha keys set NVIDIA_API_KEY`" };
 
   const url = model === "nvidia-sdxl"
     ? "https://ai.api.nvidia.com/v1/genai/stabilityai/stable-diffusion-xl"
     : "https://ai.api.nvidia.com/v1/genai/stabilityai/stable-diffusion-3-medium";
-
-  const prompt = input.style ? `${input.prompt}, style: ${input.style}` : input.prompt;
 
   const body = model === "nvidia-sdxl"
     ? {
@@ -122,13 +188,12 @@ async function generateNvidiaImage(
 
   if (!b64) return { isError: true, content: "NVIDIA returned empty response." };
 
-  // Save to temp file and return path
-  const { writeFileSync } = await import("node:fs");
-  const { join } = await import("node:path");
+  const { writeFileSync: wfs } = await import("node:fs");
+  const { join: pjoin } = await import("node:path");
   const { tmpdir } = await import("node:os");
   const { randomUUID } = await import("node:crypto");
-  const path = join(tmpdir(), `dirgha-image-${randomUUID().slice(0, 8)}.png`);
-  (writeFileSync as any)(path, Buffer.from(b64, "base64"));
+  const path = pjoin(tmpdir(), `dirgha-image-${randomUUID().slice(0, 8)}.png`);
+  (wfs as any)(path, Buffer.from(b64, "base64"));
   return { isError: false, content: `Image generated (${model}): ${path}` };
 }
 

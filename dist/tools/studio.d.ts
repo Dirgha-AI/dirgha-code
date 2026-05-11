@@ -1,11 +1,13 @@
 /**
- * studio.ts — Image, video, and audio generation tools for the CLI agent.
+ * studio.ts — Image, video, audio, and speech tools.
  *
- * The agent can generate images (NVIDIA SD3 free, OpenRouter paid),
- * videos (Fal.ai/Replicate), and audio (TTS) using API keys from the
- * key store. Billing is handled by the provider for paid models.
+ * Two auth modes:
+ *   1. GATEWAY — user is logged in (has ~/.dirgha/credentials.json).
+ *      Calls go through api.dirgha.ai which handles billing via checkBilling().
+ *   2. BYOK — user has provider API keys set via `dirgha keys set`.
+ *      Calls go directly to the provider. User pays provider directly.
  *
- * Free models (NVIDIA SD3/SDXL) require only the NVIDIA_API_KEY.
+ * Gateway is tried first. Falls back to BYOK if no token found.
  */
 import type { Tool } from "./registry.js";
 export declare const imageGenerateTool: Tool;
