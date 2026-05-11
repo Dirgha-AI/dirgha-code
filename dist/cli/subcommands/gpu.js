@@ -11,11 +11,11 @@
  *   dirgha gpu market list             Browse marketplace listings
  *   dirgha gpu market post <gpu> <price>  List GPU on marketplace
  */
-import { listGPUJobs, totalGPUSpend, auditLog, getBudget } from "../gpu/jobs.js";
-import { listGPUListings, postGPUListing } from "../gpu/market.js";
-import { RunPodProvider } from "../gpu/runpod.js";
-import { SpheronProvider } from "../gpu/spheron.js";
-import { AkashProvider } from "../gpu/akash.js";
+import { listGPUJobs, totalGPUSpend, auditLog, getBudget } from "../../gpu/jobs.js";
+import { listGPUListings, postGPUListing } from "../../gpu/market.js";
+import { RunPodProvider } from "../../gpu/runpod.js";
+import { SpheronProvider } from "../../gpu/spheron.js";
+import { AkashProvider } from "../../gpu/akash.js";
 function getAllProviders() {
     return [new RunPodProvider(), new SpheronProvider(), new AkashProvider()];
 }
@@ -114,7 +114,7 @@ export const gpuSubcommand = {
                     console.log("Usage: dirgha gpu budget <amount> (0 = unlimited)");
                     return 1;
                 }
-                const { setBudget } = await import("../gpu/jobs.js");
+                const { setBudget } = await import("../../gpu/jobs.js");
                 setBudget(amt);
                 console.log(amt === 0 ? "Budget cap removed." : `Budget cap set to $${amt.toFixed(2)}.`);
                 return 0;
