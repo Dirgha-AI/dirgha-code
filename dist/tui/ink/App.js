@@ -44,6 +44,7 @@ import { InputBox } from "./components/InputBox.js";
 import { PromptQueueIndicator } from "./components/PromptQueueIndicator.js";
 import { TaskIndicator } from "./components/TaskIndicator.js";
 import { SubagentPanel } from "./components/SubagentPanel.js";
+import { GPUJobIndicator } from "./components/GPUJobIndicator.js";
 import { ModelPicker } from "./components/ModelPicker.js";
 import { ModelSwitchPrompt } from "./components/ModelSwitchPrompt.js";
 import { ProviderPicker, } from "./components/ProviderPicker.js";
@@ -1219,7 +1220,7 @@ export function App(props) {
                         }, onReject: () => setPendingFailover(null), onPicker: () => {
                             setPendingFailover(null);
                             overlays.openOverlay("models");
-                        } })), _jsx(SubagentPanel, { events: props.events }), _jsx(TaskIndicator, {}), _jsx(PromptQueueIndicator, { queued: promptQueue }), _jsx(InputBox, { value: input, onChange: setInput, onSubmit: handleSubmit, busy: busy, liveDurationMs: liveDurationMs, vimMode: props.config.vimMode === true, onAtQueryChange: overlays.setAtQuery, onSlashQueryChange: overlays.setSlashQuery, onRequestOverlay: overlays.openOverlay, promptHistory: promptHistory, onRequestYoloToggle: () => {
+                        } })), _jsx(SubagentPanel, { events: props.events }), _jsx(GPUJobIndicator, {}), _jsx(TaskIndicator, {}), _jsx(PromptQueueIndicator, { queued: promptQueue }), _jsx(InputBox, { value: input, onChange: setInput, onSubmit: handleSubmit, busy: busy, liveDurationMs: liveDurationMs, vimMode: props.config.vimMode === true, onAtQueryChange: overlays.setAtQuery, onSlashQueryChange: overlays.setSlashQuery, onRequestOverlay: overlays.openOverlay, promptHistory: promptHistory, onRequestYoloToggle: () => {
                             const next = mode === "yolo" ? "act" : "yolo";
                             setMode(next);
                             // Wire the approval bus so mid-turn tool calls are immediately

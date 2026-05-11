@@ -64,6 +64,7 @@ import { InputBox } from "./components/InputBox.js";
 import { PromptQueueIndicator } from "./components/PromptQueueIndicator.js";
 import { TaskIndicator } from "./components/TaskIndicator.js";
 import { SubagentPanel } from "./components/SubagentPanel.js";
+import { GPUJobIndicator } from "./components/GPUJobIndicator.js";
 import { ModelPicker, type ModelEntry } from "./components/ModelPicker.js";
 import { ModelSwitchPrompt } from "./components/ModelSwitchPrompt.js";
 import {
@@ -1406,6 +1407,7 @@ export function App(props: AppProps): React.JSX.Element {
             />
           )}
           <SubagentPanel events={props.events} />
+          <GPUJobIndicator />
           <TaskIndicator />
           <PromptQueueIndicator queued={promptQueue} />
           <InputBox
