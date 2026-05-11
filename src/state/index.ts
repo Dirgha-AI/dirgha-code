@@ -16,6 +16,7 @@ export interface StateEntry {
   sessionId: string;
   startedAt: string; // ISO timestamp
   model?: string;
+  title?: string;    // Human-readable name, auto-set from [session-title] or /session rename
   checkpointIds: string[];
   cronJobIds: string[];
   endedAt?: string;
@@ -44,6 +45,18 @@ async function writeIndex(index: StateIndex): Promise<void> {
   const tmp = join(STATE_DIR, `.dirgha-state-${randomUUID()}.tmp`);
   await writeFile(tmp, JSON.stringify(index, null, 2), 'utf8');
   await rename(tmp, INDEX_PATH);
+}
+
+export async function renameSession(sessionId: string, title: string): Promise<boolean> {
+  try {
+    const index = await readIndex();
+    if (!index.sessions[sessionId]) return false;
+    index.sessions[sessionId].title = title;
+    await writeIndex(index);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function registerSession(sessionId: string, model?: string): Promise<void> {

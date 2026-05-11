@@ -246,6 +246,11 @@ export function App(props) {
                     .catch(() => {
                     /* persistence best-effort — non-blocking */
                 });
+                // Also update the state index so the session listing shows the title.
+                const id = s.id;
+                if (id) {
+                    import("../../state/index.js").then(({ renameSession }) => renameSession(id, safe).catch(() => { }));
+                }
             }
         }, []),
     });
@@ -651,30 +656,17 @@ export function App(props) {
                     projection.clear();
                 },
                 listSessions: async () => {
-                    const ids = await props.sessions.list();
-                    if (ids.length === 0)
+                    const { listSessions } = await import("../../state/index.js");
+                    const entries = await listSessions(20);
+                    if (entries.length === 0)
                         return "(no saved sessions)";
-                    const { stat: fstat } = await import("node:fs/promises");
-                    const { join: pjoin } = await import("node:path");
-                    const { homedir: hd } = await import("node:os");
-                    const sessDir = pjoin(hd(), ".dirgha", "sessions");
-                    const withMtime = await Promise.all(ids.map(async (id) => {
-                        try {
-                            const s = await fstat(pjoin(sessDir, `${id}.jsonl`));
-                            return { id, mtime: s.mtime };
-                        }
-                        catch {
-                            return { id, mtime: new Date(0) };
-                        }
-                    }));
-                    withMtime.sort((x, y) => y.mtime.getTime() - x.mtime.getTime());
-                    const shown = withMtime.slice(0, 20);
-                    const lines = shown.map(({ id, mtime }) => {
-                        const d = mtime.toISOString().slice(0, 16).replace("T", " ");
-                        return `  ${d}  ${id.slice(0, 8)}…`;
+                    const lines = entries.map((e) => {
+                        const d = e.startedAt.slice(0, 16).replace("T", " ");
+                        const title = e.title ? e.title : e.sessionId.slice(0, 12);
+                        return `  ${d}  ${title}`;
                     });
-                    if (ids.length > 20) {
-                        lines.push(`  (showing 20 of ${ids.length} — use /session load <full-id> to restore)`);
+                    if (entries.length === 20) {
+                        lines.push(`  (showing 20 — use /session load <id> to restore)`);
                     }
                     return lines.join("\n");
                 },

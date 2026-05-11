@@ -4,10 +4,10 @@
  * a summary model; the SlashContext exposes `getProvider()` +
  * `getSummaryModel()` + `getSession()` + `getSessionStore()` for this.
  */
-import { rename, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, basename } from 'node:path';
 import { branchSession } from '../../context/branch.js';
+import { renameSession } from '../../state/index.js';
 function sessionPath(id) {
     if (!id || basename(id) !== id || id.includes('\0')) {
         throw new Error(`Invalid session id: "${id}"`);
@@ -17,10 +17,10 @@ function sessionPath(id) {
 function usage() {
     return [
         'Usage:',
-        '  /session list                  List saved sessions (20 most recent)',
-        '  /session load <id>             Resume a session',
-        '  /session rename <old> <new>    Rename a session file',
-        '  /session branch <name>         Branch the current session with a summary',
+        '  /session list                        List saved sessions (20 most recent)',
+        '  /session load <id>                   Resume a session',
+        '  /session rename <id> <title>         Give a session a human-readable name',
+        '  /session branch <name>               Branch the current session with a summary',
     ].join('\n');
 }
 export const sessionCommand = {
@@ -33,19 +33,14 @@ export const sessionCommand = {
         if (op === 'load' && args[1])
             return ctx.loadSession(args[1]);
         if (op === 'rename') {
-            const [, oldId, newId] = args;
-            if (!oldId || !newId)
+            const id = args[1];
+            const title = args.slice(2).join(" ");
+            if (!id || !title)
                 return `Missing argument.\n${usage()}`;
-            const fromPath = sessionPath(oldId);
-            const toPath = sessionPath(newId);
-            const oldExists = await stat(fromPath).then(() => true).catch(() => false);
-            if (!oldExists)
-                return `Session "${oldId}" not found.`;
-            const newExists = await stat(toPath).then(() => true).catch(() => false);
-            if (newExists)
-                return `Session "${newId}" already exists — refusing to overwrite.`;
-            await rename(fromPath, toPath);
-            return `Renamed ${oldId} → ${newId}.`;
+            const ok = await renameSession(id, title);
+            if (!ok)
+                return `Session "${id}" not found.`;
+            return `Session "${id.slice(0, 12)}…" renamed to "${title}".`;
         }
         if (op === 'branch') {
             const name = args.slice(1).join('-');

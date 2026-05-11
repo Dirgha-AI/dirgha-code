@@ -7,6 +7,7 @@ export interface StateEntry {
     sessionId: string;
     startedAt: string;
     model?: string;
+    title?: string;
     checkpointIds: string[];
     cronJobIds: string[];
     endedAt?: string;
@@ -15,6 +16,7 @@ export interface StateIndex {
     version: 1;
     sessions: Record<string, StateEntry>;
 }
+export declare function renameSession(sessionId: string, title: string): Promise<boolean>;
 export declare function registerSession(sessionId: string, model?: string): Promise<void>;
 export declare function registerCheckpoint(sessionId: string, checkpointId: string): Promise<void>;
 export declare function registerCronJob(sessionId: string | undefined, jobId: string): Promise<void>;

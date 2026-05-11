@@ -28,6 +28,19 @@ async function writeIndex(index) {
     await writeFile(tmp, JSON.stringify(index, null, 2), 'utf8');
     await rename(tmp, INDEX_PATH);
 }
+export async function renameSession(sessionId, title) {
+    try {
+        const index = await readIndex();
+        if (!index.sessions[sessionId])
+            return false;
+        index.sessions[sessionId].title = title;
+        await writeIndex(index);
+        return true;
+    }
+    catch {
+        return false;
+    }
+}
 export async function registerSession(sessionId, model) {
     try {
         const index = await readIndex();
