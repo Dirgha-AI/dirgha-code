@@ -345,6 +345,7 @@ export const PRICES = [
         model: "deepseek/deepseek-v4-flash",
         inputPerM: 0.14,
         outputPerM: 0.28,
+        contextWindow: 1_048_576,
     },
     {
         provider: "openrouter",
@@ -934,8 +935,11 @@ export const DEFAULT_CONTEXT_WINDOW = 32_000;
 const CONTEXT_WINDOWS = {
     // Anthropic
     "claude-opus-4-7": 200_000,
-    "claude-sonnet-4-6": 200_000,
+    "claude-sonnet-4-6": 1_000_000,
     "claude-haiku-4-5": 200_000,
+    "anthropic/claude-sonnet-4.6": 1_000_000,
+    "anthropic/claude-haiku-4.5": 200_000,
+    "anthropic/claude-opus-4.6": 200_000,
     // OpenAI
     "gpt-5.5-pro": 400_000,
     "gpt-5.5": 400_000,
@@ -946,6 +950,8 @@ const CONTEXT_WINDOWS = {
     // Gemini
     "gemini-2.5-pro": 2_000_000,
     "gemini-2.5-flash": 1_000_000,
+    "google/gemini-2.5-flash": 1_048_576,
+    "google/gemini-2.5-pro": 1_048_576,
     // NVIDIA NIM — NIM_CATALOGUE models (source of truth)
     "deepseek-ai/deepseek-v4-pro": 1_000_000,
     "deepseek-ai/deepseek-v4-flash": 1_000_000,
@@ -966,12 +972,16 @@ const CONTEXT_WINDOWS = {
     "google/gemini-3.1-pro-preview": 2_000_000,
     "google/gemini-3-flash-preview": 1_000_000,
     // OpenRouter — Moonshot/Kimi
-    "moonshotai/kimi-k2.5": 128_000,
+    "moonshotai/kimi-k2": 262_144,
+    "moonshotai/kimi-k2.5": 262_144,
     // OpenRouter — MiniMax
     "minimax/minimax-m2.7": 200_000,
     "minimax/minimax-m2": 200_000,
     // OpenRouter — DeepSeek
+    "deepseek/deepseek-v4-flash": 1_048_576,
+    "deepseek/deepseek-v4-pro": 1_000_000,
     "deepseek/deepseek-v3.2-exp": 128_000,
+    "deepseek/deepseek-v3.2": 131_072,
     "deepseek/deepseek-r1": 128_000,
     "deepseek/deepseek-chat-v3.1": 128_000,
     // OpenRouter — Qwen
