@@ -29,6 +29,7 @@ import { hardwareSubcommand } from './hardware.js';
 import { webSubcommand } from './web.js';
 import { stateSubcommand } from './state.js';
 import { historySubcommand } from './history.js';
+import { voiceSubcommand } from './voice.js';
 import { pingSubcommand } from './ping.js';
 export const subcommands = [
     doctorSubcommand,
@@ -63,6 +64,7 @@ export const subcommands = [
     stateSubcommand,
     historySubcommand,
     pingSubcommand,
+    voiceSubcommand,
 ];
 export function findSubcommand(verb) {
     return subcommands.find(cmd => cmd.name === verb || (cmd.aliases ?? []).includes(verb));

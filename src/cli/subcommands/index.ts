@@ -52,6 +52,7 @@ import { hardwareSubcommand } from './hardware.js';
 import { webSubcommand } from './web.js';
 import { stateSubcommand } from './state.js';
 import { historySubcommand } from './history.js';
+import { voiceSubcommand } from './voice.js';
 import { pingSubcommand } from './ping.js';
 
 export const subcommands: Subcommand[] = [
@@ -87,6 +88,7 @@ export const subcommands: Subcommand[] = [
   stateSubcommand,
   historySubcommand,
   pingSubcommand,
+  voiceSubcommand,
 ];
 
 export function findSubcommand(verb: string): Subcommand | undefined {
