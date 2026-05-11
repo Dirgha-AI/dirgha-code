@@ -246,9 +246,11 @@ export function InputBox(props) {
                 return;
             }
         }
-        // Paste-collapse toggle.
+        // Paste-collapse toggle — bump key so ink-text-input remounts with
+        // cursor at value.length (internal cursorOffset can drift otherwise).
         if (key.ctrl && inputCh === "e" && pasteSegment !== null) {
             setPasteExpanded((v) => !v);
+            setTextInputKey((k) => k + 1);
             return;
         }
         // Vim mode transitions + NORMAL key handling.
@@ -272,6 +274,10 @@ export function InputBox(props) {
                     if (r.value !== props.value)
                         props.onChange(r.value);
                     setVimState(r.state);
+                    // Bump key on NORMAL→INSERT so ink-text-input remounts with
+                    // cursor at value.length (internal cursorOffset can be stale).
+                    if (r.state.mode === "INSERT")
+                        setTextInputKey((k) => k + 1);
                     return;
                 }
             }
