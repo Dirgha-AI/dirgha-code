@@ -29,6 +29,7 @@ export { createMultimodalTool } from "./multimodal.js";
 export { createCronTool } from "./cron.js";
 export { createCheckpointTool } from "./checkpoint.js";
 export { createTaskTool } from "./task.js";
+export { taskCreateTool, taskUpdateTool, taskListTool, taskDeleteTool, taskSummaryTool, } from "./task-manager.js";
 declare const cronTool: Tool;
 declare const checkpointTool: Tool;
 export * from "./registry.js";

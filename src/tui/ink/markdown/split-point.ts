@@ -38,8 +38,10 @@ export function findLastSafeSplitPoint(content: string): number {
     searchFrom = dnlIndex - 1;
   }
 
-  // Rule 3: no safe split point found — return the full length.
-  return content.length;
+  // Rule 3: no safe split point found within code blocks — force split
+  // at MAX_LIVE_CHUNK_CHARS so the live block doesn't grow unbounded
+  // and starve the event queue.
+  return Math.min(MAX_LIVE_CHUNK_CHARS, content.length);
 }
 
 /**

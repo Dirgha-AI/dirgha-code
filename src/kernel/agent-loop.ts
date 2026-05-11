@@ -93,6 +93,7 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
   let stopReason: StopReason = "end_turn";
   let turnCount = 0;
   let retriesForTurn = 0;
+  let _compactedThisTurn = false; // guards against infinite compact→retry→compact loops
   const DEFAULT_MAX_RETRIES = 3;
   // Per-reason caps override the default. TTFT timeouts have already
   // waited 90 s — retrying once is sufficient evidence the provider is
@@ -153,6 +154,9 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
       turnCount = turnIndex + 1;
       const turnId = `t${turnIndex}-${Date.now().toString(36)}`;
 
+      // Reset per-turn: each turn starts with a fresh compaction attempt budget
+      _compactedThisTurn = false;
+
       let messagesForCall: Message[];
       try {
         messagesForCall = cfg.contextTransform
@@ -212,6 +216,37 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
         // or 5xx upstream failures.
         const errMsg = err instanceof Error ? err.message : String(err);
         recordHealthFailure(cfg.provider.id, errMsg);
+
+        // ── Auto-compaction on context-length errors ──────────────────────
+        // When the provider says the conversation exceeds the model's context
+        // window, we compact the history (summarise older turns) and retry
+        // transparently. No prompt, no failover — the user never sees it.
+        // If compaction was already attempted this turn, fall through to failover.
+        const contextLenRe =
+          /context.?length|too long|maximum.*length|max.*tokens|token.?limit|context_length_exceeded|Message too long|string too long/i;
+        if (contextLenRe.test(errMsg)) {
+          if (cfg.contextTransform && !_compactedThisTurn) {
+            _compactedThisTurn = true;
+            try {
+              const compacted = await cfg.contextTransform(history);
+              // Mutate history in-place — const prevents reassignment
+              history.length = 0;
+              history.push(...compacted);
+              turnIndex--;
+              continue;
+            } catch {
+              // Compaction itself failed — fall through to normal error path
+            }
+          }
+          // Eager retry flag: suppress the failover prompt and just retry
+          // with the compacted history one more time
+          if (_compactedThisTurn) {
+            await new Promise((r) => setTimeout(r, 1000));
+            turnIndex--;
+            continue;
+          }
+        }
+
         // Known limitation: this regex is fragile — provider error messages
         // can change at any time. A classifier or structured error code is
         // the correct long-term fix, but that requires per-provider parsing.
@@ -323,6 +358,34 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
       );
       history.length = 0;
       history.push(...appended);
+
+      // Defensive: ensure history ends with a valid sequence for the next
+      // turn. If tool results were appended without a preceding assistant
+      // message carrying tool_calls (e.g. due to a provider or compaction
+      // anomaly), the next API call would get orphaned role:"tool" /
+      // role:"user" tool_result messages and trigger HTTP 400.
+      // Strip any dangling tool-result messages that lack a prior assistant
+      // message with tool_use parts.
+      while (history.length > 0) {
+        const last = history[history.length - 1];
+        const hasToolResults =
+          Array.isArray(last.content) &&
+          last.content.some((p) => p.type === "tool_result");
+        if (!hasToolResults) break;
+        // Check if the message before this one is an assistant with tool_use
+        if (history.length >= 2) {
+          const prev = history[history.length - 2];
+          if (
+            prev.role === "assistant" &&
+            Array.isArray(prev.content) &&
+            prev.content.some((p) => p.type === "tool_use")
+          ) {
+            break; // valid sequence
+          }
+        }
+        // Dangling tool result — remove it to avoid HTTP 400
+        history.pop();
+      }
 
       events.emit({ type: "turn_end", turnId, stopReason: "tool_use" });
       try {

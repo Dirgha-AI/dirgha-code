@@ -26,10 +26,12 @@ import { graphNeighborsTool } from "./graph-neighbors.js";
 import { graphTraverseTool } from "./graph-traverse.js";
 import { transactionalWriteTool } from "./transactional-write.js";
 import { dbWorkspaceInfoTool } from "./db-workspace-info.js";
+import { taskCreateTool, taskUpdateTool, taskListTool, taskDeleteTool, taskSummaryTool, } from "./task-manager.js";
 export { createMultimodalTool } from "./multimodal.js";
 export { createCronTool } from "./cron.js";
 export { createCheckpointTool } from "./checkpoint.js";
 export { createTaskTool } from "./task.js";
+export { taskCreateTool, taskUpdateTool, taskListTool, taskDeleteTool, taskSummaryTool, } from "./task-manager.js";
 const cronTool = createCronTool();
 const checkpointTool = createCheckpointTool();
 export * from "./registry.js";
@@ -64,6 +66,11 @@ export const builtInTools = [
     graphTraverseTool,
     transactionalWriteTool,
     dbWorkspaceInfoTool,
+    taskCreateTool,
+    taskUpdateTool,
+    taskListTool,
+    taskDeleteTool,
+    taskSummaryTool,
 ];
 export { fsReadTool, fsWriteTool, fsEditTool, fsLsTool, shellTool, searchGrepTool, searchGlobTool, gitTool, githubTool, browserTool, checkpointTool, cronTool, lspGoToDefinitionTool, lspFindReferencesTool, lspHoverTool, lspDocumentSymbolsTool, rtkTool, qmdTool, kbSearchTool, graphNeighborsTool, graphTraverseTool, transactionalWriteTool, dbWorkspaceInfoTool, };
 //# sourceMappingURL=index.js.map

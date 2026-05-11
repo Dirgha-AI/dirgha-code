@@ -144,7 +144,7 @@ function recordPending(result) {
         }
         : {
             kind: "text",
-            text: result.text.slice(0, 4000),
+            text: result.text,
             ts: new Date().toISOString(),
         };
     writeFileSync(path, JSON.stringify(body, null, 2));

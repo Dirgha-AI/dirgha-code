@@ -17,7 +17,7 @@
 import * as React from "react";
 import { Box, Text, useApp, useInput } from "ink";
 import { randomUUID } from "node:crypto";
-import { VirtualTranscript } from "./components/VirtualTranscript.js";
+import { Static } from "ink";
 import type { Message } from "../../kernel/types.js";
 import type { EventStream } from "../../kernel/event-stream.js";
 import { appendAudit } from "../../audit/writer.js";
@@ -62,6 +62,8 @@ import { ToolBox } from "./components/ToolBox.js";
 import { ToolGroup, type ToolItem } from "./components/ToolGroup.js";
 import { InputBox } from "./components/InputBox.js";
 import { PromptQueueIndicator } from "./components/PromptQueueIndicator.js";
+import { TaskIndicator } from "./components/TaskIndicator.js";
+import { SubagentPanel } from "./components/SubagentPanel.js";
 import { ModelPicker, type ModelEntry } from "./components/ModelPicker.js";
 import { ModelSwitchPrompt } from "./components/ModelSwitchPrompt.js";
 import {
@@ -1047,16 +1049,50 @@ export function App(props: AppProps): React.JSX.Element {
     runTurnRef.current = runTurn;
   });
 
-  // Drain the prompt queue when a turn finishes. Pops the oldest queued
-  // prompt and re-submits it through handleSubmit (which transitions
-  // back into busy=true via runTurn). Guarded on `!busy` so we never
-  // race against an already-active turn.
+  // Drain the prompt queue when a turn finishes. Drains ALL queued
+  // prompts in a single batch to avoid N sequential LLM round-trips.
+  // Errors are caught so a single failure does not orphan remaining items.
   React.useEffect(() => {
     if (busy) return;
     if (promptQueue.length === 0) return;
-    const [next, ...rest] = promptQueue;
-    setPromptQueue(rest);
-    if (next !== undefined) handleSubmit(next);
+    const queue = promptQueue;
+    setPromptQueue([]);
+    // Batch all queued prompts as separate user messages, then run
+    // the agent loop once for the whole batch.
+    for (const q of queue) {
+      lastUserPromptRef.current = q;
+      setPromptHistory((prev) => {
+        const deduped = prev.filter((p) => p !== q);
+        return [q, ...deduped].slice(0, 100);
+      });
+      historyRef.current.push({ role: "user", content: q });
+      setTranscript((prev) => [
+        ...prev,
+        { kind: "user", id: randomUUID(), text: q },
+      ]);
+      void sessionRef.current?.append({
+        type: "message",
+        ts: new Date().toISOString(),
+        message: { role: "user", content: q },
+      });
+    }
+    void (async () => {
+      try {
+        await runTurnRef.current();
+      } catch (err) {
+        // Log but don't crash — remaining prompts already have
+        // user-message entries in history so they won't be lost.
+        setTranscript((prev) => [
+          ...prev,
+          {
+            kind: "error",
+            id: randomUUID(),
+            message: `Batch queue error: ${err instanceof Error ? err.message : String(err)}`,
+          },
+        ]);
+        setBusy(false);
+      }
+    })();
   }, [busy, promptQueue, handleSubmit]);
 
   // Global Esc handler. Priority order:
@@ -1338,12 +1374,17 @@ export function App(props: AppProps): React.JSX.Element {
     <ThemeProvider activeTheme={themeName}>
       <SpinnerContext.Provider value={spinnerCtx}>
         <Box flexDirection="column">
-          <VirtualTranscript
-            items={transcript}
-            renderItem={renderTranscriptItem}
-            autoScroll
-            inputFocus={inputFocus}
-          />
+          {/* Committed transcript items — rendered in <Static> so they
+              land in the terminal scrollback buffer. User can scroll up
+              with the mouse without the viewport snapping back on every
+              Ink re-render. Only NEW items trigger a Static append. */}
+          <Static items={transcript}>
+            {(item) => (
+              <Box key={item.id} flexDirection="column">
+                {renderTranscriptItem(item)}
+              </Box>
+            )}
+          </Static>
           <Box flexDirection="column">{liveJsx}</Box>
           {busy && projection.liveItems.length === 0 && <GeneratingIndicator startedAtMs={turnStartRef.current} liveOutputTokens={liveOutputTokens} />}
           {pendingApproval !== null && approvalBusRef.current && (
@@ -1374,6 +1415,8 @@ export function App(props: AppProps): React.JSX.Element {
               }}
             />
           )}
+          <SubagentPanel events={props.events} />
+          <TaskIndicator />
           <PromptQueueIndicator queued={promptQueue} />
           <InputBox
             value={input}

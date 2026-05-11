@@ -28,12 +28,26 @@ import { graphNeighborsTool } from "./graph-neighbors.js";
 import { graphTraverseTool } from "./graph-traverse.js";
 import { transactionalWriteTool } from "./transactional-write.js";
 import { dbWorkspaceInfoTool } from "./db-workspace-info.js";
+import {
+  taskCreateTool,
+  taskUpdateTool,
+  taskListTool,
+  taskDeleteTool,
+  taskSummaryTool,
+} from "./task-manager.js";
+
 export { createMultimodalTool } from "./multimodal.js";
 
 export { createCronTool } from "./cron.js";
 export { createCheckpointTool } from "./checkpoint.js";
 export { createTaskTool } from "./task.js";
-
+export {
+  taskCreateTool,
+  taskUpdateTool,
+  taskListTool,
+  taskDeleteTool,
+  taskSummaryTool,
+} from "./task-manager.js";
 const cronTool = createCronTool();
 const checkpointTool = createCheckpointTool();
 
@@ -71,6 +85,11 @@ export const builtInTools: Tool[] = [
   graphTraverseTool,
   transactionalWriteTool,
   dbWorkspaceInfoTool,
+  taskCreateTool,
+  taskUpdateTool,
+  taskListTool,
+  taskDeleteTool,
+  taskSummaryTool,
 ];
 
 export {

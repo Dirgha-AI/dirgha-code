@@ -9,7 +9,10 @@
  * start) and the oldest event is dropped. Slow consumers can call
  * drain() to await queue emptying.
  */
-const MAX_QUEUE = 4096;
+const MAX_QUEUE = 65536;
+// When queue exceeds this threshold, batch older events into a single
+// summary error instead of dropping them one by one.
+const OVERFLOW_BATCH_THRESHOLD = MAX_QUEUE - 256;
 class EventStreamImpl {
     subscribers = new Set();
     iterators = new Set();
@@ -94,12 +97,14 @@ class IteratorState {
             waiter.resolve({ value: event, done: false });
             return;
         }
-        if (this.queue.length >= MAX_QUEUE) {
-            this.queue.shift();
-            this.droppedCount++;
+        // Batch overflow handling: when queue exceeds the threshold,
+        // drain the oldest half in one shot instead of dropping one at a time.
+        if (this.queue.length >= OVERFLOW_BATCH_THRESHOLD) {
+            const drainCount = Math.floor(this.queue.length / 2);
+            this.queue.splice(0, drainCount);
+            this.droppedCount += drainCount;
             if (!this.backpressureActive) {
                 this.backpressureActive = true;
-                // Inject a synthetic warning so consumers know data was lost.
                 this.queue.push({
                     type: "error",
                     message: `Event queue overflow: ${this.droppedCount} events dropped. Consumer is too slow.`,

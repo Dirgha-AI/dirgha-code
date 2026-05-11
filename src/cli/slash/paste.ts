@@ -183,7 +183,7 @@ function recordPending(result: ClipboardImage | ClipboardText): void {
         }
       : {
           kind: "text",
-          text: result.text.slice(0, 4000),
+          text: result.text,
           ts: new Date().toISOString(),
         };
   writeFileSync(path, JSON.stringify(body, null, 2));

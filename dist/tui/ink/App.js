@@ -17,7 +17,7 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import * as React from "react";
 import { Box, Text, useApp, useInput } from "ink";
 import { randomUUID } from "node:crypto";
-import { VirtualTranscript } from "./components/VirtualTranscript.js";
+import { Static } from "ink";
 import { appendAudit } from "../../audit/writer.js";
 import { maybeCompact } from "../../context/compaction.js";
 import { contextWindowFor, resolveModelAlias } from "../../intelligence/prices.js";
@@ -42,6 +42,8 @@ import { ToolBox } from "./components/ToolBox.js";
 import { ToolGroup } from "./components/ToolGroup.js";
 import { InputBox } from "./components/InputBox.js";
 import { PromptQueueIndicator } from "./components/PromptQueueIndicator.js";
+import { TaskIndicator } from "./components/TaskIndicator.js";
+import { SubagentPanel } from "./components/SubagentPanel.js";
 import { ModelPicker } from "./components/ModelPicker.js";
 import { ModelSwitchPrompt } from "./components/ModelSwitchPrompt.js";
 import { ProviderPicker, } from "./components/ProviderPicker.js";
@@ -283,7 +285,13 @@ export function App(props) {
     // EMA (alpha=0.3) smooths out single-frame spikes to avoid thrashing.
     // When frames are slow (> minFlushMs * 1.5): raise floor toward lastFrameMs * 1.2.
     // When frames recovered (< minFlushMs * 0.8): decay floor back toward minFlushMs.
+    // Guarded on `busy || isStreaming` so keystroke renders (very fast, ~5ms) do NOT
+    // pollute the EMA and cause the flush floor to oscillate — without this guard
+    // every keystroke pulled the EMA down, then the next streaming flush pulled it
+    // back up, producing inconsistent flush timing → visible jitter/flicker.
     React.useEffect(() => {
+        if (!busy && projection.liveItems.length === 0)
+            return;
         const lastMs = renderMetrics.lastFrameTimeMs();
         if (lastMs <= 0)
             return;
@@ -923,19 +931,53 @@ export function App(props) {
     React.useEffect(() => {
         runTurnRef.current = runTurn;
     });
-    // Drain the prompt queue when a turn finishes. Pops the oldest queued
-    // prompt and re-submits it through handleSubmit (which transitions
-    // back into busy=true via runTurn). Guarded on `!busy` so we never
-    // race against an already-active turn.
+    // Drain the prompt queue when a turn finishes. Drains ALL queued
+    // prompts in a single batch to avoid N sequential LLM round-trips.
+    // Errors are caught so a single failure does not orphan remaining items.
     React.useEffect(() => {
         if (busy)
             return;
         if (promptQueue.length === 0)
             return;
-        const [next, ...rest] = promptQueue;
-        setPromptQueue(rest);
-        if (next !== undefined)
-            handleSubmit(next);
+        const queue = promptQueue;
+        setPromptQueue([]);
+        // Batch all queued prompts as separate user messages, then run
+        // the agent loop once for the whole batch.
+        for (const q of queue) {
+            lastUserPromptRef.current = q;
+            setPromptHistory((prev) => {
+                const deduped = prev.filter((p) => p !== q);
+                return [q, ...deduped].slice(0, 100);
+            });
+            historyRef.current.push({ role: "user", content: q });
+            setTranscript((prev) => [
+                ...prev,
+                { kind: "user", id: randomUUID(), text: q },
+            ]);
+            void sessionRef.current?.append({
+                type: "message",
+                ts: new Date().toISOString(),
+                message: { role: "user", content: q },
+            });
+        }
+        void (async () => {
+            try {
+                await runTurnRef.current();
+            }
+            catch (err) {
+                // Log but don't crash — remaining prompts already have
+                // user-message entries in history so they won't be lost.
+                setTranscript((prev) => [
+                    ...prev,
+                    {
+                        kind: "error",
+                        id: randomUUID(),
+                        message: `Batch queue error: ${err instanceof Error ? err.message : String(err)}`,
+                    },
+                ]);
+                setBusy(false);
+            }
+        })();
     }, [busy, promptQueue, handleSubmit]);
     // Global Esc handler. Priority order:
     //   1. If an overlay (other than @-file) is open → close it.
@@ -1172,7 +1214,7 @@ export function App(props) {
     // the logo) on every overflow redraw, repainting it on every chat
     // turn that fills the screen. `use-flicker-detector` already warns
     // when this is about to happen.
-    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: spinnerCtx, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(VirtualTranscript, { items: transcript, renderItem: renderTranscriptItem, autoScroll: true, inputFocus: inputFocus }), _jsx(Box, { flexDirection: "column", children: liveJsx }), busy && projection.liveItems.length === 0 && _jsx(GeneratingIndicator, { startedAtMs: turnStartRef.current, liveOutputTokens: liveOutputTokens }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
+    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: spinnerCtx, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: transcript, children: (item) => (_jsx(Box, { flexDirection: "column", children: renderTranscriptItem(item) }, item.id)) }), _jsx(Box, { flexDirection: "column", children: liveJsx }), busy && projection.liveItems.length === 0 && _jsx(GeneratingIndicator, { startedAtMs: turnStartRef.current, liveOutputTokens: liveOutputTokens }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
                             approvalBusRef.current?.resolve(pendingApproval.id, decision);
                         } })), pendingFailover !== null && (_jsx(ModelSwitchPrompt, { failedModel: pendingFailover.failedModel, failoverModel: pendingFailover.failoverModel, onAccept: (failover) => {
                             const lastPrompt = pendingFailover.lastPrompt;
@@ -1185,7 +1227,7 @@ export function App(props) {
                         }, onReject: () => setPendingFailover(null), onPicker: () => {
                             setPendingFailover(null);
                             overlays.openOverlay("models");
-                        } })), _jsx(PromptQueueIndicator, { queued: promptQueue }), _jsx(InputBox, { value: input, onChange: setInput, onSubmit: handleSubmit, busy: busy, liveDurationMs: liveDurationMs, vimMode: props.config.vimMode === true, onAtQueryChange: overlays.setAtQuery, onSlashQueryChange: overlays.setSlashQuery, onRequestOverlay: overlays.openOverlay, promptHistory: promptHistory, onRequestYoloToggle: () => {
+                        } })), _jsx(SubagentPanel, { events: props.events }), _jsx(TaskIndicator, {}), _jsx(PromptQueueIndicator, { queued: promptQueue }), _jsx(InputBox, { value: input, onChange: setInput, onSubmit: handleSubmit, busy: busy, liveDurationMs: liveDurationMs, vimMode: props.config.vimMode === true, onAtQueryChange: overlays.setAtQuery, onSlashQueryChange: overlays.setSlashQuery, onRequestOverlay: overlays.openOverlay, promptHistory: promptHistory, onRequestYoloToggle: () => {
                             const next = mode === "yolo" ? "act" : "yolo";
                             setMode(next);
                             // Wire the approval bus so mid-turn tool calls are immediately

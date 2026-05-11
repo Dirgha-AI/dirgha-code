@@ -60,7 +60,9 @@ export function InputBox(props) {
     const [pasteSegment, setPasteSegment] = React.useState(null);
     const [pasteExpanded, setPasteExpanded] = React.useState(false);
     const prevValueRef = React.useRef(props.value);
-    // Prompt history recall: up/down arrow navigates submitted prompts.
+    // Prompt history recall: up arrow pulls the most recent submitted prompt
+    // for editing (replaces current input). Down arrow on a recalled prompt
+    // restores the previous input. Does NOT cycle through all history.
     const [historyIdx, setHistoryIdx] = React.useState(null);
     const savedInputRef = React.useRef("");
     const history = props.promptHistory ?? [];
@@ -75,6 +77,17 @@ export function InputBox(props) {
                 clearTimeout(armTimerRef.current);
         };
     }, []);
+    // When focus transitions from false to true (e.g., after a turn ends),
+    // bump textInputKey so ink-text-input remounts with cursor at the end.
+    // Without this the internal cursorOffset can be stale from the previous
+    // input session, causing the first keystroke to land at the wrong position.
+    const prevFocusRef = React.useRef(focus);
+    React.useEffect(() => {
+        if (focus && !prevFocusRef.current) {
+            setTextInputKey((k) => k + 1);
+        }
+        prevFocusRef.current = focus;
+    }, [focus]);
     // Notify parent whenever the active @-token shifts.
     React.useEffect(() => {
         if (props.onAtQueryChange) {
@@ -95,15 +108,33 @@ export function InputBox(props) {
             props.onSlashQueryChange(active ? token : null);
         }
     }, [props.value, props.onSlashQueryChange]);
-    // Invalidate paste-collapse if the buffer shrinks past the pasted region.
-    // NOTE: collapse boundaries become stale if the user types while collapsed
-    // (e.g. pasteSegment.end no longer points at the right position). Acceptable
-    // for now — the worst case is the paste region doesn't collapse/expand
-    // cleanly, and the user can still Ctrl+E toggle out of it.
+    // Paste-in-progress guard: slow terminals may chunk a single paste into
+    // multiple keystroke ticks. The first chunk hits the char/line threshold
+    // and is correctly treated as a paste. Subsequent chunks may be small
+    // and fall below the threshold, causing DEL/BS stripping to corrupt the
+    // pasted content. We keep a 100ms window after any paste-sized delta
+    // where DEL/BS stripping is also suppressed.
+    const pasteGuardRef = React.useRef(0);
+    const PASTE_GUARD_MS = 100;
+    // Invalidate paste-collapse if the buffer shrinks past the pasted region
+    // OR grows significantly beyond it (user typing after paste). When the
+    // segment boundaries become stale, collapse state is cleared so the
+    // rendered text always matches the actual buffer.
+    // Also clears segment when the user edits INSIDE the pasted block by
+    // comparing the expected segment content against the actual buffer.
     React.useEffect(() => {
         if (pasteSegment === null)
             return;
-        if (props.value.length < pasteSegment.end) {
+        const valueLen = props.value.length;
+        if (valueLen < pasteSegment.end || valueLen > pasteSegment.end + 500) {
+            setPasteSegment(null);
+            setPasteExpanded(false);
+            return;
+        }
+        // Check if the segment region still matches what was pasted.
+        // If the user inserted/deleted mid-block, boundaries are stale.
+        const segContent = props.value.slice(pasteSegment.start, pasteSegment.end);
+        if (segContent.length !== pasteSegment.chars) {
             setPasteSegment(null);
             setPasteExpanded(false);
         }
@@ -112,14 +143,31 @@ export function InputBox(props) {
     // and strip pending `@` updates.
     const handleChange = React.useCallback((next) => {
         const prev = prevValueRef.current;
+        const deltaChars = next.length - prev.length;
+        // Detect paste BEFORE running the DEL/BS sanitizer. When the delta
+        // looks like a paste (>=200 added chars or >=4 lines), skip the
+        // DEL/BS stripper — those bytes are likely part of the pasted
+        // content, not terminal backspace artifacts.
+        const PASTE_CHAR_THRESHOLD = 200;
+        const PASTE_LINE_THRESHOLD = 4;
+        const isPasteDelta = deltaChars >= PASTE_CHAR_THRESHOLD ||
+            (deltaChars > 0 &&
+                (next.split("\n").length - prev.split("\n").length) >=
+                    PASTE_LINE_THRESHOLD);
+        // Arm the paste guard: for 100ms after any paste-sized delta,
+        // keep suppressing DEL/BS stripping so multi-tick pastes from
+        // slow terminals aren't corrupted.
+        if (isPasteDelta) {
+            pasteGuardRef.current = Date.now() + PASTE_GUARD_MS;
+        }
+        const isGuardActive = Date.now() < pasteGuardRef.current;
         // Strip raw DEL (0x7f) and BS (0x08) characters from terminal
-        // backspace that Ink doesn't recognise. Instead of a double-strip
-        // (which corrupts the buffer), iterate once: backspace bytes delete
-        // the last retained character; other bytes are kept.
+        // backspace that Ink doesn't recognise. Skipped for paste-sized
+        // deltas and while the paste guard is active.
         const DEL = "\x7f";
         const BS = "\x08";
         let sanitized = next;
-        if (next.includes(DEL) || next.includes(BS)) {
+        if (!isPasteDelta && !isGuardActive && (next.includes(DEL) || next.includes(BS))) {
             let result = "";
             for (const ch of next) {
                 if (ch === DEL || ch === BS) {
@@ -163,36 +211,28 @@ export function InputBox(props) {
         }
     }, { isActive: true });
     useInput((inputCh, key) => {
-        // Up/down arrow prompt-history recall (Gemini CLI parity).
-        // (Up-arrow dequeue-for-edit while busy is handled in the always-active
-        // useInput above, because this handler is inactive when busy=true.)
+        // Up-arrow pulls the last submitted prompt for editing (single recall,
+        // not a cycle). A second up-arrow pushes deeper — matches the common
+        // "I want to re-send what I just typed" flow. Down arrow restores the
+        // prior input. While busy the always-active handler (above) dequeues
+        // from the prompt queue instead.
         if (key.upArrow && history.length > 0) {
             if (historyIdx === null) {
+                // First pull: save current input, recall most recent only.
                 savedInputRef.current = props.value;
                 setHistoryIdx(0);
                 props.onChange(history[0]);
                 setTextInputKey((k) => k + 1);
             }
-            else if (historyIdx < history.length - 1) {
-                const next = historyIdx + 1;
-                setHistoryIdx(next);
-                props.onChange(history[next]);
-                setTextInputKey((k) => k + 1);
-            }
+            // Second+ pulls are intentionally no-ops — we only recall the
+            // single most recent prompt to avoid disorienting deep scrolls.
             return;
         }
         if (key.downArrow && historyIdx !== null) {
-            if (historyIdx === 0) {
-                setHistoryIdx(null);
-                props.onChange(savedInputRef.current);
-                setTextInputKey((k) => k + 1);
-            }
-            else {
-                const prev = historyIdx - 1;
-                setHistoryIdx(prev);
-                props.onChange(history[prev]);
-                setTextInputKey((k) => k + 1);
-            }
+            // Restore the saved input and reset.
+            setHistoryIdx(null);
+            props.onChange(savedInputRef.current);
+            setTextInputKey((k) => k + 1);
             return;
         }
         // Any other input resets history navigation.
@@ -200,6 +240,15 @@ export function InputBox(props) {
         // reset based on the key object rather than requiring a character.
         if (historyIdx !== null && !key.upArrow && !key.downArrow) {
             setHistoryIdx(null);
+        }
+        // Enter handling — only when a paste segment exists and
+        // TextInput is not rendered. When paste is collapsed TextInput
+        // is replaced by PasteCollapseView; when expanded it's still
+        // mounted but we suppress its internal Enter handler so Enter
+        // always flows through this single path (avoiding double-submit).
+        if (key.return && pasteSegment !== null) {
+            props.onSubmit(props.value);
+            return;
         }
         // Ctrl+C handling — highest priority.
         //   1. If the buffer has text → clear it (don't arm exit).
