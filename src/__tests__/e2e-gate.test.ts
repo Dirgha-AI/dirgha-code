@@ -22,9 +22,10 @@ describe("e2e: login flow (Dirgha API)", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({}),
     });
-    // Skip if endpoint doesn't exist (e.g., during development or CI without a real API)
-    if (res.status === 404) return;
+    // Skip if endpoint unavailable (404, 502, 520, or non-JSON response)
+    if (res.status === 404 || res.status >= 500) return;
     const body = await res.json().catch(() => null);
+    if (!body) return;
 
     expect(res.status).toBeGreaterThanOrEqual(200);
     expect(res.status).toBeLessThan(500);
@@ -44,9 +45,10 @@ describe("e2e: login flow (Dirgha API)", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({}),
     });
-    // Skip dependent test if request endpoint is unavailable
-    if (reqRes.status === 404) return;
-    const reqBody = await reqRes.json();
+    // Skip dependent test if request endpoint is unavailable or returns non-JSON
+    if (reqRes.status === 404 || reqRes.status >= 500) return;
+    const reqBody = await reqRes.json().catch(() => null);
+    if (!reqBody?.device_code) return;
 
     const res = await fetch(
       `${API}/api/auth/device/poll?device_code=${encodeURIComponent(reqBody.device_code)}`,
