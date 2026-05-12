@@ -45,6 +45,13 @@ export {
 
 import type { HelpSlashCommand, ModelEntry } from "./index.js";
 
+// ── Safe stdout write — suppress EPIPE/EIO when terminal pipe breaks ────────
+const _origStdoutWrite = process.stdout.write.bind(process.stdout);
+process.stdout.write = function safeWrite(chunk: unknown): boolean {
+  try { return _origStdoutWrite(chunk as any); }
+  catch (e: any) { if (e.code !== "EPIPE" && e.code !== "EIO") throw e; return false; }
+};
+
 export interface RunInkTUIOptions {
   registry: ToolRegistry;
   providers: ProviderRegistry;

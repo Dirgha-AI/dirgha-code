@@ -24,6 +24,18 @@ export { HelpOverlay, } from "./components/HelpOverlay.js";
 export { AtFileComplete } from "./components/AtFileComplete.js";
 export { PasteCollapseView, detectPaste } from "./components/PasteCollapse.js";
 export { applyVimKey, createVimState, } from "./components/vim-bindings.js";
+// ── Safe stdout write — suppress EPIPE/EIO when terminal pipe breaks ────────
+const _origStdoutWrite = process.stdout.write.bind(process.stdout);
+process.stdout.write = function safeWrite(chunk) {
+    try {
+        return _origStdoutWrite(chunk);
+    }
+    catch (e) {
+        if (e.code !== "EPIPE" && e.code !== "EIO")
+            throw e;
+        return false;
+    }
+};
 export async function runInkTUI(opts) {
     const events = createEventStream();
     const slashRegistry = createDefaultSlashRegistry();
