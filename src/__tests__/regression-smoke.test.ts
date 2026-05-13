@@ -204,27 +204,37 @@ describe("agent-DB regression smoke (Wave 1-3 coverage)", () => {
     expect(names.has("graph_edges")).toBe(true);
     expect(names.has("embedding_meta")).toBe(true);
     expect(names.has("messages_fts")).toBe(true);
-    // embeddings is a vec0 virtual table when sqlite-vec is loaded; if
-    // the extension is absent, the migration rolls back and the table
-    // is missing. We assert the *invariant* that either the extension
-    // is present and embeddings exists, or it doesn't — never partial.
+    // embeddings is a vec0 virtual table created in the deferred phase
+    // (setImmediate inside getDb). Re-query after deferred init.
+    const { waitForDeferredInit } = await import("../state/db.js");
+    await waitForDeferredInit();
+    const tables2 = db
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type IN ('table','virtual') ORDER BY name",
+      )
+      .all() as { name: string }[];
+    const names2 = new Set(tables2.map((t) => t.name));
     if (isSqliteVecAvailable()) {
-      expect(names.has("embeddings")).toBe(true);
+      expect(names2.has("embeddings")).toBe(true);
     }
   });
 
   // 2. sqlite-vec extension loads if installed; gracefully no-ops otherwise.
   test("2. sqlite-vec extension loads if installed; gracefully no-ops otherwise", async () => {
-    const { openDb } = await import("../state/db.js");
+    const { openDb, waitForDeferredInit } = await import("../state/db.js");
     const { isVecLoaded, vecVersion } = await import("../state/vec.js");
     const db = openDb();
     if (isSqliteVecAvailable()) {
+      // The vec extension is loaded lazily (setImmediate) to avoid blocking
+      // CLI startup. Wait for it before probing.
+      await waitForDeferredInit();
       expect(isVecLoaded(db)).toBe(true);
       const version = vecVersion(db);
       expect(typeof version).toBe("string");
       expect(version).toMatch(/^v?\d+\.\d+\.\d+/);
     } else {
       // Extension absent → both probes return falsy without throwing.
+      // The lazy loader never ran, but the extension isn't available anyway.
       expect(isVecLoaded(db)).toBe(false);
       expect(vecVersion(db)).toBeNull();
     }

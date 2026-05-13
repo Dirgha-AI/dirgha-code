@@ -129,6 +129,10 @@ export function InputBox(props) {
         if (valueLen < pasteSegment.end || valueLen > pasteSegment.end + 500) {
             setPasteSegment(null);
             setPasteExpanded(false);
+            // Bump key so TextInput remounts with cursor at end of value.
+            // The paste collapse hid TextInput; when it reappears the internal
+            // cursorOffset must match the actual buffer length.
+            setTextInputKey((k) => k + 1);
             return;
         }
         // Check if the segment region still matches what was pasted.
@@ -137,6 +141,9 @@ export function InputBox(props) {
         if (segContent.length !== pasteSegment.chars) {
             setPasteSegment(null);
             setPasteExpanded(false);
+            // Same cursor-resync as above — TextInput reappears after collapse
+            // and must have cursor at the correct position.
+            setTextInputKey((k) => k + 1);
         }
     }, [props.value, pasteSegment]);
     // Wrap onChange so we can detect paste bursts, strip raw DEL/BS chars,
@@ -335,7 +342,7 @@ export function InputBox(props) {
     const borderColour = props.busy ? palette.brand : palette.accent;
     const promptColour = props.busy ? palette.brand : palette.accent;
     const collapsed = pasteSegment !== null && !pasteExpanded;
-    return (_jsxs(Box, { flexDirection: "column", width: cols, children: [_jsx(Box, { borderStyle: "single", borderColor: borderColour, paddingX: 1, children: _jsxs(Box, { gap: 1, flexGrow: 1, children: [_jsx(Text, { color: promptColour, children: "\u276F" }), collapsed && pasteSegment !== null ? (_jsx(PasteCollapseView, { value: props.value, segment: pasteSegment, expanded: false, palette: palette })) : (_jsx(TextInput, { value: props.value, onChange: handleChange, onSubmit: props.onSubmit, placeholder: props.placeholder ?? "Ask dirgha anything…", showCursor: !props.busy && !vimActive, focus: focus && !vimActive }, textInputKey))] }) }), _jsxs(Box, { paddingX: 1, justifyContent: "space-between", children: [_jsxs(Box, { gap: 1, children: [props.vimMode === true && (_jsxs(Text, { color: vimActive ? palette.accent : palette.brand, bold: true, children: ["[", vimModeLabel(vimState.mode), "]"] })), pasteSegment !== null && pasteExpanded && (_jsx(Text, { color: palette.textMuted, dimColor: true, children: "pasted block expanded (Ctrl+E collapse)" })), props.busy && (_jsx(BusyHint, { palette: palette, liveDurationMs: props.liveDurationMs, vimMode: props.vimMode === true }))] }), ctrlCArmed && (_jsx(Text, { color: palette.accent, bold: true, children: "Press Ctrl+C again to exit." }))] })] }));
+    return (_jsxs(Box, { flexDirection: "column", width: cols, children: [_jsx(Box, { borderStyle: "single", borderColor: borderColour, paddingX: 1, children: _jsxs(Box, { gap: 1, flexGrow: 1, children: [_jsx(Text, { color: promptColour, children: "\u276F" }), collapsed && pasteSegment !== null ? (_jsx(PasteCollapseView, { value: props.value, segment: pasteSegment, expanded: false, palette: palette })) : (_jsx(TextInput, { value: props.value, onChange: handleChange, onSubmit: props.onSubmit, placeholder: props.placeholder ?? "Ask dirgha anything…", showCursor: !props.busy, focus: focus && !vimActive }, textInputKey))] }) }), _jsxs(Box, { paddingX: 1, justifyContent: "space-between", children: [_jsxs(Box, { gap: 1, children: [props.vimMode === true && (_jsxs(Text, { color: vimActive ? palette.accent : palette.brand, bold: true, children: ["[", vimModeLabel(vimState.mode), "]"] })), pasteSegment !== null && pasteExpanded && (_jsx(Text, { color: palette.textMuted, dimColor: true, children: "pasted block expanded (Ctrl+E collapse)" })), props.busy && (_jsx(BusyHint, { palette: palette, liveDurationMs: props.liveDurationMs, vimMode: props.vimMode === true }))] }), ctrlCArmed && (_jsx(Text, { color: palette.accent, bold: true, children: "Press Ctrl+C again to exit." }))] })] }));
 }
 function vimModeLabel(m) {
     return m === "NORMAL" ? "NORMAL" : "INSERT";

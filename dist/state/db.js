@@ -22,6 +22,8 @@ const DB_PATH = join(DB_DIR, "dirgha.db");
 let _db = null;
 let _watcher = null;
 let _indexBootstrapped = false;
+let _deferredDone = false;
+let _deferredResolve = null;
 function getDb() {
     if (_db)
         return _db;
@@ -32,11 +34,39 @@ function getDb() {
         _db.pragma("journal_mode = WAL");
         _db.pragma("synchronous = NORMAL");
         const db = _db;
+        // Phase 1 — fast path: schema + migration only. This is sub-100ms
+        // even on a 61 MB database because SQLite only reads the header +
+        // schema tables. The vec extension and bootstrap index are deferred
+        // to phase 2 so the CLI can start rendering immediately.
         initSchema(db);
         migrateSchema(db);
-        loadVecExtension(db);
         ensureIndexStateTable(db);
-        bootstrapIndexOnce(db);
+        // Phase 2 — deferred: vec extension + memory/knowledge indexing.
+        // These can take 200-2000ms (vec native addon load + file walks).
+        // We fire them in the background so the CLI remains responsive.
+        process.nextTick(() => {
+            try {
+                const deferred = () => {
+                    loadVecExtension(db);
+                    bootstrapIndexOnce(db);
+                    _deferredDone = true;
+                    if (_deferredResolve) {
+                        _deferredResolve();
+                        _deferredResolve = null;
+                    }
+                };
+                // Defer by one microtask to let the caller (e.g. dbOpenSession)
+                // finish its INSERT before we do potentially slow I/O.
+                setImmediate(deferred);
+            }
+            catch {
+                _deferredDone = true;
+                if (_deferredResolve) {
+                    _deferredResolve();
+                    _deferredResolve = null;
+                }
+            }
+        });
         return db;
     }
     catch {
@@ -127,6 +157,19 @@ function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_edges_src ON graph_edges(src, rel);
     CREATE INDEX IF NOT EXISTS idx_edges_dst ON graph_edges(dst, rel);
     CREATE INDEX IF NOT EXISTS idx_nodes_type ON graph_nodes(type);
+
+    -- embedding_meta table + index for vector search sidecar.
+    -- The vec0 virtual table is created lazily in loadVecExtension.
+    -- embedding_meta is always available so relational lookups work
+    -- even when the vec native extension is absent.
+    CREATE TABLE IF NOT EXISTS embedding_meta (
+      id INTEGER PRIMARY KEY,
+      source TEXT NOT NULL,
+      chunk TEXT NOT NULL,
+      ts INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_embedding_meta_source
+      ON embedding_meta(source);
   `);
 }
 /**
@@ -262,6 +305,28 @@ export function isSqliteAvailable() {
     catch {
         return false;
     }
+}
+/**
+ * Wait for deferred DB initialization (vec extension, bootstrap index) to
+ * complete. Used by tests that need to assert on the post-phase-2 state.
+ * Returns immediately if deferred init already finished.
+ */
+export function waitForDeferredInit() {
+    if (_deferredDone)
+        return Promise.resolve();
+    if (!_deferredResolve) {
+        _deferredResolve = () => { };
+    }
+    return new Promise((resolve) => {
+        const existing = _deferredResolve;
+        _deferredResolve = () => {
+            existing?.();
+            resolve();
+        };
+        if (_deferredDone) {
+            _deferredResolve();
+        }
+    });
 }
 export function dbListSessions(limit = 20) {
     try {

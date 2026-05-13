@@ -89,6 +89,13 @@ export async function runInkTUI(opts) {
         }
     };
     process.on("exit", onProcessExit);
+    // Resolve ledger context promise (if any) before mounting Ink. The
+    // ledger string is needed by initialHistory() inside App.tsx for the
+    // system prompt composition; passing the resolved value here avoids
+    // a race between the React mount effect and the I/O read.
+    const resolvedLedgerContext = opts.ledgerContext instanceof Promise
+        ? await opts.ledgerContext
+        : opts.ledgerContext;
     // Debounce resize events so phone rotation doesn't trigger immediate full
     // repaints. The shim is installed just before render() and restored in the
     // finally block below.
@@ -122,8 +129,8 @@ export async function runInkTUI(opts) {
             ? { slashCommands: opts.slashCommands }
             : {}),
         ...(opts.models !== undefined ? { models: opts.models } : {}),
-        ...(opts.ledgerContext !== undefined
-            ? { ledgerContext: opts.ledgerContext }
+        ...(resolvedLedgerContext !== undefined
+            ? { ledgerContext: resolvedLedgerContext }
             : {}),
     });
     const instance = render(element, {

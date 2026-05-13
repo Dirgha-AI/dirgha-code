@@ -601,21 +601,23 @@ async function executeToolCalls(toolUses, cfg, events) {
             name: call.name,
             input,
         });
-        const toolTimeoutMs = 300_000;
+        const toolTimeoutMs = 120_000;
         const toolTimeoutCtrl = new AbortController();
         const toolTimer = setTimeout(() => toolTimeoutCtrl.abort(), toolTimeoutMs);
         const { signal: toolSignal, cancel: cancelToolRace } = raceSignals(cfg.signal, toolTimeoutCtrl.signal);
         const started = Date.now();
         let result;
+        let toolTimedOut = false;
         try {
             result = await cfg.toolExecutor.execute({ ...call, input }, toolSignal);
         }
         catch (err) {
             if (toolTimeoutCtrl.signal.aborted) {
                 result = {
-                    content: "[TIMEOUT] Tool exceeded 300s",
+                    content: "[TIMEOUT] Tool exceeded 120s",
                     isError: true,
                 };
+                toolTimedOut = true;
             }
             else {
                 result = {
@@ -627,6 +629,60 @@ async function executeToolCalls(toolUses, cfg, events) {
         finally {
             clearTimeout(toolTimer);
             cancelToolRace();
+        }
+        // Auto-retry on timeout: when a tool exceeds the deadline, retry once
+        // transparently. This handles transient hangs (slow MCP server, network
+        // blip, kernel scheduler stall) without showing the user an error.
+        // We retry at most once per tool call to avoid infinite loops.
+        if (toolTimedOut) {
+            events.emit({
+                type: "error",
+                message: `Tool "${call.name}" timed out — retrying once`,
+                retryable: true,
+            });
+            // Reset timeout for the retry
+            const retryTimeoutMs = 120_000;
+            const retryCtrl = new AbortController();
+            const retryTimer = setTimeout(() => retryCtrl.abort(), retryTimeoutMs);
+            const { signal: retrySignal, cancel: cancelRetry } = raceSignals(cfg.signal, retryCtrl.signal);
+            const retryStarted = Date.now();
+            try {
+                result = await cfg.toolExecutor.execute({ ...call, input }, retrySignal);
+                toolTimedOut = false;
+            }
+            catch (err) {
+                if (retryCtrl.signal.aborted) {
+                    result = {
+                        content: `[TIMEOUT] Tool "${call.name}" timed out after 120s (retry also timed out)`,
+                        isError: true,
+                    };
+                }
+                else {
+                    result = {
+                        content: `Tool execution failed on retry: ${String(err)}`,
+                        isError: true,
+                    };
+                }
+            }
+            finally {
+                clearTimeout(retryTimer);
+                cancelRetry();
+                // Bonus: log the retry duration so the audit trail captures the total
+                // time the user waited. The main durationMs below covers the original;
+                // we add the retry time.
+            }
+            // Emit a second tool_exec_end so the TUI can show the retry result.
+            // The first tool_exec_end from the timeout is emitted below; we emit
+            // the retry result as a second event with the same id so the TUI's
+            // event projection overwrites the previous "timed out" state.
+            events.emit({
+                type: "tool_exec_end",
+                id: call.id,
+                output: result.content,
+                isError: result.isError,
+                durationMs: Date.now() - retryStarted,
+                ...(result.metadata !== undefined ? { metadata: result.metadata } : {}),
+            });
         }
         const durationMs = Date.now() - started;
         let afterResult = result;

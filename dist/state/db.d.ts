@@ -27,6 +27,12 @@ export interface ChatResult {
 }
 export declare function dbSearchChats(query: string, limit?: number): ChatResult[];
 export declare function isSqliteAvailable(): boolean;
+/**
+ * Wait for deferred DB initialization (vec extension, bootstrap index) to
+ * complete. Used by tests that need to assert on the post-phase-2 state.
+ * Returns immediately if deferred init already finished.
+ */
+export declare function waitForDeferredInit(): Promise<void>;
 export declare function dbListSessions(limit?: number): Array<{
     id: string;
     model: string | null;

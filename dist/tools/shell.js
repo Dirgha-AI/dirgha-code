@@ -90,7 +90,7 @@ export const shellTool = {
         },
         required: ["command"],
     },
-    timeoutMs: 300_000, // 5 min — generous for multi-step shell commands
+    timeoutMs: 120_000, // 2 min — generous for multi-step shell commands; retry on timeout
     requiresApproval: () => true,
     async execute(rawInput, ctx) {
         const input = rawInput;

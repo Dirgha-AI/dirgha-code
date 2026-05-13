@@ -64,7 +64,10 @@ export interface RunInkTUIOptions {
   slashCommands?: HelpSlashCommand[];
   /** Model catalogue forwarded to the model picker. */
   models?: ModelEntry[];
-  ledgerContext?: string;
+  /** Ledger context string, or a promise that resolves to one.
+   *  When a promise is passed, runInkTUI resolves it before rendering
+   *  the first frame so the system prompt always includes ledger context. */
+  ledgerContext?: string | Promise<string | undefined>;
   /** Mutable ref — App writes the active session here so runInkTUI can flush on exit. */
   sessionHandle?: { session: Session | null };
 }
@@ -128,6 +131,14 @@ export async function runInkTUI(opts: RunInkTUIOptions): Promise<void> {
   };
   process.on("exit", onProcessExit);
 
+  // Resolve ledger context promise (if any) before mounting Ink. The
+  // ledger string is needed by initialHistory() inside App.tsx for the
+  // system prompt composition; passing the resolved value here avoids
+  // a race between the React mount effect and the I/O read.
+  const resolvedLedgerContext = opts.ledgerContext instanceof Promise
+    ? await opts.ledgerContext
+    : opts.ledgerContext;
+
   // Debounce resize events so phone rotation doesn't trigger immediate full
   // repaints. The shim is installed just before render() and restored in the
   // finally block below.
@@ -161,8 +172,8 @@ export async function runInkTUI(opts: RunInkTUIOptions): Promise<void> {
       ? { slashCommands: opts.slashCommands }
       : {}),
     ...(opts.models !== undefined ? { models: opts.models } : {}),
-    ...(opts.ledgerContext !== undefined
-      ? { ledgerContext: opts.ledgerContext }
+    ...(resolvedLedgerContext !== undefined
+      ? { ledgerContext: resolvedLedgerContext }
       : {}),
   });
   const instance = render(element, {

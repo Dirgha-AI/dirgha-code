@@ -177,6 +177,10 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
     if (valueLen < pasteSegment.end || valueLen > pasteSegment.end + 500) {
       setPasteSegment(null);
       setPasteExpanded(false);
+      // Bump key so TextInput remounts with cursor at end of value.
+      // The paste collapse hid TextInput; when it reappears the internal
+      // cursorOffset must match the actual buffer length.
+      setTextInputKey((k) => k + 1);
       return;
     }
     // Check if the segment region still matches what was pasted.
@@ -185,6 +189,9 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
     if (segContent.length !== pasteSegment.chars) {
       setPasteSegment(null);
       setPasteExpanded(false);
+      // Same cursor-resync as above — TextInput reappears after collapse
+      // and must have cursor at the correct position.
+      setTextInputKey((k) => k + 1);
     }
   }, [props.value, pasteSegment]);
 
@@ -423,7 +430,7 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
               onChange={handleChange}
               onSubmit={props.onSubmit}
               placeholder={props.placeholder ?? "Ask dirgha anything…"}
-              showCursor={!props.busy && !vimActive}
+              showCursor={!props.busy}
               focus={focus && !vimActive}
             />
           )}

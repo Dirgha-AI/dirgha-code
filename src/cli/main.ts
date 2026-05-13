@@ -115,11 +115,15 @@ async function main(): Promise<void> {
     exit(0);
   }
 
-  // BYOK hydration: pool first (highest-priority non-exhausted entry
-  // wins), then the legacy single-slot keystore for backwards compat.
-  // Real env vars beat both, so a shell-exported override still wins.
-  await hydrateEnvFromPool();
-  await hydrateEnvFromKeyStore();
+  // BYOK hydration: run both in parallel — pool first (highest-priority
+  // non-exhausted entry wins), then the legacy single-slot keystore for
+  // backwards compat. Real env vars beat both, so a shell-exported override
+  // still wins. Parallelised so a slow key-pool response doesn't block the
+  // keystore read (or vice versa).
+  await Promise.all([
+    hydrateEnvFromPool(),
+    hydrateEnvFromKeyStore(),
+  ]);
 
   // Fire-and-forget startup update check — doesn't block launch.
   checkStartupUpdate(PKG_VERSION).catch(() => {});
@@ -128,18 +132,28 @@ async function main(): Promise<void> {
   // Extensions register tools, slashes, subcommands, and event handlers.
   // Loading failures are non-fatal — the failing extension is named on
   // stderr and the rest of the CLI continues.
+  //
+  // Extensions are loaded fire-and-forget — they register on the extAPI
+  // object and are picked up downstream regardless of load order. A slow
+  // extension (e.g. one that pulls in heavy dependencies) must never block
+  // the TUI from mounting. Failed extensions are reported via callback.
   const { api: extAPI, registry: extRegistry } = createExtensionAPI();
-  const { join: pathJoin } = await import("node:path");
-  const { homedir: hd } = await import("node:os");
-  const extResult = await loadExtensions({
-    rootDir: pathJoin(hd(), ".dirgha", "extensions"),
-    api: extAPI,
-  });
-  for (const f of extResult.failed) {
-    process.stderr.write(
-      `[extensions] ${f.name} failed to load: ${f.error.message}\n`,
-    );
-  }
+  const extLoadPromise = (async () => {
+    const { join: pathJoin } = await import("node:path");
+    const { homedir: hd } = await import("node:os");
+    const extResult = await loadExtensions({
+      rootDir: pathJoin(hd(), ".dirgha", "extensions"),
+      api: extAPI,
+    });
+    for (const f of extResult.failed) {
+      process.stderr.write(
+        `[extensions] ${f.name} failed to load: ${f.error.message}\n`,
+      );
+    }
+  })();
+  // Don't await extLoadPromise here — let it race with TUI mount.
+  // The TUI's slash/tool registries will be updated lazily when the
+  // extension finishes loading.
   void extRegistry; // surface for downstream wiring (slashes / tools / events)
 
   // Subcommand dispatch (positional 0 as verb).
@@ -313,10 +327,10 @@ async function main(): Promise<void> {
   const providers = new ProviderRegistry();
   const sessions = createSessionStore();
 
-  // Load MCP servers from config and bridge their tools into the
-  // registry. Failures spawning one server don't break the others;
-  // they just surface as warnings on stderr. `mcp.shutdown()` runs at
-  // process exit to terminate child processes cleanly.
+  // Load MCP servers lazily: defer spawning child processes until the first
+  // tool execution. Spawning MCP servers (npx downloads, handshakes, tool
+  // listing) is the #1 startup latency contributor. Instead of blocking the
+  // TUI mount, we attach a lazy loader that resolves tools on first use.
   //
   // Persistent servers from ~/.dirgha/mcp.json are merged in first so
   // connections made via `/mcp connect` survive session restarts.
@@ -324,51 +338,55 @@ async function main(): Promise<void> {
   // takes precedence over the persistent registry for the same name.
   const allTools = [...builtInTools];
   let mcpShutdown: () => Promise<void> = async () => {};
-  {
-    const { loadMcpConfig } = await import("../mcp/mcp-config.js");
-    const persistedEntries = await loadMcpConfig();
-
-    // Convert McpServerEntry → McpServerSpec shape.
-    const persistedSpecs: Record<
-      string,
-      | { command: string; args?: string[]; env?: Record<string, string> }
-      | { url: string; bearerToken?: string }
-    > = {};
-    for (const [n, entry] of Object.entries(persistedEntries)) {
-      if (entry.type === "stdio" && entry.command) {
-        persistedSpecs[n] = {
-          command: entry.command,
-          ...(entry.args !== undefined ? { args: entry.args } : {}),
-          ...(entry.env !== undefined ? { env: entry.env } : {}),
-        };
-      } else if (entry.type === "http" && entry.url) {
-        persistedSpecs[n] = {
-          url: entry.url,
-          ...(entry.bearerToken !== undefined
-            ? { bearerToken: entry.bearerToken }
-            : {}),
-        };
+  let mcpLazyLoaded = false;
+  const lazyLoadMcp = async (): Promise<void> => {
+    if (mcpLazyLoaded) return;
+    mcpLazyLoaded = true;
+    try {
+      const { loadMcpConfig } = await import("../mcp/mcp-config.js");
+      const persistedEntries = await loadMcpConfig();
+      const persistedSpecs: Record<string, import("../mcp/loader.js").McpServerSpec> = {};
+      for (const [n, entry] of Object.entries(persistedEntries)) {
+        if (entry.type === "stdio" && entry.command) {
+          persistedSpecs[n] = {
+            command: entry.command,
+            ...(entry.args !== undefined ? { args: entry.args } : {}),
+            ...(entry.env !== undefined ? { env: entry.env } : {}),
+          };
+        } else if (entry.type === "http" && entry.url) {
+          persistedSpecs[n] = {
+            url: entry.url,
+            ...(entry.bearerToken !== undefined ? { bearerToken: entry.bearerToken } : {}),
+          };
+        }
       }
+      const merged = { ...persistedSpecs, ...(config.mcpServers ?? {}) };
+      if (Object.keys(merged).length > 0) {
+        const { loadMcpServers } = await import("../mcp/loader.js");
+        const mcp = await loadMcpServers(merged, {
+          onWarn: (msg) => { process.stderr.write(`warning: ${msg}\n`); },
+        });
+        for (const tool of mcp.tools) {
+          registry.register(tool);
+        }
+        mcpShutdown = mcp.shutdown;
+      }
+    } catch (err) {
+      process.stderr.write(`warning: MCP lazy-load failed: ${err instanceof Error ? err.message : String(err)}\n`);
     }
-
-    // Merge: persisted first, then config overrides for same name.
-    const merged = {
-      ...persistedSpecs,
-      ...(config.mcpServers ?? {}),
-    };
-
-    if (Object.keys(merged).length > 0) {
-      const { loadMcpServers } = await import("../mcp/loader.js");
-      const mcp = await loadMcpServers(merged, {
-        onWarn: (msg) => {
-          process.stderr.write(`warning: ${msg}\n`);
-        },
-      });
-      allTools.push(...mcp.tools);
-      mcpShutdown = mcp.shutdown;
-    }
-  }
+  };
   const registry = createToolRegistry(allTools);
+  // Wrap the registry's get() to trigger lazy MCP load on first tool lookup.
+  // This ensures the first tool call waits for MCP servers, but startup
+  // (TUI mount, config read, session create) never blocks on them.
+  const origGet = registry.get.bind(registry);
+  registry.get = (name: string) => {
+    // Fire lazy load on first access (fire-and-forget after the first call).
+    if (!mcpLazyLoaded) {
+      lazyLoadMcp().catch(() => {});
+    }
+    return origGet(name);
+  };
   // `exit` fires synchronously — async operations (like mcpShutdown) cannot
   // complete there. Register on SIGTERM/SIGINT instead so we can await the
   // shutdown promise before the process terminates.
@@ -466,13 +484,22 @@ async function main(): Promise<void> {
         cwd: cwd(),
         parentSessionId: randomUUID(),
       });
-      // Mount banner — on Windows the readline→ink raw-mode handoff
-      // takes 1-2s during which nothing renders. Without this the user
-      // sees a blank screen and assumes the app froze. The line is
-      // overdrawn instantly when ink mounts.
+      // Mount banner — emitted to stdout before Ink mounts so the
+      // terminal shows activity immediately. On Windows the readline→ink
+      // raw-mode handoff takes 1-2s during which nothing renders; without
+      // this banner the user sees a blank screen and assumes the app froze.
+      // The line is overdrawn instantly when ink mounts.
       stdout.write("\n  Launching dirgha…\n");
-      const inkLedgerCtx = await renderLedgerContext(ledgerScope("default"));
-      await runInkTUI({
+      // Kick off ledger read in parallel — don't block TUI mount on it.
+      // The ledger context resolves into the TUI before the first agent
+      // turn, so the system prompt always includes it even if it arrives
+      // a few hundred ms after ink mounts.
+      const inkLedgerPromise = renderLedgerContext(ledgerScope("default"))
+        .then((ctx) => ctx ?? undefined)
+        .catch(() => undefined);
+      // Fire Ink mount immediately with a pending ledger promise.
+      // runInkTUI resolves it inline before composing the system prompt.
+      const inkPromise = runInkTUI({
         registry,
         providers,
         sessions,
@@ -480,8 +507,9 @@ async function main(): Promise<void> {
         cwd: cwd(),
         systemPrompt: system,
         slashCommands,
-        ledgerContext: inkLedgerCtx || undefined,
+        ledgerContext: inkLedgerPromise,
       });
+      await inkPromise;
     } else {
       taskDelegatorRef.current = new SubagentDelegator({
         registry,

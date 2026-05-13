@@ -35,7 +35,10 @@ export interface RunInkTUIOptions {
     slashCommands?: HelpSlashCommand[];
     /** Model catalogue forwarded to the model picker. */
     models?: ModelEntry[];
-    ledgerContext?: string;
+    /** Ledger context string, or a promise that resolves to one.
+     *  When a promise is passed, runInkTUI resolves it before rendering
+     *  the first frame so the system prompt always includes ledger context. */
+    ledgerContext?: string | Promise<string | undefined>;
     /** Mutable ref — App writes the active session here so runInkTUI can flush on exit. */
     sessionHandle?: {
         session: Session | null;
