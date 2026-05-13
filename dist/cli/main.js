@@ -108,7 +108,7 @@ async function main() {
     // extension (e.g. one that pulls in heavy dependencies) must never block
     // the TUI from mounting. Failed extensions are reported via callback.
     const { api: extAPI, registry: extRegistry } = createExtensionAPI();
-    const extLoadPromise = (async () => {
+    void (async () => {
         const { join: pathJoin } = await import("node:path");
         const { homedir: hd } = await import("node:os");
         const extResult = await loadExtensions({
@@ -119,9 +119,9 @@ async function main() {
             process.stderr.write(`[extensions] ${f.name} failed to load: ${f.error.message}\n`);
         }
     })();
-    // Don't await extLoadPromise here — let it race with TUI mount.
-    // The TUI's slash/tool registries will be updated lazily when the
-    // extension finishes loading.
+    // Fire-and-forget: let extension loading race with TUI mount.
+    // The TUI's slash/tool registries are updated lazily when extensions
+    // finish loading.
     void extRegistry; // surface for downstream wiring (slashes / tools / events)
     // Subcommand dispatch (positional 0 as verb).
     if (positionals[0] === "submit-paper") {
