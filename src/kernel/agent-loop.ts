@@ -365,13 +365,14 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
           events.emit(ev);
           if (signal.aborted) break;
         }
-      } catch (err) {
+      } catch (rawErr) {
         // AbortError from our per-turn timeout is restructured as a clean
         // "stream timed out" error so the retry logic (PER_REASON_MAX_RETRIES)
         // picks it up as a retryable timeout.
-        if (streamCtrl.signal.aborted && !signal.aborted) {
-          err = Object.assign(new Error("stream timed out"), { name: "AbortError" });
-        }
+        const err =
+          streamCtrl.signal.aborted && !signal.aborted
+            ? Object.assign(new Error("stream timed out"), { name: "AbortError" })
+            : rawErr;
         // An AbortError mid-stream is a clean cancellation, not a
         // failure. Distinguish so callers (and `dirgha audit`) see
         // `stopReason: 'aborted'` instead of misleading 'error'.
