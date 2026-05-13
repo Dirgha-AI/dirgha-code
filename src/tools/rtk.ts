@@ -88,6 +88,7 @@ export const rtkTool: Tool = {
     },
     required: ["command"],
   },
+  timeoutMs: 120_000,
   async execute(raw: unknown, ctx: ToolContext): Promise<ToolResult> {
     const input = raw as { command: string; cwd?: string; timeoutMs?: number };
     const workDir = input.cwd ?? ctx.cwd ?? process.cwd();

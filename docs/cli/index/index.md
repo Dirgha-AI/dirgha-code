@@ -1,20 +1,20 @@
 # Dirgha CLI — Index
 
-> Latest: **v1.20.25** | [npm](https://www.npmjs.com/package/@dirgha/code) | [GitHub](https://github.com/Dirgha-AI/dirgha-code)
+> Latest: **v1.33.3** | [npm](https://www.npmjs.com/package/@dirgha/code) | [GitHub](https://github.com/Dirgha-AI/dirgha-code)
 
 ## Quick Links
 
 | Section                                            |                                                                               |
 | -------------------------------------------------- | ----------------------------------------------------------------------------- |
-| [Rendering & TUI](#rendering--tui)                 | Alternate buffer, message splitting, virtualized transcript, flicker detector |
-| [Streaming & Performance](#streaming--performance) | Flush throttle, Static committed history, spinners, React.memo                |
+| [Rendering & TUI](#rendering--tui)                 | Alternate buffer, message splitting, virtualized transcript, flicker detector, scroll indicator, paste collapse, vim paste fallback |
+| [Streaming & Performance](#streaming--performance) | Flush throttle, Static committed history, spinners, React.memo, per-turn stream timeout |
 | [Models & Providers](#models--providers)           | Per-provider catalogues, live sync, vendor prefix routing, health monitor     |
 | [Authentication & Login](#authentication--login)   | Device OAuth, TUI token loading, signup flow, secure approval                 |
-| [Autonomous Systems](#autonomous-systems)          | Self-healing failover, remote config, auto-update, startup health             |
+| [Autonomous Systems](#autonomous-systems)          | Self-healing failover, remote config, auto-update, startup health, event listener leak fix, MCP lazy load race fix |
 | [Testing & Quality](#testing--quality)             | Self-test suite, E2E tests, regression guards, CI pipeline                    |
 | [Developer Experience](#developer-experience)      | Interactive wizard, error UX, prompt history, syntax highlighting             |
 | [Architecture Decisions](#architecture-decisions)  | Smart backoff, no-aggressive-blacklist, vendor prefix priority                |
-| [Release History](#release-history)                | Full changelog v1.20.9 → v1.20.25                                             |
+| [Release History](#release-history)                | Full changelog v1.20.9 → v1.33.3                                             |
 
 ---
 
@@ -72,6 +72,58 @@ Measures estimated frame height vs terminal rows. Warns on overflow (once per se
 **Files:** `src/tui/ink/components/ToolBox.tsx`, `DenseToolMessage.tsx`, `StreamingText.tsx`, `SpinnerGlyph.tsx`
 
 All streaming-sensitive components wrapped in `React.memo`. SpinnerGlyph instances share a module-level `GLOBAL_START` timestamp so all spinners rotate in lockstep — no visual strobing when multiple tools run.
+
+### v1.33.3 — Live Item Cap Increase & Scroll Indicator
+
+**Files:** `src/tui/ink/App.tsx`
+
+The flicker overflow cap was 3x too aggressive (`Math.max(2, floor((rows-6)/4))` = 4 items on 24-row term). After the first overflow (which happens on any session > 5 turns), the user could only see the last 4 live items for the entire session — everywhere at the start of long responses was hidden.
+
+**Fixed:** Formula changed to `Math.max(4, floor((rows-6)/1.5))` = 12 items on a 24-row term, 22 on 40-row. Plus a scroll indicator `[↑ N more items above — scroll up]` renders above the visible live items when capped.
+
+### v1.33.3 — Paste Collapse Shows Lines Only
+
+**Files:** `src/tui/ink/components/PasteCollapse.tsx`
+
+Collapsed paste placeholder previously showed `[3 lines pasted, 42 chars]`. The char count was noise — users only care about lines. Changed to `[3 lines pasted]`. Expanded view similarly shows `[3 lines expanded]` instead of `[3 lines, 42 chars expanded]`.
+
+### v1.33.3 — Vim NORMAL Paste Fallback
+
+**Files:** `src/tui/ink/components/InputBox.tsx`
+
+When in vim NORMAL mode with TextInput `focus=false`, paste events arriving through `useInput` as rapid keystrokes were silently dropped — `applyVimKey` returned `handled=false` for unrecognized characters.
+
+**Fixed:** When an unrecognized printable key arrives in NORMAL mode, the character is inserted at the cursor position and the mode auto-switches to INSERT. Subsequent paste characters arrive with TextInput `focus=true` and are captured normally.
+
+### v1.33.3 — Event Listener Leak Fix (Long Sprints)
+
+**Files:** `src/kernel/agent-loop.ts`
+
+The approval prompt race attached an abort listener to `cfg.signal` (the loop-level signal) via `addEventListener("abort", handler, { once: true })`. The `once` flag only self-removes if the signal fires — but in normal operation the signal never aborts. Every tool call across a long autonomous sprint accumulated one listener on the loop signal. After ~11 tool calls, Node hit its default `maxListeners` warning.
+
+**Fixed:** The handler is now stored in a ref object and explicitly removed via `removeEventListener` after the Promise.race resolves. Zero accumulation across turns.
+
+### v1.33.3 — Per-Turn Stream Timeout
+
+**Files:** `src/kernel/agent-loop.ts`
+
+`cfg.provider.stream()` had no timeout — if the provider hung (dropped connection, never sent a terminal event), the agent loop blocked forever. The user had to kill the process.
+
+**Fixed:** Added `streamTimeoutMs` config option (default 300_000 / 5 min). Uses the same `raceSignals` + `setTimeout` pattern as the tool timeout. A per-turn `AbortController` races against the loop signal; if the timer fires, the stream is aborted and the error is classified as a retryable timeout. Timer and race listener are cleaned up in a `finally` block every turn. Also added `streamTtfbTimeoutMs` config (default 180_000 / 3 min) for future TTFB enforcement.
+
+### v1.33.3 — MCP Lazy Load Race Fix
+
+**Files:** `src/cli/main.ts`, `src/tools/exec.ts`
+
+First tool call to a lazy-loaded MCP server returned "not registered" because `registry.get()` is synchronous — it fired `lazyLoadMcp()` but returned `origGet(name)` immediately before MCP servers finished loading.
+
+**Fixed:** Added `mcpLoadPromise` that resolves when MCP lazy load completes. The `ToolExecutor` accepts `lazyLoadPromise` in its options; when a tool isn't found and the promise is pending, it awaits the promise and retries the lookup once. All 13+ call sites (agent loop, subcommands, fleet, ACP server, daemon) inherit this automatically.
+
+### v1.33.3 — Per-Tool Timeout for rtk & Browser
+
+**Files:** `src/tools/rtk.ts`, `src/tools/browser.ts`
+
+Added `timeoutMs: 120_000` to both tool definitions. Previously only the agent loop's 120s catch-all protected them, producing a generic error message. Now the timeout error reads `Tool "rtk" timed out after 120000ms.` with proper duration metadata.
 
 ### v1.22.0 — InputBox Cursor Flash Fix
 
@@ -321,6 +373,7 @@ Tracks DB write failures. Warns after 10 errors in a session. Exposed via `dirgh
 
 | Version      | Date       | Highlights                                                                                                     |
 | ------------ | ---------- | -------------------------------------------------------------------------------------------------------------- |
+| **v1.33.3**  | 2026-04-25 | Startup perf (parallel BYOK, lazy MCP, deferred DB, fire-and-forget extensions), tool auto-retry, paste cursor fix, **event listener leak fix**, **per-turn stream timeout**, **MCP lazy load race fix**, **vim paste fallback**, **flicker cap increase + scroll indicator**, **paste collapse line-only**, **per-tool timeouts** |
 | **v1.20.25** | 2026-05-03 | Self-test suite, version sync                                                                                  |
 | **v1.20.24** | 2026-05-03 | Self-test: 9 live API regression tests                                                                         |
 | **v1.20.23** | 2026-05-03 | Flicker detector startup suppression                                                                           |
@@ -343,4 +396,4 @@ Tracks DB write failures. Warns after 10 errors in a session. Exposed via `dirgh
 
 ---
 
-_Last updated: 2026-05-03. CI publishing v1.20.25 to npm._
+_Last updated: 2026-04-25. CI publishing v1.33.3 to npm._

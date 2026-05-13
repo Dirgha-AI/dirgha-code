@@ -24,5 +24,13 @@ export interface ToolExecutorOptions {
     /** User-selected sandbox mode (config + /sandbox slash command).
      *  Defaults to "off" when omitted (backwards compatible). */
     sandboxMode?: SandboxMode;
+    /**
+     * Optional promise that, when pending, defers the "not registered" error
+     * until after it resolves. Used for lazy-loaded MCP servers: the first
+     * tool call may arrive before MCP has finished loading; rather than
+     * returning "not registered", the executor awaits the lazy-load promise
+     * and retries the lookup once.
+     */
+    lazyLoadPromise?: Promise<void>;
 }
 export declare function createToolExecutor(opts: ToolExecutorOptions): ToolExecutor;

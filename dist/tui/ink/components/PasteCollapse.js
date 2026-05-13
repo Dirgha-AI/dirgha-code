@@ -52,10 +52,10 @@ function countLines(s) {
 export function PasteCollapseView(props) {
     const { value, segment, expanded, palette } = props;
     if (expanded) {
-        return (_jsxs(Box, { flexDirection: "column", children: [_jsx(Text, { children: value }), _jsxs(Text, { color: palette.text.secondary, dimColor: true, children: ["[", segment.lines, " line", segment.lines === 1 ? "" : "s", ", ", segment.chars, " ", "chars expanded \u00B7 Ctrl+E to collapse]"] })] }));
+        return (_jsxs(Box, { flexDirection: "column", children: [_jsx(Text, { children: value }), _jsxs(Text, { color: palette.text.secondary, dimColor: true, children: ["[", segment.lines, " line", segment.lines === 1 ? "" : "s", " expanded \u00B7 Ctrl+E to collapse]"] })] }));
     }
     const before = value.slice(0, segment.start);
     const after = value.slice(segment.end);
-    return (_jsxs(Box, { flexDirection: "row", flexWrap: "wrap", children: [_jsx(Text, { children: before }), _jsxs(Text, { color: palette.status.warning, children: ["[", segment.lines, " line", segment.lines === 1 ? "" : "s", " pasted,", " ", segment.chars, " chars]"] }), _jsx(Text, { children: after }), _jsxs(Text, { color: palette.text.secondary, dimColor: true, children: [" ", "\u00B7 Ctrl+E expand"] })] }));
+    return (_jsxs(Box, { flexDirection: "row", flexWrap: "wrap", children: [_jsx(Text, { children: before }), _jsxs(Text, { color: palette.status.warning, children: ["[", segment.lines, " line", segment.lines === 1 ? "" : "s", " pasted]"] }), _jsx(Text, { children: after }), _jsxs(Text, { color: palette.text.secondary, dimColor: true, children: [" ", "\u00B7 Ctrl+E expand"] })] }));
 }
 //# sourceMappingURL=PasteCollapse.js.map

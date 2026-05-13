@@ -382,12 +382,17 @@ export function App(props: AppProps): React.JSX.Element {
   const { stdout: _flickerStdout } = useStdout();
   const _termRows = _flickerStdout?.rows ?? 24;
   const _maxLiveItems = flicker.overflowDetected
-    ? Math.max(2, Math.floor((_termRows - 6) / 4))
+    ? Math.max(4, Math.floor((_termRows - 6) / 1.5))
     : Infinity;
   // Preserve array identity when no truncation needed — avoids spurious
   // useMemo recalculation on every render when overflow is not active.
+  const _liveItemCount = projection.liveItems.length;
+  const _overflowCount =
+    flicker.overflowDetected && _maxLiveItems < _liveItemCount
+      ? _liveItemCount - _maxLiveItems
+      : 0;
   const _visibleLiveItems =
-    flicker.overflowDetected && _maxLiveItems < projection.liveItems.length
+    _overflowCount > 0
       ? projection.liveItems.slice(-_maxLiveItems)
       : projection.liveItems;
 
@@ -1356,8 +1361,19 @@ export function App(props: AppProps): React.JSX.Element {
   );
 
   const liveJsx = React.useMemo(
-    () => renderTranscript(_visibleLiveItems, thinkingStreaming),
-    [_visibleLiveItems, thinkingStreaming],
+    () => (
+      <>
+        {_overflowCount > 0 && (
+          <Box paddingX={1}>
+            <Text color="gray" italic>
+              [↑ {_overflowCount} more item{_overflowCount === 1 ? "" : "s"} above — scroll up]
+            </Text>
+          </Box>
+        )}
+        {renderTranscript(_visibleLiveItems, thinkingStreaming)}
+      </>
+    ),
+    [_visibleLiveItems, thinkingStreaming, _overflowCount],
   );
 
   const providerEntries = React.useMemo(

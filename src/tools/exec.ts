@@ -34,6 +34,14 @@ export interface ToolExecutorOptions {
   /** User-selected sandbox mode (config + /sandbox slash command).
    *  Defaults to "off" when omitted (backwards compatible). */
   sandboxMode?: SandboxMode;
+  /**
+   * Optional promise that, when pending, defers the "not registered" error
+   * until after it resolves. Used for lazy-loaded MCP servers: the first
+   * tool call may arrive before MCP has finished loading; rather than
+   * returning "not registered", the executor awaits the lazy-load promise
+   * and retries the lookup once.
+   */
+  lazyLoadPromise?: Promise<void>;
 }
 
 export function createToolExecutor(opts: ToolExecutorOptions): ToolExecutor {
@@ -52,7 +60,13 @@ export function createToolExecutor(opts: ToolExecutorOptions): ToolExecutor {
 
   return {
     async execute(call: ToolCall, signal: AbortSignal): Promise<ToolResult> {
-      const tool = opts.registry.get(call.name);
+      let tool = opts.registry.get(call.name);
+      if (!tool && opts.lazyLoadPromise) {
+        // MCP servers may still be loading — wait for the lazy-load to
+        // finish, then retry the lookup once before giving up.
+        await opts.lazyLoadPromise;
+        tool = opts.registry.get(call.name);
+      }
       if (!tool) {
         return {
           content: `Tool "${call.name}" is not registered.`,

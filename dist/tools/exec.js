@@ -25,7 +25,13 @@ export function createToolExecutor(opts) {
     }
     return {
         async execute(call, signal) {
-            const tool = opts.registry.get(call.name);
+            let tool = opts.registry.get(call.name);
+            if (!tool && opts.lazyLoadPromise) {
+                // MCP servers may still be loading — wait for the lazy-load to
+                // finish, then retry the lookup once before giving up.
+                await opts.lazyLoadPromise;
+                tool = opts.registry.get(call.name);
+            }
             if (!tool) {
                 return {
                     content: `Tool "${call.name}" is not registered.`,

@@ -90,8 +90,7 @@ export function PasteCollapseView(
       <Box flexDirection="column">
         <Text>{value}</Text>
         <Text color={palette.text.secondary} dimColor>
-          [{segment.lines} line{segment.lines === 1 ? "" : "s"}, {segment.chars}{" "}
-          chars expanded · Ctrl+E to collapse]
+          [{segment.lines} line{segment.lines === 1 ? "" : "s"} expanded · Ctrl+E to collapse]
         </Text>
       </Box>
     );
@@ -102,8 +101,7 @@ export function PasteCollapseView(
     <Box flexDirection="row" flexWrap="wrap">
       <Text>{before}</Text>
       <Text color={palette.status.warning}>
-        [{segment.lines} line{segment.lines === 1 ? "" : "s"} pasted,{" "}
-        {segment.chars} chars]
+        [{segment.lines} line{segment.lines === 1 ? "" : "s"} pasted]
       </Text>
       <Text>{after}</Text>
       <Text color={palette.text.secondary} dimColor>

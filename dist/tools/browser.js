@@ -163,6 +163,7 @@ export const browserTool = {
         },
         required: ["action"],
     },
+    timeoutMs: 120_000,
     requiresApproval: (raw) => {
         const input = raw;
         // Approve network-touching or filesystem-writing actions. `content`

@@ -69,6 +69,19 @@ export interface AgentLoopConfig {
    */
   autoApprove?: boolean;
   costCalculator?: (input: number, output: number, cached: number) => number;
+  /**
+   * Maximum milliseconds to wait for the provider to begin streaming a
+   * response (TTFB timeout). Defaults to 180_000 (3 min). If the provider
+   * doesn't send the first event within this window, the turn is retried
+   * (up to the per-reason retry cap for "timeout"). Set to 0 for no limit.
+   */
+  streamTtfbTimeoutMs?: number;
+  /**
+   * Maximum milliseconds for the entire model stream per turn, from first
+   * byte to completion. Defaults to 300_000 (5 min). Protects against
+   * provider hangs that never send a terminal event. Set to 0 for no limit.
+   */
+  streamTimeoutMs?: number;
   /** Optional loop detector — checked before each turn; abort if looping. */
   loopDetector?: {
     track(turn: { toolCalls?: Array<{ name: string; args?: unknown }> }): void;
@@ -327,19 +340,38 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
       messagesForCall = _stripOrphanedToolResults(messagesForCall);
 
       const streamEvents: AgentEvent[] = [];
+      // Per-turn stream timeout: protects against provider hangs that
+      // never send a terminal event. The loop signal (user Esc) still
+      // takes precedence — a timeout fires only when the loop is not
+      // already aborted. Uses the same raceSignals pattern as the tool
+      // timeout for consistent cleanup.
+      const streamTimeoutMs = cfg.streamTimeoutMs ?? 300_000;
+      const streamCtrl = new AbortController();
+      const streamTimer = streamTimeoutMs > 0
+        ? setTimeout(() => { if (!signal.aborted) streamCtrl.abort(); }, streamTimeoutMs)
+        : null;
+      const { signal: streamSignal, cancel: cancelStreamRace } = streamTimeoutMs > 0
+        ? raceSignals(signal, streamCtrl.signal)
+        : { signal, cancel: () => {} };
       try {
         const dispatchModel = resolveModelForDispatch(cfg.model);
         for await (const ev of cfg.provider.stream({
           model: dispatchModel,
           messages: messagesForCall,
           tools: cfg.tools,
-          signal: signal,
+          signal: streamSignal,
         })) {
           streamEvents.push(ev);
           events.emit(ev);
           if (signal.aborted) break;
         }
       } catch (err) {
+        // AbortError from our per-turn timeout is restructured as a clean
+        // "stream timed out" error so the retry logic (PER_REASON_MAX_RETRIES)
+        // picks it up as a retryable timeout.
+        if (streamCtrl.signal.aborted && !signal.aborted) {
+          err = Object.assign(new Error("stream timed out"), { name: "AbortError" });
+        }
         // An AbortError mid-stream is a clean cancellation, not a
         // failure. Distinguish so callers (and `dirgha audit`) see
         // `stopReason: 'aborted'` instead of misleading 'error'.
@@ -500,6 +532,12 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
         stopReason = "error";
         events.emit({ type: "turn_end", turnId, stopReason });
         break;
+      } finally {
+        // Clean up per-turn stream timeout resources. The timer and race
+        // signal must be disposed every turn regardless of success/failure
+        // to prevent timer leaks across long autonomous sprints.
+        if (streamTimer) clearTimeout(streamTimer);
+        cancelStreamRace();
       }
 
       // Abort via signal.aborted break (not thrown AbortError): treat identically.
@@ -681,6 +719,9 @@ async function executeToolCalls(
     ) {
       // Race against abort so Esc while an approval prompt is showing
       // doesn't leave the TUI frozen with busy=true forever.
+      // IMPORTANT: the abort listener must be removed after the race resolves
+      // to prevent listener leaks on cfg.signal across long autonomous runs.
+      const removeApprovalAbort: { fn: (() => void) | null } = { fn: null };
       const decision = await Promise.race([
         cfg.approvalBus.request({
           id: call.id,
@@ -692,11 +733,17 @@ async function executeToolCalls(
             res("deny");
             return;
           }
-          cfg.signal?.addEventListener("abort", () => res("deny"), {
-            once: true,
-          });
+          const handler = (): void => res("deny");
+          cfg.signal!.addEventListener("abort", handler, { once: true });
+          removeApprovalAbort.fn = () => {
+            cfg.signal!.removeEventListener("abort", handler);
+          };
         }),
       ]);
+      // Clean up the abort listener — it was never meant to persist past
+      // the approval decision. Left unchecked, it accumulates across every
+      // tool call in long-horizon autonomous runs.
+      removeApprovalAbort.fn?.();
       if (decision === "deny" || decision === "deny_always") {
         return {
           call,

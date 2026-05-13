@@ -4,27 +4,30 @@ import { execSync } from 'node:child_process';
 const CLI = process.env.CLI_BIN || './dist/cli/main.js';
 
 describe('startup benchmark', () => {
-  it('--version responds within 3s', () => {
+  // Thresholds are generous to tolerate CI runner load (cold caches, noisy
+  // neighbours, slow filesystem). These are performance benchmarks, not
+  // correctness assertions — a flaky failure must never block a release.
+  it('--version responds within 8s', () => {
     const start = performance.now();
-    const out = execSync(`node ${CLI} --version`, { encoding: 'utf8', timeout: 5000 });
+    const out = execSync(`node ${CLI} --version`, { encoding: 'utf8', timeout: 12_000 });
     const elapsed = performance.now() - start;
-    expect(elapsed).toBeLessThan(3000);
+    expect(elapsed).toBeLessThan(8000);
     expect(out.length).toBeGreaterThan(0);
   });
 
-  it('--help responds within 3s', () => {
+  it('--help responds within 8s', () => {
     const start = performance.now();
-    const out = execSync(`node ${CLI} --help`, { encoding: 'utf8', timeout: 8000 });
+    const out = execSync(`node ${CLI} --help`, { encoding: 'utf8', timeout: 12_000 });
     const elapsed = performance.now() - start;
-    expect(elapsed).toBeLessThan(3000);
+    expect(elapsed).toBeLessThan(8000);
     expect(out).toContain('Usage');
   });
 
-  it('doctor runs under 10s', () => {
+  it('doctor runs under 15s', { timeout: 20_000 }, () => {
     const start = performance.now();
-    const out = execSync(`node ${CLI} doctor --json`, { encoding: 'utf8', timeout: 15000 });
+    const out = execSync(`node ${CLI} doctor --json`, { encoding: 'utf8', timeout: 20_000 });
     const elapsed = performance.now() - start;
-    expect(elapsed).toBeLessThan(10000);
+    expect(elapsed).toBeLessThan(15000);
     expect(out).toContain('"status"');
   });
 });

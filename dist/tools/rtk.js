@@ -67,6 +67,7 @@ export const rtkTool = {
         },
         required: ["command"],
     },
+    timeoutMs: 120_000,
     async execute(raw, ctx) {
         const input = raw;
         const workDir = input.cwd ?? ctx.cwd ?? process.cwd();

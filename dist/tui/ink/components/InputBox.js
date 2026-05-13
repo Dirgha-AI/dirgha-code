@@ -336,6 +336,18 @@ export function InputBox(props) {
                         setTextInputKey((k) => k + 1);
                     return;
                 }
+                // Unrecognized key in NORMAL mode (e.g. paste burst, typing
+                // without switching to INSERT first): insert the character
+                // directly and switch to INSERT mode. The keystroke is consumed
+                // by useInput (TextInput has focus=false in NORMAL mode), so we
+                // must append it to the value ourselves.
+                if (inputCh && inputCh.length === 1) {
+                    const pos = vimState.cursor;
+                    props.onChange(props.value.slice(0, pos) + inputCh + props.value.slice(pos));
+                }
+                setVimState((s) => ({ ...s, mode: "INSERT", pending: "", cursor: s.cursor + (inputCh?.length ?? 0) }));
+                setTextInputKey((k) => k + 1);
+                return;
             }
         }
     }, { isActive: focus });

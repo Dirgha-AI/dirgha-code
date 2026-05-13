@@ -1,4 +1,4 @@
-import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { jsxs as _jsxs, jsx as _jsx, Fragment as _Fragment } from "react/jsx-runtime";
 /**
  * Ink root component for the dirgha TUI.
  *
@@ -292,11 +292,15 @@ export function App(props) {
     const { stdout: _flickerStdout } = useStdout();
     const _termRows = _flickerStdout?.rows ?? 24;
     const _maxLiveItems = flicker.overflowDetected
-        ? Math.max(2, Math.floor((_termRows - 6) / 4))
+        ? Math.max(4, Math.floor((_termRows - 6) / 1.5))
         : Infinity;
     // Preserve array identity when no truncation needed — avoids spurious
     // useMemo recalculation on every render when overflow is not active.
-    const _visibleLiveItems = flicker.overflowDetected && _maxLiveItems < projection.liveItems.length
+    const _liveItemCount = projection.liveItems.length;
+    const _overflowCount = flicker.overflowDetected && _maxLiveItems < _liveItemCount
+        ? _liveItemCount - _maxLiveItems
+        : 0;
+    const _visibleLiveItems = _overflowCount > 0
         ? projection.liveItems.slice(-_maxLiveItems)
         : projection.liveItems;
     // Render performance metrics — track frame timing, expose for StatusBar.
@@ -1211,7 +1215,7 @@ export function App(props) {
             }
         })();
     }, [overlays]);
-    const liveJsx = React.useMemo(() => renderTranscript(_visibleLiveItems, thinkingStreaming), [_visibleLiveItems, thinkingStreaming]);
+    const liveJsx = React.useMemo(() => (_jsxs(_Fragment, { children: [_overflowCount > 0 && (_jsx(Box, { paddingX: 1, children: _jsxs(Text, { color: "gray", italic: true, children: ["[\u2191 ", _overflowCount, " more item", _overflowCount === 1 ? "" : "s", " above \u2014 scroll up]"] }) })), renderTranscript(_visibleLiveItems, thinkingStreaming)] })), [_visibleLiveItems, thinkingStreaming, _overflowCount]);
     const providerEntries = React.useMemo(() => buildProviderEntries(models, currentModel), [models, currentModel]);
     const spinnerCtx = React.useMemo(() => ({ busy, frame: 0 }), [busy]);
     const renderTranscriptItem = React.useCallback((item) => _jsx(TranscriptRow, { item: item }, item.id), []);

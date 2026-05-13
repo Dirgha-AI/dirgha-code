@@ -37,6 +37,19 @@ export interface AgentLoopConfig {
      */
     autoApprove?: boolean;
     costCalculator?: (input: number, output: number, cached: number) => number;
+    /**
+     * Maximum milliseconds to wait for the provider to begin streaming a
+     * response (TTFB timeout). Defaults to 180_000 (3 min). If the provider
+     * doesn't send the first event within this window, the turn is retried
+     * (up to the per-reason retry cap for "timeout"). Set to 0 for no limit.
+     */
+    streamTtfbTimeoutMs?: number;
+    /**
+     * Maximum milliseconds for the entire model stream per turn, from first
+     * byte to completion. Defaults to 300_000 (5 min). Protects against
+     * provider hangs that never send a terminal event. Set to 0 for no limit.
+     */
+    streamTimeoutMs?: number;
     /** Optional loop detector — checked before each turn; abort if looping. */
     loopDetector?: {
         track(turn: {

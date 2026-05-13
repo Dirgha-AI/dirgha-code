@@ -246,6 +246,7 @@ export const browserTool: Tool = {
     },
     required: ["action"],
   },
+  timeoutMs: 120_000,
   requiresApproval: (raw: unknown): boolean => {
     const input = raw as Input;
     // Approve network-touching or filesystem-writing actions. `content`

@@ -328,11 +328,23 @@ async function main() {
     // Wrap the registry's get() to trigger lazy MCP load on first tool lookup.
     // This ensures the first tool call waits for MCP servers, but startup
     // (TUI mount, config read, session create) never blocks on them.
+    // Promise the executor can await when a tool isn't found, so the first
+    // MCP tool call doesn't return "not registered" before lazy load finishes.
+    let mcpLoadResolve;
+    const mcpLoadPromise = new Promise((resolve) => {
+        mcpLoadResolve = resolve;
+    });
     const origGet = registry.get.bind(registry);
     registry.get = (name) => {
-        // Fire lazy load on first access (fire-and-forget after the first call).
         if (!mcpLazyLoaded) {
-            lazyLoadMcp().catch(() => { });
+            lazyLoadMcp()
+                .then(() => { mcpLoadResolve(); })
+                .catch(() => { mcpLoadResolve(); });
+        }
+        else {
+            // MCP already loaded (e.g. fire-and-forget finished before first tool
+            // call) — resolve immediately so the executor doesn't hang.
+            mcpLoadResolve();
         }
         return origGet(name);
     };
@@ -550,7 +562,12 @@ async function main() {
             });
         }
     });
-    const executor = createToolExecutor({ registry, cwd: cwd(), sessionId });
+    const executor = createToolExecutor({
+        registry,
+        cwd: cwd(),
+        sessionId,
+        lazyLoadPromise: mcpLoadPromise,
+    });
     const sanitized = registry.sanitize({ descriptionLimit: 200 });
     // Boot context: mode preamble + project primer (DIRGHA.md or
     // CLAUDE.md, capped at 8 KB) + caller's --system text. Without
