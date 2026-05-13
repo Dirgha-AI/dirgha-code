@@ -15,7 +15,7 @@
  */
 
 import * as React from "react";
-import { Box, Text, useApp, useInput } from "ink";
+import { Box, Text, useApp, useInput, useStdout } from "ink";
 import { randomUUID } from "node:crypto";
 import { Static } from "ink";
 import type { Message } from "../../kernel/types.js";
@@ -62,7 +62,7 @@ import { ToolBox } from "./components/ToolBox.js";
 import { ToolGroup, type ToolItem } from "./components/ToolGroup.js";
 import { InputBox } from "./components/InputBox.js";
 import { PromptQueueIndicator } from "./components/PromptQueueIndicator.js";
-import { TaskIndicator } from "./components/TaskIndicator.js";
+// TaskIndicator removed from persistent UI — stale cross-session tasks cluttered bootup
 import { SubagentPanel } from "./components/SubagentPanel.js";
 import { GPUJobIndicator } from "./components/GPUJobIndicator.js";
 import { ModelPicker, type ModelEntry } from "./components/ModelPicker.js";
@@ -373,6 +373,23 @@ export function App(props: AppProps): React.JSX.Element {
   const estimatedLineCount =
     (transcript.length + projection.liveItems.length) * 2 + 15;
   const flicker = useFlickerDetector(estimatedLineCount);
+
+  // When the live viewport overflows the terminal, cap the number of live
+  // items rendered per frame. This prevents Ink from repainting the full
+  // scrollback on every streaming tick, which is the root cause of flicker.
+  // Reuse the stdout already obtained by useFlickerDetector — a second
+  // useStdout() call would register a duplicate resize listener.
+  const { stdout: _flickerStdout } = useStdout();
+  const _termRows = _flickerStdout?.rows ?? 24;
+  const _maxLiveItems = flicker.overflowDetected
+    ? Math.max(2, Math.floor((_termRows - 6) / 4))
+    : Infinity;
+  // Preserve array identity when no truncation needed — avoids spurious
+  // useMemo recalculation on every render when overflow is not active.
+  const _visibleLiveItems =
+    flicker.overflowDetected && _maxLiveItems < projection.liveItems.length
+      ? projection.liveItems.slice(-_maxLiveItems)
+      : projection.liveItems;
 
   // Render performance metrics — track frame timing, expose for StatusBar.
   const renderMetrics: RenderMetricsGetters = useRenderMetrics();
@@ -1339,8 +1356,8 @@ export function App(props: AppProps): React.JSX.Element {
   );
 
   const liveJsx = React.useMemo(
-    () => renderTranscript(projection.liveItems, thinkingStreaming),
-    [projection.liveItems, thinkingStreaming],
+    () => renderTranscript(_visibleLiveItems, thinkingStreaming),
+    [_visibleLiveItems, thinkingStreaming],
   );
 
   const providerEntries = React.useMemo(
@@ -1408,7 +1425,6 @@ export function App(props: AppProps): React.JSX.Element {
           )}
           <SubagentPanel events={props.events} />
           <GPUJobIndicator />
-          <TaskIndicator />
           <PromptQueueIndicator queued={promptQueue} />
           <InputBox
             value={input}

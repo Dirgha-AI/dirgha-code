@@ -15,7 +15,7 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
  * focused on layout and lifecycle.
  */
 import * as React from "react";
-import { Box, Text, useApp, useInput } from "ink";
+import { Box, Text, useApp, useInput, useStdout } from "ink";
 import { randomUUID } from "node:crypto";
 import { Static } from "ink";
 import { appendAudit } from "../../audit/writer.js";
@@ -42,7 +42,7 @@ import { ToolBox } from "./components/ToolBox.js";
 import { ToolGroup } from "./components/ToolGroup.js";
 import { InputBox } from "./components/InputBox.js";
 import { PromptQueueIndicator } from "./components/PromptQueueIndicator.js";
-import { TaskIndicator } from "./components/TaskIndicator.js";
+// TaskIndicator removed from persistent UI — stale cross-session tasks cluttered bootup
 import { SubagentPanel } from "./components/SubagentPanel.js";
 import { GPUJobIndicator } from "./components/GPUJobIndicator.js";
 import { ModelPicker } from "./components/ModelPicker.js";
@@ -284,6 +284,21 @@ export function App(props) {
     // Flicker detector — compares estimated tree height to terminal rows.
     const estimatedLineCount = (transcript.length + projection.liveItems.length) * 2 + 15;
     const flicker = useFlickerDetector(estimatedLineCount);
+    // When the live viewport overflows the terminal, cap the number of live
+    // items rendered per frame. This prevents Ink from repainting the full
+    // scrollback on every streaming tick, which is the root cause of flicker.
+    // Reuse the stdout already obtained by useFlickerDetector — a second
+    // useStdout() call would register a duplicate resize listener.
+    const { stdout: _flickerStdout } = useStdout();
+    const _termRows = _flickerStdout?.rows ?? 24;
+    const _maxLiveItems = flicker.overflowDetected
+        ? Math.max(2, Math.floor((_termRows - 6) / 4))
+        : Infinity;
+    // Preserve array identity when no truncation needed — avoids spurious
+    // useMemo recalculation on every render when overflow is not active.
+    const _visibleLiveItems = flicker.overflowDetected && _maxLiveItems < projection.liveItems.length
+        ? projection.liveItems.slice(-_maxLiveItems)
+        : projection.liveItems;
     // Render performance metrics — track frame timing, expose for StatusBar.
     const renderMetrics = useRenderMetrics();
     const [showRenderMetrics, setShowRenderMetrics] = React.useState(false);
@@ -1196,7 +1211,7 @@ export function App(props) {
             }
         })();
     }, [overlays]);
-    const liveJsx = React.useMemo(() => renderTranscript(projection.liveItems, thinkingStreaming), [projection.liveItems, thinkingStreaming]);
+    const liveJsx = React.useMemo(() => renderTranscript(_visibleLiveItems, thinkingStreaming), [_visibleLiveItems, thinkingStreaming]);
     const providerEntries = React.useMemo(() => buildProviderEntries(models, currentModel), [models, currentModel]);
     const spinnerCtx = React.useMemo(() => ({ busy, frame: 0 }), [busy]);
     const renderTranscriptItem = React.useCallback((item) => _jsx(TranscriptRow, { item: item }, item.id), []);
@@ -1220,7 +1235,7 @@ export function App(props) {
                         }, onReject: () => setPendingFailover(null), onPicker: () => {
                             setPendingFailover(null);
                             overlays.openOverlay("models");
-                        } })), _jsx(SubagentPanel, { events: props.events }), _jsx(GPUJobIndicator, {}), _jsx(TaskIndicator, {}), _jsx(PromptQueueIndicator, { queued: promptQueue }), _jsx(InputBox, { value: input, onChange: setInput, onSubmit: handleSubmit, busy: busy, liveDurationMs: liveDurationMs, vimMode: props.config.vimMode === true, onAtQueryChange: overlays.setAtQuery, onSlashQueryChange: overlays.setSlashQuery, onRequestOverlay: overlays.openOverlay, promptHistory: promptHistory, onRequestYoloToggle: () => {
+                        } })), _jsx(SubagentPanel, { events: props.events }), _jsx(GPUJobIndicator, {}), _jsx(PromptQueueIndicator, { queued: promptQueue }), _jsx(InputBox, { value: input, onChange: setInput, onSubmit: handleSubmit, busy: busy, liveDurationMs: liveDurationMs, vimMode: props.config.vimMode === true, onAtQueryChange: overlays.setAtQuery, onSlashQueryChange: overlays.setSlashQuery, onRequestOverlay: overlays.openOverlay, promptHistory: promptHistory, onRequestYoloToggle: () => {
                             const next = mode === "yolo" ? "act" : "yolo";
                             setMode(next);
                             // Wire the approval bus so mid-turn tool calls are immediately

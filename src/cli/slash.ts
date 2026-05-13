@@ -210,18 +210,10 @@ export async function registerBuiltinSlashCommands(
   for (const cmd of builtinSlashCommands) {
     if (!registry.has(cmd.name)) {
       registry.register(cmd.name, cmd.execute);
-    } else {
-      process.stderr.write(
-        `[slash] skipping "/${cmd.name}" — already registered\n`,
-      );
     }
     for (const alias of cmd.aliases ?? []) {
       if (!registry.has(alias)) {
         registry.register(alias, cmd.execute);
-      } else {
-        process.stderr.write(
-          `[slash] skipping alias "/${alias}" for "/${cmd.name}" — already registered\n`,
-        );
       }
     }
   }

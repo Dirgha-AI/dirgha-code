@@ -77,6 +77,154 @@ export interface AgentLoopConfig {
   };
 }
 
+// ── History repair helpers ────────────────────────────────────────────────────
+//
+// Structural 400s (bad message sequence) cannot be fixed by retrying with the
+// same history. These helpers implement progressive in-place repair so the
+// session never dies from a malformed history.
+//
+// Call order on a 400:
+//   Level 0 → 1: _sanitizeHistory   (targeted structural fixes)
+//   Level 1 → 2: _stripAllToolTurns (remove all tool context, keep text)
+//   Level 2 → 3: truncate to last 6 messages + system
+//   Level 3+    : fall through to hard error
+
+/** General structural sanitizer — fixes all message-sequence issues. */
+function _sanitizeHistory(messages: Message[]): Message[] {
+  const result: Message[] = [];
+
+  for (const msg of messages) {
+    // Drop empty content
+    if (Array.isArray(msg.content) && msg.content.length === 0) continue;
+    if (typeof msg.content === "string" && msg.content.trim() === "") continue;
+
+    const prev = result[result.length - 1];
+    // Collapse consecutive same-role messages (merge content, skip system)
+    if (prev && prev.role === msg.role && msg.role !== "system") {
+      if (typeof prev.content === "string" && typeof msg.content === "string") {
+        prev.content = prev.content + "\n" + msg.content;
+      } else {
+        const pc: import("./types.js").ContentPart[] =
+          typeof prev.content === "string"
+            ? [{ type: "text", text: prev.content }]
+            : [...prev.content];
+        const mc: import("./types.js").ContentPart[] =
+          typeof msg.content === "string"
+            ? [{ type: "text", text: msg.content }]
+            : msg.content;
+        prev.content = [...pc, ...mc];
+      }
+      continue;
+    }
+
+    result.push({
+      ...msg,
+      content: Array.isArray(msg.content) ? [...msg.content] : msg.content,
+    });
+  }
+
+  // Strip assistant-all-tool_use blocks whose IDs have no matching tool_result
+  for (let i = 0; i < result.length - 1; i++) {
+    const msg = result[i];
+    if (msg.role !== "assistant" || !Array.isArray(msg.content)) continue;
+    const toolUses = msg.content.filter((p) => p.type === "tool_use") as Array<{ type: "tool_use"; id: string }>;
+    if (toolUses.length === 0) continue;
+    const next = result[i + 1];
+    const nextContent = next && Array.isArray(next.content) ? next.content : [];
+    const nextIds = new Set(
+      nextContent
+        .filter((p) => p.type === "tool_result")
+        .map((p) => (p as { type: "tool_result"; toolUseId: string }).toolUseId),
+    );
+    // Remove orphaned tool_use blocks (IDs with no matching result); keep valid ones
+    const orphanedUseIds = new Set(toolUses.filter((tu) => !nextIds.has(tu.id)).map((tu) => tu.id));
+    if (orphanedUseIds.size > 0) {
+      const kept = msg.content.filter(
+        (p) => p.type !== "tool_use" || !orphanedUseIds.has((p as { type: "tool_use"; id: string }).id),
+      );
+      if (kept.length === 0) { result.splice(i, 1); i--; }
+      else msg.content = kept;
+    }
+  }
+
+  // Strip tool_result blocks in user messages whose toolUseId has no matching tool_use in prev
+  for (let i = 1; i < result.length; i++) {
+    const msg = result[i];
+    if (msg.role !== "user" || !Array.isArray(msg.content)) continue;
+    const toolResults = msg.content.filter((p) => p.type === "tool_result") as Array<{ type: "tool_result"; toolUseId: string }>;
+    if (toolResults.length === 0) continue;
+    const prev = result[i - 1];
+    const prevUses = (prev && Array.isArray(prev.content) ? prev.content : []).filter(
+      (p) => p.type === "tool_use",
+    ) as Array<{ type: "tool_use"; id: string }>;
+    const validIds = new Set(prevUses.map((tu) => tu.id));
+    // Remove only the orphaned result blocks (not the whole message)
+    const orphanedResultIds = new Set(toolResults.filter((tr) => !validIds.has(tr.toolUseId)).map((tr) => tr.toolUseId));
+    if (orphanedResultIds.size > 0) {
+      const kept = msg.content.filter(
+        (p) => p.type !== "tool_result" || !orphanedResultIds.has((p as { type: "tool_result"; toolUseId: string }).toolUseId),
+      );
+      if (kept.length === 0) { result.splice(i, 1); i--; }
+      else msg.content = kept;
+    }
+  }
+
+  return result;
+}
+
+/** Nuclear fallback: remove all tool_use/tool_result content, keep text/thinking. */
+function _stripAllToolTurns(messages: Message[]): Message[] {
+  const stripped = messages
+    .map((msg): Message | null => {
+      if (typeof msg.content === "string") return msg;
+      if (msg.role === "user") {
+        const nonTool = msg.content.filter((p) => p.type !== "tool_result");
+        if (nonTool.length === 0) return null;
+        return { ...msg, content: nonTool };
+      }
+      if (msg.role === "assistant") {
+        const nonTool = msg.content.filter((p) => p.type !== "tool_use");
+        if (nonTool.length === 0) return null;
+        return { ...msg, content: nonTool };
+      }
+      return msg;
+    })
+    .filter((m): m is Message => m !== null);
+  return _sanitizeHistory(stripped);
+}
+
+// Remove any user messages containing only tool_result parts that are not
+// immediately preceded by an assistant message with tool_use parts.
+// contextTransform (compaction/summarization) can produce these by collapsing
+// assistant turns that called tools, leaving the result messages orphaned.
+// Sending orphaned tool_result messages triggers HTTP 400 from the provider.
+function _stripOrphanedToolResults(messages: Message[]): Message[] {
+  const out: Message[] = [];
+  for (const msg of messages) {
+    if (
+      msg.role === "user" &&
+      Array.isArray(msg.content) &&
+      msg.content.length > 0 &&
+      msg.content.every((p) => (p as { type: string }).type === "tool_result")
+    ) {
+      const prev = out[out.length - 1];
+      if (
+        prev?.role === "assistant" &&
+        Array.isArray(prev.content) &&
+        (prev.content as Array<{ type: string }>).some(
+          (p) => p.type === "tool_use",
+        )
+      ) {
+        out.push(msg);
+      }
+      // else: drop orphaned tool_result message — no matching tool_use above it
+    } else {
+      out.push(msg);
+    }
+  }
+  return out;
+}
+
 export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
   const events = cfg.events;
   const history: Message[] = [...cfg.messages];
@@ -94,6 +242,7 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
   let turnCount = 0;
   let retriesForTurn = 0;
   let _compactedThisTurn = false; // guards against infinite compact→retry→compact loops
+  let _historyRepairLevel = 0;   // 0=clean, 1=sanitized, 2=tool-stripped, 3=truncated
   const DEFAULT_MAX_RETRIES = 3;
   // Per-reason caps override the default. TTFT timeouts have already
   // waited 90 s — retrying once is sufficient evidence the provider is
@@ -173,6 +322,10 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
         break;
       }
 
+      // Full-history scan: remove any orphaned tool_result messages that
+      // contextTransform may have introduced mid-history (not just tail).
+      messagesForCall = _stripOrphanedToolResults(messagesForCall);
+
       const streamEvents: AgentEvent[] = [];
       try {
         const dispatchModel = resolveModelForDispatch(cfg.model);
@@ -247,6 +400,63 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
           }
         }
 
+        // ── Structural 400 recovery — progressive history repair ─────────────
+        // When a provider rejects our message sequence (bad tool ordering,
+        // orphaned results, consecutive same-role, etc.) retrying with the
+        // same broken history will fail identically. Instead, escalate through
+        // three repair levels so the session never dies from a bad history.
+        const is400Structural =
+          /\b400\b|bad.?request|invalid.*message|tool.*role|messages.*tool|tool_result.*tool_use/i.test(
+            errMsg,
+          ) &&
+          !/context.?length|too long|max.*tokens|context_length_exceeded/i.test(
+            errMsg,
+          );
+        if (is400Structural && _historyRepairLevel < 3) {
+          // Helper: after any repair, ensure history is never empty.
+          // An empty messages array will fail with a different error; keep at
+          // minimum the system messages, or the last user message as a fallback.
+          const ensureNonEmpty = (msgs: Message[]): Message[] => {
+            if (msgs.length > 0) return msgs;
+            const sys = history.filter((m) => m.role === "system");
+            if (sys.length > 0) return sys;
+            const lastUser = [...history].reverse().find((m) => m.role === "user");
+            return lastUser ? [lastUser] : history.slice(-1);
+          };
+          if (_historyRepairLevel === 0) {
+            _historyRepairLevel = 1;
+            const repaired = ensureNonEmpty(_sanitizeHistory(history));
+            history.length = 0;
+            history.push(...repaired);
+          } else if (_historyRepairLevel === 1) {
+            _historyRepairLevel = 2;
+            const stripped = ensureNonEmpty(_stripAllToolTurns(history));
+            history.length = 0;
+            history.push(...stripped);
+            events.emit({
+              type: "error",
+              message:
+                "Tool history stripped due to repeated API errors — continuing with text context only.",
+              retryable: true,
+            });
+          } else if (_historyRepairLevel === 2) {
+            _historyRepairLevel = 3;
+            const system = history.filter((m) => m.role === "system");
+            const recent = history.filter((m) => m.role !== "system").slice(-6);
+            const truncated = ensureNonEmpty([...system, ...recent]);
+            history.length = 0;
+            history.push(...truncated);
+            events.emit({
+              type: "error",
+              message:
+                "Context reset due to persistent API errors — conversation restarted from recent history.",
+              retryable: true,
+            });
+          }
+          turnIndex--;
+          continue;
+        }
+
         // Known limitation: this regex is fragile — provider error messages
         // can change at any time. A classifier or structured error code is
         // the correct long-term fix, but that requires per-provider parsing.
@@ -306,6 +516,7 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
       recordRequest(cfg.provider.id, true, 0);
       recordHealthSuccess(cfg.provider.id, 0);
       retriesForTurn = 0;
+      _historyRepairLevel = 0; // reset repair level after a clean successful turn
       if (cfg.costCalculator) {
         totals.costUsd += cfg.costCalculator(
           assembled.inputTokens,
