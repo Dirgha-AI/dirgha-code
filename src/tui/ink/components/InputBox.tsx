@@ -134,6 +134,19 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
     prevFocusRef.current = focus;
   }, [focus]);
 
+  // When the parent clears the buffer programmatically (e.g. setInput("")
+  // after a slash command submit, Ctrl+C, or queue dequeue completion),
+  // ink-text-input's internal state lags behind props.value because it
+  // only seeds from the initial value. Force remount on every external
+  // non-empty → empty transition so the visible field actually clears.
+  const prevExternalValueRef = React.useRef(props.value);
+  React.useEffect(() => {
+    if (prevExternalValueRef.current.length > 0 && props.value.length === 0) {
+      setTextInputKey((k) => k + 1);
+    }
+    prevExternalValueRef.current = props.value;
+  }, [props.value]);
+
   // Notify parent whenever the active @-token shifts.
   React.useEffect(() => {
     if (props.onAtQueryChange) {
