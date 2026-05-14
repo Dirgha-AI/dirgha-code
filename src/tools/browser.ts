@@ -104,17 +104,23 @@ async function ensureBrowser(): Promise<PwPage> {
     chromium = await loadPlaywright();
   } catch (err) {
     throw new Error(
-      `playwright is not available. Install with: pnpm add -w playwright && npx playwright install chromium. Underlying: ${(err as Error).message}`,
+      `playwright is not available. Install with: npm install -g playwright && playwright install chromium. Underlying: ${(err as Error).message}`,
     );
   }
 
   const args: string[] = ["--disable-dev-shm-usage"];
-  const sandboxAvailable = await access(
-    "/proc/sys/kernel/unprivileged_userns_clone",
-  )
-    .then(() => true)
+  // Always disable sandbox when running as root (servers, CI, containers).
+  // The file-existence check is insufficient — the file can exist with value
+  // 0 (disabled) on systems where user namespaces aren't enabled.
+  const runningAsRoot = process.getuid?.() === 0;
+  const unshareFile = await access("/proc/sys/kernel/unprivileged_userns_clone")
+    .then(async () => {
+      const { readFile } = await import("node:fs/promises");
+      const val = (await readFile("/proc/sys/kernel/unprivileged_userns_clone", "utf8")).trim();
+      return val === "1";
+    })
     .catch(() => false);
-  if (!sandboxAvailable) {
+  if (runningAsRoot || !unshareFile) {
     args.push("--no-sandbox");
   }
 

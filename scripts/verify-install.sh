@@ -79,6 +79,24 @@ if ! echo "$HELP_OUT" | grep -qE "Subcommands|Interactive|REPL"; then
 fi
 green "  --help printed expected sections"
 
+section "6. better-sqlite3 native addon"
+PKG_DIR="$TEST_DIR/node_modules/@dirgha/code"
+SQLITE_CHECK="$(node -e "
+try {
+  const Database = require('$PKG_DIR/node_modules/better-sqlite3');
+  new Database(':memory:');
+  process.stdout.write('ok');
+} catch(e) {
+  process.stdout.write('fail:' + e.message.split('\n')[0]);
+}
+" 2>&1 || true)"
+if [[ "$SQLITE_CHECK" != "ok" ]]; then
+  yellow "  WARN  better-sqlite3 native addon not built: $SQLITE_CHECK"
+  yellow "        Users will need: dirgha setup --features"
+else
+  green "  better-sqlite3 native addon loads correctly"
+fi
+
 echo
 green "============================================="
 green "  PASS  $PKG_NAME@$PKG_VER installs + boots cleanly"

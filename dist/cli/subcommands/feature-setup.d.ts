@@ -10,4 +10,4 @@
  *
  * Dispatch: called from `runSetup()` in setup.ts when `--features` is present.
  */
-export declare function runFeatureSetup(): Promise<number>;
+export declare function runFeatureSetup(argv?: string[]): Promise<number>;

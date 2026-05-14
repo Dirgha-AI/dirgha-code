@@ -467,9 +467,10 @@ async function checkCron(): Promise<CheckResult> {
 
 async function checkVecExtension(): Promise<CheckResult> {
   try {
-    const { openDb } = await import("../../state/db.js");
+    const { openDb, waitForDeferredInit } = await import("../../state/db.js");
     const { vecVersion } = await import("../../state/vec.js");
     const db = openDb();
+    await waitForDeferredInit();
     const version = vecVersion(db);
     if (version) {
       return {
