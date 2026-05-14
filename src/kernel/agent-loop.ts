@@ -99,9 +99,9 @@ export interface AgentLoopConfig {
 // session never dies from a malformed history.
 //
 // Call order on a 400:
-//   Level 0 → 1: _sanitizeHistory                (targeted structural fixes)
-//   Level 1 → 2: cfg.contextTransform if present (LLM-summarize tool history)
-//   Level 2 → 3: _stripAllToolTurns              (remove all tool context, keep text)
+//   Level 0 → 1: _sanitizeHistory + first pass                  (targeted structural fixes)
+//   Level 1 → 2: _sanitizeHistory + _stripOrphanedToolResults   (orphan cleanup, free)
+//   Level 2 → 3: _stripAllToolTurns                             (remove all tool context)
 //   Level 3 → 4: truncate to last 6 messages + system
 //   Level 4+    : fall through to hard error
 
@@ -516,19 +516,18 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
             const repaired = ensureNonEmpty(_sanitizeHistory(history));
             history.length = 0;
             history.push(...repaired);
-          } else if (_historyRepairLevel === 1 && cfg.contextTransform) {
-            // Level 2: LLM-summarize tool history — preserves semantic context
-            // instead of stripping. Reuses the same compaction pipeline that
-            // handles context-length overflows.
+          } else if (_historyRepairLevel === 1) {
+            // Level 2: targeted orphan cleanup — strip tool_result messages
+            // that have no matching tool_use above them. This is the most
+            // common cause of structural 400s after compaction and is free
+            // (no LLM call, no I/O).
             _historyRepairLevel = 2;
-            try {
-              const summarized = await cfg.contextTransform(history);
-              history.length = 0;
-              history.push(...ensureNonEmpty(summarized));
-            } catch {
-              // Summarization failed — skip to strip level on next retry
-            }
-          } else if (_historyRepairLevel === 1 || _historyRepairLevel === 2) {
+            const deorphaned = ensureNonEmpty(
+              _stripOrphanedToolResults(_sanitizeHistory(history)),
+            );
+            history.length = 0;
+            history.push(...deorphaned);
+          } else if (_historyRepairLevel === 2) {
             _historyRepairLevel = 3;
             const stripped = ensureNonEmpty(_stripAllToolTurns(history));
             history.length = 0;
