@@ -275,19 +275,8 @@ function _recoverMinimalContext(history) {
             : m.content.some((p) => p.type === "text" && p.text.trim().length > 0)));
     if (lastTextUser)
         return [...sys, lastTextUser];
-    if (sys.length > 0)
-        return [
-            ...sys,
-            {
-                role: "user",
-                content: "[System: tool history was compacted due to a message sequencing error. Resume from the last known task state — do NOT ask the user to restate their request. Check available tools (e.g. /checkpoint list) if you need context recovery.]",
-            },
-        ];
-    // Absolute fallback: synthetic user message to prevent API 400
-    return [{
-            role: "user",
-            content: "[System: tool history was compacted. Resume from context — do NOT ask the user to restate their request.]",
-        }];
+    // Return only system messages; caller must handle the case of no user message.
+    return sys.length > 0 ? sys : [];
 }
 export async function runAgentLoop(cfg) {
     const events = cfg.events;
@@ -306,13 +295,16 @@ export async function runAgentLoop(cfg) {
     let turnCount = 0;
     let retriesForTurn = 0;
     let _compactedThisTurn = false; // guards against infinite compact→retry→compact loops
+    let _lastCompactionTurnIndex = -Infinity;
     let _historyRepairLevel = 0; // 0=clean, 1=sanitized, 2=tool-stripped, 3=truncated
     // Per-session refusal tracker: maps (tool_name + serialized_args) → count of
     // isError results. After REFUSAL_ABORT_THRESHOLD identical refused calls, the
     // session is aborted rather than sending the same error back to the model
     // forever.  Lives outside the turn loop so it accumulates across turns.
     const _refusalCounts = new Map();
-    const REFUSAL_ABORT_THRESHOLD = 3;
+    const _contentRefusalCounts = new Map();
+    let _lastContentKey = null;
+    const REFUSAL_ABORT_THRESHOLD = 2;
     const DEFAULT_MAX_RETRIES = 3;
     // Per-reason caps override the default. TTFT timeouts have already
     // waited 90 s — retrying once is sufficient evidence the provider is
@@ -394,20 +386,51 @@ export async function runAgentLoop(cfg) {
             // contextTransform may have introduced mid-history (not just tail).
             messagesForCall = _stripOrphanedToolResults(messagesForCall);
             // Guard: _stripOrphanedToolResults can return [] when all messages were orphaned.
-            // An empty array causes "Empty input messages" HTTP 400. Fall back to the last
-            // non-tool user message + system messages to keep conversation alive.
+            // If so, attempt to recover minimal context. Then check if the context is still
+            // missing a user message — if we have only system messages, the conversation
+            // cannot proceed.
             if (messagesForCall.length === 0) {
                 messagesForCall = _recoverMinimalContext(history);
+            }
+            const _systemCount = messagesForCall.filter(m => m.role === 'system').length;
+            if (messagesForCall.length === 0 || messagesForCall.length === _systemCount) {
+                events.emit({
+                    type: "error",
+                    message: "Conversation context was lost and could not be recovered. Use /resume <sessionId> or start a new turn.",
+                    reason: "context_unrecoverable",
+                    retryable: false,
+                });
+                stopReason = "error";
+                events.emit({ type: "turn_end", turnId, stopReason });
+                break;
             }
             // ── Proactive compaction ──────────────────────────────────────────────
             // Fire before the API call when token usage is ≥80% of the context
             // limit — prevents silent degradation when providers don't return an
             // explicit context-length error (e.g. DeepSeek silently truncates).
+            const estimateMessageTokens = (m) => {
+                if (typeof m.content === 'string')
+                    return Math.ceil(m.content.length / 4);
+                if (Array.isArray(m.content)) {
+                    return Math.ceil(m.content.reduce((s, p) => {
+                        if (p.type === 'text')
+                            return s + (p.text?.length ?? 0);
+                        if (p.type === 'tool_use')
+                            return s + JSON.stringify(p.input ?? {}).length;
+                        if (p.type === 'tool_result')
+                            return s + ((p.content ?? '').length);
+                        return s + 0;
+                    }, 0) / 4);
+                }
+                return 0;
+            };
+            const historyTokens = history.reduce((acc, m) => acc + estimateMessageTokens(m), 0);
             const _contextLimit = cfg.contextLimit ?? 128_000;
             if (_contextLimit > 0 &&
-                totals.inputTokens > _contextLimit * 0.8 &&
+                historyTokens > _contextLimit * 0.8 &&
                 cfg.contextTransform &&
-                !_compactedThisTurn) {
+                !_compactedThisTurn &&
+                turnIndex - _lastCompactionTurnIndex >= 3) {
                 _compactedThisTurn = true;
                 try {
                     const compacted = await cfg.contextTransform(history);
@@ -417,6 +440,27 @@ export async function runAgentLoop(cfg) {
                     messagesForCall = _stripOrphanedToolResults(messagesForCall);
                     if (messagesForCall.length === 0) {
                         messagesForCall = _recoverMinimalContext(history);
+                    }
+                    const _systemCount2 = messagesForCall.filter(m => m.role === 'system').length;
+                    if (messagesForCall.length === 0 || messagesForCall.length === _systemCount2) {
+                        events.emit({
+                            type: "error",
+                            message: "Conversation context was lost and could not be recovered. Use /resume <sessionId> or start a new turn.",
+                            reason: "context_unrecoverable",
+                            retryable: false,
+                        });
+                        stopReason = "error";
+                        events.emit({ type: "turn_end", turnId, stopReason });
+                        break;
+                    }
+                    // Compute post-compaction tokens to decide cooldown
+                    const newHistoryTokens = history.reduce((acc, m) => acc + estimateMessageTokens(m), 0);
+                    if (newHistoryTokens >= historyTokens) {
+                        // Tokens did not decrease — longer cooldown
+                        _lastCompactionTurnIndex = turnIndex + 7;
+                    }
+                    else {
+                        _lastCompactionTurnIndex = turnIndex;
                     }
                 }
                 catch {
@@ -671,6 +715,21 @@ export async function runAgentLoop(cfg) {
                 break;
             }
             const toolResults = await executeToolCalls(toolUses, cfg, events, _refusalCounts, REFUSAL_ABORT_THRESHOLD);
+            // Track identical-content repeats (content-based loop detection)
+            for (const tr of toolResults) {
+                const call = tr.call;
+                const result = tr.result;
+                const contentPrefix = typeof result.content === 'string' ? result.content.slice(0, 200) : '';
+                const contentKey = `${call.name}:${JSON.stringify(call.input)}:${contentPrefix}`;
+                if (contentKey === _lastContentKey) {
+                    const prev = _contentRefusalCounts.get(contentKey) ?? 1;
+                    _contentRefusalCounts.set(contentKey, prev + 1);
+                }
+                else {
+                    _contentRefusalCounts.set(contentKey, 1);
+                }
+                _lastContentKey = contentKey;
+            }
             // If the refusal-abort Map signalled a loop (any key hit threshold),
             // emit the terminal error and stop.
             let _refusalAbortTriggered = false;
@@ -685,6 +744,21 @@ export async function runAgentLoop(cfg) {
                     stopReason = "loop";
                     _refusalAbortTriggered = true;
                     break;
+                }
+            }
+            if (!_refusalAbortTriggered) {
+                for (const [key, n] of _contentRefusalCounts) {
+                    if (n >= REFUSAL_ABORT_THRESHOLD) {
+                        const name = key.split(":")[0] ?? key;
+                        events.emit({
+                            type: "error",
+                            message: `[loop] tool "${name}" returned identical content ${n} times — aborting session to prevent infinite loop`,
+                            retryable: false,
+                        });
+                        stopReason = "loop";
+                        _refusalAbortTriggered = true;
+                        break;
+                    }
                 }
             }
             if (_refusalAbortTriggered)
