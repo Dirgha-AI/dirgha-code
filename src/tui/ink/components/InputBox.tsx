@@ -309,14 +309,34 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
         setHistoryIdx(null);
       }
 
-      // Enter handling — only when a paste segment exists and
-      // TextInput is not rendered. When paste is collapsed TextInput
-      // is replaced by PasteCollapseView; when expanded it's still
-      // mounted but we suppress its internal Enter handler so Enter
-      // always flows through this single path (avoiding double-submit).
-      if (key.return && pasteSegment !== null) {
-        props.onSubmit(props.value);
-        return;
+      // Paste-collapsed mode special keys.
+      if (pasteSegment !== null && !pasteExpanded) {
+        if (key.return) {
+          // Enter submits the full value (paste included).
+          props.onSubmit(props.value);
+          return;
+        }
+        if (key.backspace || key.delete) {
+          // One backspace wipes the entire pasted block.
+          const newValue =
+            props.value.slice(0, pasteSegment.start) +
+            props.value.slice(pasteSegment.end);
+          setPasteSegment(null);
+          setPasteExpanded(false);
+          props.onChange(newValue);
+          setTextInputKey((k) => k + 1);
+          return;
+        }
+        // Any printable character: append after pasted block and resume
+        // normal editing (clear collapse so TextInput remounts).
+        if (inputCh && inputCh.length >= 1 && !key.ctrl && !key.meta) {
+          const newValue = props.value + inputCh;
+          setPasteSegment(null);
+          setPasteExpanded(false);
+          props.onChange(newValue);
+          setTextInputKey((k) => k + 1);
+          return;
+        }
       }
 
       // Ctrl+C handling — highest priority.

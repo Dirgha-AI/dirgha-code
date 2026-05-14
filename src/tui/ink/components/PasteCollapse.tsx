@@ -100,13 +100,11 @@ export function PasteCollapseView(
   return (
     <Box flexDirection="row" flexWrap="wrap">
       <Text>{before}</Text>
-      <Text color={palette.status.warning}>
-        [{segment.lines} line{segment.lines === 1 ? "" : "s"} pasted]
-      </Text>
+      <Text color={palette.status.warning}>[paste]</Text>
       <Text>{after}</Text>
       <Text color={palette.text.secondary} dimColor>
         {" "}
-        · Ctrl+E expand
+        · ⌫ delete · Ctrl+E expand
       </Text>
     </Box>
   );
