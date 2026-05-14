@@ -422,6 +422,8 @@ export function useEventProjection(
           currentThinkingId = null;
           return;
         case "toolcall_start": {
+          flushPending();
+          flushPendingThinking();
           const item: TranscriptItem = {
             kind: "tool",
             id: event.id,
