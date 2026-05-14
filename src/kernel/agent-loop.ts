@@ -99,10 +99,11 @@ export interface AgentLoopConfig {
 // session never dies from a malformed history.
 //
 // Call order on a 400:
-//   Level 0 → 1: _sanitizeHistory   (targeted structural fixes)
-//   Level 1 → 2: _stripAllToolTurns (remove all tool context, keep text)
-//   Level 2 → 3: truncate to last 6 messages + system
-//   Level 3+    : fall through to hard error
+//   Level 0 → 1: _sanitizeHistory                (targeted structural fixes)
+//   Level 1 → 2: cfg.contextTransform if present (LLM-summarize tool history)
+//   Level 2 → 3: _stripAllToolTurns              (remove all tool context, keep text)
+//   Level 3 → 4: truncate to last 6 messages + system
+//   Level 4+    : fall through to hard error
 
 /** General structural sanitizer — fixes all message-sequence issues. */
 function _sanitizeHistory(messages: Message[]): Message[] {
@@ -502,7 +503,7 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
           !/context.?length|too long|max.*tokens|context_length_exceeded/i.test(
             errMsg,
           );
-        if (is400Structural && _historyRepairLevel < 3) {
+        if (is400Structural && _historyRepairLevel < 4) {
           // Helper: after any repair, ensure history is never empty.
           // An empty messages array will fail with a different error; keep at
           // minimum the system messages, or the last user message as a fallback.
@@ -515,8 +516,20 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
             const repaired = ensureNonEmpty(_sanitizeHistory(history));
             history.length = 0;
             history.push(...repaired);
-          } else if (_historyRepairLevel === 1) {
+          } else if (_historyRepairLevel === 1 && cfg.contextTransform) {
+            // Level 2: LLM-summarize tool history — preserves semantic context
+            // instead of stripping. Reuses the same compaction pipeline that
+            // handles context-length overflows.
             _historyRepairLevel = 2;
+            try {
+              const summarized = await cfg.contextTransform(history);
+              history.length = 0;
+              history.push(...ensureNonEmpty(summarized));
+            } catch {
+              // Summarization failed — skip to strip level on next retry
+            }
+          } else if (_historyRepairLevel === 1 || _historyRepairLevel === 2) {
+            _historyRepairLevel = 3;
             const stripped = ensureNonEmpty(_stripAllToolTurns(history));
             history.length = 0;
             history.push(...stripped);
@@ -526,8 +539,8 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
                 "Tool history stripped due to repeated API errors — continuing with text context only.",
               retryable: true,
             });
-          } else if (_historyRepairLevel === 2) {
-            _historyRepairLevel = 3;
+          } else if (_historyRepairLevel === 3) {
+            _historyRepairLevel = 4;
             const system = history.filter((m) => m.role === "system");
             const recent = history.filter((m) => m.role !== "system").slice(-6);
             const truncated = ensureNonEmpty([...system, ...recent]);

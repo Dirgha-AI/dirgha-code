@@ -162,6 +162,25 @@ function _stripOrphanedToolResults(messages) {
     }
     return out;
 }
+/**
+ * Last-resort recovery when all messages were stripped as orphaned.
+ * Returns the minimum valid context: system messages + last user text message.
+ * Never returns an empty array.
+ */
+function _recoverMinimalContext(history) {
+    const sys = history.filter((m) => m.role === "system");
+    // Find last user message that has actual text content (not just tool_results)
+    const lastTextUser = [...history].reverse().find((m) => m.role === "user" &&
+        (typeof m.content === "string"
+            ? m.content.trim().length > 0
+            : m.content.some((p) => p.type === "text" && p.text.trim().length > 0)));
+    if (lastTextUser)
+        return [...sys, lastTextUser];
+    if (sys.length > 0)
+        return sys;
+    // Absolute fallback: synthetic user message to prevent API 400
+    return [{ role: "user", content: "Continue." }];
+}
 export async function runAgentLoop(cfg) {
     const events = cfg.events;
     const history = [...cfg.messages];
@@ -254,6 +273,12 @@ export async function runAgentLoop(cfg) {
             // Full-history scan: remove any orphaned tool_result messages that
             // contextTransform may have introduced mid-history (not just tail).
             messagesForCall = _stripOrphanedToolResults(messagesForCall);
+            // Guard: _stripOrphanedToolResults can return [] when all messages were orphaned.
+            // An empty array causes "Empty input messages" HTTP 400. Fall back to the last
+            // non-tool user message + system messages to keep conversation alive.
+            if (messagesForCall.length === 0) {
+                messagesForCall = _recoverMinimalContext(history);
+            }
             // ── Proactive compaction ──────────────────────────────────────────────
             // Fire before the API call when token usage is ≥80% of the context
             // limit — prevents silent degradation when providers don't return an
@@ -270,6 +295,9 @@ export async function runAgentLoop(cfg) {
                     history.push(...compacted);
                     messagesForCall = await cfg.contextTransform(history);
                     messagesForCall = _stripOrphanedToolResults(messagesForCall);
+                    if (messagesForCall.length === 0) {
+                        messagesForCall = _recoverMinimalContext(history);
+                    }
                 }
                 catch {
                     // Compaction failed — continue with original messages
@@ -369,7 +397,7 @@ export async function runAgentLoop(cfg) {
                 // orphaned results, consecutive same-role, etc.) retrying with the
                 // same broken history will fail identically. Instead, escalate through
                 // three repair levels so the session never dies from a bad history.
-                const is400Structural = /\b400\b|bad.?request|invalid.*message|tool.*role|messages.*tool|tool_result.*tool_use/i.test(errMsg) &&
+                const is400Structural = /\b400\b|bad.?request|invalid.*message|tool.*role|messages.*tool|tool_result.*tool_use|empty.?input/i.test(errMsg) &&
                     !/context.?length|too long|max.*tokens|context_length_exceeded/i.test(errMsg);
                 if (is400Structural && _historyRepairLevel < 3) {
                     // Helper: after any repair, ensure history is never empty.
@@ -378,11 +406,7 @@ export async function runAgentLoop(cfg) {
                     const ensureNonEmpty = (msgs) => {
                         if (msgs.length > 0)
                             return msgs;
-                        const sys = history.filter((m) => m.role === "system");
-                        if (sys.length > 0)
-                            return sys;
-                        const lastUser = [...history].reverse().find((m) => m.role === "user");
-                        return lastUser ? [lastUser] : history.slice(-1);
+                        return _recoverMinimalContext(history);
                     };
                     if (_historyRepairLevel === 0) {
                         _historyRepairLevel = 1;
