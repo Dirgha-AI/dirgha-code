@@ -142,14 +142,31 @@ const everSeen = () => strip(stdout.frames.join(''));
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+/**
+ * Poll frameFn() until it contains `pattern` or timeout expires.
+ * Deterministic replacement for sleep-based flush — works on any CPU speed.
+ */
+async function waitFor(frameFn, pattern, timeoutMs = 3000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const frame = frameFn();
+    if (typeof pattern === 'string' ? frame.includes(pattern) : pattern.test(frame)) {
+      return frame;
+    }
+    await new Promise(r => setTimeout(r, 16)); // one animation frame
+  }
+  // Return whatever we have — the assert after will give a clear failure message
+  return frameFn();
+}
+
 // Tiny synchronous-ish driver: fire events then await microtask flush.
-const flush = async () => { await sleep(50); };
+const flush = async () => { await sleep(200); };
 
 const assertions = [];
 const assert = (label, ok) => assertions.push({ label, ok });
 
 try {
-  await sleep(150); // initial mount
+  await waitFor(everSeen, /Dirgha Code/); // initial mount — wait for React to commit
   assert('Logo + input box rendered on mount', /Dirgha Code/.test(everSeen()) && /Ask dirgha anything/.test(everSeen()));
 
   // Drive a streaming text turn.
@@ -163,27 +180,26 @@ try {
   events.emit({ type: 'text_delta', delta: ', ' });
   await flush();
   events.emit({ type: 'text_delta', delta: 'world!' });
-  await flush();
-  await flush(); // extra tick: let React complete its deferred render before asserting
+  await waitFor(everSeen, /Hello, world!/); // wait for React to commit full streamed text
   assert('text_delta projects to transcript during stream', /Hello, world!/.test(everSeen()));
 
   events.emit({ type: 'text_end' });
   events.emit({ type: 'usage', inputTokens: 100, outputTokens: 3, cachedTokens: 0 });
   events.emit({ type: 'turn_end', turnId: 't0', stopReason: 'end_turn' });
-  await flush();
+  await waitFor(everSeen, /\b103\b/); // wait for token count to appear in status bar
   assert('usage tokens reach status bar', /\b103\b/.test(everSeen()));
 
   // Tool event sequence.
   events.emit({ type: 'turn_start', turnId: 't1', turnIndex: 1 });
   events.emit({ type: 'tool_exec_start', id: 'shell:0', name: 'shell', input: { command: 'ls /tmp' } });
-  await flush();
+  await waitFor(everSeen, /ls \/tmp/); // wait for tool box with input to render
   assert('tool_exec_start renders tool box', /shell/i.test(everSeen()));
   assert('tool input summary visible in tool box', /ls \/tmp/.test(everSeen()));
 
   events.emit({ type: 'tool_exec_end', id: 'shell:0', output: 'file1\nfile2\n', isError: false, durationMs: 7 });
   events.emit({ type: 'turn_end', turnId: 't1', stopReason: 'end_turn' });
   events.emit({ type: 'agent_end', sessionId: 'test', stopReason: 'end_turn', usage: { inputTokens: 200, outputTokens: 10, cachedTokens: 0, costUsd: 0 } });
-  await flush();
+  await waitFor(everSeen, /file1/); // wait for tool output preview to appear
 
   // ToolBox renders ✓ + tool-icon glyph (∂ for shell) + the tool label,
   // e.g. "✓ ∂ Shell". Allow the icon column between ✓ and Shell.
@@ -202,18 +218,24 @@ try {
   // Ink listens on stdin's 'readable' event and pulls bytes via
   // stdin.read(). FakeStdin.pushChunk() queues + signals.
   const send = (s) => stdin.pushChunk(s);
-  const typeSlash = async (cmd) => {
+  const typeSlash = async (cmd, expectedOverlayPattern) => {
     for (const ch of cmd) {
       send(ch);
       await sleep(30);
     }
     // Press Enter (\r is what raw stdin sends on most TTYs).
     send('\r');
-    await sleep(300);
+    // Wait for the overlay to appear rather than sleeping a fixed amount.
+    if (expectedOverlayPattern) {
+      const snapBefore = stdout.frames.length;
+      await waitFor(() => strip(stdout.frames.slice(snapBefore).join('')), expectedOverlayPattern);
+    } else {
+      await sleep(300);
+    }
   };
 
   // /help should open the help overlay (HelpOverlay component).
-  await typeSlash('/help');
+  await typeSlash('/help', /help \d+ commands|Slash commands|filter|esc/i);
   const afterHelp = strip(stdout.frames.slice(stdoutFrameCountBefore).join(''));
   assert('/help opens help overlay', /help \d+ commands|Slash commands|↑↓|filter|esc/i.test(afterHelp));
 
@@ -223,7 +245,7 @@ try {
 
   // /theme should open the theme picker overlay.
   const beforeTheme = stdout.frames.length;
-  await typeSlash('/theme');
+  await typeSlash('/theme', /theme picker|dark.*light|cabinet/i);
   const afterTheme = strip(stdout.frames.slice(beforeTheme).join(''));
   assert('/theme opens theme picker', /theme picker|↑↓|███|dark.*light|cabinet/i.test(afterTheme));
   stdin.emit('data', '');
@@ -231,7 +253,7 @@ try {
 
   // /models should open the model picker overlay.
   const beforeModels = stdout.frames.length;
-  await typeSlash('/models');
+  await typeSlash('/models', /kimi|gpt|deepseek|moonshot|claude|model picker/i);
   const afterModels = strip(stdout.frames.slice(beforeModels).join(''));
   assert('/models opens model picker', /kimi|gpt|deepseek|moonshot|claude|model picker|↑↓/i.test(afterModels));
   stdin.emit('data', '');
