@@ -12,6 +12,7 @@ function buildOk(content, value, opts = {}) {
         isError: false,
         content,
         value,
+        data: value,
     };
     if (opts.metadata !== undefined)
         out.metadata = opts.metadata;

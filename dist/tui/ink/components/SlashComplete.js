@@ -92,7 +92,12 @@ export function SlashComplete(props) {
             setCursor(c => Math.min(matches.length - 1, c + 1));
             return;
         }
-        if (key.tab || key.return) {
+        // Tab picks the highlighted command (inserts it, leaves room for args).
+        // Enter does NOT pick — it falls through to InputBox so the user's typed
+        // command submits exactly as written. Without this fall-through, picking
+        // a non-argless command (e.g. /memory) appends a trailing space and the
+        // input never submits, leaving stale text in the buffer.
+        if (key.tab) {
             const pick = matches[cursor];
             if (pick)
                 props.onPick(pick.name);

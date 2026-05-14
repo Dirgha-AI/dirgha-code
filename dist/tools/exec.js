@@ -11,6 +11,7 @@
  */
 import { selectSandbox } from "../safety/sandbox/select.js";
 import { wrapLegacyResult, internalError } from './result-wrappers.js';
+import { distillToolResult } from './distill.js';
 function toolError(kind, message, opts = {}) {
     const r = internalError(kind, message);
     if (opts.durationMs !== undefined)
@@ -75,7 +76,7 @@ export function createToolExecutor(opts) {
                     : undefined,
             };
             try {
-                return await runTool(tool, call.input, ctx);
+                return await runTool(tool, call.input, ctx, call.id);
             }
             catch (err) {
                 const msg = err instanceof Error ? err.message : String(err);
@@ -84,7 +85,7 @@ export function createToolExecutor(opts) {
         },
     };
 }
-async function runTool(tool, input, ctx) {
+async function runTool(tool, input, ctx, callId) {
     const started = Date.now();
     const deadlineMs = tool.timeoutMs ?? 0;
     // Race tool.execute against ctx.signal so ESC aborts immediately
@@ -131,7 +132,7 @@ async function runTool(tool, input, ctx) {
     const wrapped = wrapLegacyResult(result, 'external');
     if (wrapped.durationMs === undefined)
         wrapped.durationMs = finalDuration;
-    return wrapped;
+    return distillToolResult(wrapped, callId);
 }
 function sanitiseEnv(source) {
     const out = {};

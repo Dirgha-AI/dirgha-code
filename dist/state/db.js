@@ -173,6 +173,17 @@ function initSchema(db) {
     );
     CREATE INDEX IF NOT EXISTS idx_embedding_meta_source
       ON embedding_meta(source);
+
+    -- v1.39 — session_snapshots accelerates session open by avoiding
+    -- full JSONL replay. After compaction the agent loop writes a
+    -- snapshot of the in-memory message array; on open we load the
+    -- snapshot plus tail JSONL entries with ts > snapshot.ts.
+    CREATE TABLE IF NOT EXISTS session_snapshots (
+      session_id TEXT PRIMARY KEY,
+      ts TEXT NOT NULL,
+      message_count INTEGER NOT NULL,
+      payload TEXT NOT NULL
+    );
   `);
 }
 /**
@@ -255,6 +266,15 @@ function migrateSchema(db) {
       CREATE INDEX IF NOT EXISTS idx_edges_dst ON graph_edges(dst, rel);
       CREATE INDEX IF NOT EXISTS idx_nodes_type ON graph_nodes(type);
     `);
+        // v1.39 — session_snapshots, idempotent for existing DBs.
+        db.exec(`
+      CREATE TABLE IF NOT EXISTS session_snapshots (
+        session_id TEXT PRIMARY KEY,
+        ts TEXT NOT NULL,
+        message_count INTEGER NOT NULL,
+        payload TEXT NOT NULL
+      );
+    `);
     }
     catch (err) {
         recordDbError(err);
@@ -291,6 +311,80 @@ export function dbAppendMessage(sessionId, message) {
             ? message.content
             : JSON.stringify(message.content);
         db.prepare("INSERT INTO messages(session_id, role, content, ts) VALUES (?, ?, ?, ?)").run(sessionId, message.role, content, Date.now());
+        recordDbSuccess();
+    }
+    catch (err) {
+        recordDbError(err);
+    }
+}
+export function dbCountSessionMessages(sessionId) {
+    try {
+        const db = getDb();
+        const row = db.prepare('SELECT COUNT(*) as c FROM messages WHERE session_id = ?').get(sessionId);
+        return row?.c ?? 0;
+    }
+    catch {
+        return 0;
+    }
+}
+export function dbReplaceSessionMessages(sessionId, messages) {
+    try {
+        const db = getDb();
+        const tx = db.transaction((msgs) => {
+            db.prepare('DELETE FROM messages WHERE session_id = ?').run(sessionId);
+            const stmt = db.prepare('INSERT INTO messages(session_id, role, content, ts) VALUES (?, ?, ?, ?)');
+            const now = Date.now();
+            for (const m of msgs) {
+                const content = typeof m.content === 'string' ? m.content : JSON.stringify(m.content);
+                stmt.run(sessionId, m.role, content, now);
+            }
+        });
+        tx(messages);
+        recordDbSuccess();
+    }
+    catch (err) {
+        recordDbError(err);
+    }
+}
+export function dbWriteSnapshot(sessionId, ts, messages) {
+    try {
+        const db = getDb();
+        const payload = JSON.stringify(messages);
+        db.prepare(`INSERT INTO session_snapshots(session_id, ts, message_count, payload)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(session_id) DO UPDATE SET
+         ts = excluded.ts,
+         message_count = excluded.message_count,
+         payload = excluded.payload`).run(sessionId, ts, messages.length, payload);
+        recordDbSuccess();
+    }
+    catch (err) {
+        recordDbError(err);
+    }
+}
+export function dbReadSnapshot(sessionId) {
+    try {
+        const db = getDb();
+        const row = db.prepare('SELECT ts, message_count, payload FROM session_snapshots WHERE session_id = ?').get(sessionId);
+        if (!row)
+            return null;
+        let messages = [];
+        try {
+            messages = JSON.parse(row.payload);
+        }
+        catch {
+            return null;
+        }
+        return { ts: row.ts, messageCount: row.message_count, messages };
+    }
+    catch {
+        return null;
+    }
+}
+export function dbDeleteSnapshot(sessionId) {
+    try {
+        const db = getDb();
+        db.prepare('DELETE FROM session_snapshots WHERE session_id = ?').run(sessionId);
         recordDbSuccess();
     }
     catch (err) {

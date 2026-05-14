@@ -8,7 +8,7 @@ import { appendFile, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { createReadStream } from "node:fs";
-import { dbOpenSession, dbAppendMessage, dbCloseSession } from "../state/db.js";
+import { dbOpenSession, dbAppendMessage, dbCloseSession, dbReadSnapshot } from "../state/db.js";
 export class SessionStore {
     dir;
     constructor(dir = join(homedir(), ".dirgha", "sessions")) {
@@ -32,7 +32,10 @@ export class SessionStore {
             .catch(() => false);
         if (!exists)
             return undefined;
-        return new SessionImpl(id, path);
+        const impl = new SessionImpl(id, path);
+        // Best-effort: reconcile SQLite mirror against JSONL on open.
+        void Promise.resolve().then(() => impl.reconcile());
+        return impl;
     }
     async list() {
         await this.ensure();
@@ -77,13 +80,72 @@ class SessionImpl {
             }
         }
     }
+    async getCompactionThreshold() {
+        // Returns the keptFrom timestamp of the LATEST compaction entry, or null if none.
+        let latest = null;
+        for await (const entry of this.replay()) {
+            if (entry.type === 'compaction')
+                latest = entry.keptFrom;
+        }
+        return latest;
+    }
     async messages() {
+        // Snapshot fast-load: if SQLite has a snapshot for this session, use it
+        // as the base and only replay JSONL entries with ts > snapshot.ts.
+        const snapshot = dbReadSnapshot(this.id);
+        if (snapshot) {
+            const tail = [];
+            for await (const entry of this.replay()) {
+                if (entry.type !== 'message')
+                    continue;
+                if (entry.ts <= snapshot.ts)
+                    continue;
+                tail.push(entry.message);
+            }
+            return [...snapshot.messages, ...tail];
+        }
+        // No snapshot: fall back to compaction-aware full replay. Two passes:
+        // 1) find the latest compaction threshold, 2) yield messages with
+        // ts >= threshold.
+        const threshold = await this.getCompactionThreshold();
         const out = [];
         for await (const entry of this.replay()) {
-            if (entry.type === "message")
-                out.push(entry.message);
+            if (entry.type !== 'message')
+                continue;
+            if (threshold && entry.ts < threshold)
+                continue;
+            out.push(entry.message);
         }
         return out;
+    }
+    async writeSnapshot(messages) {
+        try {
+            const { dbWriteSnapshot } = await import('../state/db.js');
+            dbWriteSnapshot(this.id, new Date().toISOString(), messages);
+        }
+        catch {
+            /* best-effort */
+        }
+    }
+    async reconcile() {
+        // Compare JSONL message count to SQLite message count for this session.
+        // If they differ, truncate the SQLite session and reinsert from JSONL.
+        // The JSONL is the source of truth. Best-effort: swallow all errors.
+        try {
+            const { dbCountSessionMessages, dbReplaceSessionMessages } = await import('../state/db.js');
+            const jsonlMsgs = [];
+            for await (const entry of this.replay()) {
+                if (entry.type === 'message')
+                    jsonlMsgs.push(entry.message);
+            }
+            const sqliteCount = dbCountSessionMessages(this.id);
+            if (sqliteCount !== jsonlMsgs.length) {
+                dbReplaceSessionMessages(this.id, jsonlMsgs);
+            }
+        }
+        catch {
+            /* best-effort: don't crash session open */
+        }
     }
     async replayAll() {
         const results = [];

@@ -88,6 +88,20 @@ export function InputBox(props) {
         }
         prevFocusRef.current = focus;
     }, [focus]);
+    // Detect external value changes (programmatic setInput from the parent —
+    // slash autocomplete pick, queue dequeue, clear after submit, Ctrl+C
+    // clear). handleChange updates prevValueRef to the typed value before
+    // the next render; if prevValueRef doesn't match props.value at effect
+    // time, the change came from outside InputBox and ink-text-input's
+    // internal cursorOffset is stale (it stays at the previous cursor
+    // position even when value changed underneath). Bump textInputKey to
+    // remount the TextInput so cursor lands at the end of the new value.
+    React.useEffect(() => {
+        if (props.value !== prevValueRef.current) {
+            setTextInputKey((k) => k + 1);
+            prevValueRef.current = props.value;
+        }
+    }, [props.value]);
     // Notify parent whenever the active @-token shifts.
     React.useEffect(() => {
         if (props.onAtQueryChange) {

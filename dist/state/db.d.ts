@@ -19,6 +19,16 @@ export declare function openDb(): import("better-sqlite3").Database;
 export declare function dbOpenSession(id: string, model?: string, cwd?: string): void;
 export declare function dbCloseSession(id: string): void;
 export declare function dbAppendMessage(sessionId: string, message: Message): void;
+export declare function dbCountSessionMessages(sessionId: string): number;
+export declare function dbReplaceSessionMessages(sessionId: string, messages: Message[]): void;
+export interface SessionSnapshot {
+    ts: string;
+    messageCount: number;
+    messages: Message[];
+}
+export declare function dbWriteSnapshot(sessionId: string, ts: string, messages: Message[]): void;
+export declare function dbReadSnapshot(sessionId: string): SessionSnapshot | null;
+export declare function dbDeleteSnapshot(sessionId: string): void;
 export interface ChatResult {
     sessionId: string;
     role: string;

@@ -45,6 +45,9 @@ export interface Session {
     replay(): AsyncIterable<SessionEntry>;
     replayAll(): Promise<SessionEntry[]>;
     messages(): Promise<Message[]>;
+    getCompactionThreshold(): Promise<string | null>;
+    reconcile(): Promise<void>;
+    writeSnapshot(messages: Message[]): Promise<void>;
     close(): void;
 }
 export interface SessionStoreOptions {
