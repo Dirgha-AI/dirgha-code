@@ -202,38 +202,66 @@ function _hardenHistory(messages: Message[]): Message[] {
       isError: true as const,
     }));
 
-    if (next?.role === "user" && Array.isArray(next.content)) {
-      // Inject sentinels into the existing user message (next in pass1)
-      // Modify pass1[i+1] in place so when the loop pushes it, it has the sentinels
+    if (next?.role === "user") {
+      // Merge sentinels into the existing user message regardless of whether
+      // its content is a string or array. Converting string → array is valid
+      // API format and prevents two consecutive user messages (which cause 400).
+      const existingParts: import("./types.js").ContentPart[] =
+        typeof next.content === "string"
+          ? [{ type: "text" as const, text: next.content }]
+          : Array.isArray(next.content)
+            ? [...next.content]
+            : [];
       pass1[i + 1] = {
         ...next,
-        content: [...sentinelParts, ...next.content],
+        content: [...sentinelParts, ...existingParts],
       };
     } else {
-      // No following user message — inject a synthetic one with sentinel results
+      // No following user message at all — inject a synthetic one
       const syntheticUser: Message = {
         role: "user",
         content: sentinelParts,
       };
       pass2.push(syntheticUser);
-      // Adjust loop index so we don't double-process the real next message
-      // (we didn't consume i+1, it'll be picked up normally)
     }
+  }
+
+  // ── Pass 2b: Re-coalesce after sentinel injection ─────────────────────────
+  // A second coalesce pass catches any consecutive user messages that may
+  // survive Pass 2 injection in edge cases.
+  const pass2b: Message[] = [];
+  for (const msg of pass2) {
+    if (Array.isArray(msg.content) && msg.content.length === 0) continue;
+    if (typeof msg.content === "string" && msg.content.trim() === "") continue;
+    const prev = pass2b[pass2b.length - 1];
+    if (prev && prev.role === msg.role && msg.role !== "system") {
+      const pc: import("./types.js").ContentPart[] =
+        typeof prev.content === "string"
+          ? [{ type: "text", text: prev.content }]
+          : [...prev.content];
+      const mc: import("./types.js").ContentPart[] =
+        typeof msg.content === "string"
+          ? [{ type: "text", text: msg.content }]
+          : msg.content;
+      prev.content = [...pc, ...mc];
+      continue;
+    }
+    pass2b.push({ ...msg, content: Array.isArray(msg.content) ? [...msg.content] : msg.content });
   }
 
   // ── Pass 3: Role constraints ─────────────────────────────────────────────────
   // History must start with "user". If first non-system message is "assistant",
   // prepend a synthetic user message.
-  const firstNonSystem = pass2.findIndex((m) => m.role !== "system");
-  if (firstNonSystem !== -1 && pass2[firstNonSystem].role === "assistant") {
-    pass2.splice(firstNonSystem, 0, {
+  const firstNonSystem = pass2b.findIndex((m) => m.role !== "system");
+  if (firstNonSystem !== -1 && pass2b[firstNonSystem].role === "assistant") {
+    pass2b.splice(firstNonSystem, 0, {
       role: "user" as const,
       content: "[System: conversation resumed]",
     });
   }
 
   // ── Pass 4: Strip orphaned tool_results ──────────────────────────────────────
-  const pass4 = _stripOrphanedToolResults(pass2);
+  const pass4 = _stripOrphanedToolResults(pass2b);
 
   // ── Pass 5: Drop remaining empty messages (safety net) ───────────────────────
   return pass4.filter((m) => {
@@ -318,13 +346,13 @@ function _recoverMinimalContext(history: Message[]): Message[] {
     ...sys,
     {
       role: "user" as const,
-      content: "[System: conversation context was lost due to a message sequencing error. Please ask the user to restate their request.]",
+      content: "[System: tool history was compacted due to a message sequencing error. Resume from the last known task state — do NOT ask the user to restate their request. Check available tools (e.g. /checkpoint list) if you need context recovery.]",
     },
   ];
   // Absolute fallback: synthetic user message to prevent API 400
   return [{
     role: "user" as const,
-    content: "[System: conversation context was lost. Please ask the user to restate their request.]",
+    content: "[System: tool history was compacted. Resume from context — do NOT ask the user to restate their request.]",
   }];
 }
 
