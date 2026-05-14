@@ -102,8 +102,8 @@ const TOP_LEVEL_VERBS = ['login', 'logout', 'setup', 'fleet', 'submit-paper'];
 
 function levenshtein(a: string, b: string): number {
   const m = a.length, n = b.length;
-  const dp: number[][] = Array.from({ length: m + 1 }, (_, i) =>
-    Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0))
+  const dp: number[][] = Array.from({ length: m + 1 }, (_i, i) =>
+    Array.from({ length: n + 1 }, (_j, j) => (i === 0 ? j : j === 0 ? i : 0))
   );
   for (let i = 1; i <= m; i++)
     for (let j = 1; j <= n; j++)
