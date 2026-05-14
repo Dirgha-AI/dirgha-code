@@ -27,9 +27,10 @@ export interface ConfigurableApprovalBus extends ApprovalBus {
   denyToolAlways(toolName: string): void;
 }
 
-export function createApprovalBus(options: { alwaysApprove?: string[] } = {}): ConfigurableApprovalBus {
+export function createApprovalBus(options: { alwaysApprove?: string[]; requestTimeoutMs?: number } = {}): ConfigurableApprovalBus {
+  const { alwaysApprove = [], requestTimeoutMs = 60000 } = options;
   const subscribers = new Set<ApprovalSubscriber>();
-  const approve = new Set(options.alwaysApprove ?? []);
+  const approve = new Set(alwaysApprove);
   const deny = new Set<string>();
   let requiresApproval = (toolName: string, _input: unknown): boolean => !approve.has(toolName) && !deny.has(toolName);
 
@@ -42,15 +43,24 @@ export function createApprovalBus(options: { alwaysApprove?: string[] } = {}): C
     async request(req) {
       if (deny.has(req.tool)) return 'deny_always';
       if (approve.has(req.tool)) return 'approve';
-      for (const sub of subscribers) {
-        const response = await sub(req);
-        if (response !== undefined) {
-          if (response === 'deny_always') deny.add(req.tool);
-          if (response === 'approve_once') approve.add(req.tool);
-          return response;
+
+      const timeout = new Promise<ApprovalResponse>((resolve) => {
+        setTimeout(() => resolve('deny'), requestTimeoutMs);
+      });
+
+      const subscriberLoop = async (): Promise<ApprovalResponse> => {
+        for (const sub of subscribers) {
+          const response = await sub(req);
+          if (response !== undefined) {
+            if (response === 'deny_always') deny.add(req.tool);
+            if (response === 'approve_once') approve.add(req.tool);
+            return response;
+          }
         }
-      }
-      return 'deny';
+        return 'deny';
+      };
+
+      return Promise.race([subscriberLoop(), timeout]);
     },
     subscribe(subscriber) {
       subscribers.add(subscriber);

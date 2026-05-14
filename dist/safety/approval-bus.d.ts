@@ -23,4 +23,5 @@ export interface ConfigurableApprovalBus extends ApprovalBus {
 }
 export declare function createApprovalBus(options?: {
     alwaysApprove?: string[];
+    requestTimeoutMs?: number;
 }): ConfigurableApprovalBus;

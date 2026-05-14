@@ -13,6 +13,7 @@
  */
 
 import { createKnowledgeStore } from "./knowledge.js";
+import { waitForDeferredInit } from "../state/db.js";
 
 const KB_TOP_K = 5;
 const KB_TIMEOUT_MS = 500;
@@ -27,6 +28,15 @@ export async function queryKb(
   topK: number = KB_TOP_K,
 ): Promise<string | undefined> {
   if (!userTurn.trim()) return undefined;
+
+  try {
+    await Promise.race([
+      waitForDeferredInit(),
+      new Promise((resolve) => setTimeout(resolve, 250)),
+    ]);
+  } catch {
+    // Deferred init failed or timed out; proceed with query anyway.
+  }
 
   const query = async (): Promise<string | undefined> => {
     const store = createKnowledgeStore();

@@ -228,7 +228,10 @@ export function InputBox(props) {
                 // First pull: save current input, recall most recent only.
                 savedInputRef.current = props.value;
                 setHistoryIdx(0);
+                prevValueRef.current = history[0];
                 props.onChange(history[0]);
+                setPasteSegment(null);
+                setPasteExpanded(false);
                 setTextInputKey((k) => k + 1);
             }
             // Second+ pulls are intentionally no-ops — we only recall the
@@ -238,7 +241,10 @@ export function InputBox(props) {
         if (key.downArrow && historyIdx !== null) {
             // Restore the saved input and reset.
             setHistoryIdx(null);
+            prevValueRef.current = savedInputRef.current;
             props.onChange(savedInputRef.current);
+            setPasteSegment(null);
+            setPasteExpanded(false);
             setTextInputKey((k) => k + 1);
             return;
         }
@@ -248,14 +254,33 @@ export function InputBox(props) {
         if (historyIdx !== null && !key.upArrow && !key.downArrow) {
             setHistoryIdx(null);
         }
-        // Enter handling — only when a paste segment exists and
-        // TextInput is not rendered. When paste is collapsed TextInput
-        // is replaced by PasteCollapseView; when expanded it's still
-        // mounted but we suppress its internal Enter handler so Enter
-        // always flows through this single path (avoiding double-submit).
-        if (key.return && pasteSegment !== null) {
-            props.onSubmit(props.value);
-            return;
+        // Paste-collapsed mode special keys.
+        if (pasteSegment !== null && !pasteExpanded) {
+            if (key.return) {
+                // Enter submits the full value (paste included).
+                props.onSubmit(props.value);
+                return;
+            }
+            if (key.backspace || key.delete) {
+                // One backspace wipes the entire pasted block.
+                const newValue = props.value.slice(0, pasteSegment.start) +
+                    props.value.slice(pasteSegment.end);
+                setPasteSegment(null);
+                setPasteExpanded(false);
+                props.onChange(newValue);
+                setTextInputKey((k) => k + 1);
+                return;
+            }
+            // Any printable character: append after pasted block and resume
+            // normal editing (clear collapse so TextInput remounts).
+            if (inputCh && inputCh.length >= 1 && !key.ctrl && !key.meta) {
+                const newValue = props.value + inputCh;
+                setPasteSegment(null);
+                setPasteExpanded(false);
+                props.onChange(newValue);
+                setTextInputKey((k) => k + 1);
+                return;
+            }
         }
         // Ctrl+C handling — highest priority.
         //   1. If the buffer has text → clear it (don't arm exit).

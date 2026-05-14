@@ -5,3 +5,7 @@
  * so callers never throw from a cosmetically bad payload.
  */
 export declare function repairJSON(raw: string): unknown;
+export declare function isJsonParseFailure(v: unknown): v is {
+    __dirgha_json_parse_failed: true;
+    raw: string;
+};

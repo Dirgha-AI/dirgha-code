@@ -40,7 +40,7 @@ export const gitTool = {
                 return { content: check.error, isError: true };
             cwd = check.resolved;
         }
-        const result = await run("git", full, cwd, ctx.env);
+        const result = await run("git", full, cwd, ctx.env, ctx.signal);
         return {
             content: [result.stdout, result.stderr]
                 .filter((s) => s && s.length > 0)
@@ -66,7 +66,8 @@ function commandFor(op) {
             return null;
     }
 }
-async function run(command, args, cwd, env) {
+async function run(command, args, cwd, env, signal) {
+    const GIT_TIMEOUT_MS = 60_000;
     return new Promise((resolveAll) => {
         const child = spawn(command, args, {
             cwd,
@@ -77,14 +78,43 @@ async function run(command, args, cwd, env) {
         const stderr = [];
         child.stdout.on("data", (buf) => stdout.push(buf));
         child.stderr.on("data", (buf) => stderr.push(buf));
-        child.on("error", () => resolveAll({ stdout: "", stderr: "", code: -1 }));
+        /** Gracefully terminate: SIGTERM, then SIGKILL after 2 s. */
+        const killChild = () => {
+            child.kill("SIGTERM");
+            setTimeout(() => {
+                try {
+                    child.kill("SIGKILL");
+                }
+                catch {
+                    /* already gone */
+                }
+            }, 2_000);
+        };
+        // If signal is already aborted, kill immediately
+        if (signal?.aborted) {
+            killChild();
+        }
+        const onAbort = () => {
+            killChild();
+        };
+        signal?.addEventListener("abort", onAbort, { once: true });
+        const timer = setTimeout(killChild, GIT_TIMEOUT_MS);
+        child.on("error", () => {
+            clearTimeout(timer);
+            signal?.removeEventListener("abort", onAbort);
+            resolveAll({ stdout: "", stderr: "", code: -1 });
+        });
         // Use 'close' (not 'exit') so stdio pipes finish draining before we
         // read the buffers — large diffs can still be in flight when 'exit' fires.
-        child.on("close", (code) => resolveAll({
-            stdout: Buffer.concat(stdout).toString("utf8"),
-            stderr: Buffer.concat(stderr).toString("utf8"),
-            code: code ?? -1,
-        }));
+        child.on("close", (code) => {
+            clearTimeout(timer);
+            signal?.removeEventListener("abort", onAbort);
+            resolveAll({
+                stdout: Buffer.concat(stdout).toString("utf8"),
+                stderr: Buffer.concat(stderr).toString("utf8"),
+                code: code ?? -1,
+            });
+        });
     });
 }
 //# sourceMappingURL=git.js.map

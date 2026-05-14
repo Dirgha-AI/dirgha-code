@@ -367,6 +367,7 @@ export function isSqliteAvailable(): boolean {
  */
 export function waitForDeferredInit(): Promise<void> {
   if (_deferredDone) return Promise.resolve();
+  if (_db === null) return Promise.resolve();
   if (!_deferredResolve) {
     _deferredResolve = (): void => {};
   }

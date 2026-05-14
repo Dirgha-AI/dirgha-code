@@ -66,8 +66,9 @@ check('summary contains expected token',  /SUMMARY-OK/.test(over.summary ?? ''))
 check('tokensAfter < tokensBefore',       over.tokensAfter < over.tokensBefore);
 check('first remains system',             over.messages[0].role === 'system');
 const firstNonSystem = over.messages.find(m => m.role !== 'system');
-const firstText = firstNonSystem?.content?.[0]?.text ?? '';
-check('synthetic user summary present',   /\[Compacted summary of earlier turns\]/.test(firstText));
+const rawContent = firstNonSystem?.content;
+const firstText = typeof rawContent === 'string' ? rawContent : (rawContent?.[0]?.text ?? '');
+check('synthetic user summary present',   /\[Compacted summary of earlier turns\]|<state_snapshot>/.test(firstText));
 check('tail preserved (last user kept)',  over.messages.at(-2)?.role === 'user');
 
 console.log('\n=== compaction: hooks fire with payloads ===');

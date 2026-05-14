@@ -42,6 +42,10 @@ export function repairJSON(raw: string): unknown {
   try {
     return JSON.parse(trimmed);
   } catch {
-    return {};
+    return { __dirgha_json_parse_failed: true, raw };
   }
+}
+
+export function isJsonParseFailure(v: unknown): v is { __dirgha_json_parse_failed: true; raw: string } {
+  return typeof v === 'object' && v !== null && '__dirgha_json_parse_failed' in v && (v as any).__dirgha_json_parse_failed === true;
 }

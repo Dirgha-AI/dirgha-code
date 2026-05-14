@@ -56,6 +56,6 @@ export function PasteCollapseView(props) {
     }
     const before = value.slice(0, segment.start);
     const after = value.slice(segment.end);
-    return (_jsxs(Box, { flexDirection: "row", flexWrap: "wrap", children: [_jsx(Text, { children: before }), _jsxs(Text, { color: palette.status.warning, children: ["[", segment.lines, " line", segment.lines === 1 ? "" : "s", " pasted]"] }), _jsx(Text, { children: after }), _jsxs(Text, { color: palette.text.secondary, dimColor: true, children: [" ", "\u00B7 Ctrl+E expand"] })] }));
+    return (_jsxs(Box, { flexDirection: "row", flexWrap: "wrap", children: [_jsx(Text, { children: before }), _jsx(Text, { color: palette.status.warning, children: "[paste]" }), _jsx(Text, { children: after }), _jsxs(Text, { color: palette.text.secondary, dimColor: true, children: [" ", "\u00B7 \u232B delete \u00B7 Ctrl+E expand"] })] }));
 }
 //# sourceMappingURL=PasteCollapse.js.map

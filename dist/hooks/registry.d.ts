@@ -1,11 +1,11 @@
 /**
  * Hook registry. Hooks fire at named lifecycle events: session_start,
  * session_end, turn_start, turn_end, tool_call_before, tool_call_after,
- * compaction_before, compaction_after. Each handler may veto by
+ * compaction_before, compaction_after, compaction_failed. Each handler may veto by
  * returning { block: true, reason }, in which case the caller decides
  * how to react.
  */
-export type HookEvent = 'session_start' | 'session_end' | 'turn_start' | 'turn_end' | 'tool_call_before' | 'tool_call_after' | 'compaction_before' | 'compaction_after' | 'message_user' | 'message_assistant';
+export type HookEvent = 'session_start' | 'session_end' | 'turn_start' | 'turn_end' | 'tool_call_before' | 'tool_call_after' | 'compaction_before' | 'compaction_after' | 'compaction_failed' | 'message_user' | 'message_assistant';
 export type HookBlock = {
     block: true;
     reason: string;

@@ -12,6 +12,7 @@
  *    can skip the section cleanly).
  */
 import { createKnowledgeStore } from "./knowledge.js";
+import { waitForDeferredInit } from "../state/db.js";
 const KB_TOP_K = 5;
 const KB_TIMEOUT_MS = 500;
 /**
@@ -22,6 +23,15 @@ const KB_TIMEOUT_MS = 500;
 export async function queryKb(userTurn, topK = KB_TOP_K) {
     if (!userTurn.trim())
         return undefined;
+    try {
+        await Promise.race([
+            waitForDeferredInit(),
+            new Promise((resolve) => setTimeout(resolve, 250)),
+        ]);
+    }
+    catch {
+        // Deferred init failed or timed out; proceed with query anyway.
+    }
     const query = async () => {
         const store = createKnowledgeStore();
         const hits = await store.searchArticles(userTurn, topK);

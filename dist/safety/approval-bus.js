@@ -6,8 +6,9 @@
  * decision is logged regardless of which UI handled it.
  */
 export function createApprovalBus(options = {}) {
+    const { alwaysApprove = [], requestTimeoutMs = 60000 } = options;
     const subscribers = new Set();
-    const approve = new Set(options.alwaysApprove ?? []);
+    const approve = new Set(alwaysApprove);
     const deny = new Set();
     let requiresApproval = (toolName, _input) => !approve.has(toolName) && !deny.has(toolName);
     const bus = {
@@ -23,17 +24,23 @@ export function createApprovalBus(options = {}) {
                 return 'deny_always';
             if (approve.has(req.tool))
                 return 'approve';
-            for (const sub of subscribers) {
-                const response = await sub(req);
-                if (response !== undefined) {
-                    if (response === 'deny_always')
-                        deny.add(req.tool);
-                    if (response === 'approve_once')
-                        approve.add(req.tool);
-                    return response;
+            const timeout = new Promise((resolve) => {
+                setTimeout(() => resolve('deny'), requestTimeoutMs);
+            });
+            const subscriberLoop = async () => {
+                for (const sub of subscribers) {
+                    const response = await sub(req);
+                    if (response !== undefined) {
+                        if (response === 'deny_always')
+                            deny.add(req.tool);
+                        if (response === 'approve_once')
+                            approve.add(req.tool);
+                        return response;
+                    }
                 }
-            }
-            return 'deny';
+                return 'deny';
+            };
+            return Promise.race([subscriberLoop(), timeout]);
         },
         subscribe(subscriber) {
             subscribers.add(subscriber);

@@ -37,5 +37,12 @@ import { importSessionSubcommand } from './import-session.js';
 import { pingSubcommand } from './ping.js';
 export declare const subcommands: Subcommand[];
 export declare function findSubcommand(verb: string): Subcommand | undefined;
+/**
+ * Returns the closest known command name if the given verb is an unrecognised
+ * typo with edit distance ≤ 2 to any known subcommand name, alias, or top-level
+ * verb. Returns undefined if the verb is an exact match (caller handles it) or
+ * if no close-enough candidate exists.
+ */
+export declare function suggestCommand(verb: string): string | undefined;
 export { runLogin, runLogout, runSetup };
 export { loginSubcommand, logoutSubcommand, setupSubcommand, doctorSubcommand, auditSubcommand, statsSubcommand, statusSubcommand, pingSubcommand, initSubcommand, keysSubcommand, modelsSubcommand, chatSubcommand, askSubcommand, compactSubcommand, exportSessionSubcommand, importSessionSubcommand, };

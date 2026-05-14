@@ -31,6 +31,7 @@ import { routeModel } from "../../providers/dispatch.js";
 import { isAutoApprove, modePreamble } from "../../context/mode.js";
 import { runAgentLoop } from "../../kernel/agent-loop.js";
 import { createErrorClassifier } from "../../intelligence/error-classifier.js";
+import { LoopDetector } from "../../subagents/loop-detector.js";
 import { createToolExecutor } from "../../tools/exec.js";
 import { createInkApprovalBus, } from "./ink-approval-bus.js";
 import { ApprovalPrompt, } from "./components/ApprovalPrompt.js";
@@ -103,6 +104,7 @@ export function App(props) {
     const interruptMsgRef = React.useRef(null);
     const pendingModelRef = React.useRef(null);
     const sessionRef = React.useRef(null);
+    const loopDetectorRef = React.useRef(new LoopDetector());
     // Tracks whether the model has produced its first response in this
     // session. The system prompt includes a one-line `[session-title]`
     // instruction only on the first turn; after the first agent_end the
@@ -873,6 +875,7 @@ export function App(props) {
             const userHooks = buildAgentHooksFromConfig(props.config);
             const composedHooks = composeHooks(enforceMode(mode), userHooks);
             const autoApprove = isAutoApprove(mode);
+            loopDetectorRef.current.reset();
             const prevHistoryLen = historyRef.current.length;
             const result = await runAgentLoop({
                 sessionId: sessionIdRef.current,
@@ -887,16 +890,26 @@ export function App(props) {
                 signal: abort.signal,
                 contextTransform: compactionTransform,
                 errorClassifier: createErrorClassifier(),
+                session: sessionRef.current ?? undefined,
+                loopDetector: loopDetectorRef.current,
                 autoApprove,
                 ...(composedHooks !== undefined ? { hooks: composedHooks } : {}),
             });
             historyRef.current = result.messages;
             for (const msg of result.messages.slice(prevHistoryLen)) {
-                void sessionRef.current?.append({
-                    type: "message",
-                    ts: new Date().toISOString(),
-                    message: msg,
-                });
+                const session = sessionRef.current;
+                if (!session)
+                    continue;
+                try {
+                    await session.append({
+                        type: "message",
+                        ts: new Date().toISOString(),
+                        message: msg,
+                    });
+                }
+                catch {
+                    /* swallow — session write failures must not crash the loop */
+                }
             }
         }
         catch (err) {

@@ -13,6 +13,7 @@
  */
 import type { Message, AgentResult, ToolDefinition, Provider, ToolExecutor, ApprovalBus, ErrorClassifier, AgentHooks } from "./types.js";
 import type { EventStream } from "./event-stream.js";
+import type { Session } from "../context/session.js";
 export interface AgentLoopConfig {
     sessionId: string;
     model: string;
@@ -59,9 +60,17 @@ export interface AgentLoopConfig {
                 name: string;
                 args?: unknown;
             }>;
+            message?: Message;
         }): void;
         isLoopDetected(): boolean;
         reason(): string | null;
     };
+    /**
+     * Optional session for per-turn crash-safe checkpointing. When provided,
+     * each assistant message and each batch of tool results is appended to the
+     * session immediately after it is produced, rather than waiting for the
+     * caller to flush everything at the end of runAgentLoop.
+     */
+    session?: Session;
 }
 export declare function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult>;

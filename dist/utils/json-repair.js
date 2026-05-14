@@ -39,7 +39,10 @@ export function repairJSON(raw) {
         return JSON.parse(trimmed);
     }
     catch {
-        return {};
+        return { __dirgha_json_parse_failed: true, raw };
     }
+}
+export function isJsonParseFailure(v) {
+    return typeof v === 'object' && v !== null && '__dirgha_json_parse_failed' in v && v.__dirgha_json_parse_failed === true;
 }
 //# sourceMappingURL=json-repair.js.map

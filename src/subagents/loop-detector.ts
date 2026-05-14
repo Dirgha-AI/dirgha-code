@@ -18,6 +18,18 @@ const DEFAULT_LOOP_CONFIG: LoopConfig = {
   maxTurnsWithoutProgress: 3,
 };
 
+function stableStringify(value: unknown): string {
+  if (value === null || value === undefined || typeof value !== "object") {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return "[" + value.map((v) => stableStringify(v)).join(",") + "]";
+  }
+  const keys = Object.keys(value as Record<string, unknown>).sort();
+  const pairs = keys.map((k) => "\"" + k + "\":" + stableStringify((value as Record<string, unknown>)[k]));
+  return "{" + pairs.join(",") + "}";
+}
+
 export class LoopDetector {
   private config: LoopConfig;
   private toolCallHistory: Map<string, number> = new Map();
@@ -34,7 +46,7 @@ export class LoopDetector {
   }): void {
     if (turn.toolCalls && turn.toolCalls.length > 0) {
       for (const tc of turn.toolCalls) {
-        const key = `${tc.name}:${JSON.stringify(tc.args ?? {})}`;
+        const key = `${tc.name}:${stableStringify(tc.args ?? {})}`;
         const count = (this.toolCallHistory.get(key) ?? 0) + 1;
         this.toolCallHistory.set(key, count);
       }

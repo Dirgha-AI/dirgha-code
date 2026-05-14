@@ -21,6 +21,7 @@ import { drainPending } from "../safety/audit-log.js";
 import { pushAuditEntries } from "../telemetry/gateway-push.js";
 import { loadToken } from "../integrations/device-auth.js";
 import { raceSignals } from "./abort-utils.js";
+import { isJsonParseFailure } from "../utils/json-repair.js";
 // ── History repair helpers ────────────────────────────────────────────────────
 //
 // Structural 400s (bad message sequence) cannot be fixed by retrying with the
@@ -28,20 +29,34 @@ import { raceSignals } from "./abort-utils.js";
 // session never dies from a malformed history.
 //
 // Call order on a 400:
-//   Level 0 → 1: _sanitizeHistory   (targeted structural fixes)
-//   Level 1 → 2: _stripAllToolTurns (remove all tool context, keep text)
-//   Level 2 → 3: truncate to last 6 messages + system
-//   Level 3+    : fall through to hard error
+//   Level 0 → 1: _sanitizeHistory + first pass                  (targeted structural fixes)
+//   Level 1 → 2: _sanitizeHistory + _stripOrphanedToolResults   (orphan cleanup, free)
+//   Level 2 → 3: _stripAllToolTurns                             (remove all tool context)
+//   Level 3 → 4: truncate to last 6 messages + system
+//   Level 4+    : fall through to hard error
 /** General structural sanitizer — fixes all message-sequence issues. */
 function _sanitizeHistory(messages) {
-    const result = [];
+    return _hardenHistory(messages);
+}
+/**
+ * Multi-pass history hardening (5 passes, matching Gemini CLI production patterns).
+ *
+ * Pass 1 — Coalesce: merge adjacent same-role messages, drop empty content.
+ * Pass 2 — Tool pairing: inject sentinel tool_results for orphaned tool_use blocks.
+ * Pass 3 — Role constraints: history must start with "user"; prepend synthetic if not.
+ * Pass 4 — Strip orphaned tool_results (calls _stripOrphanedToolResults).
+ * Pass 5 — Drop empty messages (covered in Pass 1 coalesce).
+ */
+function _hardenHistory(messages) {
+    // ── Pass 1: Coalesce ─────────────────────────────────────────────────────────
+    const pass1 = [];
     for (const msg of messages) {
-        // Drop empty content
+        // Drop empty content (Pass 1 + Pass 5)
         if (Array.isArray(msg.content) && msg.content.length === 0)
             continue;
         if (typeof msg.content === "string" && msg.content.trim() === "")
             continue;
-        const prev = result[result.length - 1];
+        const prev = pass1[pass1.length - 1];
         // Collapse consecutive same-role messages (merge content, skip system)
         if (prev && prev.role === msg.role && msg.role !== "system") {
             if (typeof prev.content === "string" && typeof msg.content === "string") {
@@ -58,60 +73,105 @@ function _sanitizeHistory(messages) {
             }
             continue;
         }
-        result.push({
+        pass1.push({
             ...msg,
             content: Array.isArray(msg.content) ? [...msg.content] : msg.content,
         });
     }
-    // Strip assistant-all-tool_use blocks whose IDs have no matching tool_result
-    for (let i = 0; i < result.length - 1; i++) {
-        const msg = result[i];
+    // ── Pass 2: Tool pairing ─────────────────────────────────────────────────────
+    // For every assistant message with tool_use parts, ensure the following user
+    // message has matching tool_result parts. Missing results get a sentinel.
+    const pass2 = [];
+    for (let i = 0; i < pass1.length; i++) {
+        const msg = pass1[i];
+        pass2.push(msg);
         if (msg.role !== "assistant" || !Array.isArray(msg.content))
             continue;
         const toolUses = msg.content.filter((p) => p.type === "tool_use");
         if (toolUses.length === 0)
             continue;
-        const next = result[i + 1];
-        const nextContent = next && Array.isArray(next.content) ? next.content : [];
-        const nextIds = new Set(nextContent
+        const next = pass1[i + 1];
+        const nextContent = next?.role === "user" && Array.isArray(next.content) ? next.content : [];
+        const existingResultIds = new Set(nextContent
             .filter((p) => p.type === "tool_result")
             .map((p) => p.toolUseId));
-        // Remove orphaned tool_use blocks (IDs with no matching result); keep valid ones
-        const orphanedUseIds = new Set(toolUses.filter((tu) => !nextIds.has(tu.id)).map((tu) => tu.id));
-        if (orphanedUseIds.size > 0) {
-            const kept = msg.content.filter((p) => p.type !== "tool_use" || !orphanedUseIds.has(p.id));
-            if (kept.length === 0) {
-                result.splice(i, 1);
-                i--;
-            }
-            else
-                msg.content = kept;
+        // Find tool_use IDs that have no matching result
+        const missingIds = toolUses
+            .map((tu) => tu.id)
+            .filter((id) => !existingResultIds.has(id));
+        if (missingIds.length === 0)
+            continue;
+        const sentinelParts = missingIds.map((id) => ({
+            type: "tool_result",
+            toolUseId: id,
+            content: "[System: tool result lost due to context management]",
+            isError: true,
+        }));
+        if (next?.role === "user") {
+            // Merge sentinels into the existing user message regardless of whether
+            // its content is a string or array. Converting string → array is valid
+            // API format and prevents two consecutive user messages (which cause 400).
+            const existingParts = typeof next.content === "string"
+                ? [{ type: "text", text: next.content }]
+                : Array.isArray(next.content)
+                    ? [...next.content]
+                    : [];
+            pass1[i + 1] = {
+                ...next,
+                content: [...sentinelParts, ...existingParts],
+            };
+        }
+        else {
+            // No following user message at all — inject a synthetic one
+            const syntheticUser = {
+                role: "user",
+                content: sentinelParts,
+            };
+            pass2.push(syntheticUser);
         }
     }
-    // Strip tool_result blocks in user messages whose toolUseId has no matching tool_use in prev
-    for (let i = 1; i < result.length; i++) {
-        const msg = result[i];
-        if (msg.role !== "user" || !Array.isArray(msg.content))
+    // ── Pass 2b: Re-coalesce after sentinel injection ─────────────────────────
+    // A second coalesce pass catches any consecutive user messages that may
+    // survive Pass 2 injection in edge cases.
+    const pass2b = [];
+    for (const msg of pass2) {
+        if (Array.isArray(msg.content) && msg.content.length === 0)
             continue;
-        const toolResults = msg.content.filter((p) => p.type === "tool_result");
-        if (toolResults.length === 0)
+        if (typeof msg.content === "string" && msg.content.trim() === "")
             continue;
-        const prev = result[i - 1];
-        const prevUses = (prev && Array.isArray(prev.content) ? prev.content : []).filter((p) => p.type === "tool_use");
-        const validIds = new Set(prevUses.map((tu) => tu.id));
-        // Remove only the orphaned result blocks (not the whole message)
-        const orphanedResultIds = new Set(toolResults.filter((tr) => !validIds.has(tr.toolUseId)).map((tr) => tr.toolUseId));
-        if (orphanedResultIds.size > 0) {
-            const kept = msg.content.filter((p) => p.type !== "tool_result" || !orphanedResultIds.has(p.toolUseId));
-            if (kept.length === 0) {
-                result.splice(i, 1);
-                i--;
-            }
-            else
-                msg.content = kept;
+        const prev = pass2b[pass2b.length - 1];
+        if (prev && prev.role === msg.role && msg.role !== "system") {
+            const pc = typeof prev.content === "string"
+                ? [{ type: "text", text: prev.content }]
+                : [...prev.content];
+            const mc = typeof msg.content === "string"
+                ? [{ type: "text", text: msg.content }]
+                : msg.content;
+            prev.content = [...pc, ...mc];
+            continue;
         }
+        pass2b.push({ ...msg, content: Array.isArray(msg.content) ? [...msg.content] : msg.content });
     }
-    return result;
+    // ── Pass 3: Role constraints ─────────────────────────────────────────────────
+    // History must start with "user". If first non-system message is "assistant",
+    // prepend a synthetic user message.
+    const firstNonSystem = pass2b.findIndex((m) => m.role !== "system");
+    if (firstNonSystem !== -1 && pass2b[firstNonSystem].role === "assistant") {
+        pass2b.splice(firstNonSystem, 0, {
+            role: "user",
+            content: "[System: conversation resumed]",
+        });
+    }
+    // ── Pass 4: Strip orphaned tool_results ──────────────────────────────────────
+    const pass4 = _stripOrphanedToolResults(pass2b);
+    // ── Pass 5: Drop remaining empty messages (safety net) ───────────────────────
+    return pass4.filter((m) => {
+        if (Array.isArray(m.content) && m.content.length === 0)
+            return false;
+        if (typeof m.content === "string" && m.content.trim() === "")
+            return false;
+        return true;
+    });
 }
 /** Nuclear fallback: remove all tool_use/tool_result content, keep text/thinking. */
 function _stripAllToolTurns(messages) {
@@ -136,25 +196,64 @@ function _stripAllToolTurns(messages) {
         .filter((m) => m !== null);
     return _sanitizeHistory(stripped);
 }
-// Remove any user messages containing only tool_result parts that are not
-// immediately preceded by an assistant message with tool_use parts.
-// contextTransform (compaction/summarization) can produce these by collapsing
-// assistant turns that called tools, leaving the result messages orphaned.
-// Sending orphaned tool_result messages triggers HTTP 400 from the provider.
+/**
+ * Remove orphaned tool_result parts from user messages.
+ * For messages whose content is entirely tool_result parts, the message is
+ * dropped if the immediately preceding assistant message does not contain a
+ * matching tool_use (same id). For mixed-content messages (some tool_result,
+ * some other parts), only the orphaned tool_result parts are removed; the
+ * remaining parts are kept. If after filtering the content becomes empty,
+ * the message is dropped.
+ * contextTransform (compaction/summarization) can produce these by collapsing
+ * assistant turns that called tools, leaving the result messages orphaned.
+ * Sending orphaned tool_result messages triggers HTTP 400 from the provider.
+ */
 function _stripOrphanedToolResults(messages) {
     const out = [];
     for (const msg of messages) {
         if (msg.role === "user" &&
             Array.isArray(msg.content) &&
-            msg.content.length > 0 &&
-            msg.content.every((p) => p.type === "tool_result")) {
-            const prev = out[out.length - 1];
-            if (prev?.role === "assistant" &&
-                Array.isArray(prev.content) &&
-                prev.content.some((p) => p.type === "tool_use")) {
+            msg.content.length > 0) {
+            const toolResultParts = msg.content.filter((p) => p.type === "tool_result");
+            const nonToolParts = msg.content.filter((p) => p.type !== "tool_result");
+            if (toolResultParts.length === 0) {
+                // No tool_result parts — keep as is
                 out.push(msg);
             }
-            // else: drop orphaned tool_result message — no matching tool_use above it
+            else if (nonToolParts.length === 0) {
+                // Pure tool_result message — existing behaviour
+                const prev = out[out.length - 1];
+                if (prev?.role === "assistant" &&
+                    Array.isArray(prev.content) &&
+                    prev.content.some((p) => p.type === "tool_use")) {
+                    out.push(msg);
+                }
+                // else: drop orphaned tool_result message
+            }
+            else {
+                // Mixed content: filter out orphaned tool_result parts
+                const prev = out[out.length - 1];
+                const matchingToolUseIds = new Set();
+                if (prev?.role === "assistant" &&
+                    Array.isArray(prev.content)) {
+                    for (const part of prev.content) {
+                        const p = part;
+                        if (p.type === "tool_use" && p.id) {
+                            matchingToolUseIds.add(p.id);
+                        }
+                    }
+                }
+                const newContent = msg.content.filter((p) => {
+                    const part = p;
+                    if (part.type !== "tool_result")
+                        return true;
+                    return part.toolUseId != null && matchingToolUseIds.has(part.toolUseId);
+                });
+                if (newContent.length > 0) {
+                    out.push({ ...msg, content: newContent });
+                }
+                // else: drop if nothing remains
+            }
         }
         else {
             out.push(msg);
@@ -177,9 +276,18 @@ function _recoverMinimalContext(history) {
     if (lastTextUser)
         return [...sys, lastTextUser];
     if (sys.length > 0)
-        return sys;
+        return [
+            ...sys,
+            {
+                role: "user",
+                content: "[System: tool history was compacted due to a message sequencing error. Resume from the last known task state — do NOT ask the user to restate their request. Check available tools (e.g. /checkpoint list) if you need context recovery.]",
+            },
+        ];
     // Absolute fallback: synthetic user message to prevent API 400
-    return [{ role: "user", content: "Continue." }];
+    return [{
+            role: "user",
+            content: "[System: tool history was compacted. Resume from context — do NOT ask the user to restate their request.]",
+        }];
 }
 export async function runAgentLoop(cfg) {
     const events = cfg.events;
@@ -199,6 +307,12 @@ export async function runAgentLoop(cfg) {
     let retriesForTurn = 0;
     let _compactedThisTurn = false; // guards against infinite compact→retry→compact loops
     let _historyRepairLevel = 0; // 0=clean, 1=sanitized, 2=tool-stripped, 3=truncated
+    // Per-session refusal tracker: maps (tool_name + serialized_args) → count of
+    // isError results. After REFUSAL_ABORT_THRESHOLD identical refused calls, the
+    // session is aborted rather than sending the same error back to the model
+    // forever.  Lives outside the turn loop so it accumulates across turns.
+    const _refusalCounts = new Map();
+    const REFUSAL_ABORT_THRESHOLD = 3;
     const DEFAULT_MAX_RETRIES = 3;
     // Per-reason caps override the default. TTFT timeouts have already
     // waited 90 s — retrying once is sufficient evidence the provider is
@@ -219,10 +333,15 @@ export async function runAgentLoop(cfg) {
                 break;
             }
             if (cfg.hooks?.beforeTurn) {
-                const decision = await cfg.hooks.beforeTurn(turnIndex, history);
-                if (decision === "abort") {
-                    stopReason = "aborted";
-                    break;
+                try {
+                    const decision = await cfg.hooks.beforeTurn(turnIndex, history);
+                    if (decision === "abort") {
+                        stopReason = "aborted";
+                        break;
+                    }
+                }
+                catch {
+                    /* beforeTurn hook errors must not crash the agent loop */
                 }
             }
             if (cfg.loopDetector?.isLoopDetected()) {
@@ -252,6 +371,7 @@ export async function runAgentLoop(cfg) {
             }
             turnCount = turnIndex + 1;
             const turnId = `t${turnIndex}-${Date.now().toString(36)}`;
+            events.emit({ type: "turn_start", turnId, turnIndex });
             // Reset per-turn: each turn starts with a fresh compaction attempt budget
             _compactedThisTurn = false;
             let messagesForCall;
@@ -399,7 +519,7 @@ export async function runAgentLoop(cfg) {
                 // three repair levels so the session never dies from a bad history.
                 const is400Structural = /\b400\b|bad.?request|invalid.*message|tool.*role|messages.*tool|tool_result.*tool_use|empty.?input/i.test(errMsg) &&
                     !/context.?length|too long|max.*tokens|context_length_exceeded/i.test(errMsg);
-                if (is400Structural && _historyRepairLevel < 3) {
+                if (is400Structural && _historyRepairLevel < 4) {
                     // Helper: after any repair, ensure history is never empty.
                     // An empty messages array will fail with a different error; keep at
                     // minimum the system messages, or the last user message as a fallback.
@@ -415,7 +535,17 @@ export async function runAgentLoop(cfg) {
                         history.push(...repaired);
                     }
                     else if (_historyRepairLevel === 1) {
+                        // Level 2: targeted orphan cleanup — strip tool_result messages
+                        // that have no matching tool_use above them. This is the most
+                        // common cause of structural 400s after compaction and is free
+                        // (no LLM call, no I/O).
                         _historyRepairLevel = 2;
+                        const deorphaned = ensureNonEmpty(_stripOrphanedToolResults(_sanitizeHistory(history)));
+                        history.length = 0;
+                        history.push(...deorphaned);
+                    }
+                    else if (_historyRepairLevel === 2) {
+                        _historyRepairLevel = 3;
                         const stripped = ensureNonEmpty(_stripAllToolTurns(history));
                         history.length = 0;
                         history.push(...stripped);
@@ -425,8 +555,8 @@ export async function runAgentLoop(cfg) {
                             retryable: true,
                         });
                     }
-                    else if (_historyRepairLevel === 2) {
-                        _historyRepairLevel = 3;
+                    else if (_historyRepairLevel === 3) {
+                        _historyRepairLevel = 4;
                         const system = history.filter((m) => m.role === "system");
                         const recent = history.filter((m) => m.role !== "system").slice(-6);
                         const truncated = ensureNonEmpty([...system, ...recent]);
@@ -512,10 +642,14 @@ export async function runAgentLoop(cfg) {
                 : [];
             if (parts.length > 0 || toolUses.length > 0) {
                 history.push(assembled.message);
+                if (cfg.session) {
+                    void cfg.session.append({ type: "message", ts: new Date().toISOString(), message: assembled.message });
+                }
             }
             try {
                 cfg.loopDetector?.track({
                     toolCalls: toolUses.map((t) => ({ name: t.name, args: t.input })),
+                    message: assembled.message,
                 });
             }
             catch {
@@ -536,7 +670,26 @@ export async function runAgentLoop(cfg) {
                 void flushAuditEntries(cfg.sessionId);
                 break;
             }
-            const toolResults = await executeToolCalls(toolUses, cfg, events);
+            const toolResults = await executeToolCalls(toolUses, cfg, events, _refusalCounts, REFUSAL_ABORT_THRESHOLD);
+            // If the refusal-abort Map signalled a loop (any key hit threshold),
+            // emit the terminal error and stop.
+            let _refusalAbortTriggered = false;
+            for (const [key, n] of _refusalCounts) {
+                if (n >= REFUSAL_ABORT_THRESHOLD) {
+                    const name = key.split(":")[0] ?? key;
+                    events.emit({
+                        type: "error",
+                        message: `[loop] tool "${name}" refused ${n} times with identical arguments — aborting session to prevent infinite loop`,
+                        retryable: false,
+                    });
+                    stopReason = "loop";
+                    _refusalAbortTriggered = true;
+                    break;
+                }
+            }
+            if (_refusalAbortTriggered)
+                break;
+            const historyLenBeforeResults = history.length;
             const appended = appendToolResults(history, toolResults.map((r) => ({
                 toolUseId: r.call.id,
                 content: r.result.content,
@@ -544,6 +697,12 @@ export async function runAgentLoop(cfg) {
             })));
             history.length = 0;
             history.push(...appended);
+            if (cfg.session) {
+                const toolResultMessages = appended.slice(historyLenBeforeResults);
+                for (const toolResultMsg of toolResultMessages) {
+                    void cfg.session.append({ type: "message", ts: new Date().toISOString(), message: toolResultMsg });
+                }
+            }
             // Defensive: ensure history ends with a valid sequence for the next
             // turn. If tool results were appended without a preceding assistant
             // message carrying tool_calls (e.g. due to a provider or compaction
@@ -594,9 +753,19 @@ export async function runAgentLoop(cfg) {
         sessionId: cfg.sessionId,
     };
 }
-async function executeToolCalls(toolUses, cfg, events) {
+async function executeToolCalls(toolUses, cfg, events, refusalCounts, _refusalAbortThreshold) {
     const run = async (call) => {
         let input = call.input;
+        if (isJsonParseFailure(input)) {
+            const truncated = input.raw.length > 400 ? input.raw.slice(0, 400) + "…" : input.raw;
+            const result = {
+                content: `Your tool call had invalid JSON arguments and was rejected. Original raw input (truncated): ${truncated}. Please re-emit the call with valid JSON.`,
+                isError: true,
+            };
+            events.emit({ type: "tool_exec_start", id: call.id, name: call.name, input: call.input });
+            events.emit({ type: "tool_exec_end", id: call.id, output: result.content, isError: true, durationMs: 0 });
+            return { call, result };
+        }
         if (cfg.hooks?.beforeToolCall) {
             try {
                 const decision = await cfg.hooks.beforeToolCall(call);
@@ -635,6 +804,19 @@ async function executeToolCalls(toolUses, cfg, events) {
                     content: `Hook error: ${hookErr instanceof Error ? hookErr.message : String(hookErr)}`,
                     isError: true,
                 };
+                events.emit({
+                    type: "tool_exec_start",
+                    id: call.id,
+                    name: call.name,
+                    input: call.input,
+                });
+                events.emit({
+                    type: "tool_exec_end",
+                    id: call.id,
+                    output: result.content,
+                    isError: true,
+                    durationMs: 0,
+                });
                 return { call, result };
             }
         }
@@ -787,6 +969,19 @@ async function executeToolCalls(toolUses, cfg, events) {
             durationMs,
             ...(result.metadata !== undefined ? { metadata: result.metadata } : {}),
         });
+        // Track repeated refusals: when the same (name, args) pair is refused
+        // REFUSAL_ABORT_THRESHOLD times in this session, the outer loop will
+        // abort rather than sending the same error to the model indefinitely.
+        if (result.isError && refusalCounts !== undefined) {
+            try {
+                const refusalKey = `${call.name}:${JSON.stringify(input)}`;
+                const prev = refusalCounts.get(refusalKey) ?? 0;
+                refusalCounts.set(refusalKey, prev + 1);
+            }
+            catch {
+                // JSON.stringify can throw on circular inputs — treat as non-refusal.
+            }
+        }
         return { call: { ...call, input }, result };
     };
     if (cfg.toolConcurrency === "parallel" && toolUses.length > 1) {

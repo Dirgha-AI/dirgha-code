@@ -27,6 +27,8 @@ export class StdioTransport implements Transport {
   private handlers: Array<(message: unknown) => void> = [];
   private closeHandlers: Array<() => void> = [];
   private buffer = "";
+  private closedByUser = false;
+  private respawnTimes: number[] = [];
   private ready: Promise<void>;
 
   constructor(private opts: StdioTransportOptions) {
@@ -60,7 +62,20 @@ export class StdioTransport implements Transport {
         child.on("error", (err) => reject(err));
         child.on("exit", () => {
           this.child = null;
-          for (const cb of this.closeHandlers) cb();
+          if (this.closedByUser) {
+            for (const cb of this.closeHandlers) cb();
+            return;
+          }
+          const now = Date.now();
+          this.respawnTimes = this.respawnTimes.filter((t) => now - t < 60_000);
+          if (this.respawnTimes.length >= 3) {
+            process.stderr.write(`[mcp:${this.opts.command}] exceeded respawn limit; marking dead\n`);
+            for (const cb of this.closeHandlers) cb();
+            return;
+          }
+          this.respawnTimes.push(now);
+          process.stderr.write(`[mcp:${this.opts.command}] crashed; respawning (attempt ${this.respawnTimes.length})\n`);
+          this.ready = this.start();
         });
         child.on("spawn", () => resolve());
       } catch (err) {
@@ -106,6 +121,7 @@ export class StdioTransport implements Transport {
   }
 
   async close(): Promise<void> {
+    this.closedByUser = true;
     if (this.child && !this.child.killed) {
       this.child.kill();
       this.child = null;

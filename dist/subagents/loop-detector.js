@@ -2,6 +2,17 @@ const DEFAULT_LOOP_CONFIG = {
     maxRepeatedToolCalls: 5,
     maxTurnsWithoutProgress: 3,
 };
+function stableStringify(value) {
+    if (value === null || value === undefined || typeof value !== "object") {
+        return JSON.stringify(value);
+    }
+    if (Array.isArray(value)) {
+        return "[" + value.map((v) => stableStringify(v)).join(",") + "]";
+    }
+    const keys = Object.keys(value).sort();
+    const pairs = keys.map((k) => "\"" + k + "\":" + stableStringify(value[k]));
+    return "{" + pairs.join(",") + "}";
+}
 export class LoopDetector {
     config;
     toolCallHistory = new Map();
@@ -13,7 +24,7 @@ export class LoopDetector {
     track(turn) {
         if (turn.toolCalls && turn.toolCalls.length > 0) {
             for (const tc of turn.toolCalls) {
-                const key = `${tc.name}:${JSON.stringify(tc.args ?? {})}`;
+                const key = `${tc.name}:${stableStringify(tc.args ?? {})}`;
                 const count = (this.toolCallHistory.get(key) ?? 0) + 1;
                 this.toolCallHistory.set(key, count);
             }

@@ -153,6 +153,34 @@ export async function maybeCompact(
       (acc, m) => acc + estimateTokens(flatten(m)),
       0,
     );
+
+    // Notify hooks that compaction failed
+    if (cfg.hooks) {
+      try {
+        await cfg.hooks.emit("compaction_failed", {
+          tokensBefore,
+          tokensAfter: tokensAfterFallback,
+          reason: "summarizer_empty",
+        });
+      } catch {
+        /* hook failure should not crash compaction */
+      }
+    }
+
+    // Log to session if available
+    if (session) {
+      try {
+        await session.append({
+          type: "system",
+          ts: new Date().toISOString(),
+          event: "compaction_failed",
+          data: { reason: "summarizer_empty" },
+        });
+      } catch {
+        /* session append failure should not crash compaction */
+      }
+    }
+
     return {
       messages: trimmed,
       compacted: false,

@@ -288,7 +288,10 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
           // First pull: save current input, recall most recent only.
           savedInputRef.current = props.value;
           setHistoryIdx(0);
+          prevValueRef.current = history[0];
           props.onChange(history[0]);
+          setPasteSegment(null);
+          setPasteExpanded(false);
           setTextInputKey((k) => k + 1);
         }
         // Second+ pulls are intentionally no-ops — we only recall the
@@ -298,7 +301,10 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
       if (key.downArrow && historyIdx !== null) {
         // Restore the saved input and reset.
         setHistoryIdx(null);
+        prevValueRef.current = savedInputRef.current;
         props.onChange(savedInputRef.current);
+        setPasteSegment(null);
+        setPasteExpanded(false);
         setTextInputKey((k) => k + 1);
         return;
       }

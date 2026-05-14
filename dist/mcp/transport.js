@@ -11,6 +11,8 @@ export class StdioTransport {
     handlers = [];
     closeHandlers = [];
     buffer = "";
+    closedByUser = false;
+    respawnTimes = [];
     ready;
     constructor(opts) {
         this.opts = opts;
@@ -39,8 +41,22 @@ export class StdioTransport {
                 child.on("error", (err) => reject(err));
                 child.on("exit", () => {
                     this.child = null;
-                    for (const cb of this.closeHandlers)
-                        cb();
+                    if (this.closedByUser) {
+                        for (const cb of this.closeHandlers)
+                            cb();
+                        return;
+                    }
+                    const now = Date.now();
+                    this.respawnTimes = this.respawnTimes.filter((t) => now - t < 60_000);
+                    if (this.respawnTimes.length >= 3) {
+                        process.stderr.write(`[mcp:${this.opts.command}] exceeded respawn limit; marking dead\n`);
+                        for (const cb of this.closeHandlers)
+                            cb();
+                        return;
+                    }
+                    this.respawnTimes.push(now);
+                    process.stderr.write(`[mcp:${this.opts.command}] crashed; respawning (attempt ${this.respawnTimes.length})\n`);
+                    this.ready = this.start();
                 });
                 child.on("spawn", () => resolve());
             }
@@ -82,6 +98,7 @@ export class StdioTransport {
         this.closeHandlers.push(handler);
     }
     async close() {
+        this.closedByUser = true;
         if (this.child && !this.child.killed) {
             this.child.kill();
             this.child = null;

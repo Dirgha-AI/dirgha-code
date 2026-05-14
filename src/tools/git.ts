@@ -55,7 +55,7 @@ export const gitTool: Tool = {
       if (!check.valid) return { content: check.error, isError: true };
       cwd = check.resolved;
     }
-    const result = await run("git", full, cwd, ctx.env);
+    const result = await run("git", full, cwd, ctx.env, ctx.signal);
     return {
       content: [result.stdout, result.stderr]
         .filter((s) => s && s.length > 0)
@@ -88,7 +88,9 @@ async function run(
   args: string[],
   cwd: string,
   env: Record<string, string>,
+  signal?: AbortSignal,
 ): Promise<{ stdout: string; stderr: string; code: number }> {
+  const GIT_TIMEOUT_MS = 60_000;
   return new Promise((resolveAll) => {
     const child = spawn(command, args, {
       cwd,
@@ -99,10 +101,41 @@ async function run(
     const stderr: Buffer[] = [];
     child.stdout.on("data", (buf) => stdout.push(buf));
     child.stderr.on("data", (buf) => stderr.push(buf));
-    child.on("error", () => resolveAll({ stdout: "", stderr: "", code: -1 }));
+
+    /** Gracefully terminate: SIGTERM, then SIGKILL after 2 s. */
+    const killChild = (): void => {
+      child.kill("SIGTERM");
+      setTimeout(() => {
+        try {
+          child.kill("SIGKILL");
+        } catch {
+          /* already gone */
+        }
+      }, 2_000);
+    };
+
+    // If signal is already aborted, kill immediately
+    if (signal?.aborted) {
+      killChild();
+    }
+
+    const onAbort = (): void => {
+      killChild();
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+
+    const timer = setTimeout(killChild, GIT_TIMEOUT_MS);
+
+    child.on("error", () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+      resolveAll({ stdout: "", stderr: "", code: -1 });
+    });
     // Use 'close' (not 'exit') so stdio pipes finish draining before we
     // read the buffers — large diffs can still be in flight when 'exit' fires.
-    child.on("close", (code) =>
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
       resolveAll({
         stdout: Buffer.concat(
           stdout as unknown as readonly Uint8Array[],
@@ -111,7 +144,7 @@ async function run(
           stderr as unknown as readonly Uint8Array[],
         ).toString("utf8"),
         code: code ?? -1,
-      }),
-    );
+      });
+    });
   });
 }

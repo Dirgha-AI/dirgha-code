@@ -71,6 +71,46 @@ export const subcommands = [
 export function findSubcommand(verb) {
     return subcommands.find(cmd => cmd.name === verb || (cmd.aliases ?? []).includes(verb));
 }
+// Verbs dispatched directly in main.ts before findSubcommand is called.
+const TOP_LEVEL_VERBS = ['login', 'logout', 'setup', 'fleet', 'submit-paper'];
+function levenshtein(a, b) {
+    const m = a.length, n = b.length;
+    const dp = Array.from({ length: m + 1 }, (_i, i) => Array.from({ length: n + 1 }, (_j, j) => (i === 0 ? j : j === 0 ? i : 0)));
+    for (let i = 1; i <= m; i++)
+        for (let j = 1; j <= n; j++)
+            dp[i][j] = a[i - 1] === b[j - 1]
+                ? dp[i - 1][j - 1]
+                : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    return dp[m][n];
+}
+/**
+ * Returns the closest known command name if the given verb is an unrecognised
+ * typo with edit distance ≤ 2 to any known subcommand name, alias, or top-level
+ * verb. Returns undefined if the verb is an exact match (caller handles it) or
+ * if no close-enough candidate exists.
+ */
+export function suggestCommand(verb) {
+    // Exact match — caller dispatches normally, no suggestion needed.
+    if (findSubcommand(verb))
+        return undefined;
+    if (TOP_LEVEL_VERBS.includes(verb))
+        return undefined;
+    // Build the candidate pool: all subcommand names + aliases + top-level verbs.
+    const candidates = [
+        ...TOP_LEVEL_VERBS,
+        ...subcommands.flatMap(cmd => [cmd.name, ...(cmd.aliases ?? [])]),
+    ];
+    let best;
+    let bestDist = Infinity;
+    for (const candidate of candidates) {
+        const d = levenshtein(verb, candidate);
+        if (d < bestDist) {
+            bestDist = d;
+            best = candidate;
+        }
+    }
+    return bestDist <= 2 ? best : undefined;
+}
 export { runLogin, runLogout, runSetup };
 export { loginSubcommand, logoutSubcommand, setupSubcommand, doctorSubcommand, auditSubcommand, statsSubcommand, statusSubcommand, pingSubcommand, initSubcommand, keysSubcommand, modelsSubcommand, chatSubcommand, askSubcommand, compactSubcommand, exportSessionSubcommand, importSessionSubcommand, };
 //# sourceMappingURL=index.js.map

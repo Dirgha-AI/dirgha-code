@@ -45,6 +45,7 @@ import { drainPending } from "../safety/audit-log.js";
 import { pushAuditEntries } from "../telemetry/gateway-push.js";
 import { loadToken } from "../integrations/device-auth.js";
 import { raceSignals } from "./abort-utils.js";
+import { isJsonParseFailure } from "../utils/json-repair.js";
 
 export interface AgentLoopConfig {
   sessionId: string;
@@ -292,31 +293,73 @@ function _stripAllToolTurns(messages: Message[]): Message[] {
   return _sanitizeHistory(stripped);
 }
 
-// Remove any user messages containing only tool_result parts that are not
-// immediately preceded by an assistant message with tool_use parts.
-// contextTransform (compaction/summarization) can produce these by collapsing
-// assistant turns that called tools, leaving the result messages orphaned.
-// Sending orphaned tool_result messages triggers HTTP 400 from the provider.
+/**
+ * Remove orphaned tool_result parts from user messages.
+ * For messages whose content is entirely tool_result parts, the message is
+ * dropped if the immediately preceding assistant message does not contain a
+ * matching tool_use (same id). For mixed-content messages (some tool_result,
+ * some other parts), only the orphaned tool_result parts are removed; the
+ * remaining parts are kept. If after filtering the content becomes empty,
+ * the message is dropped.
+ * contextTransform (compaction/summarization) can produce these by collapsing
+ * assistant turns that called tools, leaving the result messages orphaned.
+ * Sending orphaned tool_result messages triggers HTTP 400 from the provider.
+ */
 function _stripOrphanedToolResults(messages: Message[]): Message[] {
   const out: Message[] = [];
   for (const msg of messages) {
     if (
       msg.role === "user" &&
       Array.isArray(msg.content) &&
-      msg.content.length > 0 &&
-      msg.content.every((p) => (p as { type: string }).type === "tool_result")
+      msg.content.length > 0
     ) {
-      const prev = out[out.length - 1];
-      if (
-        prev?.role === "assistant" &&
-        Array.isArray(prev.content) &&
-        (prev.content as Array<{ type: string }>).some(
-          (p) => p.type === "tool_use",
-        )
-      ) {
+      const toolResultParts = msg.content.filter(
+        (p) => (p as { type: string }).type === "tool_result"
+      );
+      const nonToolParts = msg.content.filter(
+        (p) => (p as { type: string }).type !== "tool_result"
+      );
+      if (toolResultParts.length === 0) {
+        // No tool_result parts — keep as is
         out.push(msg);
+      } else if (nonToolParts.length === 0) {
+        // Pure tool_result message — existing behaviour
+        const prev = out[out.length - 1];
+        if (
+          prev?.role === "assistant" &&
+          Array.isArray(prev.content) &&
+          (prev.content as Array<{ type: string }>).some(
+            (p) => p.type === "tool_use",
+          )
+        ) {
+          out.push(msg);
+        }
+        // else: drop orphaned tool_result message
+      } else {
+        // Mixed content: filter out orphaned tool_result parts
+        const prev = out[out.length - 1];
+        const matchingToolUseIds = new Set<string>();
+        if (
+          prev?.role === "assistant" &&
+          Array.isArray(prev.content)
+        ) {
+          for (const part of prev.content) {
+            const p = part as { type: string; id?: string };
+            if (p.type === "tool_use" && p.id) {
+              matchingToolUseIds.add(p.id);
+            }
+          }
+        }
+        const newContent = msg.content.filter((p) => {
+          const part = p as { type: string; toolUseId?: string };
+          if (part.type !== "tool_result") return true;
+          return part.toolUseId != null && matchingToolUseIds.has(part.toolUseId);
+        });
+        if (newContent.length > 0) {
+          out.push({ ...msg, content: newContent });
+        }
+        // else: drop if nothing remains
       }
-      // else: drop orphaned tool_result message — no matching tool_use above it
     } else {
       out.push(msg);
     }
@@ -403,10 +446,14 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
       }
 
       if (cfg.hooks?.beforeTurn) {
-        const decision = await cfg.hooks.beforeTurn(turnIndex, history);
-        if (decision === "abort") {
-          stopReason = "aborted";
-          break;
+        try {
+          const decision = await cfg.hooks.beforeTurn(turnIndex, history);
+          if (decision === "abort") {
+            stopReason = "aborted";
+            break;
+          }
+        } catch {
+          /* beforeTurn hook errors must not crash the agent loop */
         }
       }
 
@@ -439,6 +486,7 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
 
       turnCount = turnIndex + 1;
       const turnId = `t${turnIndex}-${Date.now().toString(36)}`;
+      events.emit({ type: "turn_start", turnId, turnIndex });
 
       // Reset per-turn: each turn starts with a fresh compaction attempt budget
       _compactedThisTurn = false;
@@ -871,6 +919,16 @@ async function executeToolCalls(
     call: ToolCall,
   ): Promise<{ call: ToolCall; result: ToolResult }> => {
     let input = call.input;
+    if (isJsonParseFailure(input)) {
+      const truncated = input.raw.length > 400 ? input.raw.slice(0, 400) + "…" : input.raw;
+      const result: ToolResult = {
+        content: `Your tool call had invalid JSON arguments and was rejected. Original raw input (truncated): ${truncated}. Please re-emit the call with valid JSON.`,
+        isError: true,
+      };
+      events.emit({ type: "tool_exec_start", id: call.id, name: call.name, input: call.input });
+      events.emit({ type: "tool_exec_end", id: call.id, output: result.content, isError: true, durationMs: 0 });
+      return { call, result };
+    }
     if (cfg.hooks?.beforeToolCall) {
       try {
         const decision = await cfg.hooks.beforeToolCall(call);
@@ -911,6 +969,19 @@ async function executeToolCalls(
           content: `Hook error: ${hookErr instanceof Error ? hookErr.message : String(hookErr)}`,
           isError: true,
         };
+        events.emit({
+          type: "tool_exec_start",
+          id: call.id,
+          name: call.name,
+          input: call.input,
+        });
+        events.emit({
+          type: "tool_exec_end",
+          id: call.id,
+          output: result.content,
+          isError: true,
+          durationMs: 0,
+        });
         return { call, result };
       }
     }
