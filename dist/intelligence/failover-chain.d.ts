@@ -16,6 +16,9 @@
  *   - Logs every failover event via the injected session logger.
  *   - Falls through to the cheapest free model from the catalog when
  *     no paid or family-alternative model is available.
+ *
+ * Failover blacklist state now lives in health-monitor.ts (unified).
+ * This file delegates to health-monitor for persistent blacklist checks.
  */
 export interface FailoverTier {
     model: string;
@@ -44,7 +47,6 @@ export interface FailoverOptions {
     };
 }
 export declare function recordFailover(modelId: string, sessionLogger?: FailoverOptions["sessionLogger"]): void;
-export declare function isBlacklisted(modelId: string): boolean;
 export declare function resetFailoverState(): void;
 export declare function resetModelBlacklist(modelId: string): void;
 export declare function buildFailoverChain(modelId: string, opts?: FailoverOptions): FailoverChain;

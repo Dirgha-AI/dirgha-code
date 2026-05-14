@@ -14,9 +14,9 @@
 import { assembleTurn, extractToolUses, appendToolResults } from "./message.js";
 import { resolveModelForDispatch } from "../providers/dispatch.js";
 import { findFailover } from "../intelligence/prices.js";
-import { recordFailover, isBlacklisted, } from "../intelligence/failover-chain.js";
+import { recordFailover, } from "../intelligence/failover-chain.js";
 import { recordRequest, recordRateLimit } from "../providers/health.js";
-import { recordSuccess as recordHealthSuccess, recordFailure as recordHealthFailure, } from "../intelligence/health-monitor.js";
+import { recordSuccess as recordHealthSuccess, recordFailure as recordHealthFailure, isBlacklisted, } from "../intelligence/health-monitor.js";
 import { drainPending } from "../safety/audit-log.js";
 import { pushAuditEntries } from "../telemetry/gateway-push.js";
 import { loadToken } from "../integrations/device-auth.js";
@@ -370,7 +370,7 @@ export async function runAgentLoop(cfg) {
             // consecutive failovers, surface the failover so the TUI/caller
             // can prompt the user to switch. The loop itself continues with
             // the current model (callers swap between runAgentLoop calls).
-            if (turnIndex === 0 && isBlacklisted(cfg.model)) {
+            if (turnIndex === 0 && isBlacklisted(cfg.provider.id, cfg.model)) {
                 const fallback = findFailover(cfg.model);
                 events.emit({
                     type: "error",
@@ -545,7 +545,7 @@ export async function runAgentLoop(cfg) {
                 // bad-id (400 "not a valid model"), deprecated, rate-limit,
                 // or 5xx upstream failures.
                 const errMsg = err instanceof Error ? err.message : String(err);
-                recordHealthFailure(cfg.provider.id, errMsg);
+                recordHealthFailure(cfg.provider.id, cfg.model, errMsg);
                 // ── Auto-compaction on context-length errors ──────────────────────
                 // When the provider says the conversation exceeds the model's context
                 // window, we compact the history (summarise older turns) and retry
@@ -689,7 +689,7 @@ export async function runAgentLoop(cfg) {
             totals.outputTokens += assembled.outputTokens;
             totals.cachedTokens += assembled.cachedTokens;
             recordRequest(cfg.provider.id, true, 0);
-            recordHealthSuccess(cfg.provider.id, 0);
+            recordHealthSuccess(cfg.provider.id, cfg.model, 0);
             retriesForTurn = 0;
             _historyRepairLevel = 0; // reset repair level after a clean successful turn
             if (cfg.costCalculator) {

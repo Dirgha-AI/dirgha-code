@@ -16,10 +16,15 @@
  *   - Logs every failover event via the injected session logger.
  *   - Falls through to the cheapest free model from the catalog when
  *     no paid or family-alternative model is available.
+ *
+ * Failover blacklist state now lives in health-monitor.ts (unified).
+ * This file delegates to health-monitor for persistent blacklist checks.
  */
 
-import { lookupModel, PRICES } from "../intelligence/prices.js";
-import { familyAlternatives } from "../providers/family-fallback.js";
+import { isBlacklisted, recordFailoverEvent, resetHealth } from './health-monitor.js';
+import { PRICES } from './prices.js';
+import { lookupModel } from './prices.js';
+import { familyAlternatives } from '../providers/family-fallback.js';
 
 // Demoted 2026-05-08 — both models hang on NIM (verified live). Still
 // in the catalogue for manual `--model` selection; just not auto-picked.
@@ -57,22 +62,36 @@ export interface FailoverOptions {
   };
 }
 
-/**
- * Per-session state: tracks consecutive failover counts per model.
- * After 5 consecutive failovers on the same model, it is blacklisted
- * for the remainder of the session.
- */
-const FAILOVER_BLACKLIST_THRESHOLD = 5;
-const failoverCounts = new Map<string, number>();
-const blacklistedModels = new Set<string>();
+// ──────────────────────────────────────────────────────────
+// One-time warning tracking for unknown models
+// ──────────────────────────────────────────────────────────
+const unknownModelWarned = new Set<string>();
+
+// ──────────────────────────────────────────────────────────
+// Local helper: is a model blacklisted in the unified health state?
+// ──────────────────────────────────────────────────────────
+function isModelBlacklisted(modelId: string): boolean {
+  const entry = PRICES.find(p => p.model === modelId);
+  if (!entry) return false; // unknown model – can't check unified state
+  return isBlacklisted(entry.provider, modelId);
+}
 
 export function recordFailover(
   modelId: string,
   sessionLogger?: FailoverOptions["sessionLogger"],
 ): void {
-  const count = (failoverCounts.get(modelId) ?? 0) + 1;
-  failoverCounts.set(modelId, count);
+  // Update unified blacklist in health-monitor.
+  const entry = PRICES.find(p => p.model === modelId);
+  if (entry) {
+    recordFailoverEvent(entry.provider, modelId);
+  } else {
+    if (!unknownModelWarned.has(modelId)) {
+      unknownModelWarned.add(modelId);
+      console.warn(`[failover-chain] unknown model: ${modelId}`);
+    }
+  }
 
+  // Session logger — logs regardless of whether the unified update succeeded.
   void Promise.resolve().then(async () => {
     if (sessionLogger) {
       await sessionLogger
@@ -82,8 +101,6 @@ export function recordFailover(
           event: "failover",
           data: {
             model: modelId,
-            consecutiveFailovers: count,
-            blacklisted: count >= FAILOVER_BLACKLIST_THRESHOLD,
           },
         })
         .catch(() => {
@@ -91,24 +108,16 @@ export function recordFailover(
         });
     }
   });
-
-  if (count >= FAILOVER_BLACKLIST_THRESHOLD) {
-    blacklistedModels.add(modelId);
-  }
-}
-
-export function isBlacklisted(modelId: string): boolean {
-  return blacklistedModels.has(modelId);
 }
 
 export function resetFailoverState(): void {
-  failoverCounts.clear();
-  blacklistedModels.clear();
+  // State is now in health-monitor; use resetHealth(provider, model) per pair to reset.
 }
 
 export function resetModelBlacklist(modelId: string): void {
-  failoverCounts.delete(modelId);
-  blacklistedModels.delete(modelId);
+  const entry = PRICES.find(p => p.model === modelId);
+  if (!entry) return;
+  resetHealth(entry.provider, modelId);
 }
 
 export function buildFailoverChain(
@@ -120,8 +129,8 @@ export function buildFailoverChain(
   const seen = new Set<string>();
   const tiers: FailoverTier[] = [];
 
-  // Skip the primary if it is blacklisted this session.
-  if (!isBlacklisted(modelId)) {
+  // Skip the primary if it is blacklisted in unified state.
+  if (!isModelBlacklisted(modelId)) {
     tiers.push({ model: modelId, reason: "user-selected" });
     seen.add(modelId);
   }
@@ -137,7 +146,7 @@ export function buildFailoverChain(
         p.provider !== price.provider,
     ).sort((a, b) => a.outputPerM + a.inputPerM - (b.outputPerM + b.inputPerM));
     for (const m of familyModels) {
-      if (isBlacklisted(m.model)) continue;
+      if (isModelBlacklisted(m.model)) continue;
       if (!isHealthy(m.provider, opts.healthScores, healthThreshold)) continue;
       if (seen.has(m.model)) continue;
       seen.add(m.model);
@@ -152,7 +161,7 @@ export function buildFailoverChain(
   // Tier 3 — familyAlternatives registry (cross-family provider map)
   const fam = familyAlternatives(modelId);
   for (const alt of fam) {
-    if (isBlacklisted(alt.model)) continue;
+    if (isModelBlacklisted(alt.model)) continue;
     if (seen.has(alt.model)) continue;
     if (!isHealthy(alt.provider, opts.healthScores, healthThreshold)) continue;
     seen.add(alt.model);
@@ -168,7 +177,7 @@ export function buildFailoverChain(
       !seen.has(p.model) &&
       !AUTO_FAILOVER_BLACKLIST.has(p.model),
   );
-  if (free && !isBlacklisted(free.model) && !seen.has(free.model)) {
+  if (free && !isModelBlacklisted(free.model) && !seen.has(free.model)) {
     tiers.push({ model: free.model, reason: "free-fallback" });
     seen.add(free.model);
     if (tiers.length >= maxTiers) return finalize(tiers, seen);
