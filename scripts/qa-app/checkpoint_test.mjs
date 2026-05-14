@@ -53,7 +53,7 @@ const save1 = await exec.execute({ id: 't1', name: 'checkpoint', input: { action
 check('save: returns ok',                !save1.isError, save1.content.slice(0, 100));
 check('save: writes file under ~/.dirgha/checkpoints', existsSync(join(scratchHome, '.dirgha', 'checkpoints')) && readdirSync(join(scratchHome, '.dirgha', 'checkpoints')).length >= 1);
 const saveData = (save1.data ?? {});
-const cpId = saveData.id ?? (save1.content.match(/\b([0-9a-f-]{8,}-\d{13,})\b/)?.[1] ?? '');
+const cpId = saveData.checkpointId ?? saveData.id ?? (save1.content.match(/\b(cp-[a-zA-Z0-9_-]+-\d{13,})\b/)?.[1] ?? save1.content.match(/\b([0-9a-f-]{8,}-\d{13,})\b/)?.[1] ?? '');
 check('save: returns checkpoint id',     cpId.length > 0, `id=${cpId}`);
 
 // 2. list
@@ -73,7 +73,7 @@ const restore = await exec.execute({ id: 't5', name: 'checkpoint', input: { acti
 check('restore: returns ok',             !restore.isError, restore.content.slice(0, 100));
 
 // 5. delete the second
-const cp2Id = (save2.data ?? {}).id ?? (save2.content.match(/\b([0-9a-f-]{8,}-\d{13,})\b/)?.[1] ?? '');
+const cp2Id = (save2.data ?? {}).checkpointId ?? (save2.data ?? {}).id ?? (save2.content.match(/\b(cp-[a-zA-Z0-9_-]+-\d{13,})\b/)?.[1] ?? save2.content.match(/\b([0-9a-f-]{8,}-\d{13,})\b/)?.[1] ?? '');
 if (cp2Id) {
   const del = await exec.execute({ id: 't6', name: 'checkpoint', input: { action: 'delete', id: cp2Id } });
   check('delete: returns ok',            !del.isError, del.content.slice(0, 100));

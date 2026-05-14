@@ -62,7 +62,9 @@ describe('wrapLegacyResult', () => {
   it('T09 wrapLegacy_v2_pass_through_ok', () => {
     const input = { ok: true, value: 'x', content: 'y', isError: false };
     const result = wrapLegacyResult(input);
-    expect(result).toStrictEqual(input);
+    expect(result).toMatchObject(input);
+    // data mirrors value for legacy consumers (e.g. checkpoint_test reads .data)
+    expect(result).toHaveProperty('data', 'x');
   });
 
   it('T10 wrapLegacy_v2_pass_through_error', () => {

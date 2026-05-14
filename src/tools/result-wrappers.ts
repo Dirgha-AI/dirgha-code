@@ -12,16 +12,17 @@ import type { ToolResult, ToolError, ToolErrorKind } from '../kernel/types.js';
 function buildOk<T>(
   content: string,
   value: T,
-  opts: { metadata?: Record<string, unknown>; durationMs?: number; data?: T } = {},
+  opts: { metadata?: Record<string, unknown>; durationMs?: number } = {},
 ): ToolResult<T> {
-  const out: ToolResult<T> = {
-    ok: true,
-    isError: false,
+  const out = {
+    ok: true as const,
+    isError: false as const,
     content,
     value,
-  };
-  if (opts.metadata !== undefined) (out as { metadata?: Record<string, unknown> }).metadata = opts.metadata;
-  if (opts.durationMs !== undefined) (out as { durationMs?: number }).durationMs = opts.durationMs;
+    data: value,
+  } as Extract<ToolResult<T>, { isError: false }>;
+  if (opts.metadata !== undefined) out.metadata = opts.metadata;
+  if (opts.durationMs !== undefined) out.durationMs = opts.durationMs;
   return out;
 }
 

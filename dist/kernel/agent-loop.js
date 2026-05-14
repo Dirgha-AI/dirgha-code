@@ -22,6 +22,7 @@ import { pushAuditEntries } from "../telemetry/gateway-push.js";
 import { loadToken } from "../integrations/device-auth.js";
 import { raceSignals } from "./abort-utils.js";
 import { isJsonParseFailure } from "../utils/json-repair.js";
+import { StableLoopGuard } from '../subagents/loop-guard.js';
 // ── History repair helpers ────────────────────────────────────────────────────
 //
 // Structural 400s (bad message sequence) cannot be fixed by retrying with the
@@ -316,14 +317,17 @@ export async function runAgentLoop(cfg) {
     let _compactedThisTurn = false; // guards against infinite compact→retry→compact loops
     let _lastCompactionTurnIndex = -Infinity;
     let _historyRepairLevel = 0; // 0=clean, 1=sanitized, 2=tool-stripped, 3=truncated
-    // Per-session refusal tracker: maps (tool_name + serialized_args) → count of
-    // isError results. After REFUSAL_ABORT_THRESHOLD identical refused calls, the
-    // session is aborted rather than sending the same error back to the model
-    // forever.  Lives outside the turn loop so it accumulates across turns.
-    const _refusalCounts = new Map();
-    const _contentRefusalCounts = new Map();
-    let _lastContentKey = null;
-    const REFUSAL_ABORT_THRESHOLD = 2;
+    // Unified loop guard observes every (call, result) pair. Replaces the
+    // previous dual mechanism of REFUSAL_ABORT_THRESHOLD + content-prefix
+    // dedupe. The guard internally tracks four patterns: repeated tool
+    // calls, identical refusals, identical refusal content, and output
+    // stagnation across turns. Reset between prompts by callers.
+    const _localLoopGuard = new StableLoopGuard({
+        maxRepeatedToolCalls: 5,
+        maxTurnsWithoutProgress: 3,
+        maxIdenticalRefusals: 2,
+        maxIdenticalContentRepeats: 2,
+    });
     const DEFAULT_MAX_RETRIES = 3;
     // Per-reason caps override the default. TTFT timeouts have already
     // waited 90 s — retrying once is sufficient evidence the provider is
@@ -707,6 +711,7 @@ export async function runAgentLoop(cfg) {
                 history.push(assembled.message);
                 if (cfg.session) {
                     void cfg.session.append({ type: "message", ts: new Date().toISOString(), message: assembled.message });
+                    _localLoopGuard.observeMessage(assembled.message);
                 }
             }
             try {
@@ -733,55 +738,22 @@ export async function runAgentLoop(cfg) {
                 void flushAuditEntries(cfg.sessionId);
                 break;
             }
-            const toolResults = await executeToolCalls(toolUses, cfg, events, _refusalCounts, REFUSAL_ABORT_THRESHOLD);
-            // Track identical-content repeats (content-based loop detection)
+            const toolResults = await executeToolCalls(toolUses, cfg, events);
             for (const tr of toolResults) {
-                const call = tr.call;
-                const result = tr.result;
-                const contentPrefix = typeof result.content === 'string' ? result.content.slice(0, 200) : '';
-                const contentKey = `${call.name}:${JSON.stringify(call.input)}:${contentPrefix}`;
-                if (contentKey === _lastContentKey) {
-                    const prev = _contentRefusalCounts.get(contentKey) ?? 1;
-                    _contentRefusalCounts.set(contentKey, prev + 1);
-                }
-                else {
-                    _contentRefusalCounts.set(contentKey, 1);
-                }
-                _lastContentKey = contentKey;
+                _localLoopGuard.observe(tr.call, tr.result);
             }
-            // If the refusal-abort Map signalled a loop (any key hit threshold),
-            // emit the terminal error and stop.
-            let _refusalAbortTriggered = false;
-            for (const [key, n] of _refusalCounts) {
-                if (n >= REFUSAL_ABORT_THRESHOLD) {
-                    const name = key.split(":")[0] ?? key;
-                    events.emit({
-                        type: "error",
-                        message: `[loop] tool "${name}" refused ${n} times with identical arguments — aborting session to prevent infinite loop`,
-                        retryable: false,
-                    });
-                    stopReason = "loop";
-                    _refusalAbortTriggered = true;
-                    break;
-                }
-            }
-            if (!_refusalAbortTriggered) {
-                for (const [key, n] of _contentRefusalCounts) {
-                    if (n >= REFUSAL_ABORT_THRESHOLD) {
-                        const name = key.split(":")[0] ?? key;
-                        events.emit({
-                            type: "error",
-                            message: `[loop] tool "${name}" returned identical content ${n} times — aborting session to prevent infinite loop`,
-                            retryable: false,
-                        });
-                        stopReason = "loop";
-                        _refusalAbortTriggered = true;
-                        break;
-                    }
-                }
-            }
-            if (_refusalAbortTriggered)
+            if (_localLoopGuard.isLoopDetected()) {
+                const reason = _localLoopGuard.reason() ?? 'loop detected';
+                events.emit({
+                    type: 'error',
+                    message: `[loop] ${reason} — aborting session to prevent infinite loop`,
+                    reason: 'loop',
+                    retryable: false,
+                });
+                stopReason = 'loop';
+                events.emit({ type: 'turn_end', turnId, stopReason });
                 break;
+            }
             const historyLenBeforeResults = history.length;
             const appended = appendToolResults(history, toolResults.map((r) => ({
                 toolUseId: r.call.id,
@@ -846,7 +818,7 @@ export async function runAgentLoop(cfg) {
         sessionId: cfg.sessionId,
     };
 }
-async function executeToolCalls(toolUses, cfg, events, refusalCounts, _refusalAbortThreshold) {
+async function executeToolCalls(toolUses, cfg, events) {
     const run = async (call) => {
         let input = call.input;
         if (isJsonParseFailure(input)) {
@@ -1062,19 +1034,6 @@ async function executeToolCalls(toolUses, cfg, events, refusalCounts, _refusalAb
             durationMs,
             ...(result.metadata !== undefined ? { metadata: result.metadata } : {}),
         });
-        // Track repeated refusals: when the same (name, args) pair is refused
-        // REFUSAL_ABORT_THRESHOLD times in this session, the outer loop will
-        // abort rather than sending the same error to the model indefinitely.
-        if (result.isError && refusalCounts !== undefined) {
-            try {
-                const refusalKey = `${call.name}:${JSON.stringify(input)}`;
-                const prev = refusalCounts.get(refusalKey) ?? 0;
-                refusalCounts.set(refusalKey, prev + 1);
-            }
-            catch {
-                // JSON.stringify can throw on circular inputs — treat as non-refusal.
-            }
-        }
         return { call: { ...call, input }, result };
     };
     if (cfg.toolConcurrency === "parallel" && toolUses.length > 1) {
