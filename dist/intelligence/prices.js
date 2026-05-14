@@ -931,7 +931,8 @@ export function findContextWindow(modelId) {
  * compaction has a real cap to compare against. Models not listed fall
  * back to DEFAULT_CONTEXT_WINDOW at runtime.
  */
-export const DEFAULT_CONTEXT_WINDOW = 32_000;
+export const DEFAULT_CONTEXT_WINDOW = 64_000;
+export const DEFAULT_MAX_OUTPUT = 8_192;
 const CONTEXT_WINDOWS = {
     // Anthropic
     "claude-opus-4-7": 200_000,
@@ -952,6 +953,8 @@ const CONTEXT_WINDOWS = {
     "gemini-2.5-flash": 1_000_000,
     "google/gemini-2.5-flash": 1_048_576,
     "google/gemini-2.5-pro": 1_048_576,
+    // DeepSeek native API models
+    "deepseek-ai/deepseek-chat": 128_000,
     // NVIDIA NIM — NIM_CATALOGUE models (source of truth)
     "deepseek-ai/deepseek-v4-pro": 1_000_000,
     "deepseek-ai/deepseek-v4-flash": 1_000_000,
@@ -1004,8 +1007,12 @@ const CONTEXT_WINDOWS = {
 };
 export function contextWindowFor(modelId) {
     return (CONTEXT_WINDOWS[modelId] ??
+        getContextWindowSync(modelId) ??
         findContextWindow(modelId) ??
         DEFAULT_CONTEXT_WINDOW);
+}
+export function maxOutputFor(modelId) {
+    return getMaxOutputSync(modelId) ?? DEFAULT_MAX_OUTPUT;
 }
 /**
  * Failover map: when the primary model is unavailable (provider 504,
@@ -1038,6 +1045,7 @@ const MODEL_FAILOVERS = {
     "claude-haiku-4-5": "anthropic/claude-haiku-4-5",
 };
 import { familyAlternatives } from "../providers/family-fallback.js";
+import { getContextWindowSync, getMaxOutputSync } from "./models-dev-sync.js";
 export function findFailover(modelId) {
     // First try exact failover map
     const exact = MODEL_FAILOVERS[modelId];

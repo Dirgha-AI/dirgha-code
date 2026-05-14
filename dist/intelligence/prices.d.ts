@@ -51,8 +51,10 @@ export declare function findContextWindow(modelId: string): number | undefined;
  * compaction has a real cap to compare against. Models not listed fall
  * back to DEFAULT_CONTEXT_WINDOW at runtime.
  */
-export declare const DEFAULT_CONTEXT_WINDOW = 32000;
+export declare const DEFAULT_CONTEXT_WINDOW = 64000;
+export declare const DEFAULT_MAX_OUTPUT = 8192;
 export declare function contextWindowFor(modelId: string): number;
+export declare function maxOutputFor(modelId: string): number;
 export declare function findFailover(modelId: string): string | undefined;
 export declare function migrateDeprecatedModel(modelId: string): string;
 export declare function resolveModelAlias(input: string): string;

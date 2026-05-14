@@ -8,14 +8,27 @@
  * that it throws a ProviderError with status=429 so the agent loop's
  * normal failover/retry path picks it up.
  *
- * Usage:
- *   const limited = withRateLimit(provider, { rps: 2, burst: 4 });
- *   limited.stream(req)  // honors the bucket
- *
- * Stays out of every concrete provider class — it's a pure decorator
- * over the Provider interface.
+ * Also exports:
+ *  - PROVIDER_RATE_LIMITS — static table of RPM/TPM/concurrency by provider+tier
+ *  - parseRateLimitHeaders — parse X-RateLimit-* headers from any response
+ *  - Circuit breaker — opens after 5 consecutive 429s, backs off up to 5min
+ *  - TPM sliding window — 60s rolling token counter per provider
  */
 import type { Provider } from './iface.js';
+export interface RateLimitTier {
+    rpm: number;
+    tpm: number;
+    concurrency: number;
+}
+export declare const PROVIDER_RATE_LIMITS: Record<string, Record<string, RateLimitTier>>;
+/** Run buckets at 85% of stated RPM to absorb clock skew and concurrency spikes. */
+export declare const SAFETY_BUFFER = 0.85;
+export interface RateLimitHeaderInfo {
+    remaining?: number;
+    resetAt?: number;
+    retryAfterMs?: number;
+}
+export declare function parseRateLimitHeaders(headers: Record<string, string | undefined>): RateLimitHeaderInfo;
 export interface RateLimitOptions {
     /** Allowed requests per second (steady-state). */
     rps: number;
@@ -31,7 +44,6 @@ declare class TokenBucket {
     private lastRefill;
     constructor(capacity: number, fillRatePerMs: number);
     private refill;
-    /** Wait until one token is available. Resolves when consumed. Rejects on timeout. */
     take(maxWaitMs: number): Promise<void>;
     snapshot(): {
         tokens: number;
@@ -40,11 +52,19 @@ declare class TokenBucket {
 }
 export declare function getOrCreateBucket(providerId: string, opts: RateLimitOptions): TokenBucket;
 export declare function withRateLimit(inner: Provider, opts: RateLimitOptions): Provider;
-/** Test/debug helper. Does NOT take a token — peeks only. */
 export declare function bucketSnapshot(providerId: string, opts: RateLimitOptions): {
     tokens: number;
     capacity: number;
 };
-/** Test helper to reset all buckets between tests. */
 export declare function _resetAllBuckets(): void;
+export declare function recordProviderSuccess(providerId: string): void;
+export declare function recordProvider429(providerId: string, retryAfterMs?: number): void;
+export declare function isCircuitOpen(providerId: string): {
+    open: boolean;
+    waitMs: number;
+};
+export declare function _resetCircuitBreakers(): void;
+export declare function recordTokensUsed(providerId: string, tokens: number): void;
+export declare function tokensUsedInWindow(providerId: string): number;
+export declare function _resetTpmWindows(): void;
 export {};

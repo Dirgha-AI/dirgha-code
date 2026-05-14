@@ -1,11 +1,64 @@
 /**
  * Fetches and caches the models.dev catalog of AI model providers and their models.
+ *
+ * Provides both async (getCatalogue) and synchronous (getContextWindowSync,
+ * getMaxOutputSync) lookups. The sync map is built at module init from the
+ * on-disk cache so contextWindowFor() never needs to be async.
  */
 import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 // scope: S20
 const cachePath = join(homedir(), '.dirgha', 'models-dev-cache.json');
+// ---------------------------------------------------------------------------
+// Sync in-memory map — loaded once at module init from on-disk cache.
+// Keys: bare modelId AND providerId/modelId for both exact and prefix lookup.
+// Empty if cache file not found (new install). Warmed by populateSyncMap()
+// after getCatalogue() resolves.
+// ---------------------------------------------------------------------------
+const _syncMap = new Map();
+function _buildSyncMap(catalog) {
+    for (const [providerId, provider] of Object.entries(catalog.providers)) {
+        for (const model of provider.models) {
+            const entry = { context: model.contextWindow, output: model.maxOutput };
+            _syncMap.set(model.id, entry);
+            _syncMap.set(`${providerId}/${model.id}`, entry);
+        }
+    }
+}
+// Synchronous init from disk — never throws.
+try {
+    const raw = readFileSync(cachePath, 'utf-8');
+    _buildSyncMap(JSON.parse(raw));
+}
+catch {
+    // Cache missing or invalid — map stays empty, falls back to prices.ts
+}
+/** Synchronous context window lookup. Returns undefined if model unknown. */
+export function getContextWindowSync(modelId) {
+    const entry = _syncMap.get(modelId);
+    if (entry)
+        return entry.context;
+    // Strip provider prefix: "deepseek-ai/deepseek-chat" → "deepseek-chat"
+    const bareId = modelId.includes('/') ? modelId.split('/').pop() : modelId;
+    return _syncMap.get(bareId)?.context;
+}
+/** Synchronous max output lookup. Returns undefined if model unknown. */
+export function getMaxOutputSync(modelId) {
+    const entry = _syncMap.get(modelId);
+    if (entry)
+        return entry.output;
+    const bareId = modelId.includes('/') ? modelId.split('/').pop() : modelId;
+    return _syncMap.get(bareId)?.output;
+}
+/** Call after getCatalogue() resolves to keep the sync map warm. */
+export function populateSyncMap(catalog) {
+    _buildSyncMap(catalog);
+}
+// ---------------------------------------------------------------------------
+// Async fetch / cache
+// ---------------------------------------------------------------------------
 export async function fetchModelsDev(timeoutMs) {
     const controller = new AbortController();
     let timer;
@@ -51,7 +104,7 @@ export async function fetchModelsDev(timeoutMs) {
                 };
                 modelsArr.push(model);
             }
-            const provider = {
+            providers[provId] = {
                 id: provId,
                 name: p.name || provId,
                 apiBase: p.api ?? null,
@@ -59,16 +112,14 @@ export async function fetchModelsDev(timeoutMs) {
                 docUrl: p.doc || undefined,
                 models: modelsArr,
             };
-            providers[provId] = provider;
             modelCount += modelsArr.length;
         }
-        const catalog = {
+        return {
             fetchedAt: new Date().toISOString(),
             providerCount: Object.keys(providers).length,
             modelCount,
             providers,
         };
-        return catalog;
     }
     finally {
         if (timer)
@@ -99,6 +150,7 @@ export async function getCatalogue(ttlMs = 86400000) {
     try {
         const fresh = await fetchModelsDev();
         await writeCache(fresh);
+        populateSyncMap(fresh);
         return fresh;
     }
     catch {

@@ -254,6 +254,27 @@ export async function runAgentLoop(cfg) {
             // Full-history scan: remove any orphaned tool_result messages that
             // contextTransform may have introduced mid-history (not just tail).
             messagesForCall = _stripOrphanedToolResults(messagesForCall);
+            // ── Proactive compaction ──────────────────────────────────────────────
+            // Fire before the API call when token usage is ≥80% of the context
+            // limit — prevents silent degradation when providers don't return an
+            // explicit context-length error (e.g. DeepSeek silently truncates).
+            const _contextLimit = cfg.contextLimit ?? 128_000;
+            if (_contextLimit > 0 &&
+                totals.inputTokens > _contextLimit * 0.8 &&
+                cfg.contextTransform &&
+                !_compactedThisTurn) {
+                _compactedThisTurn = true;
+                try {
+                    const compacted = await cfg.contextTransform(history);
+                    history.length = 0;
+                    history.push(...compacted);
+                    messagesForCall = await cfg.contextTransform(history);
+                    messagesForCall = _stripOrphanedToolResults(messagesForCall);
+                }
+                catch {
+                    // Compaction failed — continue with original messages
+                }
+            }
             const streamEvents = [];
             // Per-turn stream timeout: protects against provider hangs that
             // never send a terminal event. The loop signal (user Esc) still
@@ -283,13 +304,13 @@ export async function runAgentLoop(cfg) {
                         break;
                 }
             }
-            catch (err) {
+            catch (rawErr) {
                 // AbortError from our per-turn timeout is restructured as a clean
                 // "stream timed out" error so the retry logic (PER_REASON_MAX_RETRIES)
                 // picks it up as a retryable timeout.
-                if (streamCtrl.signal.aborted && !signal.aborted) {
-                    err = Object.assign(new Error("stream timed out"), { name: "AbortError" });
-                }
+                const err = streamCtrl.signal.aborted && !signal.aborted
+                    ? Object.assign(new Error("stream timed out"), { name: "AbortError" })
+                    : rawErr;
                 // An AbortError mid-stream is a clean cancellation, not a
                 // failure. Distinguish so callers (and `dirgha audit`) see
                 // `stopReason: 'aborted'` instead of misleading 'error'.

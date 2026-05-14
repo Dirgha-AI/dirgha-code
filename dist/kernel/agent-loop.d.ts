@@ -50,6 +50,8 @@ export interface AgentLoopConfig {
      * provider hangs that never send a terminal event. Set to 0 for no limit.
      */
     streamTimeoutMs?: number;
+    /** Token limit for the model's context window. Defaults to 128_000. Used for proactive compaction before the limit is hit. */
+    contextLimit?: number;
     /** Optional loop detector — checked before each turn; abort if looping. */
     loopDetector?: {
         track(turn: {

@@ -1,6 +1,6 @@
 # Dirgha CLI — Index
 
-> Latest: **v1.33.3** | [npm](https://www.npmjs.com/package/@dirgha/code) | [GitHub](https://github.com/Dirgha-AI/dirgha-code)
+> Latest: **v1.33.5** | [npm](https://www.npmjs.com/package/@dirgha/code) | [GitHub](https://github.com/Dirgha-AI/dirgha-code)
 
 ## Quick Links
 
@@ -9,12 +9,14 @@
 | [Rendering & TUI](#rendering--tui)                 | Alternate buffer, message splitting, virtualized transcript, flicker detector, scroll indicator, paste collapse, vim paste fallback |
 | [Streaming & Performance](#streaming--performance) | Flush throttle, Static committed history, spinners, React.memo, per-turn stream timeout |
 | [Models & Providers](#models--providers)           | Per-provider catalogues, live sync, vendor prefix routing, health monitor     |
+| [Context Windows & Rate Limits](#context-windows--rate-limits) | models.dev sync, maxOutputFor, circuit breaker, TPM sliding window |
 | [Authentication & Login](#authentication--login)   | Device OAuth, TUI token loading, signup flow, secure approval                 |
 | [Autonomous Systems](#autonomous-systems)          | Self-healing failover, remote config, auto-update, startup health, event listener leak fix, MCP lazy load race fix |
 | [Testing & Quality](#testing--quality)             | Self-test suite, E2E tests, regression guards, CI pipeline                    |
 | [Developer Experience](#developer-experience)      | Interactive wizard, error UX, prompt history, syntax highlighting             |
 | [Architecture Decisions](#architecture-decisions)  | Smart backoff, no-aggressive-blacklist, vendor prefix priority                |
-| [Release History](#release-history)                | Full changelog v1.20.9 → v1.33.3                                             |
+| [Internal Docs](#internal-docs)                    | Publish setup, model context/rate-limit architecture                          |
+| [Release History](#release-history)                | Full changelog v1.20.9 → v1.33.5                                             |
 
 ---
 
@@ -355,6 +357,60 @@ Tracks DB write failures. Warns after 10 errors in a session. Exposed via `dirgh
 
 ---
 
+## Context Windows & Rate Limits
+
+> Full spec: [`docs/_internal/MODEL_CONTEXT_RATELIMIT_ARCH.md`](../../_internal/MODEL_CONTEXT_RATELIMIT_ARCH.md)
+
+### v1.33.5 — Proactive Compaction + WAL Checkpoint
+
+**Files:** `src/kernel/agent-loop.ts`, `src/state/db.ts`, `src/intelligence/prices.ts`
+
+- `contextLimit: contextWindowFor(activeModel)` wired into `runAgentLoop` — proactive compaction fires at 80% of the model's actual context window, not a hardcoded 128k fallback
+- `"deepseek-ai/deepseek-chat": 128_000` added to `CONTEXT_WINDOWS` override map
+- `PRAGMA wal_checkpoint(TRUNCATE)` added to `dbCloseSession` — prevents `dirgha.db-wal` from growing unbounded across long sessions
+
+### v1.33.5 — models.dev as Context Window Source of Truth
+
+**Files:** `src/intelligence/models-dev-sync.ts`, `src/intelligence/prices.ts`
+
+**Problem:** `CONTEXT_WINDOWS` in `prices.ts` is a ~70-entry manually maintained map. Unknown models fall back to `DEFAULT_CONTEXT_WINDOW = 32_000`, causing premature compaction.
+
+**Fix:** `models-dev-sync.ts` already fetches `https://models.dev/api.json` (4517 models, each with `contextWindow` + `maxOutput`). Adding a synchronous in-memory Map loaded at module init. `contextWindowFor()` queries this map first.
+
+Lookup chain:
+1. `CONTEXT_WINDOWS` override map (corrections for known-wrong models.dev entries)
+2. models-dev Map: exact `modelId` match
+3. models-dev Map: strip provider prefix (`"deepseek-ai/deepseek-chat"` → `"deepseek-chat"`)
+4. `PRICES` catalog (`findContextWindow`)
+5. `DEFAULT_CONTEXT_WINDOW = 64_000` (bumped from 32k)
+
+New export: `maxOutputFor(modelId)` — same chain, returns `limit.output`. Used by providers to set `max_tokens`.
+
+### v1.33.5 — Production Rate Limiter
+
+**Files:** `src/providers/rate-limiter.ts`
+
+Current rate-limiter uses a static per-provider RPS token bucket with no awareness of actual provider limits. Replacing with:
+
+- **Static table** of RPM + TPM + concurrency per provider/tier (see arch doc for full table)
+- **Dynamic header parsing** — `X-RateLimit-Remaining`, `X-RateLimit-Reset`, `Retry-After` from every response
+- **Circuit breaker** — opens after 5 consecutive 429s, cooldown starts at 60s and doubles (max 5min)
+- **TPM sliding window** — 60-second rolling token counter per provider (replaces broken per-request delay math)
+- **Jitter** on exponential backoff — `1s ± rand(1s)`, `2s ± rand(1s)`, … prevents thundering herd
+- **Safety buffer** — buckets run at 85% of stated RPM to account for clock skew
+- Backward-compatible: `withRateLimit()` decorator API preserved
+
+---
+
+## Internal Docs
+
+| Doc | Purpose |
+|---|---|
+| [`docs/_internal/PUBLISH_SETUP.md`](../../_internal/PUBLISH_SETUP.md) | npm OIDC Trusted Publishers setup, what not to do, troubleshooting |
+| [`docs/_internal/MODEL_CONTEXT_RATELIMIT_ARCH.md`](../../_internal/MODEL_CONTEXT_RATELIMIT_ARCH.md) | Full architecture spec for context windows + rate limits (written by DeepSeek, reviewed) |
+
+---
+
 ## Architecture Decisions
 
 **Smart Backoff, Not Aggressive Blacklist.** Provider health uses exponential backoff (30s → 2m → 5m → 15m → 30m → 1h → 6h → 24h). Each escalation only after persistent probe failures. 2 successes reset everything. Rewards long-term reliable providers.
@@ -373,6 +429,7 @@ Tracks DB write failures. Warns after 10 errors in a session. Exposed via `dirgh
 
 | Version      | Date       | Highlights                                                                                                     |
 | ------------ | ---------- | -------------------------------------------------------------------------------------------------------------- |
+| **v1.33.5**  | 2026-05-14 | models.dev context window source-of-truth, `maxOutputFor()`, production rate limiter (static table + circuit breaker + TPM window + header parsing), proactive compaction wired to real model context limit, WAL checkpoint on session close |
 | **v1.33.3**  | 2026-04-25 | Startup perf (parallel BYOK, lazy MCP, deferred DB, fire-and-forget extensions), tool auto-retry, paste cursor fix, **event listener leak fix**, **per-turn stream timeout**, **MCP lazy load race fix**, **vim paste fallback**, **flicker cap increase + scroll indicator**, **paste collapse line-only**, **per-tool timeouts** |
 | **v1.20.25** | 2026-05-03 | Self-test suite, version sync                                                                                  |
 | **v1.20.24** | 2026-05-03 | Self-test: 9 live API regression tests                                                                         |

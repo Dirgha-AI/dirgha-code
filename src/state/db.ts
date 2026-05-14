@@ -301,6 +301,7 @@ export function dbCloseSession(id: string): void {
       Date.now(),
       id,
     );
+    db.pragma("wal_checkpoint(TRUNCATE)");
     recordDbSuccess();
   } catch (err) {
     recordDbError(err);

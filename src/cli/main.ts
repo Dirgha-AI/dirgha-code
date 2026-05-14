@@ -790,6 +790,7 @@ async function main(): Promise<void> {
     toolExecutor: executor,
     events,
     contextTransform: compactionTransform,
+    contextLimit: contextWindowFor(activeModel),
     errorClassifier,
     autoApprove,
     costCalculator: computeCost,

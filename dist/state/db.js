@@ -260,6 +260,7 @@ export function dbCloseSession(id) {
     try {
         const db = getDb();
         db.prepare("UPDATE sessions SET ended_at = ? WHERE id = ?").run(Date.now(), id);
+        db.pragma("wal_checkpoint(TRUNCATE)");
         recordDbSuccess();
     }
     catch (err) {

@@ -82,6 +82,8 @@ export interface AgentLoopConfig {
    * provider hangs that never send a terminal event. Set to 0 for no limit.
    */
   streamTimeoutMs?: number;
+  /** Token limit for the model's context window. Defaults to 128_000. Used for proactive compaction before the limit is hit. */
+  contextLimit?: number;
   /** Optional loop detector — checked before each turn; abort if looping. */
   loopDetector?: {
     track(turn: { toolCalls?: Array<{ name: string; args?: unknown }> }): void;
@@ -338,6 +340,29 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
       // Full-history scan: remove any orphaned tool_result messages that
       // contextTransform may have introduced mid-history (not just tail).
       messagesForCall = _stripOrphanedToolResults(messagesForCall);
+
+      // ── Proactive compaction ──────────────────────────────────────────────
+      // Fire before the API call when token usage is ≥80% of the context
+      // limit — prevents silent degradation when providers don't return an
+      // explicit context-length error (e.g. DeepSeek silently truncates).
+      const _contextLimit = cfg.contextLimit ?? 128_000;
+      if (
+        _contextLimit > 0 &&
+        totals.inputTokens > _contextLimit * 0.8 &&
+        cfg.contextTransform &&
+        !_compactedThisTurn
+      ) {
+        _compactedThisTurn = true;
+        try {
+          const compacted = await cfg.contextTransform(history);
+          history.length = 0;
+          history.push(...compacted);
+          messagesForCall = await cfg.contextTransform(history);
+          messagesForCall = _stripOrphanedToolResults(messagesForCall);
+        } catch {
+          // Compaction failed — continue with original messages
+        }
+      }
 
       const streamEvents: AgentEvent[] = [];
       // Per-turn stream timeout: protects against provider hangs that

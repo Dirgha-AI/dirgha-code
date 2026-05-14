@@ -712,6 +712,7 @@ async function main() {
         toolExecutor: executor,
         events,
         contextTransform: compactionTransform,
+        contextLimit: contextWindowFor(activeModel),
         errorClassifier,
         autoApprove,
         costCalculator: computeCost,
