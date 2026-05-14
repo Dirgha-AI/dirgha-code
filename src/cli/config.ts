@@ -157,7 +157,7 @@ const CURRENT_SCHEMA = 1;
 
 export const DEFAULT_CONFIG: DirghaConfig = {
   schemaVersion: CURRENT_SCHEMA,
-  model: "moonshotai/kimi-k2.6",
+  model: "deepseek-ai/deepseek-v4-flash",
   cheapModel: "deepseek-ai/deepseek-v4-flash", // widely available via DeepSeek, NIM, and OpenRouter
   summaryModel: "moonshotai/kimi-k2.5",
   maxTurns: 16,

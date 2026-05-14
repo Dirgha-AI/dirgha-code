@@ -48,6 +48,7 @@ import { GPUJobIndicator } from "./components/GPUJobIndicator.js";
 import { ModelPicker } from "./components/ModelPicker.js";
 import { ModelSwitchPrompt } from "./components/ModelSwitchPrompt.js";
 import { ProviderPicker, } from "./components/ProviderPicker.js";
+import { OpenRouterCompanyPicker, } from "./components/OpenRouterCompanyPicker.js";
 import { HelpOverlay, } from "./components/HelpOverlay.js";
 import { KeySetOverlay } from "./components/KeySetOverlay.js";
 import { saveKey } from "../../auth/keystore.js";
@@ -153,6 +154,8 @@ export function App(props) {
     // the picked provider. Resets to 'provider' on every fresh open.
     const [pickerStage, setPickerStage] = React.useState("provider");
     const [pickerProvider, setPickerProvider] = React.useState(null);
+    // For OpenRouter 3-step flow: upstream company prefix (e.g. "deepseek", "google")
+    const [pickerOrCompany, setPickerOrCompany] = React.useState(null);
     // Pending model-switch prompt — set when the kernel emits an error
     // with a `failoverModel` hint. Cleared when the user answers
     // [y|n|p]. While set, an inline ModelSwitchPrompt renders below
@@ -1280,20 +1283,86 @@ export function App(props) {
                             }
                             return (_jsx(ProviderPicker, { providers: providerEntries, onPick: (providerId) => {
                                     setPickerProvider(providerId);
-                                    setPickerStage("model");
+                                    if (providerId === "openrouter") {
+                                        setPickerStage("or-company");
+                                    }
+                                    else {
+                                        setPickerStage("model");
+                                    }
                                 }, onCancel: () => {
                                     setPickerStage("provider");
                                     setPickerProvider(null);
                                     overlays.closeOverlay();
                                 } }));
-                        })(), overlays.active === "models" && pickerStage === "model" && (_jsx(ModelPicker, { models: models.filter((m) => m.provider === pickerProvider), current: currentModel, onPick: (id) => {
+                        })(), overlays.active === "models" && pickerStage === "or-company" && (() => {
+                        // Build company entries from OpenRouter models
+                        const orModels = models.filter(m => m.provider === "openrouter");
+                        const companyMap = new Map();
+                        for (const m of orModels) {
+                            const prefix = m.id.startsWith("~") ? m.id.slice(1).split("/")[0] : m.id.split("/")[0];
+                            if (prefix)
+                                companyMap.set(prefix, (companyMap.get(prefix) ?? 0) + 1);
+                        }
+                        const COMPANY_LABELS = {
+                            anthropic: "Anthropic", deepseek: "DeepSeek", google: "Google",
+                            moonshotai: "Moonshot / Kimi", minimax: "MiniMax", qwen: "Qwen / Alibaba",
+                            inclusionai: "Inclusion AI (Ring)", meta: "Meta", openai: "OpenAI",
+                            nvidia: "NVIDIA", poolside: "Poolside", tencent: "Tencent",
+                            "z-ai": "Z.ai",
+                        };
+                        const COMPANY_BLURB = {
+                            deepseek: "v4-pro · v4-flash · R1", google: "Gemini 3.1 Pro · Flash",
+                            moonshotai: "Kimi K2.6 · K2-Thinking", minimax: "M2.7",
+                            qwen: "Qwen3.6 Max · Flash · Coder", inclusionai: "Ring 2.6 1T (free)",
+                            anthropic: "Claude Opus/Sonnet/Haiku", openai: "GPT-5.5 Pro · Mini",
+                        };
+                        const PIN_ORDER = ["deepseek", "moonshotai", "minimax", "google", "qwen", "inclusionai", "anthropic", "openai", "meta", "nvidia"];
+                        const entries = [...companyMap.entries()]
+                            .sort(([a], [b]) => {
+                            const ai = PIN_ORDER.indexOf(a), bi = PIN_ORDER.indexOf(b);
+                            if (ai !== -1 && bi !== -1)
+                                return ai - bi;
+                            if (ai !== -1)
+                                return -1;
+                            if (bi !== -1)
+                                return 1;
+                            return a.localeCompare(b);
+                        })
+                            .map(([id, count]) => ({
+                            id,
+                            label: COMPANY_LABELS[id] ?? id,
+                            modelCount: count,
+                            blurb: COMPANY_BLURB[id],
+                            isCurrent: currentModel.startsWith(id + "/") || currentModel.startsWith("~" + id + "/"),
+                        }));
+                        return (_jsx(OpenRouterCompanyPicker, { companies: entries, onPick: (companyId) => {
+                                setPickerOrCompany(companyId);
+                                setPickerStage("model");
+                            }, onCancel: () => {
+                                setPickerStage("provider");
+                                setPickerProvider(null);
+                                setPickerOrCompany(null);
+                            } }));
+                    })(), overlays.active === "models" && pickerStage === "model" && (_jsx(ModelPicker, { models: models.filter((m) => {
+                            if (pickerProvider !== "openrouter" || !pickerOrCompany) {
+                                return m.provider === pickerProvider;
+                            }
+                            const bare = m.id.startsWith("~") ? m.id.slice(1) : m.id;
+                            return m.provider === "openrouter" && bare.startsWith(pickerOrCompany + "/");
+                        }), current: currentModel, onPick: (id) => {
                             handleModelPick(id);
                             setPickerStage("provider");
                             setPickerProvider(null);
+                            setPickerOrCompany(null);
                         }, onCancel: () => {
-                            // Esc inside ModelPicker → back to ProviderPicker (NOT close).
-                            setPickerStage("provider");
-                            setPickerProvider(null);
+                            // Esc inside ModelPicker → back to company step for OR, provider for others
+                            if (pickerProvider === "openrouter") {
+                                setPickerStage("or-company");
+                            }
+                            else {
+                                setPickerStage("provider");
+                                setPickerProvider(null);
+                            }
                         } })), overlays.active === "help" && (_jsx(HelpOverlay, { slashCommands: slashCommands, onClose: overlays.closeOverlay })), overlays.active === "theme" && (_jsx(ThemePicker, { current: themeName, onPick: handleThemePick, onCancel: overlays.closeOverlay })), overlays.active === "sandbox" && (_jsx(SandboxPicker, { current: sandboxModeRef.current, onPick: handleSandboxPick, onCancel: overlays.closeOverlay })), pendingKey && (_jsx(KeySetOverlay, { keyName: pendingKey.keyName, onSave: handleKeySetSave, onCancel: () => setPendingKey(null) })), updateVersion !== null && (_jsx(Box, { paddingX: 1, children: _jsxs(Text, { color: "yellow", children: ["[v", updateVersion, " available \u2014 press Ctrl+U or /upgrade to upgrade]"] }) })), _jsx(StatusBar, { model: currentModel, provider: providerIdForModel(currentModel), inputTokens: projection.totals.inputTokens, outputTokens: projection.totals.outputTokens, costUsd: projection.totals.costUsd, cwd: props.cwd, busy: busy, mode: mode, contextWindow: contextWindowFor(currentModel), liveOutputTokens: liveOutputTokens, liveDurationMs: liveDurationMs, overflowDetected: flicker.overflowDetected, showMetrics: showRenderMetrics, renderMetrics: renderMetrics, activeTool: activeTools[0] })] }) }) }));
 }
 /**

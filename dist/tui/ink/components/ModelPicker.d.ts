@@ -13,8 +13,9 @@
  *   right-aligned tier footer (free / basic / pro / premium / price)
  *   bottom keybind hint bar with all shortcuts
  *
- * Shape stays small (≤220 LOC); the catalogue itself is owned
- * upstream so this file is purely presentational.
+ * pinnedFamilies: optional list of provider-name substrings to sort
+ * to the top (in order given). Default order: kimi, deepseek, minimax,
+ * gemini, qwen, ring, inclusionai, claude, openai.
  */
 import * as React from "react";
 export interface ModelEntry {
@@ -28,5 +29,7 @@ export interface ModelPickerProps {
     current: string;
     onPick: (id: string) => void;
     onCancel: () => void;
+    /** Optional ordered list of provider-name substrings to pin to the top. */
+    pinnedFamilies?: string[];
 }
 export declare function ModelPicker(props: ModelPickerProps): React.JSX.Element;

@@ -14,12 +14,42 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
  *   right-aligned tier footer (free / basic / pro / premium / price)
  *   bottom keybind hint bar with all shortcuts
  *
- * Shape stays small (≤220 LOC); the catalogue itself is owned
- * upstream so this file is purely presentational.
+ * pinnedFamilies: optional list of provider-name substrings to sort
+ * to the top (in order given). Default order: kimi, deepseek, minimax,
+ * gemini, qwen, ring, inclusionai, claude, openai.
  */
 import * as React from "react";
 import { Box, Text, useInput, useStdout } from "ink";
 import { useTheme } from "../theme-context.js";
+const DEFAULT_PINNED_FAMILIES = [
+    "kimi",
+    "deepseek",
+    "minimax",
+    "gemini",
+    "qwen",
+    "ring",
+    "inclusionai",
+    "claude",
+    "openai",
+];
+function pinnedIndex(provider, pinned) {
+    const lc = provider.toLowerCase();
+    for (let i = 0; i < pinned.length; i++) {
+        if (lc.includes(pinned[i]))
+            return i;
+    }
+    return pinned.length; // unpinned → sort after all pinned groups
+}
+function sortByPinnedFamilies(models, pinned) {
+    return [...models].sort((a, b) => {
+        const ai = pinnedIndex(a.provider, pinned);
+        const bi = pinnedIndex(b.provider, pinned);
+        if (ai !== bi)
+            return ai - bi;
+        // within same pin bucket sort alpha by id
+        return a.id.localeCompare(b.id);
+    });
+}
 function groupByProvider(models) {
     const map = new Map();
     for (const m of models) {
@@ -42,15 +72,17 @@ export function ModelPicker(props) {
         pro: palette.accent,
         premium: palette.status.warning,
     };
+    const pinned = props.pinnedFamilies ?? DEFAULT_PINNED_FAMILIES;
     const [filter, setFilter] = React.useState("");
     const filtered = React.useMemo(() => {
+        const sorted = sortByPinnedFamilies(props.models, pinned);
         if (filter.length === 0)
-            return props.models;
+            return sorted;
         const needle = filter.toLowerCase();
-        return props.models.filter((m) => m.id.toLowerCase().includes(needle) ||
+        return sorted.filter((m) => m.id.toLowerCase().includes(needle) ||
             m.provider.toLowerCase().includes(needle) ||
             (m.label?.toLowerCase().includes(needle) ?? false));
-    }, [props.models, filter]);
+    }, [props.models, filter, pinned]);
     const initial = Math.max(0, filtered.findIndex((m) => m.id === props.current));
     const [cursor, setCursor] = React.useState(initial);
     // Reset cursor when filter changes so it lands on the first match.

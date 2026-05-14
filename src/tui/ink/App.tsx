@@ -72,6 +72,10 @@ import {
   type ProviderEntry as ProviderPickerEntry,
 } from "./components/ProviderPicker.js";
 import {
+  OpenRouterCompanyPicker,
+  type CompanyEntry,
+} from "./components/OpenRouterCompanyPicker.js";
+import {
   HelpOverlay,
   type HelpSlashCommand,
 } from "./components/HelpOverlay.js";
@@ -224,12 +228,14 @@ export function App(props: AppProps): React.JSX.Element {
   // Multi-step picker stage. Stage 1 = ProviderPicker (default when
   // overlays.active === 'models'); stage 2 = ModelPicker filtered to
   // the picked provider. Resets to 'provider' on every fresh open.
-  const [pickerStage, setPickerStage] = React.useState<"provider" | "model">(
+  const [pickerStage, setPickerStage] = React.useState<"provider" | "or-company" | "model">(
     "provider",
   );
   const [pickerProvider, setPickerProvider] = React.useState<string | null>(
     null,
   );
+  // For OpenRouter 3-step flow: upstream company prefix (e.g. "deepseek", "google")
+  const [pickerOrCompany, setPickerOrCompany] = React.useState<string | null>(null);
 
   // Pending model-switch prompt — set when the kernel emits an error
   // with a `failoverModel` hint. Cleared when the user answers
@@ -1528,7 +1534,11 @@ export function App(props: AppProps): React.JSX.Element {
                   providers={providerEntries}
                   onPick={(providerId): void => {
                     setPickerProvider(providerId);
-                    setPickerStage("model");
+                    if (providerId === "openrouter") {
+                      setPickerStage("or-company");
+                    } else {
+                      setPickerStage("model");
+                    }
                   }}
                   onCancel={(): void => {
                     setPickerStage("provider");
@@ -1538,19 +1548,82 @@ export function App(props: AppProps): React.JSX.Element {
                 />
               );
             })()}
+          {overlays.active === "models" && pickerStage === "or-company" && (() => {
+            // Build company entries from OpenRouter models
+            const orModels = models.filter(m => m.provider === "openrouter");
+            const companyMap = new Map<string, number>();
+            for (const m of orModels) {
+              const prefix = m.id.startsWith("~") ? m.id.slice(1).split("/")[0] : m.id.split("/")[0];
+              if (prefix) companyMap.set(prefix, (companyMap.get(prefix) ?? 0) + 1);
+            }
+            const COMPANY_LABELS: Record<string, string> = {
+              anthropic: "Anthropic", deepseek: "DeepSeek", google: "Google",
+              moonshotai: "Moonshot / Kimi", minimax: "MiniMax", qwen: "Qwen / Alibaba",
+              inclusionai: "Inclusion AI (Ring)", meta: "Meta", openai: "OpenAI",
+              nvidia: "NVIDIA", poolside: "Poolside", tencent: "Tencent",
+              "z-ai": "Z.ai",
+            };
+            const COMPANY_BLURB: Record<string, string> = {
+              deepseek: "v4-pro · v4-flash · R1", google: "Gemini 3.1 Pro · Flash",
+              moonshotai: "Kimi K2.6 · K2-Thinking", minimax: "M2.7",
+              qwen: "Qwen3.6 Max · Flash · Coder", inclusionai: "Ring 2.6 1T (free)",
+              anthropic: "Claude Opus/Sonnet/Haiku", openai: "GPT-5.5 Pro · Mini",
+            };
+            const PIN_ORDER = ["deepseek","moonshotai","minimax","google","qwen","inclusionai","anthropic","openai","meta","nvidia"];
+            const entries: CompanyEntry[] = [...companyMap.entries()]
+              .sort(([a], [b]) => {
+                const ai = PIN_ORDER.indexOf(a), bi = PIN_ORDER.indexOf(b);
+                if (ai !== -1 && bi !== -1) return ai - bi;
+                if (ai !== -1) return -1;
+                if (bi !== -1) return 1;
+                return a.localeCompare(b);
+              })
+              .map(([id, count]) => ({
+                id,
+                label: COMPANY_LABELS[id] ?? id,
+                modelCount: count,
+                blurb: COMPANY_BLURB[id],
+                isCurrent: currentModel.startsWith(id + "/") || currentModel.startsWith("~" + id + "/"),
+              }));
+            return (
+              <OpenRouterCompanyPicker
+                companies={entries}
+                onPick={(companyId): void => {
+                  setPickerOrCompany(companyId);
+                  setPickerStage("model");
+                }}
+                onCancel={(): void => {
+                  setPickerStage("provider");
+                  setPickerProvider(null);
+                  setPickerOrCompany(null);
+                }}
+              />
+            );
+          })()}
           {overlays.active === "models" && pickerStage === "model" && (
             <ModelPicker
-              models={models.filter((m) => m.provider === pickerProvider)}
+              models={models.filter((m) => {
+                if (pickerProvider !== "openrouter" || !pickerOrCompany) {
+                  return m.provider === pickerProvider;
+                }
+                const bare = m.id.startsWith("~") ? m.id.slice(1) : m.id;
+                return m.provider === "openrouter" && bare.startsWith(pickerOrCompany + "/");
+              })}
               current={currentModel}
               onPick={(id): void => {
                 handleModelPick(id);
                 setPickerStage("provider");
                 setPickerProvider(null);
+                setPickerOrCompany(null);
               }}
               onCancel={(): void => {
-                // Esc inside ModelPicker → back to ProviderPicker (NOT close).
-                setPickerStage("provider");
-                setPickerProvider(null);
+                // Esc inside ModelPicker → back to company step for OR, provider for others
+                if (pickerProvider === "openrouter") {
+                  setPickerStage("or-company");
+                } else {
+                  setPickerStage("provider");
+                  setPickerProvider(null);
+                }
               }}
             />
           )}

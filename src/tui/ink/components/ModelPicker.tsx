@@ -13,8 +13,9 @@
  *   right-aligned tier footer (free / basic / pro / premium / price)
  *   bottom keybind hint bar with all shortcuts
  *
- * Shape stays small (≤220 LOC); the catalogue itself is owned
- * upstream so this file is purely presentational.
+ * pinnedFamilies: optional list of provider-name substrings to sort
+ * to the top (in order given). Default order: kimi, deepseek, minimax,
+ * gemini, qwen, ring, inclusionai, claude, openai.
  */
 
 import * as React from "react";
@@ -33,6 +34,41 @@ export interface ModelPickerProps {
   current: string;
   onPick: (id: string) => void;
   onCancel: () => void;
+  /** Optional ordered list of provider-name substrings to pin to the top. */
+  pinnedFamilies?: string[];
+}
+
+const DEFAULT_PINNED_FAMILIES = [
+  "kimi",
+  "deepseek",
+  "minimax",
+  "gemini",
+  "qwen",
+  "ring",
+  "inclusionai",
+  "claude",
+  "openai",
+];
+
+function pinnedIndex(provider: string, pinned: string[]): number {
+  const lc = provider.toLowerCase();
+  for (let i = 0; i < pinned.length; i++) {
+    if (lc.includes(pinned[i]!)) return i;
+  }
+  return pinned.length; // unpinned → sort after all pinned groups
+}
+
+function sortByPinnedFamilies(
+  models: ModelEntry[],
+  pinned: string[],
+): ModelEntry[] {
+  return [...models].sort((a, b) => {
+    const ai = pinnedIndex(a.provider, pinned);
+    const bi = pinnedIndex(b.provider, pinned);
+    if (ai !== bi) return ai - bi;
+    // within same pin bucket sort alpha by id
+    return a.id.localeCompare(b.id);
+  });
 }
 
 function groupByProvider(
@@ -62,18 +98,21 @@ export function ModelPicker(props: ModelPickerProps): React.JSX.Element {
     premium: palette.status.warning,
   };
 
+  const pinned = props.pinnedFamilies ?? DEFAULT_PINNED_FAMILIES;
+
   const [filter, setFilter] = React.useState("");
 
   const filtered = React.useMemo(() => {
-    if (filter.length === 0) return props.models;
+    const sorted = sortByPinnedFamilies(props.models, pinned);
+    if (filter.length === 0) return sorted;
     const needle = filter.toLowerCase();
-    return props.models.filter(
+    return sorted.filter(
       (m) =>
         m.id.toLowerCase().includes(needle) ||
         m.provider.toLowerCase().includes(needle) ||
         (m.label?.toLowerCase().includes(needle) ?? false),
     );
-  }, [props.models, filter]);
+  }, [props.models, filter, pinned]);
 
   const initial = Math.max(
     0,

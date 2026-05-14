@@ -1100,6 +1100,8 @@ const MODEL_ALIASES = {
     // Gemini
     gemini: "gemini-2.5-pro",
     flash: "gemini-2.5-flash",
+    "gemini-3.1": "google/gemini-3.1-pro-preview",
+    gemini3flash: "google/gemini-3-flash-preview",
     // NVIDIA NIM
     kimi: "moonshotai/kimi-k2.6",
     "kimi-thinking": "moonshotai/kimi-k2-thinking",

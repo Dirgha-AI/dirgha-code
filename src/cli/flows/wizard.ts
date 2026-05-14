@@ -178,7 +178,7 @@ export const DEFAULT_MODEL_PER_PROVIDER: Record<string, string> = {
   anthropic: "claude-sonnet-4-6",
   openai: "gpt-5",
   gemini: "gemini-2.5-pro",
-  nvidia: "moonshotai/kimi-k2.6",
+  nvidia: "deepseek-ai/deepseek-v4-flash",
   openrouter: "inclusionai/ring-2.6-1t:free",
   fireworks: "accounts/fireworks/models/deepseek-v3",
   dirgha: "deepseek",
