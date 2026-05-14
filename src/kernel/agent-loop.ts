@@ -569,6 +569,20 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
         _compactedThisTurn = true;
         try {
           const compacted = await cfg.contextTransform(history);
+          // Persist a compaction marker so future replays can skip pre-compaction
+          // messages. keptFrom is the timestamp of the first message that
+          // SURVIVED compaction (or now() if the compacted history is empty).
+          // Best-effort: don't block compaction on session write.
+          if (cfg.session) {
+            const keptFrom = new Date().toISOString();
+            const droppedCount = history.length - compacted.length;
+            void cfg.session.append({
+              type: 'compaction',
+              ts: keptFrom,
+              keptFrom,
+              summary: `auto-compaction at turn ${turnIndex}: dropped ${droppedCount} message(s)`,
+            });
+          }
           history.length = 0;
           history.push(...compacted);
           messagesForCall = await cfg.contextTransform(history);

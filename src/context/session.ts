@@ -37,6 +37,8 @@ export interface Session {
   replay(): AsyncIterable<SessionEntry>;
   replayAll(): Promise<SessionEntry[]>;
   messages(): Promise<Message[]>;
+  getCompactionThreshold(): Promise<string | null>;
+  reconcile(): Promise<void>;
   close(): void;
 }
 
@@ -66,7 +68,10 @@ export class SessionStore {
       .then(() => true)
       .catch(() => false);
     if (!exists) return undefined;
-    return new SessionImpl(id, path);
+    const impl = new SessionImpl(id, path);
+    // Best-effort: reconcile SQLite mirror against JSONL on open.
+    void Promise.resolve().then(() => impl.reconcile());
+    return impl;
   }
 
   async list(): Promise<string[]> {
@@ -115,12 +120,49 @@ class SessionImpl implements Session {
     }
   }
 
+  async getCompactionThreshold(): Promise<string | null> {
+    // Returns the keptFrom timestamp of the LATEST compaction entry, or null if none.
+    let latest: string | null = null;
+    for await (const entry of this.replay()) {
+      if (entry.type === 'compaction') latest = entry.keptFrom;
+    }
+    return latest;
+  }
+
   async messages(): Promise<Message[]> {
+    // Two-pass: find the latest compaction threshold, then yield messages
+    // with ts >= threshold. Messages with type 'system' and 'title' entries
+    // are NOT filtered because they may carry essential context (system
+    // prompt, session title). The compaction summary message itself is
+    // emitted by the agent loop as a regular message AFTER writing the
+    // compaction entry, so it lands after keptFrom and survives.
+    const threshold = await this.getCompactionThreshold();
     const out: Message[] = [];
     for await (const entry of this.replay()) {
-      if (entry.type === "message") out.push(entry.message);
+      if (entry.type !== 'message') continue;
+      if (threshold && entry.ts < threshold) continue;
+      out.push(entry.message);
     }
     return out;
+  }
+
+  async reconcile(): Promise<void> {
+    // Compare JSONL message count to SQLite message count for this session.
+    // If they differ, truncate the SQLite session and reinsert from JSONL.
+    // The JSONL is the source of truth. Best-effort: swallow all errors.
+    try {
+      const { dbCountSessionMessages, dbReplaceSessionMessages } = await import('../state/db.js');
+      const jsonlMsgs: Message[] = [];
+      for await (const entry of this.replay()) {
+        if (entry.type === 'message') jsonlMsgs.push(entry.message);
+      }
+      const sqliteCount = dbCountSessionMessages(this.id);
+      if (sqliteCount !== jsonlMsgs.length) {
+        dbReplaceSessionMessages(this.id, jsonlMsgs);
+      }
+    } catch {
+      /* best-effort: don't crash session open */
+    }
   }
 
   async replayAll(): Promise<SessionEntry[]> {

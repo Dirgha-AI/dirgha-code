@@ -340,6 +340,35 @@ export function dbAppendMessage(sessionId: string, message: Message): void {
   }
 }
 
+export function dbCountSessionMessages(sessionId: string): number {
+  try {
+    const db = getDb();
+    const row = db.prepare('SELECT COUNT(*) as c FROM messages WHERE session_id = ?').get(sessionId) as { c: number } | undefined;
+    return row?.c ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function dbReplaceSessionMessages(sessionId: string, messages: Message[]): void {
+  try {
+    const db = getDb();
+    const tx = db.transaction((msgs: Message[]) => {
+      db.prepare('DELETE FROM messages WHERE session_id = ?').run(sessionId);
+      const stmt = db.prepare('INSERT INTO messages(session_id, role, content, ts) VALUES (?, ?, ?, ?)');
+      const now = Date.now();
+      for (const m of msgs) {
+        const content = typeof m.content === 'string' ? m.content : JSON.stringify(m.content);
+        stmt.run(sessionId, m.role, content, now);
+      }
+    });
+    tx(messages);
+    recordDbSuccess();
+  } catch (err) {
+    recordDbError(err);
+  }
+}
+
 export interface ChatResult {
   sessionId: string;
   role: string;
