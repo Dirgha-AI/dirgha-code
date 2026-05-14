@@ -16,7 +16,7 @@ import type { Subcommand } from './index.js';
 export async function runSetup(argv: string[]): Promise<number> {
   if (argv.includes('--features')) {
     const { runFeatureSetup } = await import('./feature-setup.js');
-    return runFeatureSetup();
+    return runFeatureSetup(argv);
   }
   return runWizard(argv);
 }

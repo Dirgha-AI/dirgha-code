@@ -350,7 +350,20 @@ function verifySqlite() {
 // ---------------------------------------------------------------------------
 // Main interactive flow
 // ---------------------------------------------------------------------------
-export async function runFeatureSetup() {
+export async function runFeatureSetup(argv = []) {
+    // --auto: non-interactive install triggered by postinstall hook.
+    // Silently attempts prebuilt download; always exits 0 so npm install
+    // is never blocked. Skips if sqlite is already working.
+    if (argv.includes('--auto')) {
+        const status = await detectFeatures();
+        if (!status.sqliteAvailable) {
+            const ok = await installSqlite();
+            if (ok && verifySqlite()) {
+                stdout.write('[dirgha] better-sqlite3 installed (chat history enabled)\n');
+            }
+        }
+        return 0;
+    }
     // Non-TTY: just print status and exit cleanly.
     if (!stdin.isTTY) {
         stdout.write('dirgha feature installer\n');

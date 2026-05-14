@@ -13,7 +13,7 @@ import { runWizard } from '../flows/wizard.js';
 export async function runSetup(argv) {
     if (argv.includes('--features')) {
         const { runFeatureSetup } = await import('./feature-setup.js');
-        return runFeatureSetup();
+        return runFeatureSetup(argv);
     }
     return runWizard(argv);
 }
