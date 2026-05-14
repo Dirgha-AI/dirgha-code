@@ -69,6 +69,45 @@ You can also just ask: open an issue with "what should I work on?" and we'll sug
 
 ---
 
+## Working with AI agents in this repo
+
+This section is a binding contract for any AI agent (Claude, DeepSeek, etc.) making changes to this repository. Human contributors may skip directly to [How to contribute](#how-to-contribute).
+
+### Preflight check (run before any agent-assisted edit)
+
+- Source the env: `set -a; . /root/dirgha-ai/.env; set +a` (or your equivalent .env). Verify with `echo $DEEPSEEK_API_KEY | wc -c` shows >30.
+- Helper scripts must read keys from `process.env`, never literals. If you see `const KEY = "sk-..."` in any script, STOP and fix it.
+- Before EVERY `git commit`, scan staged diff for secret patterns:
+  ```bash
+  git diff --cached | grep -E 'sk-[a-zA-Z0-9]{20,}|xoxb-|ghp_|github_pat_|AKIA[0-9A-Z]{16}|pat-[a-zA-Z0-9-]{30,}|Bearer [A-Za-z0-9._-]{30,}'
+  ```
+  If anything matches, do not push.
+- `git add -A` is forbidden in this repo by convention. Stage specific files (`git add src/...`) so you have to look at what you're committing.
+
+### Approved code-edit pattern
+
+Human contributors edit normally; AI agents in this repo dispatch all source edits through DeepSeek-v4-flash via `scripts/ds-fix.mjs` or `scripts/ds-audit-fix.mjs` (whichever takes a spec.json with file paths + instruction). The agent role is orchestrator + verifier, not direct editor.
+
+### Verification gate
+
+Every dispatched fix must pass: `npm run typecheck`, `npm run test`, `npm run test:cli:offline` before commit. The CI workflow runs all three; failing CI blocks the next publish.
+
+### What lives where
+
+- Secrets: `/root/dirgha-ai/.env` for this user (sourced into shell, never copied into source).
+- Audit specs / spec JSONs: `/tmp/*-spec.json` — gitignored.
+- Dispatch logs: stderr only; if you need them durable, write to `docs/cli/agent/`.
+
+### Incident playbook
+
+If a secret leaks anyway:
+1. Rotate immediately at the provider.
+2. Strip the literal from source for clean future pushes.
+3. Do NOT rewrite public git history (rotation is the only real mitigation).
+4. Update the corresponding memory/reference doc to note the rotation.
+
+---
+
 ## How to contribute
 
 ### Bugs and feature requests

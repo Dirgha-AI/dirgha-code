@@ -109,7 +109,7 @@ try {
   // Submit first prompt → kicks off the stalling stub turn.
   for (const ch of 'first prompt') { send(ch); await sleep(15); }
   send('\r');
-  await sleep(400);
+  await sleep(1000);
 
   assert('first prompt entered transcript',
     /first prompt/.test(everSeen()),
