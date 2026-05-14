@@ -39,9 +39,14 @@ export function useFlickerDetector(lineCount = 0): {
   if (lineCount > rows && !warnedRef.current) {
     warnedRef.current = true;
     overflowRef.current = true;
-    console.error(
-      `[Dirgha] Frame overflow detected — ${lineCount - rows} lines above terminal height.`,
-    );
+    // Debug-only: tall outputs in a short terminal aren't an error,
+    // and the user can scroll their terminal back. Suppress unless
+    // explicitly opted in.
+    if (process.env.DIRGHA_DEBUG === "1" || process.env.DIRGHA_FLICKER_WARN === "1") {
+      console.error(
+        `[Dirgha] Frame overflow detected — ${lineCount - rows} lines above terminal height.`,
+      );
+    }
   }
 
   return {
