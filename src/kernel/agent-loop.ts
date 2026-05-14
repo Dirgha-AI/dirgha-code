@@ -28,6 +28,7 @@ import type {
   AgentHooks,
 } from "./types.js";
 import type { EventStream } from "./event-stream.js";
+import type { Session } from "../context/session.js";
 import { assembleTurn, extractToolUses, appendToolResults } from "./message.js";
 import { resolveModelForDispatch } from "../providers/dispatch.js";
 import { findFailover } from "../intelligence/prices.js";
@@ -90,6 +91,13 @@ export interface AgentLoopConfig {
     isLoopDetected(): boolean;
     reason(): string | null;
   };
+  /**
+   * Optional session for per-turn crash-safe checkpointing. When provided,
+   * each assistant message and each batch of tool results is appended to the
+   * session immediately after it is produced, rather than waiting for the
+   * caller to flush everything at the end of runAgentLoop.
+   */
+  session?: Session;
 }
 
 // ── History repair helpers ────────────────────────────────────────────────────
@@ -107,14 +115,27 @@ export interface AgentLoopConfig {
 
 /** General structural sanitizer — fixes all message-sequence issues. */
 function _sanitizeHistory(messages: Message[]): Message[] {
-  const result: Message[] = [];
+  return _hardenHistory(messages);
+}
 
+/**
+ * Multi-pass history hardening (5 passes, matching Gemini CLI production patterns).
+ *
+ * Pass 1 — Coalesce: merge adjacent same-role messages, drop empty content.
+ * Pass 2 — Tool pairing: inject sentinel tool_results for orphaned tool_use blocks.
+ * Pass 3 — Role constraints: history must start with "user"; prepend synthetic if not.
+ * Pass 4 — Strip orphaned tool_results (calls _stripOrphanedToolResults).
+ * Pass 5 — Drop empty messages (covered in Pass 1 coalesce).
+ */
+function _hardenHistory(messages: Message[]): Message[] {
+  // ── Pass 1: Coalesce ─────────────────────────────────────────────────────────
+  const pass1: Message[] = [];
   for (const msg of messages) {
-    // Drop empty content
+    // Drop empty content (Pass 1 + Pass 5)
     if (Array.isArray(msg.content) && msg.content.length === 0) continue;
     if (typeof msg.content === "string" && msg.content.trim() === "") continue;
 
-    const prev = result[result.length - 1];
+    const prev = pass1[pass1.length - 1];
     // Collapse consecutive same-role messages (merge content, skip system)
     if (prev && prev.role === msg.role && msg.role !== "system") {
       if (typeof prev.content === "string" && typeof msg.content === "string") {
@@ -133,59 +154,93 @@ function _sanitizeHistory(messages: Message[]): Message[] {
       continue;
     }
 
-    result.push({
+    pass1.push({
       ...msg,
       content: Array.isArray(msg.content) ? [...msg.content] : msg.content,
     });
   }
 
-  // Strip assistant-all-tool_use blocks whose IDs have no matching tool_result
-  for (let i = 0; i < result.length - 1; i++) {
-    const msg = result[i];
+  // ── Pass 2: Tool pairing ─────────────────────────────────────────────────────
+  // For every assistant message with tool_use parts, ensure the following user
+  // message has matching tool_result parts. Missing results get a sentinel.
+  const pass2: Message[] = [];
+  for (let i = 0; i < pass1.length; i++) {
+    const msg = pass1[i];
+    pass2.push(msg);
+
     if (msg.role !== "assistant" || !Array.isArray(msg.content)) continue;
-    const toolUses = msg.content.filter((p) => p.type === "tool_use") as Array<{ type: "tool_use"; id: string }>;
+    const toolUses = msg.content.filter((p) => p.type === "tool_use") as Array<{
+      type: "tool_use";
+      id: string;
+    }>;
     if (toolUses.length === 0) continue;
-    const next = result[i + 1];
-    const nextContent = next && Array.isArray(next.content) ? next.content : [];
-    const nextIds = new Set(
+
+    const next = pass1[i + 1];
+    const nextContent =
+      next?.role === "user" && Array.isArray(next.content) ? next.content : [];
+    const existingResultIds = new Set(
       nextContent
         .filter((p) => p.type === "tool_result")
-        .map((p) => (p as { type: "tool_result"; toolUseId: string }).toolUseId),
+        .map(
+          (p) =>
+            (p as { type: "tool_result"; toolUseId: string }).toolUseId,
+        ),
     );
-    // Remove orphaned tool_use blocks (IDs with no matching result); keep valid ones
-    const orphanedUseIds = new Set(toolUses.filter((tu) => !nextIds.has(tu.id)).map((tu) => tu.id));
-    if (orphanedUseIds.size > 0) {
-      const kept = msg.content.filter(
-        (p) => p.type !== "tool_use" || !orphanedUseIds.has((p as { type: "tool_use"; id: string }).id),
-      );
-      if (kept.length === 0) { result.splice(i, 1); i--; }
-      else msg.content = kept;
+
+    // Find tool_use IDs that have no matching result
+    const missingIds = toolUses
+      .map((tu) => tu.id)
+      .filter((id) => !existingResultIds.has(id));
+
+    if (missingIds.length === 0) continue;
+
+    const sentinelParts = missingIds.map((id) => ({
+      type: "tool_result" as const,
+      toolUseId: id,
+      content:
+        "[System: tool result lost due to context management]",
+      isError: true as const,
+    }));
+
+    if (next?.role === "user" && Array.isArray(next.content)) {
+      // Inject sentinels into the existing user message (next in pass1)
+      // Modify pass1[i+1] in place so when the loop pushes it, it has the sentinels
+      pass1[i + 1] = {
+        ...next,
+        content: [...sentinelParts, ...next.content],
+      };
+    } else {
+      // No following user message — inject a synthetic one with sentinel results
+      const syntheticUser: Message = {
+        role: "user",
+        content: sentinelParts,
+      };
+      pass2.push(syntheticUser);
+      // Adjust loop index so we don't double-process the real next message
+      // (we didn't consume i+1, it'll be picked up normally)
     }
   }
 
-  // Strip tool_result blocks in user messages whose toolUseId has no matching tool_use in prev
-  for (let i = 1; i < result.length; i++) {
-    const msg = result[i];
-    if (msg.role !== "user" || !Array.isArray(msg.content)) continue;
-    const toolResults = msg.content.filter((p) => p.type === "tool_result") as Array<{ type: "tool_result"; toolUseId: string }>;
-    if (toolResults.length === 0) continue;
-    const prev = result[i - 1];
-    const prevUses = (prev && Array.isArray(prev.content) ? prev.content : []).filter(
-      (p) => p.type === "tool_use",
-    ) as Array<{ type: "tool_use"; id: string }>;
-    const validIds = new Set(prevUses.map((tu) => tu.id));
-    // Remove only the orphaned result blocks (not the whole message)
-    const orphanedResultIds = new Set(toolResults.filter((tr) => !validIds.has(tr.toolUseId)).map((tr) => tr.toolUseId));
-    if (orphanedResultIds.size > 0) {
-      const kept = msg.content.filter(
-        (p) => p.type !== "tool_result" || !orphanedResultIds.has((p as { type: "tool_result"; toolUseId: string }).toolUseId),
-      );
-      if (kept.length === 0) { result.splice(i, 1); i--; }
-      else msg.content = kept;
-    }
+  // ── Pass 3: Role constraints ─────────────────────────────────────────────────
+  // History must start with "user". If first non-system message is "assistant",
+  // prepend a synthetic user message.
+  const firstNonSystem = pass2.findIndex((m) => m.role !== "system");
+  if (firstNonSystem !== -1 && pass2[firstNonSystem].role === "assistant") {
+    pass2.splice(firstNonSystem, 0, {
+      role: "user" as const,
+      content: "[System: conversation resumed]",
+    });
   }
 
-  return result;
+  // ── Pass 4: Strip orphaned tool_results ──────────────────────────────────────
+  const pass4 = _stripOrphanedToolResults(pass2);
+
+  // ── Pass 5: Drop remaining empty messages (safety net) ───────────────────────
+  return pass4.filter((m) => {
+    if (Array.isArray(m.content) && m.content.length === 0) return false;
+    if (typeof m.content === "string" && m.content.trim() === "") return false;
+    return true;
+  });
 }
 
 /** Nuclear fallback: remove all tool_use/tool_result content, keep text/thinking. */
@@ -654,6 +709,9 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
         : [];
       if (parts.length > 0 || toolUses.length > 0) {
         history.push(assembled.message);
+        if (cfg.session) {
+          void cfg.session.append({ type: "message", ts: new Date().toISOString(), message: assembled.message });
+        }
       }
       try {
         cfg.loopDetector?.track({
@@ -703,6 +761,7 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
         }
       }
       if (_refusalAbortTriggered) break;
+      const historyLenBeforeResults = history.length;
       const appended = appendToolResults(
         history,
         toolResults.map((r) => ({
@@ -713,6 +772,12 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
       );
       history.length = 0;
       history.push(...appended);
+      if (cfg.session) {
+        const toolResultMessages = appended.slice(historyLenBeforeResults);
+        for (const toolResultMsg of toolResultMessages) {
+          void cfg.session.append({ type: "message", ts: new Date().toISOString(), message: toolResultMsg });
+        }
+      }
 
       // Defensive: ensure history ends with a valid sequence for the next
       // turn. If tool results were appended without a preceding assistant
@@ -772,7 +837,7 @@ async function executeToolCalls(
   cfg: AgentLoopConfig,
   events: EventStream,
   refusalCounts?: Map<string, number>,
-  refusalAbortThreshold?: number,
+  _refusalAbortThreshold?: number,
 ): Promise<Array<{ call: ToolCall; result: ToolResult }>> {
   const run = async (
     call: ToolCall,

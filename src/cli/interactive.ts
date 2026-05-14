@@ -395,6 +395,7 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
           signal: abortController.signal,
           errorClassifier: createErrorClassifier(),
           loopDetector,
+          session,
           ...(composedHooks !== undefined ? { hooks: composedHooks } : {}),
           // Per-model compaction trigger: 75 % of the model's actual
           // context window beats a static 120k cap (which over-compacts
