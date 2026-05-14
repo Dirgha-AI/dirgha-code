@@ -30,7 +30,7 @@ const cases = [
   ['flash',   'gemini-2.5-flash'],
   ['deepseek','deepseek-ai/deepseek-v4-pro'],
   ['llama',   'meta/llama-4-maverick-17b-128e-instruct'],
-  ['ling',    'inclusionai/ling-2.6-1t:free'],
+  ['ling',    'inclusionai/ring-2.6-1t:free'],
 ];
 for (const [alias, canon] of cases) {
   check(`${alias} ⇒ ${canon}`, resolveModelAlias(alias) === canon);

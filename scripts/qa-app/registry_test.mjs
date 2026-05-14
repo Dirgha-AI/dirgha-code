@@ -29,7 +29,7 @@ check('lookupModel miss returns undef', lookupModel('not-a-model') === undefined
 console.log('\n=== contextWindowFor ===');
 check('Kimi K2.6 has 256k context',     contextWindowFor('moonshotai/kimi-k2.6') === 256_000);
 check('Gemini 2.5 Pro has 2M context',  contextWindowFor('gemini-2.5-pro') === 2_000_000);
-check('unknown model gets default',     contextWindowFor('unknown/foo') === 32_000);
+check('unknown model gets default',     contextWindowFor('unknown/foo') === 64_000);
 
 console.log('\n=== modelsByFamily ===');
 const families = modelsByFamily();
