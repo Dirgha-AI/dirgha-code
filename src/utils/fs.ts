@@ -3,11 +3,15 @@ import { resolve, sep } from "node:path";
 export function isValidCwdPath(
   cwd: string,
   relativePath: string,
+  opts?: { allowOutside?: boolean },
 ):
   | { valid: false; error: string }
   | { valid: true; resolved: string; cwdNorm: string } {
   const resolved = resolve(cwd, relativePath);
   const cwdNorm = cwd.endsWith(sep) ? cwd : cwd + sep;
+  if (opts?.allowOutside) {
+    return { valid: true, resolved, cwdNorm };
+  }
   if (!resolved.startsWith(cwdNorm) && resolved !== cwd) {
     return { valid: false, error: `path escapes workspace: ${relativePath}` };
   }

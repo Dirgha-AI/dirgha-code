@@ -33,6 +33,7 @@ export interface ToolExecutorOptions {
   permission?: PermissionEngine;
   /** User-selected sandbox mode (config + /sandbox slash command).
    *  Defaults to "off" when omitted (backwards compatible). */
+  autoApprove?: boolean;
   sandboxMode?: SandboxMode;
   /**
    * Optional promise that, when pending, defers the "not registered" error
@@ -68,8 +69,10 @@ export function createToolExecutor(opts: ToolExecutorOptions): ToolExecutor {
         tool = opts.registry.get(call.name);
       }
       if (!tool) {
+        const available = opts.registry.list().map((t: Tool) => t.name);
+        const suggestions = closestMatches(call.name, available, 3);
         return {
-          content: `Tool "${call.name}" is not registered.`,
+          content: `Tool "${call.name}" is not registered. ${available.length} tools available. ${suggestions.length > 0 ? 'Did you mean: ' + suggestions.join(', ') + '?' : 'Use the tool registry list to see what is callable.'}`,
           isError: true,
         };
       }
@@ -94,6 +97,7 @@ export function createToolExecutor(opts: ToolExecutorOptions): ToolExecutor {
         signal,
         sandbox,
         sandboxMode: opts.sandboxMode ?? "off",
+        autoApprove: opts.autoApprove,
         log: opts.log,
         onProgress: opts.onProgress
           ? (msg: string) => opts.onProgress!(call.id, msg)
@@ -181,4 +185,16 @@ function sanitiseEnv(source: NodeJS.ProcessEnv): Record<string, string> {
     out[k] = v;
   }
   return out;
+}
+
+function closestMatches(needle: string, haystack: string[], k: number): string[] {
+  // Simple Levenshtein-distance approximation with prefix fallback.
+  const distance = (a: string, b: string): number => {
+    if (a.length < b.length) [a, b] = [b, a];
+    return a.split('').reduce((acc, c, i) => acc + (c !== b[i] ? 1 : 0), 0);
+  };
+  return haystack
+    .filter(h => h.startsWith(needle.slice(0, 3)) || distance(needle, h) <= 2)
+    .sort((a, b) => distance(needle, a) - distance(needle, b))
+    .slice(0, k);
 }

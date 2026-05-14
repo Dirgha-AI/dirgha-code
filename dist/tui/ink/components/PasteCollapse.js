@@ -52,10 +52,10 @@ function countLines(s) {
 export function PasteCollapseView(props) {
     const { value, segment, expanded, palette } = props;
     if (expanded) {
-        return (_jsxs(Box, { flexDirection: "column", children: [_jsx(Text, { children: value }), _jsxs(Text, { color: palette.text.secondary, dimColor: true, children: ["[", segment.lines, " line", segment.lines === 1 ? "" : "s", " expanded \u00B7 Ctrl+E to collapse]"] })] }));
+        return (_jsxs(Box, { flexDirection: "column", children: [_jsx(Text, { children: value }), _jsx(Text, { color: palette.text.secondary, dimColor: true, children: "[paste preview \u00B7 \u232B delete \u00B7 Ctrl+E hide]" })] }));
     }
     const before = value.slice(0, segment.start);
     const after = value.slice(segment.end);
-    return (_jsxs(Box, { flexDirection: "row", flexWrap: "wrap", children: [_jsx(Text, { children: before }), _jsx(Text, { color: palette.status.warning, children: "[paste]" }), _jsx(Text, { children: after }), _jsxs(Text, { color: palette.text.secondary, dimColor: true, children: [" ", "\u00B7 \u232B delete \u00B7 Ctrl+E expand"] })] }));
+    return (_jsxs(Box, { flexDirection: "row", flexWrap: "wrap", children: [_jsx(Text, { children: before }), _jsx(Text, { color: palette.status.warning, children: "[paste]" }), _jsx(Text, { children: after }), _jsxs(Text, { color: palette.text.secondary, dimColor: true, children: [" ", "\u00B7 \u232B delete \u00B7 Ctrl+E preview"] })] }));
 }
 //# sourceMappingURL=PasteCollapse.js.map

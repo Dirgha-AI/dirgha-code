@@ -63,6 +63,9 @@ export function loadProjectPrimer(startDir) {
             break;
         dir = next;
     }
+    if (process.env.DIRGHA_DEBUG_PRIMER) {
+        process.stderr.write(`[primer] no project primer found from ${startDir} upward\n`);
+    }
     return { primer: "", source: null, truncated: false };
 }
 /**

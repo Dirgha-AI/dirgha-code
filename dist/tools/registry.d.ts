@@ -27,6 +27,10 @@ export interface ToolContext {
     /** Selected sandbox mode. Tools that spawn external commands honour
      *  this — fs-* tools currently do not (path allowlist work TBD). */
     sandboxMode: SandboxMode;
+    /** True when the user has enabled YOLO mode (autoApprove all tools).
+     *  fs-* tools relax the workspace-path check when this is true AND
+     *  sandboxMode is 'off'. */
+    autoApprove?: boolean;
     log?: (level: "debug" | "info" | "warn" | "error", msg: string, meta?: Record<string, unknown>) => void;
     onProgress?: (message: string) => void;
 }

@@ -56,12 +56,18 @@ export function loadSoul(home: string = homedir()): SoulResult {
       return { text: readCapped(userPath), source: 'user', path: userPath };
     }
   } catch { /* not present */ }
+  if (process.env.DIRGHA_DEBUG_SOUL) {
+    process.stderr.write(`[soul] using fallback: default\n`);
+  }
   const path = defaultSoulPath();
   try {
     return { text: readCapped(path), source: 'default', path };
   } catch {
     // Last-ditch fallback if the package layout is broken (shouldn't
     // happen, but soul reads are non-blocking).
+    if (process.env.DIRGHA_DEBUG_SOUL) {
+      process.stderr.write(`[soul] using fallback: hardcoded\n`);
+    }
     return { text: 'You are dirgha, a terminal coding agent. Be terse, direct, and helpful.', source: 'default', path };
   }
 }

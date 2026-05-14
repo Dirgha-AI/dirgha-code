@@ -26,7 +26,7 @@ export const fsWriteTool = {
     requiresApproval: () => true,
     async execute(rawInput, ctx) {
         const input = rawInput;
-        const check = isValidCwdPath(ctx.cwd, input.path);
+        const check = isValidCwdPath(ctx.cwd, input.path, { allowOutside: ctx.autoApprove === true && (ctx.sandboxMode === 'off' || ctx.sandboxMode == null) });
         if (!check.valid)
             return { content: check.error, isError: true };
         const abs = check.resolved;

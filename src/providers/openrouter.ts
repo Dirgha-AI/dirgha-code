@@ -51,7 +51,7 @@ export class OpenRouterProvider implements Provider {
   constructor(config: ProviderConfig & { appName?: string; appUrl?: string }) {
     this.apiKey = config.apiKey ?? process.env.OPENROUTER_API_KEY ?? "";
     if (!this.apiKey)
-      throw new ProviderError("OPENROUTER_API_KEY is required", this.id);
+      throw new ProviderError("OPENROUTER_API_KEY is required. Set it via one of: (1) export OPENROUTER_API_KEY=sk-or-... in your shell, (2) run `dirgha login --provider=openrouter --key=sk-or-...`, or (3) inside the CLI type /keys to open the keystore.", this.id);
     this.baseUrl = (config.baseUrl ?? DEFAULT_BASE).replace(/\/+$/, "");
     // OR's free-tier models (hy3, ling, etc.) can take 30–60 s for the
     // first byte on long prompts; multi-turn coding sprints need more

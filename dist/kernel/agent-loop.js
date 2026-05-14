@@ -221,14 +221,33 @@ function _stripOrphanedToolResults(messages) {
                 out.push(msg);
             }
             else if (nonToolParts.length === 0) {
-                // Pure tool_result message — existing behaviour
-                const prev = out[out.length - 1];
-                if (prev?.role === "assistant" &&
-                    Array.isArray(prev.content) &&
-                    prev.content.some((p) => p.type === "tool_use")) {
+                // Pure tool_result message: check that at least one tool_result
+                // has a matching tool_use id in the most recent assistant with
+                // tool_use parts. Walk backwards through `out` (the already-
+                // stripped projection) so compaction-dropped assistants are
+                // correctly recognised as missing.
+                const matchingToolUseIds = new Set();
+                for (let j = out.length - 1; j >= 0; j -= 1) {
+                    const candidate = out[j];
+                    if (candidate.role === "assistant" && Array.isArray(candidate.content)) {
+                        for (const part of candidate.content) {
+                            const p = part;
+                            if (p.type === "tool_use" && typeof p.id === "string") {
+                                matchingToolUseIds.add(p.id);
+                            }
+                        }
+                        if (matchingToolUseIds.size > 0)
+                            break;
+                    }
+                }
+                const hasMatchingResult = msg.content.some((p) => {
+                    const tr = p;
+                    return tr.type === "tool_result" && typeof tr.toolUseId === "string" && matchingToolUseIds.has(tr.toolUseId);
+                });
+                if (hasMatchingResult) {
                     out.push(msg);
                 }
-                // else: drop orphaned tool_result message
+                // else: drop orphan — no matching tool_use id found in prior out
             }
             else {
                 // Mixed content: filter out orphaned tool_result parts

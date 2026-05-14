@@ -35,13 +35,13 @@ export const fsLsTool = {
     },
     async execute(rawInput, ctx) {
         const input = rawInput;
-        const check = isValidCwdPath(ctx.cwd, input.path ?? ".");
+        const check = isValidCwdPath(ctx.cwd, input.path ?? ".", { allowOutside: ctx.autoApprove === true && (ctx.sandboxMode === 'off' || ctx.sandboxMode == null) });
         if (!check.valid)
             return { content: check.error, isError: true };
         const target = check.resolved;
-        if (HUGE_ROOTS.has(target)) {
+        if (!ctx.autoApprove && HUGE_ROOTS.has(target)) {
             return {
-                content: `Refusing to list ${target} — too broad. Supply a narrower path, or use search_glob / search_grep with a targeted pattern.`,
+                content: `Refusing to list ${target} — too broad. Use search_glob with a specific pattern, or list a subdirectory: try ls ${target}/specific-folder, or set YOLO mode (ctx.autoApprove) to allow listing top-level directories.`,
                 isError: true,
             };
         }

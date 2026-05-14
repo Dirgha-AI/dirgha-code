@@ -30,7 +30,7 @@ export class DeepSeekProvider {
     constructor(config = {}) {
         this.apiKey = config.apiKey ?? process.env.DEEPSEEK_API_KEY ?? "";
         if (!this.apiKey)
-            throw new ProviderError("DEEPSEEK_API_KEY is required", this.id);
+            throw new ProviderError("DEEPSEEK_API_KEY is required. Set it via one of: (1) export DEEPSEEK_API_KEY=sk-... in your shell, (2) run `dirgha login --provider=deepseek --key=sk-...`, or (3) inside the CLI type /keys to open the keystore.", this.id);
         this.baseUrl = (config.baseUrl ?? DEFAULT_BASE).replace(/\/+$/, "");
         // Reasoning models can take 30–60 s on first-token. Match OpenRouter's
         // headroom so multi-turn coding sprints don't cancel themselves.

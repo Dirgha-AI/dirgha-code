@@ -23,6 +23,7 @@ export interface ToolExecutorOptions {
     permission?: PermissionEngine;
     /** User-selected sandbox mode (config + /sandbox slash command).
      *  Defaults to "off" when omitted (backwards compatible). */
+    autoApprove?: boolean;
     sandboxMode?: SandboxMode;
     /**
      * Optional promise that, when pending, defers the "not registered" error

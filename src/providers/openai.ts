@@ -30,7 +30,7 @@ export class OpenAIProvider implements Provider {
 
   constructor(config: ProviderConfig & { organization?: string }) {
     this.apiKey = config.apiKey ?? process.env.OPENAI_API_KEY ?? '';
-    if (!this.apiKey) throw new ProviderError('OPENAI_API_KEY is required', this.id);
+    if (!this.apiKey) throw new ProviderError('OPENAI_API_KEY is required. Set it via one of: (1) export OPENAI_API_KEY=sk-... in your shell, (2) run `dirgha login --provider=openai --key=sk-...`, or (3) inside the CLI type /keys to open the keystore.', this.id);
     this.baseUrl = (config.baseUrl ?? DEFAULT_BASE).replace(/\/+$/, '');
     this.timeoutMs = config.timeoutMs ?? 60_000;
     this.organization = config.organization;

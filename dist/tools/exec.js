@@ -33,8 +33,10 @@ export function createToolExecutor(opts) {
                 tool = opts.registry.get(call.name);
             }
             if (!tool) {
+                const available = opts.registry.list().map((t) => t.name);
+                const suggestions = closestMatches(call.name, available, 3);
                 return {
-                    content: `Tool "${call.name}" is not registered.`,
+                    content: `Tool "${call.name}" is not registered. ${available.length} tools available. ${suggestions.length > 0 ? 'Did you mean: ' + suggestions.join(', ') + '?' : 'Use the tool registry list to see what is callable.'}`,
                     isError: true,
                 };
             }
@@ -59,6 +61,7 @@ export function createToolExecutor(opts) {
                 signal,
                 sandbox,
                 sandboxMode: opts.sandboxMode ?? "off",
+                autoApprove: opts.autoApprove,
                 log: opts.log,
                 onProgress: opts.onProgress
                     ? (msg) => opts.onProgress(call.id, msg)
@@ -137,5 +140,17 @@ function sanitiseEnv(source) {
         out[k] = v;
     }
     return out;
+}
+function closestMatches(needle, haystack, k) {
+    // Simple Levenshtein-distance approximation with prefix fallback.
+    const distance = (a, b) => {
+        if (a.length < b.length)
+            [a, b] = [b, a];
+        return a.split('').reduce((acc, c, i) => acc + (c !== b[i] ? 1 : 0), 0);
+    };
+    return haystack
+        .filter(h => h.startsWith(needle.slice(0, 3)) || distance(needle, h) <= 2)
+        .sort((a, b) => distance(needle, a) - distance(needle, b))
+        .slice(0, k);
 }
 //# sourceMappingURL=exec.js.map

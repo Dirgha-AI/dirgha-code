@@ -1,4 +1,6 @@
-export declare function isValidCwdPath(cwd: string, relativePath: string): {
+export declare function isValidCwdPath(cwd: string, relativePath: string, opts?: {
+    allowOutside?: boolean;
+}): {
     valid: false;
     error: string;
 } | {

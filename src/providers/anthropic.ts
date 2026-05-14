@@ -23,7 +23,7 @@ export class AnthropicProvider implements Provider {
 
   constructor(config: ProviderConfig & { version?: string }) {
     this.apiKey = config.apiKey ?? process.env.ANTHROPIC_API_KEY ?? '';
-    if (!this.apiKey) throw new ProviderError('ANTHROPIC_API_KEY is required', this.id);
+    if (!this.apiKey) throw new ProviderError('ANTHROPIC_API_KEY is required. Set it via one of: (1) export ANTHROPIC_API_KEY=sk-ant-... in your shell, (2) run `dirgha login --provider=anthropic --key=sk-ant-...`, or (3) inside the CLI type /keys to open the keystore.', this.id);
     this.baseUrl = (config.baseUrl ?? DEFAULT_BASE).replace(/\/+$/, '');
     this.version = config.version ?? DEFAULT_VERSION;
     this.timeoutMs = config.timeoutMs ?? 60_000;
