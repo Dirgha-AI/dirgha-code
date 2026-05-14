@@ -45,6 +45,7 @@ import { modePreamble } from "../context/mode.js";
 import { isAutoApprove } from "../context/mode.js";
 import { createErrorClassifier } from "../intelligence/error-classifier.js";
 import { SubagentDelegator } from "../subagents/delegator.js";
+import { LoopDetector } from "../subagents/loop-detector.js";
 
 export interface InteractiveOptions {
   registry: ToolRegistry;
@@ -362,6 +363,7 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
 
       const userHooks = buildAgentHooksFromConfig(opts.config);
       const composedHooks = composeHooks(enforceMode(currentMode), userHooks);
+      const loopDetector = new LoopDetector();
       const abortController = new AbortController();
       abortRef.current = abortController;
       const sigintHandler = (): void => {
@@ -392,6 +394,7 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
           events,
           signal: abortController.signal,
           errorClassifier: createErrorClassifier(),
+          loopDetector,
           ...(composedHooks !== undefined ? { hooks: composedHooks } : {}),
           // Per-model compaction trigger: 75 % of the model's actual
           // context window beats a static 120k cap (which over-compacts
