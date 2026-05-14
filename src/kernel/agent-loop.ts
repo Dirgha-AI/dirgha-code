@@ -240,6 +240,29 @@ function _stripOrphanedToolResults(messages: Message[]): Message[] {
   return out;
 }
 
+/**
+ * Last-resort recovery when all messages were stripped as orphaned.
+ * Returns the minimum valid context: system messages + last user text message.
+ * Never returns an empty array.
+ */
+function _recoverMinimalContext(history: Message[]): Message[] {
+  const sys = history.filter((m) => m.role === "system");
+  // Find last user message that has actual text content (not just tool_results)
+  const lastTextUser = [...history].reverse().find(
+    (m) =>
+      m.role === "user" &&
+      (typeof m.content === "string"
+        ? m.content.trim().length > 0
+        : (m.content as import("./types.js").ContentPart[]).some(
+            (p) => p.type === "text" && (p as { type: "text"; text: string }).text.trim().length > 0,
+          )),
+  );
+  if (lastTextUser) return [...sys, lastTextUser];
+  if (sys.length > 0) return sys;
+  // Absolute fallback: synthetic user message to prevent API 400
+  return [{ role: "user" as const, content: "Continue." }];
+}
+
 export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
   const events = cfg.events;
   const history: Message[] = [...cfg.messages];
@@ -340,6 +363,12 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
       // Full-history scan: remove any orphaned tool_result messages that
       // contextTransform may have introduced mid-history (not just tail).
       messagesForCall = _stripOrphanedToolResults(messagesForCall);
+      // Guard: _stripOrphanedToolResults can return [] when all messages were orphaned.
+      // An empty array causes "Empty input messages" HTTP 400. Fall back to the last
+      // non-tool user message + system messages to keep conversation alive.
+      if (messagesForCall.length === 0) {
+        messagesForCall = _recoverMinimalContext(history);
+      }
 
       // ── Proactive compaction ──────────────────────────────────────────────
       // Fire before the API call when token usage is ≥80% of the context
@@ -359,6 +388,9 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
           history.push(...compacted);
           messagesForCall = await cfg.contextTransform(history);
           messagesForCall = _stripOrphanedToolResults(messagesForCall);
+          if (messagesForCall.length === 0) {
+            messagesForCall = _recoverMinimalContext(history);
+          }
         } catch {
           // Compaction failed — continue with original messages
         }
@@ -464,7 +496,7 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
         // same broken history will fail identically. Instead, escalate through
         // three repair levels so the session never dies from a bad history.
         const is400Structural =
-          /\b400\b|bad.?request|invalid.*message|tool.*role|messages.*tool|tool_result.*tool_use/i.test(
+          /\b400\b|bad.?request|invalid.*message|tool.*role|messages.*tool|tool_result.*tool_use|empty.?input/i.test(
             errMsg,
           ) &&
           !/context.?length|too long|max.*tokens|context_length_exceeded/i.test(
@@ -476,10 +508,7 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
           // minimum the system messages, or the last user message as a fallback.
           const ensureNonEmpty = (msgs: Message[]): Message[] => {
             if (msgs.length > 0) return msgs;
-            const sys = history.filter((m) => m.role === "system");
-            if (sys.length > 0) return sys;
-            const lastUser = [...history].reverse().find((m) => m.role === "user");
-            return lastUser ? [lastUser] : history.slice(-1);
+            return _recoverMinimalContext(history);
           };
           if (_historyRepairLevel === 0) {
             _historyRepairLevel = 1;

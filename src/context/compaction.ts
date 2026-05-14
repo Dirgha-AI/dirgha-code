@@ -83,6 +83,27 @@ export async function maybeCompact(
     }
   }
 
+  // Strip user messages that contain only tool_result parts from the start of
+  // preserved — they will become orphaned after the compacted summary replaces
+  // the assistant turns that originally called those tools.
+  const cleanPreserved: Message[] = [];
+  for (const msg of preserved) {
+    if (
+      msg.role === "user" &&
+      Array.isArray(msg.content) &&
+      msg.content.length > 0 &&
+      (msg.content as Array<{ type: string }>).every((p) => p.type === "tool_result")
+    ) {
+      const prev = cleanPreserved[cleanPreserved.length - 1];
+      const prevHasToolUse =
+        prev?.role === "assistant" &&
+        Array.isArray(prev.content) &&
+        (prev.content as Array<{ type: string }>).some((p) => p.type === "tool_use");
+      if (!prevHasToolUse) continue; // drop orphaned tool_result message
+    }
+    cleanPreserved.push(msg);
+  }
+
   const summary = await summarise(cfg, historical);
   const trimmed: Message[] = [
     ...systems,
@@ -95,7 +116,7 @@ export async function maybeCompact(
         },
       ],
     },
-    ...preserved,
+    ...cleanPreserved,
   ];
   const tokensAfter = trimmed.reduce(
     (acc, m) => acc + estimateTokens(flatten(m)),
