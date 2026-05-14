@@ -15,7 +15,11 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 
-const KEY = "sk-9cbb31b936224af6a8d99f3c7d470cda";
+const KEY = process.env.DEEPSEEK_API_KEY;
+if (!KEY) {
+  console.error("DEEPSEEK_API_KEY env var is required.");
+  process.exit(2);
+}
 const MODEL = "deepseek-v4-flash";
 const URL = "https://api.deepseek.com/chat/completions";
 
