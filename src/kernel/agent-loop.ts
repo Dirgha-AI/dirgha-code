@@ -259,9 +259,18 @@ function _recoverMinimalContext(history: Message[]): Message[] {
           )),
   );
   if (lastTextUser) return [...sys, lastTextUser];
-  if (sys.length > 0) return sys;
+  if (sys.length > 0) return [
+    ...sys,
+    {
+      role: "user" as const,
+      content: "[System: conversation context was lost due to a message sequencing error. Please ask the user to restate their request.]",
+    },
+  ];
   // Absolute fallback: synthetic user message to prevent API 400
-  return [{ role: "user" as const, content: "Continue." }];
+  return [{
+    role: "user" as const,
+    content: "[System: conversation context was lost. Please ask the user to restate their request.]",
+  }];
 }
 
 export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
