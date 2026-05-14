@@ -144,16 +144,16 @@ if [[ "$TIER" == "all" ]]; then
   slash_smoke "/config"  "/config ENTER"  3500 "[Dd]irgha|[Cc]onventions|No DIRGHA.md|first line|Key docs|ARCHITECTURE"
   # /account — needs auth; without token returns "Not signed in"
   slash_smoke "/account" "/account ENTER" 3500 "Not signed in|Account|tier|balance|free|pro"
-  # /upgrade — fires an inline `npm install -g` first; the CLI then
-  # exits to relaunch. The tmux pane may register "no server running"
-  # if the relaunch happens before capture. Accept any of these states.
-  slash_smoke "/upgrade" "/upgrade ENTER" 9000 "Not signed in|Upgrade:|Upgrading|http|dirgha\\.ai|up to date|no server running|already on latest"
   # /session — defaults to list — same content as /resume essentially
   slash_smoke "/session" "/session ENTER" 3500 "Available|saved|sessions|session|Usage|-\\s[a-f0-9]"
   # /history — empty session has 0 prompts
   slash_smoke "/history" "/history ENTER" 3500 "no prompts|no session|Last \\d+ prompts"
   # /fleet — root command should print usage when no args
   slash_smoke "/fleet"   "/fleet ENTER"   3500 "fleet|launch|list|worktree|Usage|status"
+  # /upgrade MUST be last — it triggers `npm install -g` + CLI relaunch which
+  # kills the tmux server, breaking any subsequent tests in the same run.
+  # The pane may register "no server running" if relaunch outpaces capture.
+  slash_smoke "/upgrade" "/upgrade ENTER" 9000 "Not signed in|Upgrade:|Upgrading|http|dirgha\\.ai|up to date|no server running|already on latest"
 fi
 
 log ""
