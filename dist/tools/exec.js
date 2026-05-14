@@ -10,6 +10,19 @@
  * progress push events back through the agent-loop event stream.
  */
 import { selectSandbox } from "../safety/sandbox/select.js";
+import { wrapLegacyResult, internalError } from './result-wrappers.js';
+function toolError(kind, message, opts = {}) {
+    const r = internalError(kind, message);
+    if (opts.durationMs !== undefined)
+        r.durationMs = opts.durationMs;
+    if (r.isError === true && r.error) {
+        if (opts.fatal_to_loop !== undefined)
+            r.error.fatal_to_loop = opts.fatal_to_loop;
+        if (opts.cause !== undefined)
+            r.error.cause = opts.cause;
+    }
+    return r;
+}
 export function createToolExecutor(opts) {
     const env = opts.env ?? sanitiseEnv(process.env);
     // Resolve the platform sandbox adapter once per executor instance.
@@ -35,10 +48,7 @@ export function createToolExecutor(opts) {
             if (!tool) {
                 const available = opts.registry.list().map((t) => t.name);
                 const suggestions = closestMatches(call.name, available, 3);
-                return {
-                    content: `Tool "${call.name}" is not registered. ${available.length} tools available. ${suggestions.length > 0 ? 'Did you mean: ' + suggestions.join(', ') + '?' : 'Use the tool registry list to see what is callable.'}`,
-                    isError: true,
-                };
+                return toolError('tool_not_found', `Tool "${call.name}" is not registered. ${available.length} tools available. ${suggestions.length > 0 ? 'Did you mean: ' + suggestions.join(', ') + '?' : 'Use the tool registry list to see what is callable.'}`);
             }
             if (opts.permission) {
                 const decision = opts.permission.check({
@@ -47,10 +57,7 @@ export function createToolExecutor(opts) {
                     target: opts.cwd,
                 });
                 if (!decision.allowed) {
-                    return {
-                        content: `Permission denied: ${decision.reason}`,
-                        isError: true,
-                    };
+                    return toolError('permission', `Permission denied: ${decision.reason}`);
                 }
             }
             const sandbox = await sandboxPromise;
@@ -72,7 +79,7 @@ export function createToolExecutor(opts) {
             }
             catch (err) {
                 const msg = err instanceof Error ? err.message : String(err);
-                return { content: `Tool "${call.name}" failed: ${msg}`, isError: true };
+                return toolError('internal', `Tool "${call.name}" failed: ${msg}`, { cause: err });
             }
         },
     };
@@ -90,18 +97,11 @@ async function runTool(tool, input, ctx) {
     const abortPromise = ctx.signal
         ? new Promise((resolve) => {
             if (ctx.signal.aborted) {
-                resolve({
-                    content: `Tool "${tool.name}" aborted before start.`,
-                    isError: true,
-                });
+                resolve(toolError('aborted', `Tool "${tool.name}" aborted before start.`));
                 return;
             }
             ctx.signal.addEventListener("abort", () => {
-                resolve({
-                    content: `Tool "${tool.name}" aborted by user (signal).`,
-                    isError: true,
-                    durationMs: Date.now() - started,
-                });
+                resolve(toolError('aborted', `Tool "${tool.name}" aborted by user (signal).`, { durationMs: Date.now() - started }));
             }, { once: true });
         })
         : new Promise(() => {
@@ -114,11 +114,7 @@ async function runTool(tool, input, ctx) {
             abortPromise,
             new Promise((resolve) => {
                 const timer = setTimeout(() => {
-                    resolve({
-                        content: `Tool "${tool.name}" timed out after ${deadlineMs}ms.`,
-                        isError: true,
-                        durationMs: deadlineMs,
-                    });
+                    resolve(toolError('timeout', `Tool "${tool.name}" timed out after ${deadlineMs}ms.`, { durationMs: deadlineMs }));
                 }, deadlineMs);
                 ctx.signal?.addEventListener("abort", () => clearTimeout(timer), {
                     once: true,
@@ -129,8 +125,13 @@ async function runTool(tool, input, ctx) {
     else {
         result = await Promise.race([tool.execute(input, ctx), abortPromise]);
     }
-    result.durationMs = result.durationMs ?? Date.now() - started;
-    return result;
+    const finalDuration = result.durationMs ?? Date.now() - started;
+    // Canonicalise: every result reaches the agent loop as a v2 ToolResult
+    // with `ok` field set, regardless of which shape the tool returned.
+    const wrapped = wrapLegacyResult(result, 'external');
+    if (wrapped.durationMs === undefined)
+        wrapped.durationMs = finalDuration;
+    return wrapped;
 }
 function sanitiseEnv(source) {
     const out = {};

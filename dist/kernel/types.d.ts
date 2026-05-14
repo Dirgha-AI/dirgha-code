@@ -120,13 +120,52 @@ export interface ToolCall {
     name: string;
     input: unknown;
 }
-export interface ToolResult<T = unknown> {
+/**
+ * Typed error information for tool failures. Used by the agent loop
+ * to decide retry/abort/fallback behaviour.
+ */
+export type ToolErrorKind = 'refusal' | 'timeout' | 'permission' | 'malformed_input' | 'tool_not_found' | 'aborted' | 'rate_limit' | 'network' | 'internal' | 'external';
+export interface ToolError {
+    kind: ToolErrorKind;
+    message: string;
+    retryable: boolean;
+    fatal_to_loop: boolean;
+    cause?: unknown;
+}
+/**
+ * Discriminant union for tool results. The `ok` field is the discriminant.
+ * `content` is always present (human-readable string for the provider's
+ * tool_result message). `isError` is a derived alias of `!ok` for legacy
+ * consumers; new code should use `ok` instead.
+ */
+type ToolResultBase = {
     content: string;
-    data?: T;
-    isError: boolean;
     metadata?: Record<string, unknown>;
     durationMs?: number;
-}
+};
+export type ToolResult<T = unknown> = (ToolResultBase & {
+    isError: false;
+    ok?: true;
+    value?: T;
+    data?: T;
+}) | (ToolResultBase & {
+    isError: true;
+    ok?: false;
+    error?: ToolError;
+    data?: unknown;
+});
+/**
+ * Type guard: narrows ToolResult to its error branch.
+ */
+export declare function isToolError<T>(r: ToolResult<T>): r is Extract<ToolResult<T>, {
+    isError: true;
+}>;
+/**
+ * Type guard: narrows ToolResult to its success branch.
+ */
+export declare function isToolOk<T>(r: ToolResult<T>): r is Extract<ToolResult<T>, {
+    isError: false;
+}>;
 export interface ToolDefinition {
     name: string;
     description: string;
@@ -211,3 +250,4 @@ export interface AgentResult {
     turnCount: number;
     sessionId: string;
 }
+export {};

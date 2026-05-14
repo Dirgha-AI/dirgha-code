@@ -117,12 +117,72 @@ export interface ToolCall {
   input: unknown;
 }
 
-export interface ToolResult<T = unknown> {
+/**
+ * Typed error information for tool failures. Used by the agent loop
+ * to decide retry/abort/fallback behaviour.
+ */
+export type ToolErrorKind =
+  | 'refusal'         // tool returned a refusal (user input rejected)
+  | 'timeout'         // tool timed out
+  | 'permission'      // permission denied
+  | 'malformed_input' // input failed validation
+  | 'tool_not_found'  // tool name not in registry
+  | 'aborted'         // ctx.signal triggered abort
+  | 'rate_limit'      // upstream rate limited
+  | 'network'         // network error (DNS, refused conn, etc.)
+  | 'internal'        // bug in our code; thrown exception caught by executor
+  | 'external';       // unknown error from a v1 tool's content string
+
+export interface ToolError {
+  kind: ToolErrorKind;
+  message: string;
+  retryable: boolean;
+  fatal_to_loop: boolean;
+  cause?: unknown;
+}
+
+/**
+ * Discriminant union for tool results. The `ok` field is the discriminant.
+ * `content` is always present (human-readable string for the provider's
+ * tool_result message). `isError` is a derived alias of `!ok` for legacy
+ * consumers; new code should use `ok` instead.
+ */
+type ToolResultBase = {
   content: string;
-  data?: T;
-  isError: boolean;
   metadata?: Record<string, unknown>;
   durationMs?: number;
+};
+
+export type ToolResult<T = unknown> =
+  | (ToolResultBase & {
+      isError: false;
+      ok?: true;
+      value?: T;
+      data?: T;
+    })
+  | (ToolResultBase & {
+      isError: true;
+      ok?: false;
+      error?: ToolError;
+      data?: unknown;
+    });
+
+/**
+ * Type guard: narrows ToolResult to its error branch.
+ */
+export function isToolError<T>(
+  r: ToolResult<T>,
+): r is Extract<ToolResult<T>, { isError: true }> {
+  return r.isError === true;
+}
+
+/**
+ * Type guard: narrows ToolResult to its success branch.
+ */
+export function isToolOk<T>(
+  r: ToolResult<T>,
+): r is Extract<ToolResult<T>, { isError: false }> {
+  return r.isError === false;
 }
 
 export interface ToolDefinition {
