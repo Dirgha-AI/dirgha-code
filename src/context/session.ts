@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { createReadStream } from "node:fs";
 import type { Message, UsageTotal } from "../kernel/types.js";
-import { dbOpenSession, dbAppendMessage, dbCloseSession } from "../state/db.js";
+import { dbOpenSession, dbAppendMessage, dbCloseSession, dbReadSnapshot } from "../state/db.js";
 
 export type SessionEntry =
   | { type: "message"; ts: string; message: Message }
@@ -39,6 +39,7 @@ export interface Session {
   messages(): Promise<Message[]>;
   getCompactionThreshold(): Promise<string | null>;
   reconcile(): Promise<void>;
+  writeSnapshot(messages: Message[]): Promise<void>;
   close(): void;
 }
 
@@ -130,12 +131,22 @@ class SessionImpl implements Session {
   }
 
   async messages(): Promise<Message[]> {
-    // Two-pass: find the latest compaction threshold, then yield messages
-    // with ts >= threshold. Messages with type 'system' and 'title' entries
-    // are NOT filtered because they may carry essential context (system
-    // prompt, session title). The compaction summary message itself is
-    // emitted by the agent loop as a regular message AFTER writing the
-    // compaction entry, so it lands after keptFrom and survives.
+    // Snapshot fast-load: if SQLite has a snapshot for this session, use it
+    // as the base and only replay JSONL entries with ts > snapshot.ts.
+    const snapshot = dbReadSnapshot(this.id);
+    if (snapshot) {
+      const tail: Message[] = [];
+      for await (const entry of this.replay()) {
+        if (entry.type !== 'message') continue;
+        if (entry.ts <= snapshot.ts) continue;
+        tail.push(entry.message);
+      }
+      return [...snapshot.messages, ...tail];
+    }
+
+    // No snapshot: fall back to compaction-aware full replay. Two passes:
+    // 1) find the latest compaction threshold, 2) yield messages with
+    // ts >= threshold.
     const threshold = await this.getCompactionThreshold();
     const out: Message[] = [];
     for await (const entry of this.replay()) {
@@ -144,6 +155,15 @@ class SessionImpl implements Session {
       out.push(entry.message);
     }
     return out;
+  }
+
+  async writeSnapshot(messages: Message[]): Promise<void> {
+    try {
+      const { dbWriteSnapshot } = await import('../state/db.js');
+      dbWriteSnapshot(this.id, new Date().toISOString(), messages);
+    } catch {
+      /* best-effort */
+    }
   }
 
   async reconcile(): Promise<void> {

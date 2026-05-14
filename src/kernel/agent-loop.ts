@@ -582,6 +582,9 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
               keptFrom,
               summary: `auto-compaction at turn ${turnIndex}: dropped ${droppedCount} message(s)`,
             });
+            // Snapshot the post-compaction history so future session opens
+            // can fast-load without scanning the full JSONL.
+            void cfg.session.writeSnapshot(compacted);
           }
           history.length = 0;
           history.push(...compacted);

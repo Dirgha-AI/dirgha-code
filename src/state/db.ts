@@ -189,6 +189,17 @@ function initSchema(db: import("better-sqlite3").Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_embedding_meta_source
       ON embedding_meta(source);
+
+    -- v1.39 — session_snapshots accelerates session open by avoiding
+    -- full JSONL replay. After compaction the agent loop writes a
+    -- snapshot of the in-memory message array; on open we load the
+    -- snapshot plus tail JSONL entries with ts > snapshot.ts.
+    CREATE TABLE IF NOT EXISTS session_snapshots (
+      session_id TEXT PRIMARY KEY,
+      ts TEXT NOT NULL,
+      message_count INTEGER NOT NULL,
+      payload TEXT NOT NULL
+    );
   `);
 }
 
@@ -289,6 +300,16 @@ function migrateSchema(db: import("better-sqlite3").Database): void {
       CREATE INDEX IF NOT EXISTS idx_edges_dst ON graph_edges(dst, rel);
       CREATE INDEX IF NOT EXISTS idx_nodes_type ON graph_nodes(type);
     `);
+
+    // v1.39 — session_snapshots, idempotent for existing DBs.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS session_snapshots (
+        session_id TEXT PRIMARY KEY,
+        ts TEXT NOT NULL,
+        message_count INTEGER NOT NULL,
+        payload TEXT NOT NULL
+      );
+    `);
   } catch (err) {
     recordDbError(err);
   }
@@ -363,6 +384,59 @@ export function dbReplaceSessionMessages(sessionId: string, messages: Message[])
       }
     });
     tx(messages);
+    recordDbSuccess();
+  } catch (err) {
+    recordDbError(err);
+  }
+}
+
+export interface SessionSnapshot {
+  ts: string;
+  messageCount: number;
+  messages: Message[];
+}
+
+export function dbWriteSnapshot(sessionId: string, ts: string, messages: Message[]): void {
+  try {
+    const db = getDb();
+    const payload = JSON.stringify(messages);
+    db.prepare(
+      `INSERT INTO session_snapshots(session_id, ts, message_count, payload)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(session_id) DO UPDATE SET
+         ts = excluded.ts,
+         message_count = excluded.message_count,
+         payload = excluded.payload`,
+    ).run(sessionId, ts, messages.length, payload);
+    recordDbSuccess();
+  } catch (err) {
+    recordDbError(err);
+  }
+}
+
+export function dbReadSnapshot(sessionId: string): SessionSnapshot | null {
+  try {
+    const db = getDb();
+    const row = db.prepare(
+      'SELECT ts, message_count, payload FROM session_snapshots WHERE session_id = ?',
+    ).get(sessionId) as { ts: string; message_count: number; payload: string } | undefined;
+    if (!row) return null;
+    let messages: Message[] = [];
+    try {
+      messages = JSON.parse(row.payload) as Message[];
+    } catch {
+      return null;
+    }
+    return { ts: row.ts, messageCount: row.message_count, messages };
+  } catch {
+    return null;
+  }
+}
+
+export function dbDeleteSnapshot(sessionId: string): void {
+  try {
+    const db = getDb();
+    db.prepare('DELETE FROM session_snapshots WHERE session_id = ?').run(sessionId);
     recordDbSuccess();
   } catch (err) {
     recordDbError(err);
