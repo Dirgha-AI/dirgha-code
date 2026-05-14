@@ -36,6 +36,7 @@ import {
   runLogout,
   runSetup,
   findSubcommand,
+  suggestCommand,
 } from "./subcommands/index.js";
 import { appendAudit } from "../audit/writer.js";
 import { buildAgentHooksFromConfig } from "../hooks/config-bridge.js";
@@ -103,6 +104,23 @@ async function main(): Promise<void> {
   }
 
   const { flags, positionals } = parseFlags(argv.slice(2));
+
+  // Upfront typo detection — runs before any hardcoded dispatch so that
+  // a misspelled verb (e.g. `logi`, `lgout`, `udpate`) never falls through
+  // to interactive mode.
+  {
+    const verb = positionals[0];
+    if (verb && !verb.startsWith('--')) {
+      const suggestion = suggestCommand(verb);
+      if (suggestion) {
+        process.stderr.write(
+          `dirgha: unknown command "${verb}"\n\nDid you mean "${suggestion}"?\n\n  dirgha ${suggestion} --help\n\n`
+        );
+        exit(1);
+      }
+    }
+  }
+
   // Top-level help/version only fire when there's no verb. With a verb
   // present (e.g. `dirgha fleet --help`), let the subcommand handle its
   // own help so users get scoped docs.
