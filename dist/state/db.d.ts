@@ -32,6 +32,7 @@ export declare function isSqliteAvailable(): boolean;
  * complete. Used by tests that need to assert on the post-phase-2 state.
  * Returns immediately if deferred init already finished.
  */
+export declare function getVecInitError(): string | null;
 export declare function waitForDeferredInit(): Promise<void>;
 export declare function dbListSessions(limit?: number): Array<{
     id: string;

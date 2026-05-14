@@ -23,6 +23,7 @@ let _db = null;
 let _watcher = null;
 let _indexBootstrapped = false;
 let _deferredDone = false;
+let _vecInitError = null;
 let _deferredResolve = null;
 function getDb() {
     if (_db)
@@ -47,7 +48,12 @@ function getDb() {
         process.nextTick(() => {
             try {
                 const deferred = () => {
-                    loadVecExtension(db);
+                    try {
+                        loadVecExtension(db);
+                    }
+                    catch (err) {
+                        _vecInitError = err instanceof Error ? err.message : String(err);
+                    }
                     bootstrapIndexOnce(db);
                     _deferredDone = true;
                     if (_deferredResolve) {
@@ -312,6 +318,9 @@ export function isSqliteAvailable() {
  * complete. Used by tests that need to assert on the post-phase-2 state.
  * Returns immediately if deferred init already finished.
  */
+export function getVecInitError() {
+    return _vecInitError;
+}
 export function waitForDeferredInit() {
     if (_deferredDone)
         return Promise.resolve();

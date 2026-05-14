@@ -12,9 +12,10 @@
  *    can skip the section cleanly).
  */
 import { createKnowledgeStore } from "./knowledge.js";
-import { waitForDeferredInit } from "../state/db.js";
+import { waitForDeferredInit, getVecInitError } from "../state/db.js";
 const KB_TOP_K = 5;
 const KB_TIMEOUT_MS = 500;
+let _diagnosticEmitted = false;
 /**
  * Return up to `topK` KB article snippets relevant to `userTurn`,
  * formatted as a `<kb_context>` block. Returns `undefined` when the
@@ -31,6 +32,12 @@ export async function queryKb(userTurn, topK = KB_TOP_K) {
     }
     catch {
         // Deferred init failed or timed out; proceed with query anyway.
+    }
+    // If vec extension failed to load, emit diagnostic once per process.
+    const vecError = getVecInitError();
+    if (vecError !== null && !_diagnosticEmitted) {
+        _diagnosticEmitted = true;
+        return `<kb_diagnostic>\nKB unavailable: sqlite-vec extension failed to load (${vecError}). Knowledge-base context will not be injected. Run "dirgha doctor" for details.\n</kb_diagnostic>`;
     }
     const query = async () => {
         const store = createKnowledgeStore();

@@ -32,6 +32,7 @@ let _db: import("better-sqlite3").Database | null = null;
 let _watcher: WatcherHandle | null = null;
 let _indexBootstrapped = false;
 let _deferredDone = false;
+let _vecInitError: string | null = null;
 let _deferredResolve: (() => void) | null = null;
 
 function getDb(): import("better-sqlite3").Database {
@@ -63,7 +64,11 @@ function getDb(): import("better-sqlite3").Database {
     process.nextTick(() => {
       try {
         const deferred = (): void => {
-          loadVecExtension(db);
+          try {
+            loadVecExtension(db);
+          } catch (err) {
+            _vecInitError = err instanceof Error ? err.message : String(err);
+          }
           bootstrapIndexOnce(db);
           _deferredDone = true;
           if (_deferredResolve) {
@@ -365,6 +370,10 @@ export function isSqliteAvailable(): boolean {
  * complete. Used by tests that need to assert on the post-phase-2 state.
  * Returns immediately if deferred init already finished.
  */
+export function getVecInitError(): string | null {
+  return _vecInitError;
+}
+
 export function waitForDeferredInit(): Promise<void> {
   if (_deferredDone) return Promise.resolve();
   if (_db === null) return Promise.resolve();
