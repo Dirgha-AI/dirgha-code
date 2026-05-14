@@ -160,9 +160,6 @@ function initSchema(db) {
       FOREIGN KEY (src) REFERENCES graph_nodes(id) ON DELETE CASCADE,
       FOREIGN KEY (dst) REFERENCES graph_nodes(id) ON DELETE CASCADE
     );
-    CREATE INDEX IF NOT EXISTS idx_edges_src ON graph_edges(src, rel);
-    CREATE INDEX IF NOT EXISTS idx_edges_dst ON graph_edges(dst, rel);
-    CREATE INDEX IF NOT EXISTS idx_nodes_type ON graph_nodes(type);
 
     -- embedding_meta table + index for vector search sidecar.
     -- The vec0 virtual table is created lazily in loadVecExtension.
@@ -240,6 +237,20 @@ function migrateSchema(db) {
         FOREIGN KEY (src) REFERENCES graph_nodes(id) ON DELETE CASCADE,
         FOREIGN KEY (dst) REFERENCES graph_nodes(id) ON DELETE CASCADE
       );
+    `);
+        // Migrate legacy graph_edges columns (from_id/to_id/type) -> (src/dst/rel).
+        const edgeCols = db.pragma("table_info(graph_edges)");
+        const edgeNames = new Set(edgeCols.map((c) => c.name));
+        if (edgeNames.has("from_id") && !edgeNames.has("src")) {
+            db.exec("ALTER TABLE graph_edges RENAME COLUMN from_id TO src");
+        }
+        if (edgeNames.has("to_id") && !edgeNames.has("dst")) {
+            db.exec("ALTER TABLE graph_edges RENAME COLUMN to_id TO dst");
+        }
+        if (edgeNames.has("type") && !edgeNames.has("rel")) {
+            db.exec("ALTER TABLE graph_edges RENAME COLUMN type TO rel");
+        }
+        db.exec(`
       CREATE INDEX IF NOT EXISTS idx_edges_src ON graph_edges(src, rel);
       CREATE INDEX IF NOT EXISTS idx_edges_dst ON graph_edges(dst, rel);
       CREATE INDEX IF NOT EXISTS idx_nodes_type ON graph_nodes(type);
