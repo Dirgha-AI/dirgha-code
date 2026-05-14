@@ -21,6 +21,7 @@ import type { SandboxAdapter } from "../safety/sandbox/iface.js";
 import type { PermissionEngine } from "./permission.js";
 import { selectSandbox } from "../safety/sandbox/select.js";
 import { wrapLegacyResult, internalError } from './result-wrappers.js';
+import { distillToolResult } from './distill.js';
 
 export type { ToolExecutor } from "../kernel/types.js";
 
@@ -109,7 +110,7 @@ export function createToolExecutor(opts: ToolExecutorOptions): ToolExecutor {
           : undefined,
       };
       try {
-        return await runTool(tool, call.input, ctx);
+        return await runTool(tool, call.input, ctx, call.id);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         return toolError('internal', `Tool "${call.name}" failed: ${msg}`, { cause: err });
@@ -122,6 +123,7 @@ async function runTool(
   tool: Tool,
   input: unknown,
   ctx: ToolContext,
+  callId?: string,
 ): Promise<ToolResult> {
   const started = Date.now();
   const deadlineMs = tool.timeoutMs ?? 0;
@@ -173,7 +175,7 @@ async function runTool(
   // with `ok` field set, regardless of which shape the tool returned.
   const wrapped = wrapLegacyResult(result, 'external');
   if (wrapped.durationMs === undefined) wrapped.durationMs = finalDuration;
-  return wrapped;
+  return distillToolResult(wrapped, callId);
 }
 
 function sanitiseEnv(source: NodeJS.ProcessEnv): Record<string, string> {
