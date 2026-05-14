@@ -31,7 +31,7 @@ const COOLDOWN_BACKOFF_MS = [
 const RECOVERY_SUCCESSES = 2; // consecutive successes to decrement cooldown level
 const COOLDOWN_DECAY_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24h of good behaviour → auto-decrement
 const MAX_FAILOVERS = 3; // consecutive failovers before failover-blacklist
-const FAILOVER_WINDOW_MS = 10 * 60 * 1000; // 10 minutes – failover events outside this window decay
+const _FAILOVER_WINDOW_MS = 10 * 60 * 1000; // reserved: failover events outside this window decay (not yet implemented; recordSuccess clears the counter eagerly)
 // ──────────────────────────────────────────────────────────
 // Internal state
 // ──────────────────────────────────────────────────────────
