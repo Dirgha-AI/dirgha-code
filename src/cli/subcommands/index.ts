@@ -55,6 +55,7 @@ import { historySubcommand } from './history.js';
 import { voiceSubcommand } from './voice.js';
 import { gpuSubcommand } from './gpu.js';
 import { pingSubcommand } from './ping.js';
+import { registerSubcommand } from './register.js';
 
 export const subcommands: Subcommand[] = [
   doctorSubcommand,
@@ -91,6 +92,7 @@ export const subcommands: Subcommand[] = [
   pingSubcommand,
   voiceSubcommand,
   gpuSubcommand,
+  registerSubcommand,
 ];
 
 export function findSubcommand(verb: string): Subcommand | undefined {
