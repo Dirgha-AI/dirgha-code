@@ -13,7 +13,7 @@
  * subcommand surface lives where the rest of `dirgha *` verbs live.
  */
 import { execFileSync, spawnSync } from 'node:child_process';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -194,6 +194,20 @@ async function runUpgradeSelf(yes) {
     }
     void appendAudit({ kind: 'update', summary: `self ${current} → ${check.latest}`, target: 'self', from: current, to: check.latest ?? '?' });
     try {
+        // Clean up stale npm staging dirs (`.code-*`) left by previous failed
+        // global installs. npm renames the live dir to a temp name before placing
+        // the new version; if that temp name already exists it throws ENOTEMPTY.
+        try {
+            const isWin = process.platform === 'win32';
+            const npmBin = isWin ? 'npm.cmd' : 'npm';
+            const globalRoot = execFileSync(npmBin, ['root', '-g'], { encoding: 'utf8', shell: isWin }).trim();
+            const pkgScope = globalRoot + '/@dirgha';
+            const stale = readdirSync(pkgScope).filter(d => /^\.code-/.test(d));
+            for (const d of stale) {
+                rmSync(`${pkgScope}/${d}`, { recursive: true, force: true });
+            }
+        }
+        catch { /* best-effort; failing here is fine */ }
         // Windows: npm is npm.cmd (no PATHEXT in execFile). shell:true is safe
         // because PKG is a hard-coded constant, not user input (CVE-2024-27980).
         const isWin = process.platform === 'win32';

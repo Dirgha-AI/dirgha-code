@@ -30,6 +30,9 @@ import { parseFlags } from "../flags.js";
 import { style, defaultTheme } from "../../tui/theme.js";
 async function runShell(cmd, cwd, timeoutMs) {
     return new Promise((resolve) => {
+        // shell: true is intentional — accept commands are developer-supplied shell
+        // expressions (pipes, quoting, subshells) that require a shell interpreter.
+        // This is not an injection surface: callers are the CLI user themselves.
         const child = spawn(cmd, { shell: true, cwd });
         let out = "";
         let err = "";

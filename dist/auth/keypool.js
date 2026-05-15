@@ -83,7 +83,9 @@ async function writePool(pool, home = homedir()) {
         await chmod(tmp, 0o600);
     }
     catch {
-        /* non-POSIX */
+        if (process.platform !== "win32") {
+            process.stderr.write(`[keypool] Warning: could not set 0600 on ${tmp} — key file may be world-readable\n`);
+        }
     }
     await rename(tmp, target);
 }

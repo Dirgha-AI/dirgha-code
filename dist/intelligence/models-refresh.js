@@ -29,7 +29,7 @@ export async function fetchProviderModels(opts) {
         const headers = {};
         if (apiKey)
             headers.Authorization = `Bearer ${apiKey}`;
-        const resp = await fetchImpl(`${baseUrl.replace(/\/+$/, '')}/models`, { headers });
+        const resp = await fetchImpl(`${baseUrl.replace(/\/+$/, '')}/models`, { headers, signal: AbortSignal.timeout(15_000) });
         if (!resp.ok)
             return { name, baseUrl, models: [], fetchedAt, error: `HTTP ${resp.status}` };
         const json = await resp.json();
