@@ -68,7 +68,9 @@ export async function saveKey(
   try {
     await chmod(tmp, 0o600);
   } catch {
-    /* non-POSIX (Windows) */
+    if (process.platform !== "win32") {
+      process.stderr.write(`[keystore] Warning: could not set 0600 on ${tmp} — key file may be world-readable\n`);
+    }
   }
   await rename(tmp, path);
   process.env[envVar] = value;

@@ -53,6 +53,9 @@ async function runShell(
   timeoutMs: number,
 ): Promise<{ exit: number; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
+    // shell: true is intentional — accept commands are developer-supplied shell
+    // expressions (pipes, quoting, subshells) that require a shell interpreter.
+    // This is not an injection surface: callers are the CLI user themselves.
     const child = spawn(cmd, { shell: true, cwd });
     let out = "";
     let err = "";
