@@ -2,6 +2,14 @@
 
 All notable changes are tracked here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); we use [Semantic Versioning](https://semver.org/).
 
+## [1.42.3] — 2026-04-25
+
+### Bug Fixes
+
+* **tui:** input border flicker on mobile — replaced full `borderStyle="single"` box with thin top-only separator, gated behind `isSmallTerminal()`; removed hard-coded `width={cols}` on InputBox (`src/tui/ink/components/InputBox.tsx`)
+* **tui:** gap between messages and input bar — `flexGrow={1}` on live transcript area anchors InputBox to bottom (`src/tui/ink/App.tsx`)
+* **docs:** agent guidance for long-running shell commands — `nohup` + poll pattern documented at `docs/agents/long-running-commands.md`
+
 ## [1.25.0] — 2026-05-11
 
 ### Features

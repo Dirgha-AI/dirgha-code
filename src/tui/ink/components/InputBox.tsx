@@ -19,9 +19,10 @@
  */
 
 import * as React from "react";
-import { Box, Text, useApp, useInput, useStdout } from "ink";
+import { Box, Text, useApp, useInput } from "ink";
 import TextInput from "ink-text-input";
 import { useTheme } from "../theme-context.js";
+import { isSmallTerminal } from "../is-small-terminal.js";
 import {
   applyVimKey,
   createVimState,
@@ -88,10 +89,8 @@ function leadingSlashToken(value: string): string | null {
 }
 
 export function InputBox(props: InputBoxProps): React.JSX.Element {
-  const { stdout } = useStdout();
   const { exit } = useApp();
   const palette = useTheme();
-  const cols = stdout?.columns ?? 80;
   const [ctrlCArmed, setCtrlCArmed] = React.useState(false);
   const armTimerRef = React.useRef<NodeJS.Timeout | null>(null);
 
@@ -467,8 +466,19 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
   const collapsed = pasteSegment !== null && !pasteExpanded;
 
   return (
-    <Box flexDirection="column" width={cols}>
-      <Box borderStyle="single" borderColor={borderColour} paddingX={1}>
+    <Box flexDirection="column">
+      {!isSmallTerminal() && (
+        <Box
+          borderStyle="single"
+          borderTop={true}
+          borderBottom={false}
+          borderLeft={false}
+          borderRight={false}
+          borderColor={borderColour}
+          height={0}
+        />
+      )}
+      <Box paddingX={1}>
         <Box gap={1} flexGrow={1}>
           <Text color={promptColour}>❯</Text>
           {collapsed && pasteSegment !== null ? (

@@ -1426,7 +1426,7 @@ export function App(props: AppProps): React.JSX.Element {
               </Box>
             )}
           </Static>
-          <Box flexDirection="column">{liveJsx}</Box>
+          <Box flexDirection="column" flexGrow={1}>{liveJsx}</Box>
           {busy && projection.liveItems.length === 0 && <GeneratingIndicator startedAtMs={turnStartRef.current} liveOutputTokens={liveOutputTokens} />}
           {pendingApproval !== null && approvalBusRef.current && (
             <ApprovalPrompt
