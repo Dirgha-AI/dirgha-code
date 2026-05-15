@@ -19,23 +19,18 @@ export function useFlickerDetector(lineCount = 0) {
     React.useEffect(() => {
         frameCountRef.current++;
     });
-    // Skip the first 5 frames — the TUI needs time to stabilize after
-    // mount (alternate buffer enter, Logo render, initial layout).
-    // Detecting overflow during startup produces false positives.
-    if (frameCountRef.current <= 5) {
-        return {
-            overflowDetected: overflowRef.current,
-            frameCount: frameCountRef.current,
-        };
-    }
-    if (lineCount > rows && !warnedRef.current) {
-        warnedRef.current = true;
+    // Detect overflow on every frame (including the first few), but only
+    // warn after frame 5 to avoid false-positive startup messages. The
+    // overflowRef is set from frame 1 so the caller's `_maxLiveItems` cap
+    // engages proactively instead of waiting for 5 frames of jitter before
+    // limiting live item count.
+    if (lineCount > rows) {
         overflowRef.current = true;
-        // Debug-only: tall outputs in a short terminal aren't an error,
-        // and the user can scroll their terminal back. Suppress unless
-        // explicitly opted in.
-        if (process.env.DIRGHA_DEBUG === "1" || process.env.DIRGHA_FLICKER_WARN === "1") {
-            console.error(`[Dirgha] Frame overflow detected — ${lineCount - rows} lines above terminal height.`);
+        if (frameCountRef.current > 5 && !warnedRef.current) {
+            warnedRef.current = true;
+            if (process.env.DIRGHA_DEBUG === "1" || process.env.DIRGHA_FLICKER_WARN === "1") {
+                console.error(`[Dirgha] Frame overflow detected — ${lineCount - rows} lines above terminal height.`);
+            }
         }
     }
     return {

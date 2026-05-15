@@ -73,6 +73,13 @@ export interface EventProjectionOptions {
    *  the static `minFlushMs()` value. App.tsx updates this based on
    *  observed render frame times so slow frames automatically back off. */
   adaptiveFlushRef?: React.RefObject<{ floorMs: number }>;
+  /** Streaming ref — set to true while text or thinking deltas are actively
+   *  being received (text_start → text_end, thinking_start → thinking_end).
+   *  App.tsx uses this in the adaptive EMA guard to prevent fast tool-update
+   *  frames from polluting the streaming frame-time EMA, which would cause
+   *  the flush floor to oscillate and produce visible jitter on tool→text
+   *  transitions. */
+  streamingRef?: React.RefObject<{ active: boolean }>;
 }
 
 /**
@@ -186,6 +193,21 @@ export function useEventProjection(
     let currentTextId: string | null = null;
     let currentThinkingId: string | null = null;
 
+    function upsertText(
+      prev: TranscriptItem[],
+      id: string,
+      content: string,
+    ): TranscriptItem[] {
+      if (!Array.isArray(prev)) return prev;
+      const idx = prev.findIndex((it) => it.kind === "text" && it.id === id);
+      if (idx !== -1) {
+        const next = [...prev];
+        next[idx] = { kind: "text", id, content } as TranscriptItem;
+        return next;
+      }
+      return [...prev, { kind: "text", id, content } as TranscriptItem];
+    }
+
     function flushPending(): void {
       const p = pendingTextRef.current;
       if (!p) return;
@@ -195,15 +217,7 @@ export function useEventProjection(
         clearTimeout(flushTimerRef.current);
         flushTimerRef.current = null;
       }
-      setLive((prev) =>
-        Array.isArray(prev)
-          ? prev.map((it) =>
-              it.kind === "text" && it.id === p.id
-                ? { ...it, content: p.content }
-                : it,
-            )
-          : prev,
-      );
+      setLive((prev) => upsertText(prev, p.id, p.content));
     }
 
     function flushPendingThinking(): void {
@@ -252,10 +266,11 @@ export function useEventProjection(
           ) {
             titleScanRef.current = "scanning";
           }
-          setLive((prev) => [
-            ...prev,
-            { kind: "text", id: currentTextId!, content: "" },
-          ]);
+          // NOTE: deliberately NOT adding an empty text item here.
+          // The first text_delta flush creates the item, which avoids a
+          // wasteful Ink re-render with empty content that contributes
+          // to terminal flicker on every streaming turn.
+          if (opts.streamingRef) opts.streamingRef.current.active = true;
           return;
         case "text_delta": {
           const id = currentTextId;
@@ -347,29 +362,13 @@ export function useEventProjection(
                       content: pending,
                     };
                     lastFlushedTextRef.current = pending;
-                    setLive((prev) =>
-                      Array.isArray(prev)
-                        ? prev.map((it) =>
-                            it.kind === "text" && it.id === flushTarget.id
-                              ? { ...it, content: pending }
-                              : it,
-                          )
-                        : prev,
-                    );
+                    setLive((prev) => upsertText(prev, flushTarget.id, pending));
                     return;
                   }
                 }
 
                 lastFlushedTextRef.current = flushTarget.content;
-                setLive((prev) =>
-                  Array.isArray(prev)
-                    ? prev.map((it) =>
-                        it.kind === "text" && it.id === flushTarget.id
-                          ? { ...it, content: flushTarget.content }
-                          : it,
-                      )
-                    : prev,
-                );
+                setLive((prev) => upsertText(prev, flushTarget.id, flushTarget.content));
               },
               flushDelay(pendingTextRef.current?.content.length ?? 0),
             );
@@ -379,6 +378,7 @@ export function useEventProjection(
         case "text_end":
           flushPending();
           currentTextId = null;
+          if (opts.streamingRef) opts.streamingRef.current.active = false;
           return;
         case "thinking_start":
           currentThinkingId = randomUUID();
@@ -386,6 +386,7 @@ export function useEventProjection(
             ...prev,
             { kind: "thinking", id: currentThinkingId!, content: "" },
           ]);
+          if (opts.streamingRef) opts.streamingRef.current.active = true;
           return;
         case "thinking_delta": {
           const id = currentThinkingId;
@@ -420,6 +421,7 @@ export function useEventProjection(
         case "thinking_end":
           flushPendingThinking();
           currentThinkingId = null;
+          if (opts.streamingRef) opts.streamingRef.current.active = false;
           return;
         case "toolcall_start": {
           flushPending();
@@ -612,6 +614,7 @@ export function useEventProjection(
 
     return () => {
       unsubscribe();
+      if (opts.streamingRef) opts.streamingRef.current.active = false;
       if (flushTimerRef.current !== null) {
         clearTimeout(flushTimerRef.current);
         flushTimerRef.current = null;
@@ -645,20 +648,42 @@ export function useEventProjection(
     const pt = pendingTextRef.current;
     if (pt) {
       pendingTextRef.current = null;
-      liveItemsRef.current = liveItemsRef.current.map((it) =>
-        it.kind === "text" && it.id === pt.id
-          ? { ...it, content: pt.content }
-          : it,
+      const idx = liveItemsRef.current.findIndex(
+        (it) => it.kind === "text" && it.id === pt.id,
       );
+      if (idx !== -1) {
+        liveItemsRef.current[idx] = {
+          kind: "text",
+          id: pt.id,
+          content: pt.content,
+        } satisfies TranscriptItem;
+      } else {
+        liveItemsRef.current.push({
+          kind: "text",
+          id: pt.id,
+          content: pt.content,
+        });
+      }
     }
     const pk = pendingThinkingRef.current;
     if (pk) {
       pendingThinkingRef.current = null;
-      liveItemsRef.current = liveItemsRef.current.map((it) =>
-        it.kind === "thinking" && it.id === pk.id
-          ? { ...it, content: pk.content }
-          : it,
+      const idx = liveItemsRef.current.findIndex(
+        (it) => it.kind === "thinking" && it.id === pk.id,
       );
+      if (idx !== -1) {
+        liveItemsRef.current[idx] = {
+          kind: "thinking",
+          id: pk.id,
+          content: pk.content,
+        } satisfies TranscriptItem;
+      } else {
+        liveItemsRef.current.push({
+          kind: "thinking",
+          id: pk.id,
+          content: pk.content,
+        });
+      }
     }
     // Read the ref synchronously — safe from async finally blocks.
     const committed = liveItemsRef.current;

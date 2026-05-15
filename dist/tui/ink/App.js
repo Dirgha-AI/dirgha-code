@@ -202,6 +202,12 @@ export function App(props) {
     // below that watches render frame times from useRenderMetrics().
     const adaptiveFlushRef = React.useRef({ floorMs: minFlushMs() });
     const frameEmaRef = React.useRef(minFlushMs());
+    // Streaming-active ref: set to true by the projection during
+    // text_start→text_end / thinking_start→thinking_end. Used in the EMA
+    // guard below so fast tool-update frames never pollute the streaming
+    // frame-time EMA, which would cause the flush floor to oscillate and
+    // produce visible jitter on tool→text transitions.
+    const streamingRef = React.useRef({ active: false });
     const projection = useEventProjection(props.events, {
         // Gemini CLI parity: when streamed text exceeds 5000 chars, split it
         // at a safe markdown boundary and push the older portion to committed
@@ -210,6 +216,7 @@ export function App(props) {
             setTranscript((prev) => [...prev, item]);
         }, []),
         adaptiveFlushRef,
+        streamingRef,
         // First-turn `[session-title] X` marker support. The projection
         // strips the marker line from the transcript; here we surface the
         // captured title as: (a) the OSC 0 terminal title, (b) a persisted
@@ -315,12 +322,13 @@ export function App(props) {
     // EMA (alpha=0.3) smooths out single-frame spikes to avoid thrashing.
     // When frames are slow (> minFlushMs * 1.5): raise floor toward lastFrameMs * 1.2.
     // When frames recovered (< minFlushMs * 0.8): decay floor back toward minFlushMs.
-    // Guarded on `busy || isStreaming` so keystroke renders (very fast, ~5ms) do NOT
-    // pollute the EMA and cause the flush floor to oscillate — without this guard
-    // every keystroke pulled the EMA down, then the next streaming flush pulled it
-    // back up, producing inconsistent flush timing → visible jitter/flicker.
+    // Guarded on `streamingRef.current.active` so only active text/thinking
+    // streaming frames update the EMA. Without this, fast tool-execution frames
+    // (~5ms via queueMicrotask batching) pollute the EMA during tool→text
+    // transitions, causing the flush floor to oscillate and produce visible
+    // jitter. Keystroke renders (when not busy) are also excluded.
     React.useEffect(() => {
-        if (!busy && projection.liveItems.length === 0)
+        if (!streamingRef.current.active)
             return;
         const lastMs = renderMetrics.lastFrameTimeMs();
         if (lastMs <= 0)

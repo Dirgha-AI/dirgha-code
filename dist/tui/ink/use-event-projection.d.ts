@@ -75,5 +75,14 @@ export interface EventProjectionOptions {
     adaptiveFlushRef?: React.RefObject<{
         floorMs: number;
     }>;
+    /** Streaming ref — set to true while text or thinking deltas are actively
+     *  being received (text_start → text_end, thinking_start → thinking_end).
+     *  App.tsx uses this in the adaptive EMA guard to prevent fast tool-update
+     *  frames from polluting the streaming frame-time EMA, which would cause
+     *  the flush floor to oscillate and produce visible jitter on tool→text
+     *  transitions. */
+    streamingRef?: React.RefObject<{
+        active: boolean;
+    }>;
 }
 export declare function useEventProjection(events: EventStream, opts?: EventProjectionOptions): EventProjection;
