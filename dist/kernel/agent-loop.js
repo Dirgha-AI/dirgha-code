@@ -408,6 +408,12 @@ export async function runAgentLoop(cfg) {
             // Full-history scan: remove any orphaned tool_result messages that
             // contextTransform may have introduced mid-history (not just tail).
             messagesForCall = _stripOrphanedToolResults(messagesForCall);
+            // Sanitise: run the 5-pass hardener to catch empty assistant messages,
+            // orphaned tool_use parts, and other structural issues that compaction
+            // can produce (e.g. assistant with content=[] and no tool_calls).
+            // This prevents "Invalid assistant message: content or tool_calls must
+            // be set" HTTP 400 errors from reaching the provider.
+            messagesForCall = _sanitizeHistory(messagesForCall);
             // Guard: _stripOrphanedToolResults can return [] when all messages were orphaned.
             // If so, attempt to recover minimal context. Then check if the context is still
             // missing a user message — if we have only system messages, the conversation
@@ -478,6 +484,7 @@ export async function runAgentLoop(cfg) {
                     history.push(...compacted);
                     messagesForCall = await cfg.contextTransform(history);
                     messagesForCall = _stripOrphanedToolResults(messagesForCall);
+                    messagesForCall = _sanitizeHistory(messagesForCall);
                     if (messagesForCall.length === 0) {
                         messagesForCall = _recoverMinimalContext(history);
                     }

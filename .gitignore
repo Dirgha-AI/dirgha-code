@@ -37,3 +37,7 @@ promo/script-run.log
 # Promo build artefacts
 promo/snapshots/
 promo/renders/
+
+# untracked audit/sprint docs
+docs/audits/
+docs/sprints/

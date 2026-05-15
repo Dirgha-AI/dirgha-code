@@ -1459,6 +1459,7 @@ export function App(props: AppProps): React.JSX.Element {
           <SubagentPanel events={props.events} />
           <GPUJobIndicator />
           <PromptQueueIndicator queued={promptQueue} />
+          <Divider />
           <InputBox
             value={input}
             onChange={setInput}
@@ -1673,6 +1674,7 @@ export function App(props: AppProps): React.JSX.Element {
               </Text>
             </Box>
           )}
+          <Divider />
           <StatusBar
             model={currentModel}
             provider={providerIdForModel(currentModel)}
@@ -1693,6 +1695,20 @@ export function App(props: AppProps): React.JSX.Element {
         </Box>
       </SpinnerContext.Provider>
     </ThemeProvider>
+  );
+}
+
+/** A horizontal rule spanning the terminal width. */
+function Divider(): React.JSX.Element {
+  return (
+    <Box
+      borderStyle="single"
+      borderTop={true}
+      borderBottom={false}
+      borderLeft={false}
+      borderRight={false}
+      height={0}
+    />
   );
 }
 
