@@ -525,15 +525,6 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
           </Text>
         )}
       </Box>
-      <Box
-        borderStyle="single"
-        borderTop={true}
-        borderBottom={false}
-        borderLeft={false}
-        borderRight={false}
-        borderColor={borderColour}
-        height={0}
-      />
     </Box>
   );
 }

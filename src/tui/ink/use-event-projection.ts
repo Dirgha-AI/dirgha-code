@@ -724,7 +724,7 @@ export function useEventProjection(
   );
 }
 
-function summariseInput(input: unknown, max = 60): string {
+function summariseInput(input: unknown, max = 100): string {
   if (input === undefined || input === null) return "";
   const s = typeof input === "string" ? input : safeStringify(input);
   const collapsed = s.replace(/\s+/g, " ").trim();

@@ -62,14 +62,17 @@ export const ToolGroup = React.memo(function ToolGroup(
   // Border colour follows the most-severe state: error > running > done.
   const groupColour = pickGroupColour(props.tools, palette);
   const isDimmed = props.tools.every((t) => t.status === "done");
+  // All-dense tool groups (e.g. fs_read + search_grep) render borderless
+  // so file content flows at full terminal width without a constraining box.
+  const allDense = props.tools.every((t) => isDenseTool(t.name));
 
   return (
     <Box flexDirection="column" marginBottom={1}>
       <Box
-        borderStyle="round"
-        borderColor={groupColour}
-        borderDimColor={isDimmed}
-        paddingX={1}
+        borderStyle={allDense ? undefined : "round"}
+        borderColor={allDense ? undefined : groupColour}
+        borderDimColor={allDense ? undefined : isDimmed}
+        paddingX={allDense ? 0 : 1}
         flexDirection="column"
       >
         {props.tools.map((tool, idx) => {

@@ -323,9 +323,24 @@ export function openDb(): import("better-sqlite3").Database {
 export function dbOpenSession(id: string, model?: string, cwd?: string): void {
   try {
     const db = getDb();
+    // Only specify id + started_at in the INSERT so column defaults
+    // (model TEXT NOT NULL DEFAULT '', etc.) are used instead of NULL.
+    // Older DB schemas may have NOT NULL on columns like `model` where
+    // our current initSchema has nullable; passing NULL would cause
+    // INSERT OR IGNORE to silently skip the row, breaking FK for messages.
     db.prepare(
-      "INSERT OR IGNORE INTO sessions(id, model, cwd, started_at) VALUES (?, ?, ?, ?)",
-    ).run(id, model ?? null, cwd ?? null, Date.now());
+      "INSERT OR IGNORE INTO sessions(id, started_at) VALUES (?, ?)",
+    ).run(id, Date.now());
+    // If model or cwd were provided, update them after the row exists.
+    if (model || cwd) {
+      const sets: string[] = [];
+      const vals: (string)[] = [];
+      if (model) { sets.push("model = ?"); vals.push(model); }
+      if (cwd) { sets.push("cwd = ?"); vals.push(cwd); }
+      if (sets.length > 0) {
+        db.prepare(`UPDATE sessions SET ${sets.join(", ")} WHERE id = ?`).run(...vals, id);
+      }
+    }
   } catch {
     /* never block the CLI */
   }
@@ -348,6 +363,12 @@ export function dbCloseSession(id: string): void {
 export function dbAppendMessage(sessionId: string, message: Message): void {
   try {
     const db = getDb();
+    // Ensure the session row exists before inserting a message.
+    // dbOpenSession may not have completed yet due to async timing.
+    // Only set id + started_at — other columns have defaults.
+    db.prepare(
+      "INSERT OR IGNORE INTO sessions(id, started_at) VALUES (?, ?)",
+    ).run(sessionId, Date.now());
     const content =
       typeof message.content === "string"
         ? message.content

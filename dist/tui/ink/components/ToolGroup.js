@@ -41,7 +41,10 @@ export const ToolGroup = React.memo(function ToolGroup(props) {
     // Border colour follows the most-severe state: error > running > done.
     const groupColour = pickGroupColour(props.tools, palette);
     const isDimmed = props.tools.every((t) => t.status === "done");
-    return (_jsx(Box, { flexDirection: "column", marginBottom: 1, children: _jsx(Box, { borderStyle: "round", borderColor: groupColour, borderDimColor: isDimmed, paddingX: 1, flexDirection: "column", children: props.tools.map((tool, idx) => {
+    // All-dense tool groups (e.g. fs_read + search_grep) render borderless
+    // so file content flows at full terminal width without a constraining box.
+    const allDense = props.tools.every((t) => isDenseTool(t.name));
+    return (_jsx(Box, { flexDirection: "column", marginBottom: 1, children: _jsx(Box, { borderStyle: allDense ? undefined : "round", borderColor: allDense ? undefined : groupColour, borderDimColor: allDense ? undefined : isDimmed, paddingX: allDense ? 0 : 1, flexDirection: "column", children: props.tools.map((tool, idx) => {
                 const isLast = idx === props.tools.length - 1;
                 if (isDenseTool(tool.name)) {
                     return (_jsx(Box, { marginBottom: isLast ? 0 : 0, children: _jsx(DenseToolMessage, { name: tool.name, status: tool.status, argSummary: tool.argSummary, outputPreview: tool.outputPreview, durationMs: tool.durationMs, startedAt: tool.startedAt }) }, tool.id));

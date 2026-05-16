@@ -568,7 +568,7 @@ export function useEventProjection(events, opts = {}) {
     }, []);
     return React.useMemo(() => ({ liveItems, totals, commitLive, appendLive, appendLiveSync, clear }), [liveItems, totals, commitLive, appendLive, appendLiveSync, clear]);
 }
-function summariseInput(input, max = 60) {
+function summariseInput(input, max = 100) {
     if (input === undefined || input === null)
         return "";
     const s = typeof input === "string" ? input : safeStringify(input);

@@ -81,7 +81,7 @@ export const DenseToolMessage = React.memo(function DenseToolMessage(
           ? formatElapsed(Date.now() - props.startedAt)
           : "";
   const summary = props.outputPreview
-    ? props.outputPreview.replace(/\s+/g, " ").slice(0, 60)
+    ? props.outputPreview.replace(/\s+/g, " ").slice(0, 100)
     : "";
 
   const summaryNode = React.useMemo((): React.ReactNode => {

@@ -28,7 +28,8 @@ export const StreamingText = React.memo(function StreamingText({
   const { stdout } = useStdout();
   const palette = useTheme();
   const cols = stdout?.columns ?? 80;
-  const contentWidth = Math.max(20, cols - PREFIX_WIDTH - 2);
+  // Full terminal width minus the 2-char ✦ prefix gutter.
+  const contentWidth = Math.max(20, cols - PREFIX_WIDTH);
   if (content.length === 0) return null;
   return (
     <Box flexDirection="row" marginBottom={1}>

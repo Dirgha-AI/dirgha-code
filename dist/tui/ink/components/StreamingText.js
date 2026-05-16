@@ -20,7 +20,8 @@ export const StreamingText = React.memo(function StreamingText({ content, }) {
     const { stdout } = useStdout();
     const palette = useTheme();
     const cols = stdout?.columns ?? 80;
-    const contentWidth = Math.max(20, cols - PREFIX_WIDTH - 2);
+    // Full terminal width minus the 2-char ✦ prefix gutter.
+    const contentWidth = Math.max(20, cols - PREFIX_WIDTH);
     if (content.length === 0)
         return null;
     return (_jsxs(Box, { flexDirection: "row", marginBottom: 1, children: [_jsx(Box, { width: PREFIX_WIDTH, children: _jsx(Text, { color: palette.text.accent, children: PREFIX }) }), _jsx(Box, { flexGrow: 1, flexDirection: "column", children: _jsx(MarkdownDisplay, { text: content, palette: palette, width: contentWidth }) })] }));

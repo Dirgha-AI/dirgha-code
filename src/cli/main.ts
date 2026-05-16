@@ -582,7 +582,8 @@ async function main(): Promise<void> {
     return;
   }
 
-  const sessionId = randomUUID();
+  const resumeId = typeof flags["resume"] === "string" ? flags["resume"] : null;
+  const sessionId = resumeId ?? randomUUID();
   const events = createEventStream();
   if (json) {
     events.subscribe((ev) => {
@@ -720,6 +721,29 @@ async function main(): Promise<void> {
   });
 
   const messages: Message[] = [];
+  // Load existing messages when resuming a session
+  if (resumeId) {
+    try {
+      const sessionFile = join(homedir(), ".dirgha", "sessions", `${sessionId}.jsonl`);
+      if (existsSync(sessionFile)) {
+        const lines = readFileSync(sessionFile, "utf8").trim().split("\n");
+        const loadedMsgs: Message[] = [];
+        for (const line of lines) {
+          if (!line) continue;
+          try {
+            const entry = JSON.parse(line);
+            if (entry.message) loadedMsgs.push(entry.message);
+          } catch { /* skip corrupt lines */ }
+        }
+        // Skip the original system+user to avoid duplication (replayed below)
+        const skip = 2;
+        messages.push(...loadedMsgs.slice(skip));
+        process.stderr.write(`[resume] Loaded ${messages.length} prior messages from session ${sessionId}\n`);
+      }
+    } catch (err) {
+      process.stderr.write(`[resume] Could not load session: ${String(err)}\n`);
+    }
+  }
   messages.push({ role: "system", content: composedSystem });
   messages.push({ role: "user", content: prompt });
 
@@ -834,6 +858,7 @@ async function main(): Promise<void> {
     errorClassifier,
     autoApprove,
     costCalculator: computeCost,
+    session,
     ...(composedHooks !== undefined ? { hooks: composedHooks } : {}),
   });
   // v1.15.0: no mid-session runtime failover — model switches during a
@@ -865,6 +890,12 @@ async function main(): Promise<void> {
   }
   if (!json) stdout.write("\n");
   if (result.stopReason === "error") exit(2);
+  if (result.stopReason === "max_turns") {
+    process.stderr.write(
+      `\n[max-turns] Limit reached after ${result.turnCount} turns · resume: dirgha --resume ${sessionId} "<prompt>"\n`,
+    );
+    exit(75);
+  }
 }
 
 async function isFirstRun(): Promise<boolean> {

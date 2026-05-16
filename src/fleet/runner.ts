@@ -45,6 +45,7 @@ import {
   type WorktreeHandle,
 } from "./types.js";
 import { getTemplate, listTemplateNames } from "./templates.js";
+import { createSessionStore } from "../context/session.js";
 
 const DECOMPOSE_SYSTEM = `You are a task decomposer. Given a user goal, split it into 2-5 INDEPENDENT subtasks that can run in PARALLEL without conflicting with each other (no shared-file edits).
 
@@ -238,6 +239,11 @@ async function runOneAgent(agent: FleetAgent, opts: RunOptions): Promise<void> {
   const sessionId = `fleet-${agent.id}-${Date.now().toString(36)}`;
   agent.sessionId = sessionId;
 
+  // Create a persistent session for crash-safe audit + resume.
+  const sessions = createSessionStore();
+  const fleetSession = await sessions.create(sessionId);
+  void fleetSession.append({ type: "message", ts: new Date().toISOString(), message: { role: "user", content: agent.subtask.task } });
+
   emitFleetEvent(opts.events, {
     type: "fleet_agent_start",
     agentId: agent.id,
@@ -303,6 +309,7 @@ async function runOneAgent(agent: FleetAgent, opts: RunOptions): Promise<void> {
       events: localEvents,
       signal: controller.signal,
       hooks: ledgerHookRaw,
+      session: fleetSession,
     });
     agent.transcript = result.messages;
     agent.stopReason = result.stopReason;

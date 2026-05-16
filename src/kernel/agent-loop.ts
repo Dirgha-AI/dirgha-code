@@ -867,9 +867,9 @@ export async function runAgentLoop(cfg: AgentLoopConfig): Promise<AgentResult> {
         : [];
       if (parts.length > 0 || toolUses.length > 0) {
         history.push(assembled.message);
+        _localLoopGuard.observeMessage(assembled.message);
         if (cfg.session) {
           void cfg.session.append({ type: "message", ts: new Date().toISOString(), message: assembled.message });
-          _localLoopGuard.observeMessage(assembled.message);
         }
       }
       try {
