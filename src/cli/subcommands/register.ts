@@ -202,6 +202,7 @@ interface RegisterFlags {
   manifestPath: string;
   gateway: string;
   dryRun: boolean;
+  update: boolean;
   token: string | null;
   help: boolean;
 }
@@ -211,6 +212,7 @@ function parseFlags(argv: string[], cwd: string): RegisterFlags {
     manifestPath: join(cwd, 'dirgha-agent.yaml'),
     gateway: process.env['DIRGHA_GATEWAY_URL'] ?? 'https://api.dirgha.ai',
     dryRun: false,
+    update: false,
     token: null,
     help: false,
   };
@@ -219,6 +221,8 @@ function parseFlags(argv: string[], cwd: string): RegisterFlags {
     const arg = argv[i];
     if (arg === '--help' || arg === '-h') {
       flags.help = true;
+    } else if (arg === '--update') {
+      flags.update = true;
     } else if (arg === '--dry-run') {
       flags.dryRun = true;
     } else if (arg === '--manifest' && argv[i + 1]) {
@@ -243,6 +247,7 @@ const HELP = [
   '  dirgha register --manifest <path>      Read manifest from custom path',
   '  dirgha register --gateway <url>        Override gateway URL (default: https://api.dirgha.ai)',
   '  dirgha register --dry-run              Validate manifest and print without POSTing',
+  '  dirgha register --update              Update an existing agent registration',
   '  dirgha register --token <jwt>          Use provided auth token instead of stored credentials',
   '',
   'The manifest file (dirgha-agent.yaml) must contain:',
@@ -316,12 +321,14 @@ export const registerSubcommand: Subcommand = {
       token = stored.token;
     }
 
-    // 6. POST to registry
-    const url = `${flags.gateway}/api/registry/agents`;
+    // 6. POST/PUT to registry
+    const url = flags.update
+      ? `${flags.gateway}/api/registry/agents/${manifest.metadata.name}`
+      : `${flags.gateway}/api/registry/agents`;
     let res: Response;
     try {
       res = await fetch(url, {
-        method: 'POST',
+        method: flags.update ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
@@ -337,6 +344,14 @@ export const registerSubcommand: Subcommand = {
     if (res.status === 401) {
       stderr.write(
         `${style(defaultTheme.danger, '✗')} Auth required. Run ${style(defaultTheme.accent, 'dirgha auth login')} first.\n`
+      );
+      return 1;
+    }
+
+    if (res.status === 404 && flags.update) {
+      stderr.write(
+        `${style(defaultTheme.danger, '✗')} Agent '${manifest.metadata.name}' not found. ` +
+        `Omit --update to register a new agent.\n`
       );
       return 1;
     }

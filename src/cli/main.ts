@@ -31,6 +31,7 @@ import { renderStreamingEvents } from "../tui/renderer.js";
 import { createSessionStore } from "../context/session.js";
 import { registerSession, closeSession } from "../state/index.js";
 import { runSubmitPaper } from "./submit-paper.js";
+import { runAuth } from "./auth-cmd.js";
 import {
   runLogin,
   runLogout,
@@ -206,6 +207,13 @@ async function main(): Promise<void> {
     const tail =
       verbIdx >= 0 ? rawArgs.slice(verbIdx + 1) : positionals.slice(1);
     exit(await runSetup(tail));
+  }
+  if (positionals[0] === "auth") {
+    const verbIdx = rawArgs.indexOf("auth");
+    const tail =
+      verbIdx >= 0 ? rawArgs.slice(verbIdx + 1) : positionals.slice(1);
+    const op = (tail[0] as "login" | "logout" | "whoami") ?? "login";
+    exit(await runAuth({ op, gatewayUrl: process.env.DIRGHA_GATEWAY_URL }));
   }
   if (positionals[0] === "fleet") {
     // `dirgha fleet <launch|list|merge|discard|triple|cleanup>` —
