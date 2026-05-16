@@ -12,6 +12,7 @@
 
 import { stdout, stderr } from 'node:process';
 import { readFile, writeFile, unlink, stat, mkdir } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
 import { homedir, cpus, totalmem, freemem, platform, arch } from 'node:os';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
@@ -149,7 +150,17 @@ async function sendHeartbeat(token: string): Promise<HeartbeatResponse | { statu
 // Subcommand: start
 // ---------------------------------------------------------------------------
 
-async function runStart(): Promise<number> {
+async function runStart(detach = false): Promise<number> {
+  if (detach) {
+    // Spawn a detached copy of this process without the --detach flag.
+    const args = process.argv.slice(1).filter(a => a !== '--detach');
+    const child = spawn(process.execPath, args, { detached: true, stdio: 'ignore' });
+    child.unref();
+    print(`${style(defaultTheme.accent, '◆')} Node daemon started in background (PID ${child.pid}).`);
+    print(`  Run ${style(defaultTheme.accent, 'dirgha node status')} to check health.`);
+    return 0;
+  }
+
   const tok = await loadToken();
   if (!tok) {
     err(`Login required: run ${style(defaultTheme.accent, 'dirgha auth login')}`);
@@ -294,6 +305,7 @@ async function runInvite(): Promise<number> {
 const HELP = [
   'Usage:',
   '  dirgha node start     Start the node daemon (Ctrl+C to stop)',
+  '  dirgha node start --detach   Start daemon in background (detached)',
   '  dirgha node stop      Signal a running daemon to stop',
   '  dirgha node status    Show PID and uptime of the running daemon',
   '  dirgha node invite    Generate a referral link (20% bonus for 90 days)',
@@ -316,7 +328,7 @@ export const nodeSubcommand: Subcommand = {
       stdout.write(HELP + '\n');
       return 0;
     }
-    if (op === 'start')  return runStart();
+    if (op === 'start')  return runStart(argv.includes('--detach'));
     if (op === 'stop')   return runStop();
     if (op === 'status') return runStatus();
     if (op === 'invite') return runInvite();
