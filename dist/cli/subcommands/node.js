@@ -160,7 +160,6 @@ async function runStart(detach = false) {
     process.on('SIGINT', cleanup);
     process.on('SIGTERM', cleanup);
     // Run heartbeat loop indefinitely (Ctrl+C exits via SIGINT handler)
-    // eslint-disable-next-line no-constant-condition
     while (true) {
         await new Promise(r => setTimeout(r, HEARTBEAT_INTERVAL_MS));
         const result = await sendHeartbeat(tok.token);

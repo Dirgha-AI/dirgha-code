@@ -22,7 +22,7 @@ import * as React from "react";
 import { Box, Text, useApp, useInput } from "ink";
 import TextInput from "ink-text-input";
 import { useTheme } from "../theme-context.js";
-import { isSmallTerminal } from "../is-small-terminal.js";
+import { isSmallTerminal as _isSmallTerminal } from "../is-small-terminal.js";
 import {
   applyVimKey,
   createVimState,

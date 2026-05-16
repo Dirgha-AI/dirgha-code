@@ -193,7 +193,6 @@ async function runStart(detach = false): Promise<number> {
   process.on('SIGTERM', cleanup);
 
   // Run heartbeat loop indefinitely (Ctrl+C exits via SIGINT handler)
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     await new Promise<void>(r => setTimeout(r, HEARTBEAT_INTERVAL_MS));
 
