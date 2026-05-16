@@ -12,6 +12,7 @@ import { runAgentLoop } from "../kernel/agent-loop.js";
 import { extractText } from "../kernel/message.js";
 import { createToolExecutor } from "../tools/exec.js";
 import { LoopDetector } from "../subagents/loop-detector.js";
+import { createSessionStore } from "../context/session.js";
 /**
  * Safe default tool allowlist for sub-agents. Covers read/write/search and
  * common dev operations while excluding high-privilege tools (e.g. network
@@ -64,6 +65,12 @@ export class SubagentDelegator {
         if (req.system)
             messages.push({ role: "system", content: req.system });
         messages.push({ role: "user", content: req.prompt });
+        // Create a persistent session for the sub-agent so its transcript is
+        // crash-safe and available via /resume and dirgha export-session.
+        const sessions = createSessionStore();
+        const subSession = await sessions.create(sessionId);
+        // Append the initial user prompt so the session has a recoverable prefix.
+        void subSession.append({ type: "message", ts: new Date().toISOString(), message: messages[messages.length - 1] });
         const loopDetector = new LoopDetector();
         const result = await runAgentLoop({
             sessionId,
@@ -74,8 +81,14 @@ export class SubagentDelegator {
             provider: this.opts.provider,
             toolExecutor: executor,
             events,
+            session: subSession,
             loopDetector,
         });
+        // Persist any messages the agent loop didn't already append via session.
+        for (const msg of result.messages) {
+            void subSession.append({ type: "message", ts: new Date().toISOString(), message: msg });
+        }
+        subSession.close();
         const lastAssistant = [...result.messages]
             .reverse()
             .find((m) => m.role === "assistant");

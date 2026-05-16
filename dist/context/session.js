@@ -22,7 +22,7 @@ export class SessionStore {
             .catch(() => false);
         if (!exists)
             await writeFile(path, "", "utf8");
-        void Promise.resolve().then(() => dbOpenSession(id));
+        dbOpenSession(id);
         return new SessionImpl(id, path);
     }
     async open(id) {
