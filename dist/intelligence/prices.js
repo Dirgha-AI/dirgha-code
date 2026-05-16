@@ -1033,12 +1033,14 @@ const MODEL_FAILOVERS = {
     "moonshotai/kimi-k2-instruct-0905": "moonshotai/kimi-k2.6",
     "minimaxai/minimax-m2": "minimaxai/minimax-m2.7",
     "deepseek-ai/deepseek-v3.1-terminus": "deepseek-ai/deepseek-v4-pro",
-    "deepseek-ai/deepseek-v3.2": "deepseek-ai/deepseek-v4-flash",
+    "deepseek-ai/deepseek-v3.2": "deepseek-ai/deepseek-v4-pro",
+    // flash hangs on NIM — always demote to pro
+    "deepseek-ai/deepseek-v4-flash": "deepseek-ai/deepseek-v4-pro",
+    "deepseek-v4-flash": "deepseek-ai/deepseek-v4-pro",
     // NIM → OpenRouter mirror (transient failure fallback)
     "qwen/qwen3-next-80b-a3b-instruct": "qwen/qwen3-235b-a22b-thinking-2507",
     "meta/llama-3.3-70b-instruct": "qwen/qwen3-coder:free",
     "deepseek-ai/deepseek-v4-pro": "deepseek/deepseek-v3.2-exp",
-    "deepseek-ai/deepseek-v4-flash": "deepseek/deepseek-chat-v3.1",
     // Anthropic-native → OpenRouter mirror (no key needed if OR set)
     "claude-opus-4-7": "anthropic/claude-opus-4-7",
     "claude-sonnet-4-6": "anthropic/claude-sonnet-4-6",
@@ -1073,6 +1075,9 @@ const DEPRECATED_MODELS = new Set([
     "minimaxai/minimax-m2",
     "deepseek-ai/deepseek-v3.1-terminus",
     "deepseek-ai/deepseek-v3.2",
+    // Hangs on NIM — auto-demote to pro variant
+    "deepseek-ai/deepseek-v4-flash",
+    "deepseek-v4-flash",
 ]);
 export function migrateDeprecatedModel(modelId) {
     if (DEPRECATED_MODELS.has(modelId)) {
