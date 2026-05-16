@@ -324,7 +324,7 @@ export const nodeSubcommand: Subcommand = {
   async run(argv): Promise<number> {
     const op = argv[0] ?? 'help';
 
-    if (op === 'help' || op === '-h' || op === '--help') {
+    if (op === 'help' || op === '-h' || op === '--help' || argv.includes('--help') || argv.includes('-h')) {
       stdout.write(HELP + '\n');
       return 0;
     }

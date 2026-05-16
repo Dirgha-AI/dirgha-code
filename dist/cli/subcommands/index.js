@@ -32,6 +32,8 @@ import { historySubcommand } from './history.js';
 import { voiceSubcommand } from './voice.js';
 import { gpuSubcommand } from './gpu.js';
 import { pingSubcommand } from './ping.js';
+import { registerSubcommand } from './register.js';
+import { nodeSubcommand } from './node.js';
 export const subcommands = [
     doctorSubcommand,
     loginSubcommand,
@@ -67,12 +69,14 @@ export const subcommands = [
     pingSubcommand,
     voiceSubcommand,
     gpuSubcommand,
+    registerSubcommand,
+    nodeSubcommand,
 ];
 export function findSubcommand(verb) {
     return subcommands.find(cmd => cmd.name === verb || (cmd.aliases ?? []).includes(verb));
 }
 // Verbs dispatched directly in main.ts before findSubcommand is called.
-const TOP_LEVEL_VERBS = ['login', 'logout', 'setup', 'fleet', 'submit-paper'];
+const TOP_LEVEL_VERBS = ['login', 'logout', 'setup', 'auth', 'fleet', 'submit-paper'];
 function levenshtein(a, b) {
     const m = a.length, n = b.length;
     const dp = Array.from({ length: m + 1 }, (_i, i) => Array.from({ length: n + 1 }, (_j, j) => (i === 0 ? j : j === 0 ? i : 0)));

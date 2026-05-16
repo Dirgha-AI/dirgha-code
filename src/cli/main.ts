@@ -212,6 +212,20 @@ async function main(): Promise<void> {
     const verbIdx = rawArgs.indexOf("auth");
     const tail =
       verbIdx >= 0 ? rawArgs.slice(verbIdx + 1) : positionals.slice(1);
+    if (tail.includes("--help") || tail.includes("-h") || tail[0] === "help") {
+      stdout.write([
+        "Usage:",
+        "  dirgha auth login     Sign in via device code (opens browser)",
+        "  dirgha auth logout    Remove stored credentials",
+        "  dirgha auth whoami    Show current user and token details",
+        "",
+        "Options:",
+        "  --help, -h   Show this help",
+        "",
+        "Set DIRGHA_GATEWAY_URL to point at a self-hosted gateway.",
+      ].join("\n") + "\n");
+      exit(0);
+    }
     const op = (tail[0] as "login" | "logout" | "whoami") ?? "login";
     exit(await runAuth({ op, gatewayUrl: process.env.DIRGHA_GATEWAY_URL }));
   }

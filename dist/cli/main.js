@@ -25,6 +25,7 @@ import { renderStreamingEvents } from "../tui/renderer.js";
 import { createSessionStore } from "../context/session.js";
 import { registerSession, closeSession } from "../state/index.js";
 import { runSubmitPaper } from "./submit-paper.js";
+import { runAuth } from "./auth-cmd.js";
 import { runLogin, runLogout, runSetup, findSubcommand, suggestCommand, } from "./subcommands/index.js";
 import { appendAudit } from "../audit/writer.js";
 import { buildAgentHooksFromConfig } from "../hooks/config-bridge.js";
@@ -165,6 +166,26 @@ async function main() {
         const verbIdx = rawArgs.indexOf("setup");
         const tail = verbIdx >= 0 ? rawArgs.slice(verbIdx + 1) : positionals.slice(1);
         exit(await runSetup(tail));
+    }
+    if (positionals[0] === "auth") {
+        const verbIdx = rawArgs.indexOf("auth");
+        const tail = verbIdx >= 0 ? rawArgs.slice(verbIdx + 1) : positionals.slice(1);
+        if (tail.includes("--help") || tail.includes("-h") || tail[0] === "help") {
+            stdout.write([
+                "Usage:",
+                "  dirgha auth login     Sign in via device code (opens browser)",
+                "  dirgha auth logout    Remove stored credentials",
+                "  dirgha auth whoami    Show current user and token details",
+                "",
+                "Options:",
+                "  --help, -h   Show this help",
+                "",
+                "Set DIRGHA_GATEWAY_URL to point at a self-hosted gateway.",
+            ].join("\n") + "\n");
+            exit(0);
+        }
+        const op = tail[0] ?? "login";
+        exit(await runAuth({ op, gatewayUrl: process.env.DIRGHA_GATEWAY_URL }));
     }
     if (positionals[0] === "fleet") {
         // `dirgha fleet <launch|list|merge|discard|triple|cleanup>` —

@@ -467,17 +467,15 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
 
   return (
     <Box flexDirection="column">
-      {!isSmallTerminal() && (
-        <Box
-          borderStyle="single"
-          borderTop={true}
-          borderBottom={false}
-          borderLeft={false}
-          borderRight={false}
-          borderColor={borderColour}
-          height={0}
-        />
-      )}
+      <Box
+        borderStyle="single"
+        borderTop={true}
+        borderBottom={false}
+        borderLeft={false}
+        borderRight={false}
+        borderColor={borderColour}
+        height={0}
+      />
       <Box paddingX={1}>
         <Box gap={1} flexGrow={1}>
           <Text color={promptColour}>❯</Text>
@@ -527,6 +525,15 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
           </Text>
         )}
       </Box>
+      <Box
+        borderStyle="single"
+        borderTop={true}
+        borderBottom={false}
+        borderLeft={false}
+        borderRight={false}
+        borderColor={borderColour}
+        height={0}
+      />
     </Box>
   );
 }
