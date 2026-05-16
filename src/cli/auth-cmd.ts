@@ -69,7 +69,9 @@ function tryLaunchBrowser(url: string): void {
     : 'xdg-open';
   import('node:child_process').then(({ spawn }) => {
     try {
-      spawn(opener, [url], { stdio: 'ignore', detached: true }).unref();
+      const cp = spawn(opener, [url], { stdio: 'ignore', detached: true });
+      cp.on('error', () => {}); // silence ENOENT when xdg-open is unavailable (headless)
+      cp.unref();
     } catch { /* ignore; user will copy the URL manually */ }
   }).catch(() => { /* module unavailable; noop */ });
 }
