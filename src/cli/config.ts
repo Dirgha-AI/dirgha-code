@@ -177,7 +177,6 @@ export const DEFAULT_CONFIG: DirghaConfig = {
 
 // ── Trust store for project-level config ──────────────────────────────
 
-const DANGEROUS_KEYS = new Set<string>(["mcpServers", "hooks", "extensions"]);
 const TRUST_STORE_PATH = join(homedir(), ".dirgha", "trusted-projects.json");
 
 function readTrustStore(): Set<string> {

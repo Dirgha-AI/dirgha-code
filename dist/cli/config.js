@@ -27,7 +27,6 @@ export const DEFAULT_CONFIG = {
     sandbox: "off",
 };
 // ── Trust store for project-level config ──────────────────────────────
-const DANGEROUS_KEYS = new Set(["mcpServers", "hooks", "extensions"]);
 const TRUST_STORE_PATH = join(homedir(), ".dirgha", "trusted-projects.json");
 function readTrustStore() {
     try {
