@@ -26,6 +26,7 @@ import { join } from "node:path";
 import { stdout, stdin } from "node:process";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
+import { assertSafeFetchUrlAsync } from "../utils/url-guard.js";
 const KEY_REGEX = /KEY|TOKEN|SECRET|PASSWORD|AUTH/i;
 function osBucket(plat) {
     if (plat === "linux")
@@ -225,10 +226,12 @@ function appendSendRecord(bundle, endpoint, ok) {
 }
 async function send(bundle, endpoint) {
     try {
+        await assertSafeFetchUrlAsync(endpoint);
         const r = await fetch(endpoint, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(bundle),
+            redirect: "manual",
             signal: AbortSignal.timeout(10_000),
         });
         return r.ok;

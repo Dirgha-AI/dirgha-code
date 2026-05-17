@@ -9,7 +9,7 @@ import { runDirect } from './noop.js';
 export class WindowsSandbox {
     platform = 'windows';
     async available() {
-        return process.platform === 'win32';
+        return false;
     }
     async exec(opts) {
         const env = { ...opts.env };

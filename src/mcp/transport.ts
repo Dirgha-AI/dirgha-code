@@ -193,7 +193,22 @@ export class HttpTransport implements Transport {
     const timer = setTimeout(() => ac.abort(), this.opts.timeoutMs ?? 60_000);
     let resp: Response;
     try {
-      await assertSafeFetchUrlAsync(this.opts.url);
+      // Allow loopback for MCP — local MCP servers are the common case.
+      // Non-loopback private ranges (RFC1918, link-local, metadata) are
+      // still blocked by the SSRF guard to prevent config-supplied pivots.
+      const parsedUrl = new URL(this.opts.url);
+      const host = parsedUrl.hostname;
+      const isLoopback =
+        host === "localhost" ||
+        host === "127.0.0.1" ||
+        host === "::1" ||
+        host === "[::1]" ||
+        host === "0.0.0.0" ||
+        host === "127.1" ||
+        host.startsWith("127.");
+      if (!isLoopback) {
+        await assertSafeFetchUrlAsync(this.opts.url);
+      }
       resp = await fetch(this.opts.url, {
         method: "POST",
         headers,

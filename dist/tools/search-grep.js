@@ -7,6 +7,7 @@ import { spawn } from "node:child_process";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { isValidCwdPath } from "../utils/fs.js";
+import { safeEnvironment } from "../utils/env.js";
 const DEFAULT_LIMIT = 200;
 export const searchGrepTool = {
     name: "search_grep",
@@ -53,6 +54,7 @@ async function runRipgrep(input, root, limit) {
     args.push("--", input.pattern, root);
     const child = spawn("rg", args, {
         cwd: root,
+        env: safeEnvironment(),
         stdio: ["ignore", "pipe", "pipe"],
     });
     const out = [];
