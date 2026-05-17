@@ -18,6 +18,7 @@ import { execFile, execFileSync } from 'node:child_process';
 import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { safeEnvironment } from '../utils/env.js';
 import type { WorktreeHandle } from './types.js';
 
 const pexec = promisify(execFile);
@@ -34,7 +35,7 @@ export function slug(input: string, maxLen = 40): string {
 /** Find the git repo root (via `git rev-parse --show-toplevel`). Throws if not in a repo. */
 export async function getRepoRoot(cwd: string = process.cwd()): Promise<string> {
   try {
-    const { stdout } = await pexec('git', ['rev-parse', '--show-toplevel'], { cwd });
+    const { stdout } = await pexec('git', ['rev-parse', '--show-toplevel'], { cwd, env: safeEnvironment() });
     return stdout.trim();
   } catch {
     throw new Error('fleet: not inside a git repository — fleet requires a git-tracked project.');
@@ -43,7 +44,7 @@ export async function getRepoRoot(cwd: string = process.cwd()): Promise<string> 
 
 /** Get current HEAD commit SHA for a given working directory. */
 export async function getHeadSha(cwd: string): Promise<string> {
-  const { stdout } = await pexec('git', ['rev-parse', 'HEAD'], { cwd });
+  const { stdout } = await pexec('git', ['rev-parse', 'HEAD'], { cwd, env: safeEnvironment() });
   return stdout.trim();
 }
 
@@ -93,14 +94,14 @@ export async function createWorktree(
   // Ensure stale branch refs from killed prior runs don't block re-launch.
   if (!opts.reuseBranch && await branchExists(repoRoot, branch)) {
     await pruneStaleWorktreeForBranch(repoRoot, branch);
-    try { await pexec('git', ['branch', '-D', branch], { cwd: repoRoot }); } catch { /* already gone */ }
+    try { await pexec('git', ['branch', '-D', branch], { cwd: repoRoot, env: safeEnvironment() }); } catch { /* already gone */ }
   }
 
   const args = opts.reuseBranch
     ? ['worktree', 'add', path, branch]
     : ['worktree', 'add', '-b', branch, path, base];
 
-  await pexec('git', args, { cwd: repoRoot });
+  await pexec('git', args, { cwd: repoRoot, env: safeEnvironment() });
   const baseCommit = await getHeadSha(path);
   const handle: WorktreeHandle = { path, branch, repoRoot, baseCommit };
   trackForCleanup(handle);
@@ -110,7 +111,7 @@ export async function createWorktree(
 /** Return true if the local branch ref exists. */
 async function branchExists(repoRoot: string, branch: string): Promise<boolean> {
   try {
-    await pexec('git', ['show-ref', '--verify', '--quiet', `refs/heads/${branch}`], { cwd: repoRoot });
+    await pexec('git', ['show-ref', '--verify', '--quiet', `refs/heads/${branch}`], { cwd: repoRoot, env: safeEnvironment() });
     return true;
   } catch { return false; }
 }
@@ -118,17 +119,17 @@ async function branchExists(repoRoot: string, branch: string): Promise<boolean> 
 /** Remove any registered worktree still referencing `branch`, then prune. */
 async function pruneStaleWorktreeForBranch(repoRoot: string, branch: string): Promise<void> {
   try {
-    const { stdout } = await pexec('git', ['worktree', 'list', '--porcelain'], { cwd: repoRoot });
+    const { stdout } = await pexec('git', ['worktree', 'list', '--porcelain'], { cwd: repoRoot, env: safeEnvironment() });
     for (const block of stdout.trim().split(/\n\s*\n/)) {
       const wtBranch = (/^branch (.+)$/m.exec(block)?.[1] ?? '').replace(/^refs\/heads\//, '');
       if (wtBranch !== branch) continue;
       const wtPath = /^worktree (.+)$/m.exec(block)?.[1] ?? '';
       if (wtPath) {
         try { rmSync(wtPath, { recursive: true, force: true }); } catch { /* best effort */ }
-        try { await pexec('git', ['worktree', 'remove', '--force', wtPath], { cwd: repoRoot }); } catch { /* already gone */ }
+        try { await pexec('git', ['worktree', 'remove', '--force', wtPath], { cwd: repoRoot, env: safeEnvironment() }); } catch { /* already gone */ }
       }
     }
-    await pexec('git', ['worktree', 'prune', '--expire=now'], { cwd: repoRoot });
+    await pexec('git', ['worktree', 'prune', '--expire=now'], { cwd: repoRoot, env: safeEnvironment() });
   } catch { /* best effort */ }
 }
 
@@ -139,25 +140,25 @@ export async function destroyWorktree(handle: WorktreeHandle, force = false): Pr
   try {
     const args = ['worktree', 'remove', handle.path];
     if (force) args.push('--force');
-    await pexec('git', args, { cwd: handle.repoRoot });
+    await pexec('git', args, { cwd: handle.repoRoot, env: safeEnvironment() });
   } catch {
     try { rmSync(handle.path, { recursive: true, force: true }); } catch { /* best effort */ }
   }
   // Best-effort prune of the registered worktree entry.
-  try { await pexec('git', ['worktree', 'prune'], { cwd: handle.repoRoot }); } catch { /* ignore */ }
+  try { await pexec('git', ['worktree', 'prune'], { cwd: handle.repoRoot, env: safeEnvironment() }); } catch { /* ignore */ }
 }
 
 /** Delete a local branch. Silent on failure. */
 export async function deleteBranch(repoRoot: string, branch: string, force = false): Promise<void> {
   try {
-    await pexec('git', ['branch', force ? '-D' : '-d', branch], { cwd: repoRoot });
+    await pexec('git', ['branch', force ? '-D' : '-d', branch], { cwd: repoRoot, env: safeEnvironment() });
   } catch { /* not an error — branch may still be in use or already gone */ }
 }
 
 /** List all git worktrees attached to this repo. Includes the primary. */
 export async function listWorktrees(repoRoot: string): Promise<WorktreeHandle[]> {
   try {
-    const { stdout } = await pexec('git', ['worktree', 'list', '--porcelain'], { cwd: repoRoot });
+    const { stdout } = await pexec('git', ['worktree', 'list', '--porcelain'], { cwd: repoRoot, env: safeEnvironment() });
     return parseWorktreePorcelain(stdout, repoRoot);
   } catch {
     return [];
@@ -211,11 +212,11 @@ function installExitHandler(): void {
       // the rmSync + prune + branch-D ordering problem (git refuses branch -D
       // on a branch that still has a registered worktree entry, and prune alone
       // requires --expire=now to remove recently-deleted paths immediately).
-      try { execFileSync('git', ['worktree', 'remove', '--force', h.path], { cwd: h.repoRoot, stdio: 'ignore' }); } catch { /* best effort */ }
+      try { execFileSync('git', ['worktree', 'remove', '--force', h.path], { cwd: h.repoRoot, env: safeEnvironment(), stdio: 'ignore' }); } catch { /* best effort */ }
       // Fallback in case the path still exists (e.g. worktree remove failed).
       try { rmSync(h.path, { recursive: true, force: true }); } catch { /* best effort */ }
       // Branch ref is now deletable since git no longer sees it as checked out.
-      try { execFileSync('git', ['branch', '-D', h.branch], { cwd: h.repoRoot, stdio: 'ignore' }); } catch { /* best effort */ }
+      try { execFileSync('git', ['branch', '-D', h.branch], { cwd: h.repoRoot, env: safeEnvironment(), stdio: 'ignore' }); } catch { /* best effort */ }
     }
   };
 

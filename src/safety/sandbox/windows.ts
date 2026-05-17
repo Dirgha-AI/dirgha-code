@@ -13,7 +13,7 @@ export class WindowsSandbox implements SandboxAdapter {
   readonly platform = 'windows' as const;
 
   async available(): Promise<boolean> {
-    return process.platform === 'win32';
+    return false;
   }
 
   async exec(opts: SandboxExecOptions): Promise<SandboxResult> {

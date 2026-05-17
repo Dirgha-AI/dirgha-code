@@ -5,9 +5,13 @@
  * addresses unless the user explicitly opts out via
  * `DIRGHA_ALLOW_PRIVATE_FETCH=1`.
  *
- * Only checks literal hostnames and IP strings — no DNS resolution
- * (sync, dependency-free).
+ * `assertSafeFetchUrl` — sync literal-IP fast path.
+ * `assertSafeFetchUrlAsync` — async variant that also resolves the
+ * hostname via DNS and checks every resolved address against the same
+ * private/loopback/link-local/RFC1918 blocks (DNS-rebind defence).
  */
+
+import { lookup } from "node:dns/promises";
 
 const LOCAL_HOSTNAMES = new Set([
   "localhost",
@@ -133,5 +137,56 @@ export function assertSafeFetchUrl(url: string): void {
     throw new Error(
       `SSRF guard: blocked fetch to ${labels[classification] ?? classification} address "${hostname}" (set DIRGHA_ALLOW_PRIVATE_FETCH=1 to override)`,
     );
+  }
+}
+
+/**
+ * True when the hostname looks like a raw IPv4 or IPv6 address.
+ */
+function isLiteralIp(hostname: string): boolean {
+  if (hostname.startsWith("[")) return true;
+  if (hostname.includes(":")) return true;
+  return /^\d+\.\d+\.\d+\.\d+$/.test(hostname);
+}
+
+/**
+ * Async variant that additionally resolves the hostname via DNS and
+ * re-runs the private/loopback/link-local/RFC1918 IP checks against
+ * EVERY resolved address. Rejects if any resolved address is private.
+ *
+ * Callers MUST also use `redirect: 'manual'` on their fetch call, OR
+ * re-validate the final URL after redirects — otherwise a 301 to a
+ * private address can bypass this guard.
+ *
+ * @throws Error if the URL or any resolved address targets a blocked address.
+ */
+export async function assertSafeFetchUrlAsync(url: string): Promise<void> {
+  // Sync fast-path first (catches literal IPs + known hostnames immediately).
+  assertSafeFetchUrl(url);
+
+  const hostname = parseHostname(url);
+  if (!hostname || isLiteralIp(hostname)) return;
+
+  let addresses: { address: string; family: number }[];
+  try {
+    addresses = await lookup(hostname, { all: true, family: 0 });
+  } catch {
+    // DNS resolution failure: allow through (fail-open).
+    return;
+  }
+
+  for (const addr of addresses) {
+    const classification = classifyIp(addr.address);
+    if (classification !== null) {
+      const labels: Record<string, string> = {
+        loopback: "loopback",
+        linklocal: "link-local",
+        rfc1918: "private (RFC1918)",
+        zero: "zero-config (0.0.0.0/8)",
+      };
+      throw new Error(
+        `SSRF guard: DNS-resolved address ${addr.address} is ${labels[classification] ?? classification} for hostname "${hostname}" (set DIRGHA_ALLOW_PRIVATE_FETCH=1 to override)`,
+      );
+    }
   }
 }

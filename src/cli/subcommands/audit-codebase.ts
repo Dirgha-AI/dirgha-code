@@ -18,6 +18,7 @@
 import { mkdir, writeFile, readFile, readdir } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { homedir } from 'node:os';
+import { safeEnvironment } from '../../utils/env.js';
 import { join, basename, resolve } from 'node:path';
 import { stdout, stderr } from 'node:process';
 import { style, defaultTheme } from '../../tui/theme.js';
@@ -79,7 +80,7 @@ async function runOneAudit(opts: {
   return new Promise(resolveTask => {
     const child = spawn('node', [opts.cliBin, fullPrompt, '-m', opts.model, '--print', `--max-turns=${opts.maxTurns}`], {
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: process.env,
+      env: safeEnvironment(),
     });
 
     const killer = setTimeout(() => {

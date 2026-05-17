@@ -5,6 +5,7 @@
 
 import { execFile as execFileCb } from 'node:child_process';
 import { promisify } from 'node:util';
+import { safeEnvironment } from '../utils/env.js';
 import { randomUUID} from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import os from 'node:os';
@@ -58,7 +59,7 @@ export async function installNpmSkill(
     // injection risk; the `--` separator before pkgSpec is belt-and-braces.
     const isWin = process.platform === 'win32';
     const npmBin = isWin ? 'npm.cmd' : 'npm';
-    const { stdout } = await execFile(npmBin, ['pack', '--silent', '--pack-destination', '.', '--', pkgSpec], { cwd: tempDir, shell: isWin });
+    const { stdout } = await execFile(npmBin, ['pack', '--silent', '--pack-destination', '.', '--', pkgSpec], { cwd: tempDir, shell: isWin, env: safeEnvironment() });
     const lines = stdout.trim().split('\n');
     const tgzName = lines[lines.length - 1].trim();
     if (!tgzName.endsWith('.tgz')) {
@@ -66,7 +67,7 @@ export async function installNpmSkill(
     }
 
     // Extract tarball
-    await execFile('tar', ['-xzf', tgzName], { cwd: tempDir });
+    await execFile('tar', ['-xzf', tgzName], { cwd: tempDir, env: safeEnvironment() });
     const packageDir = path.join(tempDir, 'package');
 
     // Validate SKILL.md exists

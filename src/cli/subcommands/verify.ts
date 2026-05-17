@@ -20,6 +20,7 @@
 
 import { spawn } from "node:child_process";
 import { stdout, stderr, exit as procExit } from "node:process";
+import { safeEnvironment } from "../../utils/env.js";
 import { randomUUID } from "node:crypto";
 import { runAgentLoop } from "../../kernel/agent-loop.js";
 import { createEventStream } from "../../kernel/event-stream.js";
@@ -56,7 +57,7 @@ async function runShell(
     // shell: true is intentional — accept commands are developer-supplied shell
     // expressions (pipes, quoting, subshells) that require a shell interpreter.
     // This is not an injection surface: callers are the CLI user themselves.
-    const child = spawn(cmd, { shell: true, cwd });
+    const child = spawn(cmd, { shell: true, cwd, env: safeEnvironment() });
     let out = "";
     let err = "";
     let killed = false;

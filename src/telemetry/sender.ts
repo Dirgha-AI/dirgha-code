@@ -21,7 +21,7 @@
 import { platform } from 'node:os';
 import { createHash } from 'node:crypto';
 import { readTelemetryConfig } from '../cli/subcommands/telemetry.js';
-import { assertSafeFetchUrl } from '../utils/url-guard.js';
+import { assertSafeFetchUrlAsync } from '../utils/url-guard.js';
 
 // Public Posthog project key — provided by the project owner. This is
 // not a secret: the `phc_` prefix denotes a "client-side" key that only
@@ -124,11 +124,12 @@ export async function sendEvent(ev: TelemetryEvent): Promise<boolean> {
     // than manual setTimeout+AbortController (which was firing prematurely
     // in observed runs — the modern helper handles edge cases like the
     // signal already being aborted at fetch-init time).
-    assertSafeFetchUrl(endpoint);
+    await assertSafeFetchUrlAsync(endpoint);
     const r = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+      redirect: 'manual',
       signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
     });
     return r.ok;

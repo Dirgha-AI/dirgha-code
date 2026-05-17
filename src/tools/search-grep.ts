@@ -10,6 +10,7 @@ import { join } from "node:path";
 import type { Tool } from "./registry.js";
 import type { ToolResult } from "../kernel/types.js";
 import { isValidCwdPath } from "../utils/fs.js";
+import { safeEnvironment } from "../utils/env.js";
 
 interface Input {
   pattern: string;
@@ -87,6 +88,7 @@ async function runRipgrep(
 
   const child = spawn("rg", args, {
     cwd: root,
+    env: safeEnvironment(),
     stdio: ["ignore", "pipe", "pipe"],
   });
   const out: string[] = [];
