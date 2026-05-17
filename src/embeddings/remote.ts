@@ -11,6 +11,7 @@
  */
 
 import type { EmbeddingAdapter } from "./iface.js";
+import { assertSafeFetchUrl } from "../utils/url-guard.js";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 
@@ -68,6 +69,7 @@ export class RemoteEmbedder implements EmbeddingAdapter {
       if (this.bearerToken) {
         headers["Authorization"] = `Bearer ${this.bearerToken}`;
       }
+      assertSafeFetchUrl(this.endpoint);
       const res = await this.fetchImpl(this.endpoint, {
         method: "POST",
         headers,

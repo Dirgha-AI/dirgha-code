@@ -9,6 +9,7 @@
  * When an onProgress callback is provided, tools that emit streaming
  * progress push events back through the agent-loop event stream.
  */
+import { safeEnvironment } from "../utils/env.js";
 import { selectSandbox } from "../safety/sandbox/select.js";
 import { wrapLegacyResult, internalError } from './result-wrappers.js';
 import { distillToolResult } from './distill.js';
@@ -25,7 +26,7 @@ function toolError(kind, message, opts = {}) {
     return r;
 }
 export function createToolExecutor(opts) {
-    const env = opts.env ?? sanitiseEnv(process.env);
+    const env = opts.env ?? safeEnvironment();
     // Resolve the platform sandbox adapter once per executor instance.
     // Falls back to null if selectSandbox throws (unsupported platform or
     // misconfigured DIRGHA_SANDBOX override). Tools receive the adapter via
@@ -133,15 +134,6 @@ async function runTool(tool, input, ctx, callId) {
     if (wrapped.durationMs === undefined)
         wrapped.durationMs = finalDuration;
     return distillToolResult(wrapped, callId);
-}
-function sanitiseEnv(source) {
-    const out = {};
-    for (const [k, v] of Object.entries(source)) {
-        if (v === undefined)
-            continue;
-        out[k] = v;
-    }
-    return out;
 }
 function closestMatches(needle, haystack, k) {
     // Simple Levenshtein-distance approximation with prefix fallback.

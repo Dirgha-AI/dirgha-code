@@ -1249,6 +1249,68 @@ export function App(props) {
     const providerEntries = React.useMemo(() => buildProviderEntries(models, currentModel), [models, currentModel]);
     const spinnerCtx = React.useMemo(() => ({ busy }), [busy]);
     const renderTranscriptItem = React.useCallback((item) => _jsx(TranscriptRow, { item: item }, item.id), []);
+    // ── Overlay/picker handler stubs (hoisted to avoid conditional hook calls) ──
+    const onResolveApproval = React.useCallback((decision) => {
+        approvalBusRef.current?.resolve(pendingApproval.id, decision);
+    }, [pendingApproval]);
+    const onAcceptFailover = React.useCallback((failover) => {
+        const lastPrompt = pendingFailover.lastPrompt;
+        setCurrentModel(failover);
+        setPendingFailover(null);
+        if (lastPrompt) {
+            setTimeout(() => handleSubmit(lastPrompt), 0);
+        }
+    }, [pendingFailover, handleSubmit]);
+    const onRejectFailover = React.useCallback(() => setPendingFailover(null), []);
+    const onPickerFailover = React.useCallback(() => {
+        setPendingFailover(null);
+        overlays.openOverlay("models");
+    }, [overlays]);
+    const onCancelAtFile = React.useCallback(() => {
+        overlays.setAtQuery(null);
+        overlays.setActive(null);
+    }, [overlays]);
+    const onCancelSlash = React.useCallback(() => {
+        overlays.setSlashQuery(null);
+        overlays.setActive(null);
+    }, [overlays]);
+    const onPickProvider = React.useCallback((providerId) => {
+        setPickerProvider(providerId);
+        if (providerId === "openrouter") {
+            setPickerStage("or-company");
+        }
+        else {
+            setPickerStage("model");
+        }
+    }, []);
+    const onCancelProvider = React.useCallback(() => {
+        setPickerStage("provider");
+        setPickerProvider(null);
+        overlays.closeOverlay();
+    }, [overlays]);
+    const modelPickerModels = React.useMemo(() => models.filter((m) => {
+        if (pickerProvider !== "openrouter" || !pickerOrCompany) {
+            return m.provider === pickerProvider;
+        }
+        const bare = m.id.startsWith("~") ? m.id.slice(1) : m.id;
+        return m.provider === "openrouter" && bare.startsWith(pickerOrCompany + "/");
+    }), [models, pickerProvider, pickerOrCompany]);
+    const onPickModel = React.useCallback((id) => {
+        handleModelPick(id);
+        setPickerStage("provider");
+        setPickerProvider(null);
+        setPickerOrCompany(null);
+    }, [handleModelPick]);
+    const onCancelModel = React.useCallback(() => {
+        if (pickerProvider === "openrouter") {
+            setPickerStage("or-company");
+        }
+        else {
+            setPickerStage("provider");
+            setPickerProvider(null);
+        }
+    }, [pickerProvider]);
+    const onCancelKeySet = React.useCallback(() => setPendingKey(null), []);
     // Logo is emitted via process.stdout.write() before Ink mounts (see
     // tui/ink/index.ts). Keeping it out of Ink's render tree avoids the
     // re-emission flicker users hit when transcripts overflow the
@@ -1256,20 +1318,7 @@ export function App(props) {
     // the logo) on every overflow redraw, repainting it on every chat
     // turn that fills the screen. `use-flicker-detector` already warns
     // when this is about to happen.
-    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: spinnerCtx, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: transcript, children: (item) => (_jsx(Box, { flexDirection: "column", children: renderTranscriptItem(item) }, item.id)) }), _jsx(Box, { flexDirection: "column", flexGrow: 1, children: liveJsx }), busy && projection.liveItems.length === 0 && _jsx(GeneratingIndicator, { elapsedMs: liveDurationMs, liveOutputTokens: liveOutputTokens }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
-                            approvalBusRef.current?.resolve(pendingApproval.id, decision);
-                        } })), pendingFailover !== null && (_jsx(ModelSwitchPrompt, { failedModel: pendingFailover.failedModel, failoverModel: pendingFailover.failoverModel, onAccept: (failover) => {
-                            const lastPrompt = pendingFailover.lastPrompt;
-                            setCurrentModel(failover);
-                            setPendingFailover(null);
-                            // Re-submit the failed prompt against the new model.
-                            if (lastPrompt) {
-                                setTimeout(() => handleSubmit(lastPrompt), 0);
-                            }
-                        }, onReject: () => setPendingFailover(null), onPicker: () => {
-                            setPendingFailover(null);
-                            overlays.openOverlay("models");
-                        } })), _jsx(SubagentPanel, { events: props.events }), _jsx(GPUJobIndicator, {}), _jsx(PromptQueueIndicator, { queued: promptQueue }), _jsx(Divider, {}), _jsx(InputBox, { value: input, onChange: setInput, onSubmit: handleSubmit, busy: busy, liveDurationMs: liveDurationMs, vimMode: props.config.vimMode === true, onAtQueryChange: overlays.setAtQuery, onSlashQueryChange: overlays.setSlashQuery, onRequestOverlay: overlays.openOverlay, promptHistory: promptHistory, onRequestYoloToggle: () => {
+    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: spinnerCtx, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: transcript, children: (item) => (_jsx(Box, { flexDirection: "column", children: renderTranscriptItem(item) }, item.id)) }), _jsx(Box, { flexDirection: "column", flexGrow: 1, children: liveJsx }), busy && projection.liveItems.length === 0 && _jsx(GeneratingIndicator, { elapsedMs: liveDurationMs, liveOutputTokens: liveOutputTokens }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: onResolveApproval })), pendingFailover !== null && (_jsx(ModelSwitchPrompt, { failedModel: pendingFailover.failedModel, failoverModel: pendingFailover.failoverModel, onAccept: onAcceptFailover, onReject: onRejectFailover, onPicker: onPickerFailover })), _jsx(SubagentPanel, { events: props.events }), _jsx(GPUJobIndicator, {}), _jsx(PromptQueueIndicator, { queued: promptQueue }), _jsx(Divider, {}), _jsx(InputBox, { value: input, onChange: setInput, onSubmit: handleSubmit, busy: busy, liveDurationMs: liveDurationMs, vimMode: props.config.vimMode === true, onAtQueryChange: overlays.setAtQuery, onSlashQueryChange: overlays.setSlashQuery, onRequestOverlay: overlays.openOverlay, promptHistory: promptHistory, onRequestYoloToggle: () => {
                             const next = mode === "yolo" ? "act" : "yolo";
                             setMode(next);
                             // Wire the approval bus so mid-turn tool calls are immediately
@@ -1295,32 +1344,14 @@ export function App(props) {
                             const last = q[q.length - 1];
                             setInput(last);
                             setPromptQueue((prev) => prev.slice(0, -1));
-                        } }), healthResult !== null && !healthResult.allOk && (_jsx(Box, { paddingX: 1, children: _jsxs(Text, { color: "yellow", children: ["[! System check: ", healthResult.failures.length, " issue", healthResult.failures.length !== 1 ? "s" : "", " found \u2014 run 'dirgha doctor' for details]"] }) })), overlays.active === "atfile" && overlays.atQuery !== null && (_jsx(AtFileComplete, { cwd: props.cwd, query: overlays.atQuery, onPick: handleAtPick, onCancel: () => {
-                            overlays.setAtQuery(null);
-                            overlays.setActive(null);
-                        } })), overlays.active === "slash" && overlays.slashQuery !== null && (_jsx(SlashComplete, { commands: slashCommands, query: overlays.slashQuery, onPick: handleSlashPick, onCancel: () => {
-                            overlays.setSlashQuery(null);
-                            overlays.setActive(null);
-                        } })), overlays.active === "models" &&
+                        } }), healthResult !== null && !healthResult.allOk && (_jsx(Box, { paddingX: 1, children: _jsxs(Text, { color: "yellow", children: ["[! System check: ", healthResult.failures.length, " issue", healthResult.failures.length !== 1 ? "s" : "", " found \u2014 run 'dirgha doctor' for details]"] }) })), overlays.active === "atfile" && overlays.atQuery !== null && (_jsx(AtFileComplete, { cwd: props.cwd, query: overlays.atQuery, onPick: handleAtPick, onCancel: onCancelAtFile })), overlays.active === "slash" && overlays.slashQuery !== null && (_jsx(SlashComplete, { commands: slashCommands, query: overlays.slashQuery, onPick: handleSlashPick, onCancel: onCancelSlash })), overlays.active === "models" &&
                         pickerStage === "provider" &&
                         (() => {
                             if (providerEntries.length === 0) {
                                 // Fall through to flat ModelPicker if no providers (catalogue empty).
                                 return null;
                             }
-                            return (_jsx(ProviderPicker, { providers: providerEntries, onPick: (providerId) => {
-                                    setPickerProvider(providerId);
-                                    if (providerId === "openrouter") {
-                                        setPickerStage("or-company");
-                                    }
-                                    else {
-                                        setPickerStage("model");
-                                    }
-                                }, onCancel: () => {
-                                    setPickerStage("provider");
-                                    setPickerProvider(null);
-                                    overlays.closeOverlay();
-                                } }));
+                            return (_jsx(ProviderPicker, { providers: providerEntries, onPick: onPickProvider, onCancel: onCancelProvider }));
                         })(), overlays.active === "models" && pickerStage === "or-company" && (() => {
                         // Build company entries from OpenRouter models
                         const orModels = models.filter(m => m.provider === "openrouter");
@@ -1370,27 +1401,7 @@ export function App(props) {
                                 setPickerProvider(null);
                                 setPickerOrCompany(null);
                             } }));
-                    })(), overlays.active === "models" && pickerStage === "model" && (_jsx(ModelPicker, { models: models.filter((m) => {
-                            if (pickerProvider !== "openrouter" || !pickerOrCompany) {
-                                return m.provider === pickerProvider;
-                            }
-                            const bare = m.id.startsWith("~") ? m.id.slice(1) : m.id;
-                            return m.provider === "openrouter" && bare.startsWith(pickerOrCompany + "/");
-                        }), current: currentModel, onPick: (id) => {
-                            handleModelPick(id);
-                            setPickerStage("provider");
-                            setPickerProvider(null);
-                            setPickerOrCompany(null);
-                        }, onCancel: () => {
-                            // Esc inside ModelPicker → back to company step for OR, provider for others
-                            if (pickerProvider === "openrouter") {
-                                setPickerStage("or-company");
-                            }
-                            else {
-                                setPickerStage("provider");
-                                setPickerProvider(null);
-                            }
-                        } })), overlays.active === "help" && (_jsx(HelpOverlay, { slashCommands: slashCommands, onClose: overlays.closeOverlay })), overlays.active === "theme" && (_jsx(ThemePicker, { current: themeName, onPick: handleThemePick, onCancel: overlays.closeOverlay })), overlays.active === "sandbox" && (_jsx(SandboxPicker, { current: sandboxModeRef.current, onPick: handleSandboxPick, onCancel: overlays.closeOverlay })), pendingKey && (_jsx(KeySetOverlay, { keyName: pendingKey.keyName, onSave: handleKeySetSave, onCancel: () => setPendingKey(null) })), updateVersion !== null && (_jsx(Box, { paddingX: 1, children: _jsxs(Text, { color: "yellow", children: ["[v", updateVersion, " available \u2014 press Ctrl+U or /upgrade to upgrade]"] }) })), _jsx(Divider, {}), _jsx(StatusBar, { model: currentModel, provider: providerIdForModel(currentModel), inputTokens: projection.totals.inputTokens, outputTokens: projection.totals.outputTokens, costUsd: projection.totals.costUsd, cwd: props.cwd, busy: busy, mode: mode, contextWindow: contextWindowFor(currentModel), liveOutputTokens: liveOutputTokens, liveDurationMs: liveDurationMs, overflowDetected: flicker.overflowDetected, showMetrics: showRenderMetrics, renderMetrics: renderMetrics, activeTool: activeTools[0] })] }) }) }));
+                    })(), overlays.active === "models" && pickerStage === "model" && (_jsx(ModelPicker, { models: modelPickerModels, current: currentModel, onPick: onPickModel, onCancel: onCancelModel })), overlays.active === "help" && (_jsx(HelpOverlay, { slashCommands: slashCommands, onClose: overlays.closeOverlay })), overlays.active === "theme" && (_jsx(ThemePicker, { current: themeName, onPick: handleThemePick, onCancel: overlays.closeOverlay })), overlays.active === "sandbox" && (_jsx(SandboxPicker, { current: sandboxModeRef.current, onPick: handleSandboxPick, onCancel: overlays.closeOverlay })), pendingKey && (_jsx(KeySetOverlay, { keyName: pendingKey.keyName, onSave: handleKeySetSave, onCancel: onCancelKeySet })), updateVersion !== null && (_jsx(Box, { paddingX: 1, children: _jsxs(Text, { color: "yellow", children: ["[v", updateVersion, " available \u2014 press Ctrl+U or /upgrade to upgrade]"] }) })), _jsx(Divider, {}), _jsx(StatusBar, { model: currentModel, provider: providerIdForModel(currentModel), inputTokens: projection.totals.inputTokens, outputTokens: projection.totals.outputTokens, costUsd: projection.totals.costUsd, cwd: props.cwd, busy: busy, mode: mode, contextWindow: contextWindowFor(currentModel), liveOutputTokens: liveOutputTokens, liveDurationMs: liveDurationMs, overflowDetected: flicker.overflowDetected, showMetrics: showRenderMetrics, renderMetrics: renderMetrics, activeTool: activeTools[0] })] }) }) }));
 }
 /** A horizontal rule spanning the terminal width. */
 function Divider() {

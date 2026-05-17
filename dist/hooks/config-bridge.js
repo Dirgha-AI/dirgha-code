@@ -18,12 +18,14 @@
  * matcher fire for every call.
  */
 import { spawn } from "node:child_process";
+import { safeEnvironment } from "../utils/env.js";
 async function runHook(entry, payload, timeoutMs = 10_000) {
     return new Promise((resolve) => {
         const [bin, ...args] = entry.command.split(/\s+/);
         const child = spawn(bin, args, {
             stdio: ["pipe", "pipe", "pipe"],
             shell: false,
+            env: safeEnvironment(),
         });
         let out = "";
         let err = "";

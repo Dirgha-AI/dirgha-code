@@ -3,9 +3,12 @@
  * environment, and CLI flags. Results are cached on first read.
  */
 
-import { readFile } from "node:fs/promises";
+import { readFile, readlink } from "node:fs/promises";
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { createInterface } from "node:readline/promises";
+import { stdin, stdout } from "node:process";
 import { migrateDeprecatedModel } from "../intelligence/prices.js";
 
 export interface DirghaConfig {
@@ -162,7 +165,7 @@ export const DEFAULT_CONFIG: DirghaConfig = {
   summaryModel: "deepseek-ai/deepseek-v4-flash",
   maxTurns: 16,
   showThinking: false,
-  autoApproveTools: ["fs_read", "fs_ls", "search_grep", "search_glob", "git"],
+  autoApproveTools: ["fs_read", "fs_ls", "search_grep", "search_glob"],
   skills: { enabled: true },
   smartRoute: { enabled: false },
   compaction: { triggerTokens: 120_000, preserveLastTurns: 6 },
@@ -172,6 +175,103 @@ export const DEFAULT_CONFIG: DirghaConfig = {
   sandbox: "off",
 };
 
+// ── Trust store for project-level config ──────────────────────────────
+
+const DANGEROUS_KEYS = new Set<string>(["mcpServers", "hooks", "extensions"]);
+const TRUST_STORE_PATH = join(homedir(), ".dirgha", "trusted-projects.json");
+
+function readTrustStore(): Set<string> {
+  try {
+    if (!existsSync(TRUST_STORE_PATH)) return new Set();
+    const raw = JSON.parse(readFileSync(TRUST_STORE_PATH, "utf8"));
+    if (Array.isArray(raw)) return new Set(raw.map(String));
+    return new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function writeTrustStore(roots: Set<string>): void {
+  try {
+    const dir = join(homedir(), ".dirgha");
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      TRUST_STORE_PATH,
+      JSON.stringify([...roots], null, 2),
+      "utf8",
+    );
+  } catch {
+    /* swallow — worst case the user re-grants trust next time */
+  }
+}
+
+async function resolveProjectRoot(cwd: string): Promise<string> {
+  try {
+    // If cwd is a symlink, resolve it for stable trust
+    const resolved = await readlink(cwd).catch(() => cwd);
+    return resolved;
+  } catch {
+    return cwd;
+  }
+}
+
+function hasDangerousKeys(
+  partial: Partial<DirghaConfig>,
+): { dangerous: boolean; mcp: boolean; hooks: boolean; ext: boolean } {
+  const result = { dangerous: false, mcp: false, hooks: false, ext: false };
+  if (!partial) return result;
+  if (partial.mcpServers !== undefined) {
+    result.dangerous = true;
+    result.mcp = true;
+  }
+  if (partial.hooks !== undefined) {
+    result.dangerous = true;
+    result.hooks = true;
+  }
+  if ((partial as Record<string, unknown>).extensions !== undefined) {
+    result.dangerous = true;
+    result.ext = true;
+  }
+  return result;
+}
+
+function stripDangerousKeys(
+  partial: Partial<DirghaConfig>,
+): Partial<DirghaConfig> {
+  const out: Record<string, unknown> = { ...partial };
+  delete out.mcpServers;
+  delete out.hooks;
+  delete out.extensions;
+  return out as unknown as Partial<DirghaConfig>;
+}
+
+async function promptTrust(
+  root: string,
+  dangers: { mcp: boolean; hooks: boolean; ext: boolean },
+): Promise<boolean> {
+  const lines: string[] = [
+    `\n[dirgha] Project config at "${root}/.dirgha/config.json" contains:`,
+  ];
+  if (dangers.mcp) lines.push("  · mcpServers — subprocess(es) that run on every session");
+  if (dangers.hooks) lines.push("  · hooks — shell commands executed during the agent loop");
+  if (dangers.ext) lines.push("  · extensions — dynamically loaded code");
+  lines.push(
+    "",
+    "  These features will be disabled unless the project is trusted.",
+    "  Trust this project and allow these features? [y/N] ",
+  );
+  process.stderr.write(lines.join("\n"));
+
+  try {
+    const rl = createInterface({ input: stdin, output: stdout });
+    const answer = (await rl.question("")).trim().toLowerCase();
+    rl.close();
+    return answer === "y" || answer === "yes";
+  } catch {
+    return false;
+  }
+}
+
 export async function loadConfig(
   cwd: string = process.cwd(),
 ): Promise<DirghaConfig> {
@@ -179,8 +279,36 @@ export async function loadConfig(
   const projectPath = join(cwd, ".dirgha", "config.json");
 
   const userPartial = await readJson(userPath);
-  const projectPartial = await readJson(projectPath);
+  let projectPartial = await readJson(projectPath);
   const envPartial = readEnvOverrides();
+
+  // Gate project-level dangerous keys behind trust
+  const dangers = hasDangerousKeys(projectPartial);
+  if (dangers.dangerous) {
+    const projectRoot = await resolveProjectRoot(cwd);
+    const trusted = readTrustStore();
+    if (trusted.has(projectRoot)) {
+      // Trusted — load normally
+    } else if (stdin.isTTY) {
+      // Interactive — prompt
+      const granted = await promptTrust(projectRoot, dangers);
+      if (granted) {
+        trusted.add(projectRoot);
+        writeTrustStore(trusted);
+      } else {
+        projectPartial = stripDangerousKeys(projectPartial);
+        process.stderr.write(
+          "[dirgha] project mcpServers/hooks disabled. Run again and answer 'y' to trust.\n",
+        );
+      }
+    } else {
+      // Non-interactive — strip silently
+      projectPartial = stripDangerousKeys(projectPartial);
+      process.stderr.write(
+        "[dirgha] untrusted project config: mcpServers/hooks disabled (run interactively to grant trust)\n",
+      );
+    }
+  }
 
   const merged = merge(DEFAULT_CONFIG, userPartial, projectPartial, envPartial);
   validate(merged);

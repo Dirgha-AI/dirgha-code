@@ -21,6 +21,7 @@
 import { spawn } from "node:child_process";
 import type { AgentHooks, ToolCall, ToolResult } from "../kernel/types.js";
 import type { DirghaConfig } from "../cli/config.js";
+import { safeEnvironment } from "../utils/env.js";
 
 interface HookEntry {
   command: string;
@@ -38,6 +39,7 @@ async function runHook(
     const child = spawn(bin, args, {
       stdio: ["pipe", "pipe", "pipe"],
       shell: false,
+      env: safeEnvironment(),
     });
     let out = "";
     let err = "";

@@ -6,6 +6,7 @@
  * and timeouts are all silently swallowed. Telemetry must never crash or
  * slow down the CLI.
  */
+import { assertSafeFetchUrl } from '../utils/url-guard.js';
 const PUSH_TIMEOUT_MS = 5_000;
 /**
  * POST each audit entry to the gateway's agent-session log endpoint.
@@ -21,6 +22,7 @@ export async function pushAuditEntries(sessionId, entries, token) {
     const url = `${base}/api/agent-sessions/${encodeURIComponent(sessionId)}/logs`;
     for (const entry of entries) {
         try {
+            assertSafeFetchUrl(url);
             const body = JSON.stringify({
                 kind: entry.kind,
                 ts: entry.ts,

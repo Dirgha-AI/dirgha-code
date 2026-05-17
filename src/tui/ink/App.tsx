@@ -46,6 +46,7 @@ import {
 } from "./ink-approval-bus.js";
 import {
   ApprovalPrompt,
+  type ApprovalDecision,
   type ApprovalRequest,
 } from "./components/ApprovalPrompt.js";
 import type { SessionStore, Session } from "../../context/session.js";
@@ -1419,6 +1420,103 @@ export function App(props: AppProps): React.JSX.Element {
     [],
   );
 
+  // ── Overlay/picker handler stubs (hoisted to avoid conditional hook calls) ──
+  const onResolveApproval = React.useCallback(
+    (decision: ApprovalDecision): void => {
+      approvalBusRef.current?.resolve(pendingApproval!.id, decision);
+    },
+    [pendingApproval],
+  );
+  const onAcceptFailover = React.useCallback(
+    (failover: string): void => {
+      const lastPrompt = pendingFailover!.lastPrompt;
+      setCurrentModel(failover);
+      setPendingFailover(null);
+      if (lastPrompt) {
+        setTimeout(() => handleSubmit(lastPrompt), 0);
+      }
+    },
+    [pendingFailover, handleSubmit],
+  );
+  const onRejectFailover = React.useCallback(
+    (): void => setPendingFailover(null),
+    [],
+  );
+  const onPickerFailover = React.useCallback(
+    (): void => {
+      setPendingFailover(null);
+      overlays.openOverlay("models");
+    },
+    [overlays],
+  );
+  const onCancelAtFile = React.useCallback(
+    (): void => {
+      overlays.setAtQuery(null);
+      overlays.setActive(null);
+    },
+    [overlays],
+  );
+  const onCancelSlash = React.useCallback(
+    (): void => {
+      overlays.setSlashQuery(null);
+      overlays.setActive(null);
+    },
+    [overlays],
+  );
+  const onPickProvider = React.useCallback(
+    (providerId: string): void => {
+      setPickerProvider(providerId);
+      if (providerId === "openrouter") {
+        setPickerStage("or-company");
+      } else {
+        setPickerStage("model");
+      }
+    },
+    [],
+  );
+  const onCancelProvider = React.useCallback(
+    (): void => {
+      setPickerStage("provider");
+      setPickerProvider(null);
+      overlays.closeOverlay();
+    },
+    [overlays],
+  );
+  const modelPickerModels = React.useMemo(
+    () => models.filter((m) => {
+      if (pickerProvider !== "openrouter" || !pickerOrCompany) {
+        return m.provider === pickerProvider;
+      }
+      const bare = m.id.startsWith("~") ? m.id.slice(1) : m.id;
+      return m.provider === "openrouter" && bare.startsWith(pickerOrCompany + "/");
+    }),
+    [models, pickerProvider, pickerOrCompany],
+  );
+  const onPickModel = React.useCallback(
+    (id: string): void => {
+      handleModelPick(id);
+      setPickerStage("provider");
+      setPickerProvider(null);
+      setPickerOrCompany(null);
+    },
+    [handleModelPick],
+  );
+  const onCancelModel = React.useCallback(
+    (): void => {
+      if (pickerProvider === "openrouter") {
+        setPickerStage("or-company");
+      } else {
+        setPickerStage("provider");
+        setPickerProvider(null);
+      }
+    },
+    [pickerProvider],
+  );
+  const onCancelKeySet = React.useCallback(
+    (): void => setPendingKey(null),
+    [],
+  );
+
   // Logo is emitted via process.stdout.write() before Ink mounts (see
   // tui/ink/index.ts). Keeping it out of Ink's render tree avoids the
   // re-emission flicker users hit when transcripts overflow the
@@ -1446,29 +1544,16 @@ export function App(props: AppProps): React.JSX.Element {
           {pendingApproval !== null && approvalBusRef.current && (
             <ApprovalPrompt
               request={pendingApproval}
-              onResolve={(decision): void => {
-                approvalBusRef.current?.resolve(pendingApproval.id, decision);
-              }}
+              onResolve={onResolveApproval}
             />
           )}
           {pendingFailover !== null && (
             <ModelSwitchPrompt
               failedModel={pendingFailover.failedModel}
               failoverModel={pendingFailover.failoverModel}
-              onAccept={(failover): void => {
-                const lastPrompt = pendingFailover.lastPrompt;
-                setCurrentModel(failover);
-                setPendingFailover(null);
-                // Re-submit the failed prompt against the new model.
-                if (lastPrompt) {
-                  setTimeout(() => handleSubmit(lastPrompt), 0);
-                }
-              }}
-              onReject={(): void => setPendingFailover(null)}
-              onPicker={(): void => {
-                setPendingFailover(null);
-                overlays.openOverlay("models");
-              }}
+              onAccept={onAcceptFailover}
+              onReject={onRejectFailover}
+              onPicker={onPickerFailover}
             />
           )}
           <SubagentPanel events={props.events} />
@@ -1532,10 +1617,7 @@ export function App(props: AppProps): React.JSX.Element {
               cwd={props.cwd}
               query={overlays.atQuery}
               onPick={handleAtPick}
-              onCancel={(): void => {
-                overlays.setAtQuery(null);
-                overlays.setActive(null);
-              }}
+              onCancel={onCancelAtFile}
             />
           )}
           {overlays.active === "slash" && overlays.slashQuery !== null && (
@@ -1543,10 +1625,7 @@ export function App(props: AppProps): React.JSX.Element {
               commands={slashCommands}
               query={overlays.slashQuery}
               onPick={handleSlashPick}
-              onCancel={(): void => {
-                overlays.setSlashQuery(null);
-                overlays.setActive(null);
-              }}
+              onCancel={onCancelSlash}
             />
           )}
           {overlays.active === "models" &&
@@ -1559,19 +1638,8 @@ export function App(props: AppProps): React.JSX.Element {
               return (
                 <ProviderPicker
                   providers={providerEntries}
-                  onPick={(providerId): void => {
-                    setPickerProvider(providerId);
-                    if (providerId === "openrouter") {
-                      setPickerStage("or-company");
-                    } else {
-                      setPickerStage("model");
-                    }
-                  }}
-                  onCancel={(): void => {
-                    setPickerStage("provider");
-                    setPickerProvider(null);
-                    overlays.closeOverlay();
-                  }}
+                  onPick={onPickProvider}
+                  onCancel={onCancelProvider}
                 />
               );
             })()}
@@ -1629,29 +1697,10 @@ export function App(props: AppProps): React.JSX.Element {
           })()}
           {overlays.active === "models" && pickerStage === "model" && (
             <ModelPicker
-              models={models.filter((m) => {
-                if (pickerProvider !== "openrouter" || !pickerOrCompany) {
-                  return m.provider === pickerProvider;
-                }
-                const bare = m.id.startsWith("~") ? m.id.slice(1) : m.id;
-                return m.provider === "openrouter" && bare.startsWith(pickerOrCompany + "/");
-              })}
+              models={modelPickerModels}
               current={currentModel}
-              onPick={(id): void => {
-                handleModelPick(id);
-                setPickerStage("provider");
-                setPickerProvider(null);
-                setPickerOrCompany(null);
-              }}
-              onCancel={(): void => {
-                // Esc inside ModelPicker → back to company step for OR, provider for others
-                if (pickerProvider === "openrouter") {
-                  setPickerStage("or-company");
-                } else {
-                  setPickerStage("provider");
-                  setPickerProvider(null);
-                }
-              }}
+              onPick={onPickModel}
+              onCancel={onCancelModel}
             />
           )}
           {overlays.active === "help" && (
@@ -1678,7 +1727,7 @@ export function App(props: AppProps): React.JSX.Element {
             <KeySetOverlay
               keyName={pendingKey.keyName}
               onSave={handleKeySetSave}
-              onCancel={() => setPendingKey(null)}
+              onCancel={onCancelKeySet}
             />
           )}
           {updateVersion !== null && (

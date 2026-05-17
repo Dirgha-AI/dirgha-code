@@ -3,6 +3,7 @@
  * a small JSON envelope to the configured endpoint. Content is never
  * transmitted — only command name, duration, model, and success state.
  */
+import { assertSafeFetchUrl } from "../utils/url-guard.js";
 export function createTelemetry(opts) {
     if (!opts.enabled) {
         return { async record() { } };
@@ -15,6 +16,7 @@ export function createTelemetry(opts) {
             const payload = { ...event, anonId, ts: new Date().toISOString() };
             try {
                 const signal = AbortSignal.timeout(timeout);
+                assertSafeFetchUrl(endpoint);
                 await fetch(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },

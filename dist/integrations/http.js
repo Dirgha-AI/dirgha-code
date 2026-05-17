@@ -2,6 +2,7 @@
  * Shared HTTP helper for integration clients. Adds Bearer auth, typed
  * JSON parsing, and consistent error surfaces.
  */
+import { assertSafeFetchUrl } from "../utils/url-guard.js";
 export class IntegrationError extends Error {
     status;
     body;
@@ -28,6 +29,7 @@ export async function jsonRequest(opts) {
         headers['Content-Type'] = 'application/json';
     let response;
     try {
+        assertSafeFetchUrl(url);
         response = await fetch(url, {
             method: opts.method ?? 'GET',
             headers,
@@ -67,6 +69,7 @@ export async function sseRequest(opts) {
     }
     let response;
     try {
+        assertSafeFetchUrl(url);
         response = await fetch(url, {
             method: opts.method ?? 'GET',
             headers,

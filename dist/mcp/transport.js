@@ -5,6 +5,7 @@
  */
 import { spawn } from "node:child_process";
 import { safeEnvironment } from "../utils/env.js";
+import { assertSafeFetchUrl } from "../utils/url-guard.js";
 export class StdioTransport {
     opts;
     child = null;
@@ -151,6 +152,7 @@ export class HttpTransport {
         const timer = setTimeout(() => ac.abort(), this.opts.timeoutMs ?? 60_000);
         let resp;
         try {
+            assertSafeFetchUrl(this.opts.url);
             resp = await fetch(this.opts.url, {
                 method: "POST",
                 headers,

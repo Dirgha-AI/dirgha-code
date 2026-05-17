@@ -6,6 +6,7 @@
 
 import { spawn, type ChildProcess } from "node:child_process";
 import { safeEnvironment } from "../utils/env.js";
+import { assertSafeFetchUrl } from "../utils/url-guard.js";
 
 export interface Transport {
   send(message: unknown): Promise<void>;
@@ -192,6 +193,7 @@ export class HttpTransport implements Transport {
     const timer = setTimeout(() => ac.abort(), this.opts.timeoutMs ?? 60_000);
     let resp: Response;
     try {
+      assertSafeFetchUrl(this.opts.url);
       resp = await fetch(this.opts.url, {
         method: "POST",
         headers,

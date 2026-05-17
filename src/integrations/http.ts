@@ -3,6 +3,8 @@
  * JSON parsing, and consistent error surfaces.
  */
 
+import { assertSafeFetchUrl } from "../utils/url-guard.js";
+
 export class IntegrationError extends Error {
   constructor(message: string, readonly status?: number, readonly body?: unknown) {
     super(message);
@@ -36,6 +38,7 @@ export async function jsonRequest<T>(opts: RequestOptions): Promise<T> {
 
   let response: Response;
   try {
+    assertSafeFetchUrl(url);
     response = await fetch(url, {
       method: opts.method ?? 'GET',
       headers,
@@ -75,6 +78,7 @@ export async function sseRequest(opts: RequestOptions): Promise<AsyncIterable<st
 
   let response: Response;
   try {
+    assertSafeFetchUrl(url);
     response = await fetch(url, {
       method: opts.method ?? 'GET',
       headers,

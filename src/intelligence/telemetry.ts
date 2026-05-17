@@ -4,6 +4,8 @@
  * transmitted — only command name, duration, model, and success state.
  */
 
+import { assertSafeFetchUrl } from "../utils/url-guard.js";
+
 export interface TelemetryEvent {
   command: string;
   model?: string;
@@ -36,6 +38,7 @@ export function createTelemetry(opts: TelemetryOptions): Telemetry {
       const payload = { ...event, anonId, ts: new Date().toISOString() };
       try {
         const signal = AbortSignal.timeout(timeout);
+        assertSafeFetchUrl(endpoint);
         await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

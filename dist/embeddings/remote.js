@@ -9,6 +9,7 @@
  * throw immediately with the server-supplied message — these are usually
  * config errors (wrong URL, bad auth) that won't fix themselves on retry.
  */
+import { assertSafeFetchUrl } from "../utils/url-guard.js";
 const DEFAULT_TIMEOUT_MS = 30_000;
 export class RemoteEmbedder {
     provider = "remote";
@@ -47,6 +48,7 @@ export class RemoteEmbedder {
             if (this.bearerToken) {
                 headers["Authorization"] = `Bearer ${this.bearerToken}`;
             }
+            assertSafeFetchUrl(this.endpoint);
             const res = await this.fetchImpl(this.endpoint, {
                 method: "POST",
                 headers,
