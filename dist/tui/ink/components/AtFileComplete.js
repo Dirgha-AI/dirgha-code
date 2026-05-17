@@ -94,7 +94,7 @@ async function walk(root, budget = MAX_WALK_ENTRIES) {
     }
     return out;
 }
-export function AtFileComplete(props) {
+function AtFileCompleteInner(props) {
     const { stdout } = useStdout();
     const palette = useTheme();
     const cols = stdout?.columns ?? 80;
@@ -146,14 +146,15 @@ export function AtFileComplete(props) {
         }
     });
     if (error !== null) {
-        return (_jsx(Box, { borderStyle: "single", borderColor: palette.error, paddingX: 1, width: width, children: _jsxs(Text, { color: palette.error, children: ["walk failed: ", error] }) }));
+        return (_jsx(Box, { borderStyle: "single", borderColor: palette.status.error, paddingX: 1, width: width, children: _jsxs(Text, { color: palette.status.error, children: ["walk failed: ", error] }) }));
     }
     if (index === null) {
-        return (_jsx(Box, { borderStyle: "single", borderColor: palette.borderIdle, paddingX: 1, width: width, children: _jsx(Text, { color: palette.textMuted, dimColor: true, children: "indexing files\u2026" }) }));
+        return (_jsx(Box, { borderStyle: "single", borderColor: palette.border.default, paddingX: 1, width: width, children: _jsx(Text, { color: palette.text.secondary, dimColor: true, children: "indexing files\u2026" }) }));
     }
     if (matches.length === 0) {
-        return (_jsx(Box, { borderStyle: "single", borderColor: palette.borderIdle, paddingX: 1, width: width, children: _jsxs(Text, { color: palette.textMuted, dimColor: true, children: ["no matches for @", props.query] }) }));
+        return (_jsx(Box, { borderStyle: "single", borderColor: palette.border.default, paddingX: 1, width: width, children: _jsxs(Text, { color: palette.text.secondary, dimColor: true, children: ["no matches for @", props.query] }) }));
     }
-    return (_jsxs(Box, { flexDirection: "column", borderStyle: "single", borderColor: palette.accent, paddingX: 1, width: width, children: [_jsxs(Box, { justifyContent: "space-between", children: [_jsxs(Text, { color: palette.accent, bold: true, children: ["@", props.query] }), _jsx(Text, { color: palette.textMuted, dimColor: true, children: "\u2191\u2193 \u00B7 tab/enter \u00B7 esc" })] }), matches.map((m, i) => (_jsxs(Box, { gap: 1, paddingLeft: 1, children: [_jsx(Text, { color: i === cursor ? palette.accent : palette.textMuted, children: i === cursor ? '>' : ' ' }), _jsx(Text, { color: i === cursor ? palette.textPrimary : palette.textMuted, bold: i === cursor, children: m.path })] }, m.path)))] }));
+    return (_jsxs(Box, { flexDirection: "column", borderStyle: "single", borderColor: palette.text.accent, paddingX: 1, width: width, children: [_jsxs(Box, { justifyContent: "space-between", children: [_jsxs(Text, { color: palette.text.accent, bold: true, children: ["@", props.query] }), _jsx(Text, { color: palette.text.secondary, dimColor: true, children: "\u2191\u2193 \u00B7 tab/enter \u00B7 esc" })] }), matches.map((m, i) => (_jsxs(Box, { gap: 1, paddingLeft: 1, children: [_jsx(Text, { color: i === cursor ? palette.text.accent : palette.text.secondary, children: i === cursor ? '>' : ' ' }), _jsx(Text, { color: i === cursor ? palette.text.primary : palette.text.secondary, bold: i === cursor, children: m.path })] }, m.path)))] }));
 }
+export const AtFileComplete = React.memo(AtFileCompleteInner);
 //# sourceMappingURL=AtFileComplete.js.map

@@ -32,4 +32,6 @@ export interface ModelPickerProps {
     /** Optional ordered list of provider-name substrings to pin to the top. */
     pinnedFamilies?: string[];
 }
-export declare function ModelPicker(props: ModelPickerProps): React.JSX.Element;
+declare function ModelPickerInner(props: ModelPickerProps): React.JSX.Element;
+export declare const ModelPicker: React.MemoExoticComponent<typeof ModelPickerInner>;
+export {};

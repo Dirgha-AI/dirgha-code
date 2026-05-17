@@ -37,7 +37,7 @@ export const MarkdownDisplay = React.memo(function MarkdownDisplay(props) {
     const blocks = React.useMemo(() => (text ? parserRef.current.parse(text) : []), [text]);
     if (!text)
         return null;
-    return (_jsx(Box, { flexDirection: "column", children: blocks.map((b, i) => (_jsx(BlockView, { block: b, palette: palette, width: width, idx: i }, i))) }));
+    return (_jsx(Box, { flexDirection: "column", children: blocks.map((b, i) => (_jsx(BlockView, { block: b, palette: palette, width: width, idx: i }, b.kind + '-' + i))) }));
 });
 function BlockView({ block, palette, width, idx, }) {
     switch (block.kind) {

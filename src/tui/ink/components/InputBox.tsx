@@ -508,7 +508,7 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
           )}
           {pasteSegment !== null && pasteExpanded && (
             <Text color={palette.textMuted} dimColor>
-              pasted block expanded (Ctrl+E collapse)
+              [Pasted {pasteSegment.lines === 1 ? "1 line" : `${pasteSegment.lines} lines`} expanded · Ctrl+E collapse]
             </Text>
           )}
           {props.busy && (

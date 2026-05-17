@@ -18,4 +18,6 @@ export interface ModelSwitchPromptProps {
     onReject: () => void;
     onPicker: () => void;
 }
-export declare function ModelSwitchPrompt(props: ModelSwitchPromptProps): React.JSX.Element;
+declare function ModelSwitchPromptInner(props: ModelSwitchPromptProps): React.JSX.Element;
+export declare const ModelSwitchPrompt: React.MemoExoticComponent<typeof ModelSwitchPromptInner>;
+export {};

@@ -23,7 +23,7 @@ export interface ModelSwitchPromptProps {
   onPicker: () => void;
 }
 
-export function ModelSwitchPrompt(props: ModelSwitchPromptProps): React.JSX.Element {
+function ModelSwitchPromptInner(props: ModelSwitchPromptProps): React.JSX.Element {
   const palette = useTheme();
   useInput((ch, _key) => {
     if (ch === 'y' || ch === 'Y') {
@@ -54,3 +54,5 @@ export function ModelSwitchPrompt(props: ModelSwitchPromptProps): React.JSX.Elem
     </Box>
   );
 }
+export const ModelSwitchPrompt = React.memo(ModelSwitchPromptInner);
+

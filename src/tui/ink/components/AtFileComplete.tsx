@@ -100,7 +100,7 @@ async function walk(root: string, budget = MAX_WALK_ENTRIES): Promise<string[]> 
   return out;
 }
 
-export function AtFileComplete(props: AtFileCompleteProps): React.JSX.Element {
+function AtFileCompleteInner(props: AtFileCompleteProps): React.JSX.Element {
   const { stdout } = useStdout();
   const palette = useTheme();
   const cols = stdout?.columns ?? 80;
@@ -145,40 +145,41 @@ export function AtFileComplete(props: AtFileCompleteProps): React.JSX.Element {
 
   if (error !== null) {
     return (
-      <Box borderStyle="single" borderColor={palette.error} paddingX={1} width={width}>
-        <Text color={palette.error}>walk failed: {error}</Text>
+      <Box borderStyle="single" borderColor={palette.status.error} paddingX={1} width={width}>
+        <Text color={palette.status.error}>walk failed: {error}</Text>
       </Box>
     );
   }
 
   if (index === null) {
     return (
-      <Box borderStyle="single" borderColor={palette.borderIdle} paddingX={1} width={width}>
-        <Text color={palette.textMuted} dimColor>indexing files…</Text>
+      <Box borderStyle="single" borderColor={palette.border.default} paddingX={1} width={width}>
+        <Text color={palette.text.secondary} dimColor>indexing files…</Text>
       </Box>
     );
   }
 
   if (matches.length === 0) {
     return (
-      <Box borderStyle="single" borderColor={palette.borderIdle} paddingX={1} width={width}>
-        <Text color={palette.textMuted} dimColor>no matches for @{props.query}</Text>
+      <Box borderStyle="single" borderColor={palette.border.default} paddingX={1} width={width}>
+        <Text color={palette.text.secondary} dimColor>no matches for @{props.query}</Text>
       </Box>
     );
   }
 
   return (
-    <Box flexDirection="column" borderStyle="single" borderColor={palette.accent} paddingX={1} width={width}>
+    <Box flexDirection="column" borderStyle="single" borderColor={palette.text.accent} paddingX={1} width={width}>
       <Box justifyContent="space-between">
-        <Text color={palette.accent} bold>@{props.query}</Text>
-        <Text color={palette.textMuted} dimColor>↑↓ · tab/enter · esc</Text>
+        <Text color={palette.text.accent} bold>@{props.query}</Text>
+        <Text color={palette.text.secondary} dimColor>↑↓ · tab/enter · esc</Text>
       </Box>
       {matches.map((m, i) => (
         <Box key={m.path} gap={1} paddingLeft={1}>
-          <Text color={i === cursor ? palette.accent : palette.textMuted}>{i === cursor ? '>' : ' '}</Text>
-          <Text color={i === cursor ? palette.textPrimary : palette.textMuted} bold={i === cursor}>{m.path}</Text>
+          <Text color={i === cursor ? palette.text.accent : palette.text.secondary}>{i === cursor ? '>' : ' '}</Text>
+          <Text color={i === cursor ? palette.text.primary : palette.text.secondary} bold={i === cursor}>{m.path}</Text>
         </Box>
       ))}
     </Box>
   );
 }
+export const AtFileComplete = React.memo(AtFileCompleteInner);

@@ -19,7 +19,7 @@ const PROVIDER_HINT = {
     GEMINI_API_KEY: "Get yours at aistudio.google.com/app/apikey",
     FIREWORKS_API_KEY: "Get yours at fireworks.ai/settings/api-keys",
 };
-export function KeySetOverlay(props) {
+function KeySetOverlayInner(props) {
     const theme = useTheme();
     const [value, setValue] = React.useState("");
     const [masked, setMasked] = React.useState(true);
@@ -44,4 +44,5 @@ export function KeySetOverlay(props) {
                                 props.onSave(v.trim());
                         } })] }), _jsx(Box, { marginTop: 1, flexDirection: "row", gap: 3, children: _jsx(Text, { color: theme.textMuted, children: "Enter to save \u00B7 Esc to cancel \u00B7 Ctrl+H to toggle mask" }) })] }));
 }
+export const KeySetOverlay = React.memo(KeySetOverlayInner);
 //# sourceMappingURL=KeySetOverlay.js.map

@@ -1034,9 +1034,7 @@ const MODEL_FAILOVERS = {
     "minimaxai/minimax-m2": "minimaxai/minimax-m2.7",
     "deepseek-ai/deepseek-v3.1-terminus": "deepseek-ai/deepseek-v4-pro",
     "deepseek-ai/deepseek-v3.2": "deepseek-ai/deepseek-v4-pro",
-    // flash hangs on NIM — always demote to pro
-    "deepseek-ai/deepseek-v4-flash": "deepseek-ai/deepseek-v4-pro",
-    "deepseek-v4-flash": "deepseek-ai/deepseek-v4-pro",
+    // flash routes via api.deepseek.com direct (not NIM) — no demotion needed
     // NIM → OpenRouter mirror (transient failure fallback)
     "qwen/qwen3-next-80b-a3b-instruct": "qwen/qwen3-235b-a22b-thinking-2507",
     "meta/llama-3.3-70b-instruct": "qwen/qwen3-coder:free",

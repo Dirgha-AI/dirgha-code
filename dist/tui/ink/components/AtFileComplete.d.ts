@@ -22,4 +22,6 @@ export interface AtFileCompleteProps {
     onPick: (path: string) => void;
     onCancel: () => void;
 }
-export declare function AtFileComplete(props: AtFileCompleteProps): React.JSX.Element;
+declare function AtFileCompleteInner(props: AtFileCompleteProps): React.JSX.Element;
+export declare const AtFileComplete: React.MemoExoticComponent<typeof AtFileCompleteInner>;
+export {};

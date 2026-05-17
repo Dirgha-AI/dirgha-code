@@ -31,7 +31,7 @@ export interface ApprovalPromptProps {
   onResolve: (decision: ApprovalDecision) => void;
 }
 
-export function ApprovalPrompt(props: ApprovalPromptProps): React.JSX.Element {
+function ApprovalPromptInner(props: ApprovalPromptProps): React.JSX.Element {
   const palette = useTheme();
   const { request, onResolve } = props;
 
@@ -88,3 +88,5 @@ export function ApprovalPrompt(props: ApprovalPromptProps): React.JSX.Element {
     </Box>
   );
 }
+export const ApprovalPrompt = React.memo(ApprovalPromptInner);
+

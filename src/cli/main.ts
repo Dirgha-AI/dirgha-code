@@ -1011,9 +1011,29 @@ process.stderr.on("error", () => {});
 process.stdin.on("error", (e: NodeJS.ErrnoException) => {
   if (e.code === "EIO" || e.code === "EPIPE") process.exit(0);
 });
+
+// Restore terminal raw mode before crash exits so the shell is never left
+// in a state where echoing and line-wrap are disabled.  This is a last-
+// resort guard; normal exits go through readline's `close` event or the
+// Ink `exit` handler which already do cleanup.  Idempotent — Ink's own
+// `process.on("exit")` handler runs afterwards and is harmless here.
+const _restoreRawModeOnCrash = (): void => {
+  try {
+    if (process.stdin.isTTY) process.stdin.setRawMode(false);
+  } catch { /* best-effort */ }
+};
+
 process.on("uncaughtException", (e: NodeJS.ErrnoException) => {
   if (e.code === "EPIPE" || e.code === "EIO") process.exit(0);
-  throw e;
+  _restoreRawModeOnCrash();
+  process.stderr.write(`\nuncaughtException: ${e.stack ?? e.message}\n`);
+  process.exit(1);
+});
+process.on("unhandledRejection", (reason: unknown) => {
+  _restoreRawModeOnCrash();
+  const msg = reason instanceof Error ? (reason.stack ?? reason.message) : String(reason);
+  process.stderr.write(`\nunhandledRejection: ${msg}\n`);
+  process.exit(1);
 });
 
 rotateCrashLog();

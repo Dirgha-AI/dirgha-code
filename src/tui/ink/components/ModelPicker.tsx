@@ -83,7 +83,7 @@ function groupByProvider(
   return [...map.entries()].map(([provider, items]) => ({ provider, items }));
 }
 
-export function ModelPicker(props: ModelPickerProps): React.JSX.Element {
+function ModelPickerInner(props: ModelPickerProps): React.JSX.Element {
   const { stdout } = useStdout();
   const palette = useTheme();
   const cols = stdout?.columns ?? 80;
@@ -93,8 +93,8 @@ export function ModelPicker(props: ModelPickerProps): React.JSX.Element {
   // hardcoded Ink color names so they respect the user's theme choice.
   const tierColor: Record<NonNullable<ModelEntry["tier"]>, string> = {
     free: palette.status.success,
-    basic: palette.brand,
-    pro: palette.accent,
+    basic: palette.ui.focus,
+    pro: palette.text.accent,
     premium: palette.status.warning,
   };
 
@@ -179,12 +179,12 @@ export function ModelPicker(props: ModelPickerProps): React.JSX.Element {
     <Box
       flexDirection="column"
       borderStyle="round"
-      borderColor={palette.accent}
+      borderColor={palette.text.accent}
       paddingX={1}
       width={width}
     >
       <Box justifyContent="space-between">
-        <Text color={palette.accent} bold>
+        <Text color={palette.text.accent} bold>
           Select model
         </Text>
         {filter.length > 0 ? (
@@ -326,3 +326,4 @@ export function ModelPicker(props: ModelPickerProps): React.JSX.Element {
     </Box>
   );
 }
+export const ModelPicker = React.memo(ModelPickerInner);

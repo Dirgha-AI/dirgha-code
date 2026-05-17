@@ -46,11 +46,23 @@ export function useRenderMetrics() {
         const removed = frameTimesRef.current.shift();
         totalFrameTimeRef.current -= removed;
     }
+    // Throttle disk writes: only flush every 60 frames (~1 min at ~1fps or
+    // ~1s at 60fps) so per-frame I/O doesn't saturate the event loop.
+    const lastFlushFrameRef = React.useRef(0);
+    const FLUSH_EVERY_N_FRAMES = 60;
     React.useEffect(() => {
-        // Capture frameTime and frameTimesRef at mount time, then write
-        // once per render to state so the I/O doesn't repeat on re-renders
-        // of the parent (which would fire hundreds/sec).
-        const capturedFrameTime = frameTime;
+        // Skip frame 0 (mount baseline — delta is meaningless) and only
+        // flush every FLUSH_EVERY_N_FRAMES renders so disk I/O stays bounded.
+        const frame = framesThisSessionRef.current;
+        if (frame <= 1)
+            return;
+        if (frame - lastFlushFrameRef.current < FLUSH_EVERY_N_FRAMES)
+            return;
+        lastFlushFrameRef.current = frame;
+        // Snapshot current session totals so the async write is consistent
+        // even if another render fires before the Promise resolves.
+        const capturedFrameTime = frameTimesRef.current[frameTimesRef.current.length - 1] ?? 0;
+        const capturedFrameTimes = [...frameTimesRef.current];
         void (async () => {
             try {
                 const state = await readState();
@@ -61,8 +73,8 @@ export function useRenderMetrics() {
                 };
                 prev.totalFrames += 1;
                 prev.totalFrameTimeMs += capturedFrameTime;
-                if (frameTimesRef.current.length >= 100) {
-                    const sorted = [...frameTimesRef.current].sort((a, b) => a - b);
+                if (capturedFrameTimes.length >= 100) {
+                    const sorted = [...capturedFrameTimes].sort((a, b) => a - b);
                     const idx = Math.ceil(sorted.length * 0.99) - 1;
                     const p99 = sorted[idx] ?? 0;
                     prev.p99History.push(p99);
@@ -76,7 +88,7 @@ export function useRenderMetrics() {
                 /* best-effort */
             }
         })();
-    }, []);
+    });
     // Memoise the getters object across renders. Without this, every App
     // re-render (every keystroke!) returned a NEW object reference, which
     // defeated `React.memo` on consumers like StatusBar — the bar

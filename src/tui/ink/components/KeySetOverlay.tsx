@@ -29,7 +29,7 @@ const PROVIDER_HINT: Record<string, string> = {
   FIREWORKS_API_KEY: "Get yours at fireworks.ai/settings/api-keys",
 };
 
-export function KeySetOverlay(props: KeySetOverlayProps): React.JSX.Element {
+function KeySetOverlayInner(props: KeySetOverlayProps): React.JSX.Element {
   const theme = useTheme();
   const [value, setValue] = React.useState("");
   const [masked, setMasked] = React.useState(true);
@@ -83,3 +83,5 @@ export function KeySetOverlay(props: KeySetOverlayProps): React.JSX.Element {
     </Box>
   );
 }
+export const KeySetOverlay = React.memo(KeySetOverlayInner);
+

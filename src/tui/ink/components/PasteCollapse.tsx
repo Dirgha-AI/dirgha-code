@@ -13,8 +13,8 @@ import * as React from "react";
 import { Box, Text } from "ink";
 import type { Palette } from "../../theme.js";
 
-export const PASTE_LINE_THRESHOLD = 4;
-export const PASTE_CHAR_THRESHOLD = 200;
+export const PASTE_LINE_THRESHOLD = 2;
+export const PASTE_CHAR_THRESHOLD = 100;
 
 export interface PasteSegment {
   start: number;
@@ -86,21 +86,25 @@ export function PasteCollapseView(
 ): React.JSX.Element {
   const { value, segment, expanded, palette } = props;
   if (expanded) {
+    const lineLabel = segment.lines === 1 ? "1 line" : `${segment.lines} lines`;
     return (
       <Box flexDirection="column">
         <Text>{value}</Text>
         <Text color={palette.text.secondary} dimColor>
-          [paste preview · ⌫ delete · Ctrl+E hide]
+          [Pasted {lineLabel} preview · ⌫ delete · Ctrl+E collapse]
         </Text>
       </Box>
     );
   }
   const before = value.slice(0, segment.start);
   const after = value.slice(segment.end);
+  const lineLabel = segment.lines === 1 ? "1 line" : `${segment.lines} lines`;
   return (
     <Box flexDirection="row" flexWrap="wrap">
       <Text>{before}</Text>
-      <Text color={palette.status.warning}>[paste]</Text>
+      <Text color={palette.status.warning}>
+        [Pasted {lineLabel}]
+      </Text>
       <Text>{after}</Text>
       <Text color={palette.text.secondary} dimColor>
         {" "}

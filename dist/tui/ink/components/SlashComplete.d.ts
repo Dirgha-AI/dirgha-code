@@ -28,4 +28,6 @@ export interface SlashCompleteProps {
     onPick: (name: string) => void;
     onCancel: () => void;
 }
-export declare function SlashComplete(props: SlashCompleteProps): React.JSX.Element;
+declare function SlashCompleteInner(props: SlashCompleteProps): React.JSX.Element;
+export declare const SlashComplete: React.MemoExoticComponent<typeof SlashCompleteInner>;
+export {};

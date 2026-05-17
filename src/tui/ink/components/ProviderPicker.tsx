@@ -41,7 +41,7 @@ export interface ProviderPickerProps {
   onCancel: () => void;
 }
 
-export function ProviderPicker(props: ProviderPickerProps): React.JSX.Element {
+function ProviderPickerInner(props: ProviderPickerProps): React.JSX.Element {
   const { stdout } = useStdout();
   const palette = useTheme();
   const cols = stdout?.columns ?? 80;
@@ -171,3 +171,4 @@ export function ProviderPicker(props: ProviderPickerProps): React.JSX.Element {
     </Box>
   );
 }
+export const ProviderPicker = React.memo(ProviderPickerInner);

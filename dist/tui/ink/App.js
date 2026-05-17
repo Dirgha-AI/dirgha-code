@@ -557,6 +557,13 @@ export function App(props) {
     // (which captures current currentModel, mode, etc.) without adding those
     // values to handleSubmit's deps and causing it to recreate on every change.
     const runTurnRef = React.useRef(() => Promise.resolve());
+    // overlaysActiveRef lets handleSubmit read overlays.active without listing
+    // it as a useCallback dep — preventing handleSubmit from recreating (and
+    // downstream effects from re-running) every time an overlay opens/closes.
+    const overlaysActiveRef = React.useRef(overlays.active);
+    React.useEffect(() => {
+        overlaysActiveRef.current = overlays.active;
+    }, [overlays.active]);
     const handleSubmit = React.useCallback((raw) => {
         const value = raw.trim();
         if (value.length === 0)
@@ -813,7 +820,6 @@ export function App(props) {
         overlays.setAtQuery,
         overlays.setSlashQuery,
         overlays.setActive,
-        overlays.active,
         handleUpgrade,
     ]);
     const runTurn = async () => {
@@ -1241,7 +1247,7 @@ export function App(props) {
     }, [overlays]);
     const liveJsx = React.useMemo(() => (_jsxs(_Fragment, { children: [_overflowCount > 0 && (_jsx(Box, { paddingX: 1, children: _jsxs(Text, { color: "gray", italic: true, children: ["[\u2191 ", _overflowCount, " more item", _overflowCount === 1 ? "" : "s", " above \u2014 scroll up]"] }) })), renderTranscript(_visibleLiveItems, thinkingStreaming)] })), [_visibleLiveItems, thinkingStreaming, _overflowCount]);
     const providerEntries = React.useMemo(() => buildProviderEntries(models, currentModel), [models, currentModel]);
-    const spinnerCtx = React.useMemo(() => ({ busy, frame: 0 }), [busy]);
+    const spinnerCtx = React.useMemo(() => ({ busy }), [busy]);
     const renderTranscriptItem = React.useCallback((item) => _jsx(TranscriptRow, { item: item }, item.id), []);
     // Logo is emitted via process.stdout.write() before Ink mounts (see
     // tui/ink/index.ts). Keeping it out of Ink's render tree avoids the
@@ -1250,7 +1256,7 @@ export function App(props) {
     // the logo) on every overflow redraw, repainting it on every chat
     // turn that fills the screen. `use-flicker-detector` already warns
     // when this is about to happen.
-    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: spinnerCtx, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: transcript, children: (item) => (_jsx(Box, { flexDirection: "column", children: renderTranscriptItem(item) }, item.id)) }), _jsx(Box, { flexDirection: "column", flexGrow: 1, children: liveJsx }), busy && projection.liveItems.length === 0 && _jsx(GeneratingIndicator, { startedAtMs: turnStartRef.current, liveOutputTokens: liveOutputTokens }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
+    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: spinnerCtx, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: transcript, children: (item) => (_jsx(Box, { flexDirection: "column", children: renderTranscriptItem(item) }, item.id)) }), _jsx(Box, { flexDirection: "column", flexGrow: 1, children: liveJsx }), busy && projection.liveItems.length === 0 && _jsx(GeneratingIndicator, { elapsedMs: liveDurationMs, liveOutputTokens: liveOutputTokens }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: (decision) => {
                             approvalBusRef.current?.resolve(pendingApproval.id, decision);
                         } })), pendingFailover !== null && (_jsx(ModelSwitchPrompt, { failedModel: pendingFailover.failedModel, failoverModel: pendingFailover.failoverModel, onAccept: (failover) => {
                             const lastPrompt = pendingFailover.lastPrompt;
@@ -1468,12 +1474,7 @@ function TranscriptRow({ item, isStreaming = false, }) {
 }
 function GeneratingIndicator(props) {
     const palette = useTheme();
-    const [now, setNow] = React.useState(Date.now());
-    React.useEffect(() => {
-        const t = setInterval(() => setNow(Date.now()), statusbarTickMs());
-        return () => clearInterval(t);
-    }, []);
-    const elapsedSec = props.startedAtMs > 0 ? Math.round((now - props.startedAtMs) / 1000) : 0;
+    const elapsedSec = Math.round(props.elapsedMs / 1000);
     const slow = elapsedSec >= 5 && props.liveOutputTokens === 0;
     const label = slow
         ? `warming up · ${elapsedSec}s · first token can take 10–30s on free models`

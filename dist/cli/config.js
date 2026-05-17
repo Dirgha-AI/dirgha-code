@@ -9,9 +9,9 @@ import { migrateDeprecatedModel } from "../intelligence/prices.js";
 const CURRENT_SCHEMA = 1;
 export const DEFAULT_CONFIG = {
     schemaVersion: CURRENT_SCHEMA,
-    model: "deepseek-ai/deepseek-v4-pro",
-    cheapModel: "deepseek-ai/deepseek-v4-pro",
-    summaryModel: "moonshotai/kimi-k2.5",
+    model: "deepseek-ai/deepseek-v4-flash",
+    cheapModel: "deepseek-ai/deepseek-v4-flash",
+    summaryModel: "deepseek-ai/deepseek-v4-flash",
     maxTurns: 16,
     showThinking: false,
     autoApproveTools: ["fs_read", "fs_ls", "search_grep", "search_glob", "git"],

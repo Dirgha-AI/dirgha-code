@@ -1,7 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { Box, Text } from "ink";
-export const PASTE_LINE_THRESHOLD = 4;
-export const PASTE_CHAR_THRESHOLD = 200;
+export const PASTE_LINE_THRESHOLD = 2;
+export const PASTE_CHAR_THRESHOLD = 100;
 /**
  * Returns a segment describing a just-pasted block when the delta between
  * two consecutive buffer values looks like a paste. Returns null when the
@@ -52,10 +52,12 @@ function countLines(s) {
 export function PasteCollapseView(props) {
     const { value, segment, expanded, palette } = props;
     if (expanded) {
-        return (_jsxs(Box, { flexDirection: "column", children: [_jsx(Text, { children: value }), _jsx(Text, { color: palette.text.secondary, dimColor: true, children: "[paste preview \u00B7 \u232B delete \u00B7 Ctrl+E hide]" })] }));
+        const lineLabel = segment.lines === 1 ? "1 line" : `${segment.lines} lines`;
+        return (_jsxs(Box, { flexDirection: "column", children: [_jsx(Text, { children: value }), _jsxs(Text, { color: palette.text.secondary, dimColor: true, children: ["[Pasted ", lineLabel, " preview \u00B7 \u232B delete \u00B7 Ctrl+E collapse]"] })] }));
     }
     const before = value.slice(0, segment.start);
     const after = value.slice(segment.end);
-    return (_jsxs(Box, { flexDirection: "row", flexWrap: "wrap", children: [_jsx(Text, { children: before }), _jsx(Text, { color: palette.status.warning, children: "[paste]" }), _jsx(Text, { children: after }), _jsxs(Text, { color: palette.text.secondary, dimColor: true, children: [" ", "\u00B7 \u232B delete \u00B7 Ctrl+E preview"] })] }));
+    const lineLabel = segment.lines === 1 ? "1 line" : `${segment.lines} lines`;
+    return (_jsxs(Box, { flexDirection: "row", flexWrap: "wrap", children: [_jsx(Text, { children: before }), _jsxs(Text, { color: palette.status.warning, children: ["[Pasted ", lineLabel, "]"] }), _jsx(Text, { children: after }), _jsxs(Text, { color: palette.text.secondary, dimColor: true, children: [" ", "\u00B7 \u232B delete \u00B7 Ctrl+E preview"] })] }));
 }
 //# sourceMappingURL=PasteCollapse.js.map

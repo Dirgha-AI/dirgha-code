@@ -173,7 +173,18 @@ export async function runInteractive(opts) {
         void closeSession(sessionId);
         process.exit(0);
     });
+    const restoreTerminal = () => {
+        try {
+            if (process.stdin.isTTY)
+                process.stdin.setRawMode(false);
+        }
+        catch {
+            /* best-effort */
+        }
+        process.stdin.resume();
+    };
     const gracefulShutdown = () => {
+        restoreTerminal();
         try {
             session.close();
             void closeSession(sessionId);

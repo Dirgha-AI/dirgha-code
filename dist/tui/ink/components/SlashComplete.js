@@ -60,7 +60,7 @@ function rankCommand(entry, query) {
     score -= firstHit;
     return { ok: true, score };
 }
-export function SlashComplete(props) {
+function SlashCompleteInner(props) {
     const { stdout } = useStdout();
     const palette = useTheme();
     const cols = stdout?.columns ?? 80;
@@ -104,10 +104,11 @@ export function SlashComplete(props) {
         }
     });
     if (matches.length === 0) {
-        return (_jsx(Box, { borderStyle: "single", borderColor: palette.borderIdle, paddingX: 1, width: width, children: _jsxs(Text, { color: palette.textMuted, dimColor: true, children: ["no slash commands match /", props.query] }) }));
+        return (_jsx(Box, { borderStyle: "single", borderColor: palette.border.default, paddingX: 1, width: width, children: _jsxs(Text, { color: palette.text.secondary, dimColor: true, children: ["no slash commands match /", props.query] }) }));
     }
     // Calculate name column width so descriptions line up.
     const nameWidth = Math.max(...matches.map(m => m.name.length)) + 1;
-    return (_jsxs(Box, { flexDirection: "column", borderStyle: "single", borderColor: palette.accent, paddingX: 1, width: width, children: [_jsxs(Box, { justifyContent: "space-between", children: [_jsxs(Text, { color: palette.accent, bold: true, children: ["/", props.query] }), _jsx(Text, { color: palette.textMuted, dimColor: true, children: "\u2191\u2193 \u00B7 tab/enter \u00B7 esc" })] }), matches.map((m, i) => (_jsxs(Box, { gap: 1, paddingLeft: 1, children: [_jsx(Text, { color: i === cursor ? palette.accent : palette.textMuted, children: i === cursor ? '>' : ' ' }), _jsx(Box, { width: nameWidth, children: _jsxs(Text, { color: i === cursor ? palette.textPrimary : palette.brand, bold: i === cursor, children: ["/", m.name] }) }), _jsx(Text, { color: i === cursor ? palette.textPrimary : palette.textMuted, dimColor: i !== cursor, children: m.description })] }, m.name)))] }));
+    return (_jsxs(Box, { flexDirection: "column", borderStyle: "single", borderColor: palette.text.accent, paddingX: 1, width: width, children: [_jsxs(Box, { justifyContent: "space-between", children: [_jsxs(Text, { color: palette.text.accent, bold: true, children: ["/", props.query] }), _jsx(Text, { color: palette.text.secondary, dimColor: true, children: "\u2191\u2193 \u00B7 tab/enter \u00B7 esc" })] }), matches.map((m, i) => (_jsxs(Box, { gap: 1, paddingLeft: 1, children: [_jsx(Text, { color: i === cursor ? palette.text.accent : palette.text.secondary, children: i === cursor ? '>' : ' ' }), _jsx(Box, { width: nameWidth, children: _jsxs(Text, { color: i === cursor ? palette.text.primary : palette.ui.focus, bold: i === cursor, children: ["/", m.name] }) }), _jsx(Text, { color: i === cursor ? palette.text.primary : palette.text.secondary, dimColor: i !== cursor, children: m.description })] }, m.name)))] }));
 }
+export const SlashComplete = React.memo(SlashCompleteInner);
 //# sourceMappingURL=SlashComplete.js.map

@@ -1,7 +1,22 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+/**
+ * Inline tool-approval prompt — Ink-native.
+ *
+ * Replaces the legacy `createTuiApprovalBus` (in `tui/approval.ts`),
+ * which wrote the approval question directly to `process.stdout` and
+ * read `process.stdin` raw. That approach worked OK on Linux but on
+ * Windows the raw-mode handoff between Ink and the approval reader
+ * hung — and on every platform the prompt was invisible because Ink's
+ * differential renderer overdrew it on the next frame.
+ *
+ * This component renders inside the React tree like `ModelSwitchPrompt`,
+ * so it participates in normal Ink layout. Keys are read via `useInput`
+ * (no raw-mode contention) and the answer is reported via `onResolve`.
+ */
+import * as React from 'react';
 import { Box, Text, useInput } from 'ink';
 import { useTheme } from '../theme-context.js';
-export function ApprovalPrompt(props) {
+function ApprovalPromptInner(props) {
     const palette = useTheme();
     const { request, onResolve } = props;
     useInput((ch, key) => {
@@ -37,4 +52,5 @@ export function ApprovalPrompt(props) {
                             : line.startsWith('-') ? palette.status.error
                                 : palette.text.secondary, children: line }, i))), truncated && (_jsxs(Text, { color: palette.text.secondary, dimColor: true, children: ["\u23BF (", diffLines.length - 12, " more lines hidden)"] }))] })), _jsx(Box, { marginTop: 1, children: _jsxs(Text, { color: palette.text.secondary, children: [' ', "[", _jsx(Text, { bold: true, color: palette.status.success, children: "y" }), "]es (default)", '  ', "[", _jsx(Text, { bold: true, color: palette.text.secondary, children: "n" }), "]o", '  ', "[", _jsx(Text, { bold: true, color: palette.text.accent, children: "a" }), "]lways for this session", '  ', "[", _jsx(Text, { bold: true, color: palette.status.error, children: "d" }), "]eny all"] }) })] }));
 }
+export const ApprovalPrompt = React.memo(ApprovalPromptInner);
 //# sourceMappingURL=ApprovalPrompt.js.map

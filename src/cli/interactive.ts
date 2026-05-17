@@ -210,7 +210,17 @@ export async function runInteractive(opts: InteractiveOptions): Promise<void> {
     process.exit(0);
   });
 
+  const restoreTerminal = (): void => {
+    try {
+      if (process.stdin.isTTY) process.stdin.setRawMode(false);
+    } catch {
+      /* best-effort */
+    }
+    process.stdin.resume();
+  };
+
   const gracefulShutdown = (): void => {
+    restoreTerminal();
     try {
       session.close();
       void closeSession(sessionId);

@@ -51,7 +51,7 @@ export const MarkdownDisplay = React.memo(function MarkdownDisplay(
   return (
     <Box flexDirection="column">
       {blocks.map((b, i) => (
-        <BlockView key={i} block={b} palette={palette} width={width} idx={i} />
+        <BlockView key={b.kind + '-' + i} block={b} palette={palette} width={width} idx={i} />
       ))}
     </Box>
   );

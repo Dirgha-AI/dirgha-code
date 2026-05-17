@@ -13,4 +13,6 @@ export interface KeySetOverlayProps {
     onSave: (value: string) => void;
     onCancel: () => void;
 }
-export declare function KeySetOverlay(props: KeySetOverlayProps): React.JSX.Element;
+declare function KeySetOverlayInner(props: KeySetOverlayProps): React.JSX.Element;
+export declare const KeySetOverlay: React.MemoExoticComponent<typeof KeySetOverlayInner>;
+export {};

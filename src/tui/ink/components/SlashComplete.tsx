@@ -78,7 +78,7 @@ function rankCommand(entry: SlashCommandEntry, query: string): { ok: boolean; sc
   return { ok: true, score };
 }
 
-export function SlashComplete(props: SlashCompleteProps): React.JSX.Element {
+function SlashCompleteInner(props: SlashCompleteProps): React.JSX.Element {
   const { stdout } = useStdout();
   const palette = useTheme();
   const cols = stdout?.columns ?? 80;
@@ -117,8 +117,8 @@ export function SlashComplete(props: SlashCompleteProps): React.JSX.Element {
 
   if (matches.length === 0) {
     return (
-      <Box borderStyle="single" borderColor={palette.borderIdle} paddingX={1} width={width}>
-        <Text color={palette.textMuted} dimColor>no slash commands match /{props.query}</Text>
+      <Box borderStyle="single" borderColor={palette.border.default} paddingX={1} width={width}>
+        <Text color={palette.text.secondary} dimColor>no slash commands match /{props.query}</Text>
       </Box>
     );
   }
@@ -127,18 +127,18 @@ export function SlashComplete(props: SlashCompleteProps): React.JSX.Element {
   const nameWidth = Math.max(...matches.map(m => m.name.length)) + 1;
 
   return (
-    <Box flexDirection="column" borderStyle="single" borderColor={palette.accent} paddingX={1} width={width}>
+    <Box flexDirection="column" borderStyle="single" borderColor={palette.text.accent} paddingX={1} width={width}>
       <Box justifyContent="space-between">
-        <Text color={palette.accent} bold>/{props.query}</Text>
-        <Text color={palette.textMuted} dimColor>↑↓ · tab/enter · esc</Text>
+        <Text color={palette.text.accent} bold>/{props.query}</Text>
+        <Text color={palette.text.secondary} dimColor>↑↓ · tab/enter · esc</Text>
       </Box>
       {matches.map((m, i) => (
         <Box key={m.name} gap={1} paddingLeft={1}>
-          <Text color={i === cursor ? palette.accent : palette.textMuted}>{i === cursor ? '>' : ' '}</Text>
+          <Text color={i === cursor ? palette.text.accent : palette.text.secondary}>{i === cursor ? '>' : ' '}</Text>
           <Box width={nameWidth}>
-            <Text color={i === cursor ? palette.textPrimary : palette.brand} bold={i === cursor}>/{m.name}</Text>
+            <Text color={i === cursor ? palette.text.primary : palette.ui.focus} bold={i === cursor}>/{m.name}</Text>
           </Box>
-          <Text color={i === cursor ? palette.textPrimary : palette.textMuted} dimColor={i !== cursor}>
+          <Text color={i === cursor ? palette.text.primary : palette.text.secondary} dimColor={i !== cursor}>
             {m.description}
           </Text>
         </Box>
@@ -146,3 +146,4 @@ export function SlashComplete(props: SlashCompleteProps): React.JSX.Element {
     </Box>
   );
 }
+export const SlashComplete = React.memo(SlashCompleteInner);

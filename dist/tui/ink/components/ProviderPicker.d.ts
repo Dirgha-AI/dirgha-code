@@ -35,4 +35,6 @@ export interface ProviderPickerProps {
     onPick: (providerId: string) => void;
     onCancel: () => void;
 }
-export declare function ProviderPicker(props: ProviderPickerProps): React.JSX.Element;
+declare function ProviderPickerInner(props: ProviderPickerProps): React.JSX.Element;
+export declare const ProviderPicker: React.MemoExoticComponent<typeof ProviderPickerInner>;
+export {};

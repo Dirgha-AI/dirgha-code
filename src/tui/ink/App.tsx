@@ -663,6 +663,14 @@ export function App(props: AppProps): React.JSX.Element {
   // values to handleSubmit's deps and causing it to recreate on every change.
   const runTurnRef = React.useRef<() => Promise<void>>(() => Promise.resolve());
 
+  // overlaysActiveRef lets handleSubmit read overlays.active without listing
+  // it as a useCallback dep — preventing handleSubmit from recreating (and
+  // downstream effects from re-running) every time an overlay opens/closes.
+  const overlaysActiveRef = React.useRef(overlays.active);
+  React.useEffect(() => {
+    overlaysActiveRef.current = overlays.active;
+  }, [overlays.active]);
+
   const handleSubmit = React.useCallback(
     (raw: string): void => {
       const value = raw.trim();
@@ -929,7 +937,6 @@ export function App(props: AppProps): React.JSX.Element {
       overlays.setAtQuery,
       overlays.setSlashQuery,
       overlays.setActive,
-      overlays.active,
       handleUpgrade,
     ],
   );
@@ -1406,7 +1413,7 @@ export function App(props: AppProps): React.JSX.Element {
     [models, currentModel],
   );
 
-  const spinnerCtx = React.useMemo(() => ({ busy, frame: 0 }), [busy]);
+  const spinnerCtx = React.useMemo(() => ({ busy }), [busy]);
   const renderTranscriptItem = React.useCallback(
     (item: TranscriptItem) => <TranscriptRow key={item.id} item={item} />,
     [],
@@ -1435,7 +1442,7 @@ export function App(props: AppProps): React.JSX.Element {
             )}
           </Static>
           <Box flexDirection="column" flexGrow={1}>{liveJsx}</Box>
-          {busy && projection.liveItems.length === 0 && <GeneratingIndicator startedAtMs={turnStartRef.current} liveOutputTokens={liveOutputTokens} />}
+          {busy && projection.liveItems.length === 0 && <GeneratingIndicator elapsedMs={liveDurationMs} liveOutputTokens={liveOutputTokens} />}
           {pendingApproval !== null && approvalBusRef.current && (
             <ApprovalPrompt
               request={pendingApproval}
@@ -1850,17 +1857,11 @@ function TranscriptRow({
 }
 
 function GeneratingIndicator(props: {
-  startedAtMs: number;
+  elapsedMs: number;
   liveOutputTokens: number;
 }): React.JSX.Element {
   const palette = useTheme();
-  const [now, setNow] = React.useState(Date.now());
-  React.useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), statusbarTickMs());
-    return () => clearInterval(t);
-  }, []);
-  const elapsedSec =
-    props.startedAtMs > 0 ? Math.round((now - props.startedAtMs) / 1000) : 0;
+  const elapsedSec = Math.round(props.elapsedMs / 1000);
   const slow = elapsedSec >= 5 && props.liveOutputTokens === 0;
   const label = slow
     ? `warming up · ${elapsedSec}s · first token can take 10–30s on free models`

@@ -24,4 +24,6 @@ export interface ApprovalPromptProps {
     request: ApprovalRequest;
     onResolve: (decision: ApprovalDecision) => void;
 }
-export declare function ApprovalPrompt(props: ApprovalPromptProps): React.JSX.Element;
+declare function ApprovalPromptInner(props: ApprovalPromptProps): React.JSX.Element;
+export declare const ApprovalPrompt: React.MemoExoticComponent<typeof ApprovalPromptInner>;
+export {};

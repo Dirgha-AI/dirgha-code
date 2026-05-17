@@ -59,7 +59,7 @@ function groupByProvider(models) {
     }
     return [...map.entries()].map(([provider, items]) => ({ provider, items }));
 }
-export function ModelPicker(props) {
+function ModelPickerInner(props) {
     const { stdout } = useStdout();
     const palette = useTheme();
     const cols = stdout?.columns ?? 80;
@@ -68,8 +68,8 @@ export function ModelPicker(props) {
     // hardcoded Ink color names so they respect the user's theme choice.
     const tierColor = {
         free: palette.status.success,
-        basic: palette.brand,
-        pro: palette.accent,
+        basic: palette.ui.focus,
+        pro: palette.text.accent,
         premium: palette.status.warning,
     };
     const pinned = props.pinnedFamilies ?? DEFAULT_PINNED_FAMILIES;
@@ -135,7 +135,7 @@ export function ModelPicker(props) {
     const titleWidth = width - 24;
     // Build a flat row index so digit shortcuts map to the visible ordering.
     let idx = 0;
-    return (_jsxs(Box, { flexDirection: "column", borderStyle: "round", borderColor: palette.accent, paddingX: 1, width: width, children: [_jsxs(Box, { justifyContent: "space-between", children: [_jsx(Text, { color: palette.accent, bold: true, children: "Select model" }), filter.length > 0 ? (_jsxs(Text, { color: palette.text.accent, children: [_jsxs(Text, { color: palette.text.secondary, dimColor: true, children: ["filter:", " "] }), filter, _jsxs(Text, { color: palette.text.secondary, dimColor: true, children: [" ", "(", filtered.length, ")"] })] })) : (_jsxs(Text, { color: palette.text.secondary, dimColor: true, children: [filtered.length, " models"] }))] }), _jsxs(Box, { marginTop: 1, flexDirection: "column", children: [filtered.length === 0 && (_jsxs(Text, { color: palette.text.secondary, dimColor: true, children: ["No models match \"", filter, "\"."] })), groups.map((group) => (_jsxs(Box, { flexDirection: "column", marginBottom: 1, children: [_jsx(Text, { color: palette.text.secondary, dimColor: true, children: group.provider }), group.items.map((m) => {
+    return (_jsxs(Box, { flexDirection: "column", borderStyle: "round", borderColor: palette.text.accent, paddingX: 1, width: width, children: [_jsxs(Box, { justifyContent: "space-between", children: [_jsx(Text, { color: palette.text.accent, bold: true, children: "Select model" }), filter.length > 0 ? (_jsxs(Text, { color: palette.text.accent, children: [_jsxs(Text, { color: palette.text.secondary, dimColor: true, children: ["filter:", " "] }), filter, _jsxs(Text, { color: palette.text.secondary, dimColor: true, children: [" ", "(", filtered.length, ")"] })] })) : (_jsxs(Text, { color: palette.text.secondary, dimColor: true, children: [filtered.length, " models"] }))] }), _jsxs(Box, { marginTop: 1, flexDirection: "column", children: [filtered.length === 0 && (_jsxs(Text, { color: palette.text.secondary, dimColor: true, children: ["No models match \"", filter, "\"."] })), groups.map((group) => (_jsxs(Box, { flexDirection: "column", marginBottom: 1, children: [_jsx(Text, { color: palette.text.secondary, dimColor: true, children: group.provider }), group.items.map((m) => {
                                 const myIdx = idx;
                                 idx += 1;
                                 const isCursor = myIdx === cursor;
@@ -161,4 +161,5 @@ export function ModelPicker(props) {
                                                         : palette.text.secondary, children: lead }) }), _jsx(Box, { minWidth: 2, flexShrink: 0, children: _jsx(Text, { color: palette.text.secondary, dimColor: true, children: num }) }), _jsx(Box, { flexGrow: 1, flexShrink: 1, children: _jsx(Text, { color: titleColor, bold: isCursor, wrap: "wrap", children: truncatedTitle }) }), m.tier !== undefined && (_jsx(Box, { minWidth: 6, flexShrink: 0, justifyContent: "flex-end", children: _jsx(Text, { color: tierLabel, dimColor: !isCursor, children: m.tier }) }))] }, m.id));
                             })] }, group.provider)))] }), _jsxs(Box, { borderStyle: "single", borderTop: true, borderBottom: false, borderLeft: false, borderRight: false, borderColor: palette.border.default, flexDirection: "column", children: [_jsxs(Box, { children: [_jsxs(Text, { color: palette.text.secondary, dimColor: true, children: ["\u2192", " "] }), _jsx(Text, { color: palette.text.accent, children: selected?.id ?? props.current })] }), _jsxs(Box, { justifyContent: "space-between", children: [_jsxs(Text, { color: palette.text.secondary, dimColor: true, children: [_jsx(Text, { bold: true, color: palette.text.primary, children: "\u2191\u2193" }), " ", "nav", "   ", _jsx(Text, { bold: true, color: palette.text.primary, children: "enter" }), " ", "pick", "   ", _jsx(Text, { bold: true, color: palette.text.primary, children: "1-9" }), " ", "jump"] }), _jsxs(Text, { color: palette.text.secondary, dimColor: true, children: [_jsx(Text, { bold: true, color: palette.text.primary, children: "type" }), " ", "filter", "   ", _jsx(Text, { bold: true, color: palette.text.primary, children: "esc" }), " ", filter ? "clear" : "cancel"] })] })] })] }));
 }
+export const ModelPicker = React.memo(ModelPickerInner);
 //# sourceMappingURL=ModelPicker.js.map
