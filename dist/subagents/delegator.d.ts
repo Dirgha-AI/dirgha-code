@@ -8,11 +8,15 @@
  */
 import type { Provider, UsageTotal, Message } from "../kernel/types.js";
 import type { ToolRegistry } from "../tools/registry.js";
+import type { ProviderRegistry } from "../providers/index.js";
 /**
  * Safe default tool allowlist for sub-agents. Covers read/write/search and
  * common dev operations while excluding high-privilege tools (e.g. network
  * requests, approval bypass, registry mutation). A parent agent can grant
  * additional tools by supplying an explicit toolAllowlist on SubagentRequest.
+ *
+ * NOTE: these names MUST match the actual tool.name in the registry.
+ * See src/tools/registry.ts for the canonical list.
  */
 export declare const DEFAULT_SUBAGENT_TOOLS: Set<string>;
 export interface SubagentRequest {
@@ -32,7 +36,12 @@ export interface SubagentResult {
 }
 export interface DelegatorOptions {
     registry: ToolRegistry;
-    provider: Provider;
+    /** ProviderRegistry for model-aware routing. When set, `provider` is
+     *  ignored and the provider is resolved via `providers.forModel()`. */
+    providers?: ProviderRegistry;
+    /** @deprecated use providers instead — kept for backward compat with
+     *  callers that resolve a single Provider upfront (e.g. slash/spawn.ts). */
+    provider?: Provider;
     defaultModel: string;
     cwd: string;
     parentSessionId: string;

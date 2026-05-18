@@ -18,7 +18,8 @@
     "vendor/"
   ],
   "scripts": {
-    "postinstall": "test -d dist && node dist/cli/main.js setup --features --auto 2>/dev/null || true",
+    "postinstall": "echo '[dirgha] run \"npx dirgha setup\" to complete setup after install'",
+"postinstall-legacy": "test -d dist && node dist/cli/main.js setup --features --auto 2>/dev/null || true",
     "build": "tsc -p tsconfig.json && node scripts/postbuild.mjs && node scripts/patch-ink-text-input.mjs",
     "build:watch": "tsc -p tsconfig.json --watch",
     "clean": "rm -rf ./dist",

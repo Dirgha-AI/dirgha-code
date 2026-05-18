@@ -45,6 +45,7 @@ import { InputBox } from "./components/InputBox.js";
 import { PromptQueueIndicator } from "./components/PromptQueueIndicator.js";
 // TaskIndicator removed from persistent UI — stale cross-session tasks cluttered bootup
 import { SubagentPanel } from "./components/SubagentPanel.js";
+import { SubagentDashboard } from "./components/SubagentDashboard.js";
 import { GPUJobIndicator } from "./components/GPUJobIndicator.js";
 import { ModelPicker } from "./components/ModelPicker.js";
 import { ModelSwitchPrompt } from "./components/ModelSwitchPrompt.js";
@@ -73,6 +74,7 @@ import { useToolProgress } from "./use-tool-progress.js";
 import { useDeclinedVersions } from "./use-declined-versions.js";
 import { useStartupHealth } from "./use-startup-health.js";
 import { useFlickerDetector } from "./use-flicker-detector.js";
+import { useTranscriptScroll } from "./use-transcript-scroll.js";
 import { useRenderMetrics, } from "./use-render-metrics.js";
 import { getRemoteConfig, isVersionBelowMin, } from "../../intelligence/remote-config.js";
 import { createRequire } from "node:module";
@@ -296,25 +298,27 @@ export function App(props) {
     // Flicker detector — compares estimated tree height to terminal rows.
     const estimatedLineCount = (transcript.length + projection.liveItems.length) * 2 + 15;
     const flicker = useFlickerDetector(estimatedLineCount);
-    // When the live viewport overflows the terminal, cap the number of live
-    // items rendered per frame. This prevents Ink from repainting the full
-    // scrollback on every streaming tick, which is the root cause of flicker.
-    // Reuse the stdout already obtained by useFlickerDetector — a second
-    // useStdout() call would register a duplicate resize listener.
-    const { stdout: _flickerStdout } = useStdout();
-    const _termRows = _flickerStdout?.rows ?? 24;
-    const _maxLiveItems = flicker.overflowDetected
-        ? Math.max(4, Math.floor((_termRows - 6) / 1.5))
-        : Infinity;
-    // Preserve array identity when no truncation needed — avoids spurious
-    // useMemo recalculation on every render when overflow is not active.
-    const _liveItemCount = projection.liveItems.length;
-    const _overflowCount = flicker.overflowDetected && _maxLiveItems < _liveItemCount
-        ? _liveItemCount - _maxLiveItems
-        : 0;
-    const _visibleLiveItems = _overflowCount > 0
-        ? projection.liveItems.slice(-_maxLiveItems)
-        : projection.liveItems;
+    // Hoisted early: input is focused when no overlays (except @-file / slash
+    // completions) are open and no pending approval/key prompts are showing.
+    // Defined here so useTranscriptScroll below can reference it.
+    const scrInputFocus = pendingKey === null &&
+        pendingApproval === null &&
+        (overlays.active === null ||
+            overlays.active === "atfile" ||
+            overlays.active === "slash");
+    // Transcript scroll state — pinned-absolute-index virtual scrolling.
+    // Uses terminal rows to determine the visible window size. Auto-scrolls
+    // to follow new content only when the user is at the bottom.
+    const { stdout: scrStdout } = useStdout();
+    const _termRows = scrStdout?.rows ?? 24;
+    const visibleCount = Math.max(4, Math.floor((_termRows - 6) / 1.5));
+    const scroll = useTranscriptScroll(projection.liveItems.length, visibleCount, true, // autoScroll — follow new items when at bottom
+    scrInputFocus);
+    // Visible window into live items based on scroll position.
+    // pinnedEndIdx is the absolute end index; we take up to `visibleCount`
+    // items ending at that position.
+    const scrollStart = Math.max(0, scroll.pinnedEndIdx - visibleCount);
+    const _visibleLiveItems = projection.liveItems.slice(scrollStart, scroll.pinnedEndIdx);
     // Render performance metrics — track frame timing, expose for StatusBar.
     const renderMetrics = useRenderMetrics();
     const [showRenderMetrics, setShowRenderMetrics] = React.useState(false);
@@ -1058,6 +1062,20 @@ export function App(props) {
             abortRef.current.abort();
         }
     });
+    // End key scrolls transcript back to the live tail (shows latest items).
+    // When input is focused, require Ctrl+End to avoid interfering with
+    // text insertion/IME. Uses a ref to keep the key-holding callback stable
+    // across renders (avoids Ink's useInput re-registration churn).
+    const scrollRef = React.useRef(scroll);
+    scrollRef.current = scroll;
+    useInput((_ch, key) => {
+        if (!key.end)
+            return;
+        // With focused input only intercept Ctrl+End; unfocused accepts plain End.
+        if (scrInputFocus && !key.ctrl)
+            return;
+        scrollRef.current.scrollToBottom();
+    });
     const handleModelPick = React.useCallback((id) => {
         overlays.closeOverlay();
         // Dedupe: a stale picker callback firing after the model is already
@@ -1188,11 +1206,7 @@ export function App(props) {
             setTimeout(() => handleSubmit(spliced || `/${name}`), 0);
         }
     }, [overlays, ARGLESS_SLASH, handleSubmit]);
-    const inputFocus = pendingKey === null &&
-        pendingApproval === null &&
-        (overlays.active === null ||
-            overlays.active === "atfile" ||
-            overlays.active === "slash");
+    const inputFocus = scrInputFocus;
     // Active theme name — driven by local state so the picker can flip it
     // live. Initial value comes from config; subsequent changes are
     // persisted to ~/.dirgha/config.json so future sessions pick it up.
@@ -1245,7 +1259,7 @@ export function App(props) {
             }
         })();
     }, [overlays]);
-    const liveJsx = React.useMemo(() => (_jsxs(_Fragment, { children: [_overflowCount > 0 && (_jsx(Box, { paddingX: 1, children: _jsxs(Text, { color: "gray", italic: true, children: ["[\u2191 ", _overflowCount, " more item", _overflowCount === 1 ? "" : "s", " above \u2014 scroll up]"] }) })), renderTranscript(_visibleLiveItems, thinkingStreaming)] })), [_visibleLiveItems, thinkingStreaming, _overflowCount]);
+    const liveJsx = React.useMemo(() => (_jsxs(_Fragment, { children: [scroll.belowCount > 0 && (_jsx(Box, { paddingX: 1, children: _jsxs(Text, { color: "gray", italic: true, children: ["[\u2193 ", scroll.belowCount, " more item", scroll.belowCount === 1 ? "" : "s", " below \u2014 scroll down]"] }) })), renderTranscript(_visibleLiveItems, thinkingStreaming)] })), [_visibleLiveItems, thinkingStreaming, scroll.belowCount]);
     const providerEntries = React.useMemo(() => buildProviderEntries(models, currentModel), [models, currentModel]);
     const spinnerCtx = React.useMemo(() => ({ busy }), [busy]);
     const renderTranscriptItem = React.useCallback((item) => _jsx(TranscriptRow, { item: item }, item.id), []);
@@ -1318,7 +1332,7 @@ export function App(props) {
     // the logo) on every overflow redraw, repainting it on every chat
     // turn that fills the screen. `use-flicker-detector` already warns
     // when this is about to happen.
-    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: spinnerCtx, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: transcript, children: (item) => (_jsx(Box, { flexDirection: "column", children: renderTranscriptItem(item) }, item.id)) }), _jsx(Box, { flexDirection: "column", flexGrow: 1, children: liveJsx }), busy && projection.liveItems.length === 0 && _jsx(GeneratingIndicator, { elapsedMs: liveDurationMs, liveOutputTokens: liveOutputTokens }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: onResolveApproval })), pendingFailover !== null && (_jsx(ModelSwitchPrompt, { failedModel: pendingFailover.failedModel, failoverModel: pendingFailover.failoverModel, onAccept: onAcceptFailover, onReject: onRejectFailover, onPicker: onPickerFailover })), _jsx(SubagentPanel, { events: props.events }), _jsx(GPUJobIndicator, {}), _jsx(PromptQueueIndicator, { queued: promptQueue }), _jsx(Divider, {}), _jsx(InputBox, { value: input, onChange: setInput, onSubmit: handleSubmit, busy: busy, liveDurationMs: liveDurationMs, vimMode: props.config.vimMode === true, onAtQueryChange: overlays.setAtQuery, onSlashQueryChange: overlays.setSlashQuery, onRequestOverlay: overlays.openOverlay, promptHistory: promptHistory, onRequestYoloToggle: () => {
+    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: spinnerCtx, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: transcript, children: (item) => (_jsx(Box, { flexDirection: "column", children: renderTranscriptItem(item) }, item.id)) }), _jsx(Box, { flexDirection: "column", flexGrow: 1, children: liveJsx }), busy && projection.liveItems.length === 0 && _jsx(GeneratingIndicator, { elapsedMs: liveDurationMs, liveOutputTokens: liveOutputTokens }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: onResolveApproval })), pendingFailover !== null && (_jsx(ModelSwitchPrompt, { failedModel: pendingFailover.failedModel, failoverModel: pendingFailover.failoverModel, onAccept: onAcceptFailover, onReject: onRejectFailover, onPicker: onPickerFailover })), _jsx(SubagentPanel, { events: props.events }), _jsx(SubagentDashboard, { events: props.events }), _jsx(GPUJobIndicator, {}), _jsx(PromptQueueIndicator, { queued: promptQueue }), _jsx(Divider, {}), _jsx(InputBox, { value: input, onChange: setInput, onSubmit: handleSubmit, busy: busy, liveDurationMs: liveDurationMs, vimMode: props.config.vimMode === true, onAtQueryChange: overlays.setAtQuery, onSlashQueryChange: overlays.setSlashQuery, onRequestOverlay: overlays.openOverlay, promptHistory: promptHistory, onRequestYoloToggle: () => {
                             const next = mode === "yolo" ? "act" : "yolo";
                             setMode(next);
                             // Wire the approval bus so mid-turn tool calls are immediately

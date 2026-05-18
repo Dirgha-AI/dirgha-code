@@ -216,6 +216,21 @@ async function main() {
         });
         exit(code);
     }
+    if (positionals[0] === "orchestra") {
+        // `dirgha orchestra <up|list|attach|kill|down|log>` —
+        // multi-agent task orchestration. Spawns N agent subprocesses,
+        // manages them in an in-memory registry, and provides a TUI
+        // dashboard. No tmux dependency — agents are child processes
+        // managed by the dirgha CLI itself.
+        const { orchestraCommand } = await import("../orchestra/bin.js");
+        const verbIdx = rawArgs.indexOf("orchestra");
+        const tail = verbIdx >= 0 ? rawArgs.slice(verbIdx + 1) : positionals.slice(1);
+        const code = await orchestraCommand(tail, {
+            json: flags.json === true,
+            cwd: cwd(),
+        });
+        exit(code);
+    }
     // Generic subcommand dispatch. Covers: doctor, audit, stats, status,
     // init, keys, models, chat, ask, compact, export-session,
     // import-session (plus anything the auth agent adds to the barrel).
@@ -464,7 +479,7 @@ async function main() {
             // initialisation below, leaving taskDelegatorRef.current = null.
             taskDelegatorRef.current = new SubagentDelegator({
                 registry,
-                provider: providers.forModel(model),
+                providers,
                 defaultModel: model,
                 cwd: cwd(),
                 parentSessionId: randomUUID(),
@@ -499,7 +514,7 @@ async function main() {
         else {
             taskDelegatorRef.current = new SubagentDelegator({
                 registry,
-                provider: providers.forModel(model),
+                providers,
                 defaultModel: model,
                 cwd: cwd(),
                 parentSessionId: randomUUID(),
@@ -724,7 +739,7 @@ async function main() {
     // delegator that the `task` tool delegate-shim references.
     taskDelegatorRef.current = new SubagentDelegator({
         registry,
-        provider,
+        providers,
         defaultModel: activeModel,
         cwd: cwd(),
         parentSessionId: sessionId,

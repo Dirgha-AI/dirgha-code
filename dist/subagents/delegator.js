@@ -18,11 +18,14 @@ import { createSessionStore } from "../context/session.js";
  * common dev operations while excluding high-privilege tools (e.g. network
  * requests, approval bypass, registry mutation). A parent agent can grant
  * additional tools by supplying an explicit toolAllowlist on SubagentRequest.
+ *
+ * NOTE: these names MUST match the actual tool.name in the registry.
+ * See src/tools/registry.ts for the canonical list.
  */
 export const DEFAULT_SUBAGENT_TOOLS = new Set([
-    'read_file', 'write_file', 'edit_file', 'search_grep', 'search_glob',
-    'shell', 'browser', 'go_to_definition', 'find_references', 'hover',
-    'list_symbols', 'git_read', 'task',
+    'fs_read', 'fs_write', 'fs_edit', 'search_grep', 'search_glob',
+    'shell', 'browser', 'go_to_definition', 'find_references', 'hover_documentation',
+    'document_symbols', 'git', 'task', 'rtk',
 ]);
 export class SubagentDelegator {
     opts;
@@ -72,13 +75,20 @@ export class SubagentDelegator {
         // Append the initial user prompt so the session has a recoverable prefix.
         void subSession.append({ type: "message", ts: new Date().toISOString(), message: messages[messages.length - 1] });
         const loopDetector = new LoopDetector();
+        // Resolve the provider for the requested model. When providers is given,
+        // route through the registry so different models reach different providers.
+        // Fall back to the deprecated single-provider field for backward compat.
+        const resolvedModel = req.model ?? this.opts.defaultModel;
+        const provider = this.opts.providers
+            ? this.opts.providers.forModel(resolvedModel)
+            : this.opts.provider;
         const result = await runAgentLoop({
             sessionId,
-            model: req.model ?? this.opts.defaultModel,
+            model: resolvedModel,
             messages,
             tools: sanitized.definitions,
             maxTurns: req.maxTurns ?? 6,
-            provider: this.opts.provider,
+            provider,
             toolExecutor: executor,
             events,
             session: subSession,
@@ -92,8 +102,20 @@ export class SubagentDelegator {
         const lastAssistant = [...result.messages]
             .reverse()
             .find((m) => m.role === "assistant");
+        // Include the raw error message when the loop errored with no output
+        let output = "";
+        if (lastAssistant) {
+            output = extractText(lastAssistant);
+        }
+        else if (result.stopReason === "error") {
+            // Try to extract an error message from the last user/tool messages
+            const lastMsg = result.messages[result.messages.length - 1];
+            output = lastMsg && lastMsg.role === "tool"
+                ? `[sub-agent error] ${extractText(lastMsg).slice(0, 500)}`
+                : `[sub-agent error] loop stopped with reason: ${result.stopReason}`;
+        }
         const returnValue = {
-            output: lastAssistant ? extractText(lastAssistant) : "",
+            output,
             usage: result.usage,
             transcript: result.messages,
             stopReason: result.stopReason,

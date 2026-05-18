@@ -102,7 +102,7 @@ export function findSubcommand(verb: string): Subcommand | undefined {
 }
 
 // Verbs dispatched directly in main.ts before findSubcommand is called.
-const TOP_LEVEL_VERBS = ['login', 'logout', 'setup', 'auth', 'fleet', 'submit-paper'];
+const TOP_LEVEL_VERBS = ['login', 'logout', 'setup', 'auth', 'fleet', 'orchestra', 'submit-paper'];
 
 function levenshtein(a: string, b: string): number {
   const m = a.length, n = b.length;

@@ -6,17 +6,18 @@
 
 | Section                                            |                                                                               |
 | -------------------------------------------------- | ----------------------------------------------------------------------------- |
-| [Rendering & TUI](#rendering--tui)                 | Alternate buffer, message splitting, virtualized transcript, flicker detector, scroll indicator, paste collapse, vim paste fallback |
-| [Streaming & Performance](#streaming--performance) | Flush throttle, Static committed history, spinners, React.memo, per-turn stream timeout |
+| [Rendering & TUI](#rendering--tui)                 | Alternate buffer, message splitting, virtualized transcript, flicker detector, scroll indicator, paste collapse, vim paste fallback, paste threshold, double separator fix, pinnedEndIdx transcript scroll |
+| [Streaming & Performance](#streaming--performance) | Flush throttle, Static committed history, spinners, React.memo, per-turn stream timeout, tool-call dropping gap fix |
 | [Models & Providers](#models--providers)           | Per-provider catalogues, live sync, vendor prefix routing, health monitor     |
 | [Context Windows & Rate Limits](#context-windows--rate-limits) | models.dev sync, maxOutputFor, circuit breaker, TPM sliding window |
 | [Authentication & Login](#authentication--login)   | Device OAuth, TUI token loading, signup flow, secure approval                 |
 | [Autonomous Systems](#autonomous-systems)          | Self-healing failover, remote config, auto-update, startup health, event listener leak fix, MCP lazy load race fix |
+| [Sub-agents & Delegation](#sub-agents--delegation)  | Subagent Dashboard, task tool fixes, provider routing, error propagation |
 | [Testing & Quality](#testing--quality)             | Self-test suite, E2E tests, regression guards, CI pipeline                    |
-| [Developer Experience](#developer-experience)      | Interactive wizard, error UX, prompt history, syntax highlighting             |
+| [Developer Experience](#developer-experience)      | Interactive wizard, error UX, prompt history, syntax highlighting, full history cycling |
 | [Architecture Decisions](#architecture-decisions)  | Smart backoff, no-aggressive-blacklist, vendor prefix priority                |
 | [Internal Docs](#internal-docs)                    | Publish setup, model context/rate-limit architecture                          |
-| [Release History](#release-history)                | Full changelog v1.20.9 → v1.33.5                                             |
+| [Release History](#release-history)                | Full changelog v1.20.9 → v1.42.14                                             |
 
 ---
 
@@ -157,6 +158,30 @@ Thinking content rendered as always-visible bubble (Gemini CLI style). First lin
 
 Removed all raw ANSI escape codes. Every color now uses `useTheme()` palette. Tool errors (exit != 0) render in red (`palette.status.error`). Paste collapse uses warning color.
 
+### v1.42.14 — Paste Collapse Threshold Lowered
+
+**Files:** `src/tui/ink/components/PasteCollapse.tsx`
+
+Collapse threshold lowered from 100 chars / 2 lines to **2 chars / 1 line**. Any multi-line paste is now summarised with a line count. Single-line pastes >= 80 chars show char count.
+
+### v1.42.14 — Double Separator Line Removed
+
+**Files:** `src/tui/ink/components/InputBox.tsx:14-21`, `src/tui/ink/App.tsx:1572`
+
+InputBox had an extra `borderTop` box creating a double-thick separator above the input field. Removed the box — the `Divider` component at `App.tsx:1572` already provides the single separator line.
+
+### v1.42.14 — Transcript Scroll Wiring (pinnedEndIdx)
+
+**Files:** `src/tui/ink/App.tsx:404-421`, `src/tui/ink/use-transcript-scroll.ts`
+
+Replaced flicker-based live item truncation with pinned-absolute-index virtual scrolling. `pinnedEndIdx` tracks the last visible live item — when the user scrolls up, new streaming items no longer push the viewport. Auto-scroll only fires when the user was at the bottom before the new item arrived. PageUp/PageDown scroll by half terminal height; Ctrl+PageUp/PageDown for input-focused mode; End (or Ctrl+End when focused) jumps to live tail. Indicator shows `[↓ N items below — scroll down]` when content exists below the viewport.
+
+### v1.42.14 — Subagent Dashboard
+
+**File:** `src/tui/ink/components/SubagentDashboard.tsx`
+
+New Ink panel that tracks the full sub-agent lifecycle from the parent event stream: `toolcall_start` → `toolcall_end` (prompt capture), `tool_exec_start` → `tool_exec_end` (execution). Shows status (○ pending, ● running, ✓ completed, ✗ error), truncated prompt label, duration, and output preview. Handles race conditions where events arrive out of order. Rendered alongside existing `SubagentPanel` — both coexist. Full report: [`docs/cli/subagent-dashboard-and-delegation-fixes-2026-04-25.md`](subagent-dashboard-and-delegation-fixes-2026-04-25.md)
+
 ---
 
 ## Streaming & Performance
@@ -172,6 +197,12 @@ Removed `if (this.includeThinking)` gate from reasoning_content delta capture. D
 **Files:** `src/tui/ink/App.tsx`
 
 `<Static items={[{ key: "logo" }]}>` memoized via `useMemo(() => [{ key: "logo" }], [])`. Previous code created new array/object references on every render, causing Ink's Static to re-evaluate.
+
+### v1.42.14 — Tool-Call Dropping Gap Fix (commitLive)
+
+**Files:** `src/tui/ink/use-event-projection.ts:commitLive`
+
+Added synchronous drain of `pendingToolUpdatesRef` into `liveItemsRef.current` before `commitLive` reads `liveItemsRef` to build committed transcript items. Previously, `commitLive` and the async tool-update render path ran on different microtask ticks — if `commitLive` fired between a tool-spawned microtask and its `queueMicrotask` flush, the tool-call's output was lost (the tool appeared committed but silent). The drain guarantees all pending tool outputs are reflected in the committed snapshot.
 
 ---
 
@@ -283,6 +314,34 @@ Sessions survive SIGINT, SIGTERM, and crashes. Auto-save fires in TUI, readline 
 
 ---
 
+## Sub-agents & Delegation
+
+### v1.42.14 — Delegator Fixes (Tool Names, Provider Routing, Error Prop)
+
+**File:** `src/subagents/delegator.ts`, `src/tools/task.ts`
+
+Three systemic fixes to the sub-agent delegation pipeline:
+
+1. **Tool name correction** — `DEFAULT_SUBAGENT_TOOLS` used wrong names
+   (`read_file` → `fs_read`, `write_file` → `fs_write`, `edit_file` → `fs_edit`,
+   `hover` → `hover_documentation`, `list_symbols` → `document_symbols`,
+   `git_read` → `git`). Sub-agents with default tools could not read, write, or
+   edit files.
+
+2. **Provider routing** — `DelegatorOptions` changed from a single resolved
+   `Provider` instance to `providers?: ProviderRegistry`. When a task requests
+   a different model (e.g. `deepseek-v4-pro` while the parent uses Anthropic),
+   the delegator now calls `providers.forModel()` to get the correct provider.
+   Backward compat via optional `provider` fallback.
+
+3. **Error propagation** — when the agent loop errors with no assistant message,
+   the last tool error is extracted and returned instead of
+   `"(sub-agent produced no output)"`.
+
+Full report: [`docs/cli/subagent-dashboard-and-delegation-fixes-2026-04-25.md`](subagent-dashboard-and-delegation-fixes-2026-04-25.md)
+
+---
+
 ## Testing & Quality
 
 ### v1.20.13 — TUI Jitter Tests (Vitest)
@@ -355,6 +414,12 @@ Thinking content preserved as `[Previous assistant reasoning: ...]` in compactio
 
 Tracks DB write failures. Warns after 10 errors in a session. Exposed via `dirgha doctor`. No silent corruption.
 
+### v1.42.14 — Arrow Up/Down Full History Cycling
+
+**Files:** `src/tui/ink/components/InputBox.tsx:147-173`
+
+Replaced single-recall history navigation with bash-style cycling through a `historyCacheRef`. Previously, pressing Up once recalled the last prompt but a second Up returned to the current draft (losing the historical trail). Now Up iterates backwards through the last 100 prompts; Down returns through them; at the bottom of the stack the original draft is restored. `historyCacheRef` snapshots the draft on first Up press so it survives navigation.
+
 ---
 
 ## Context Windows & Rate Limits
@@ -408,6 +473,7 @@ Current rate-limiter uses a static per-provider RPS token bucket with no awarene
 |---|---|
 | [`docs/_internal/PUBLISH_SETUP.md`](../../_internal/PUBLISH_SETUP.md) | npm OIDC Trusted Publishers setup, what not to do, troubleshooting |
 | [`docs/_internal/MODEL_CONTEXT_RATELIMIT_ARCH.md`](../../_internal/MODEL_CONTEXT_RATELIMIT_ARCH.md) | Full architecture spec for context windows + rate limits (written by DeepSeek, reviewed) |
+| [`docs/audits/AUDIT-multi-agent-tui-landscape-2026-04-25.md`](../../audits/AUDIT-multi-agent-tui-landscape-2026-04-25.md) | Multi-agent TUI landscape analysis — X-Orchestrator, Cognigy, Claude Code, OpenAI Orchestration SDK, etc. |
 
 ---
 
@@ -429,6 +495,7 @@ Current rate-limiter uses a static per-provider RPS token bucket with no awarene
 
 | Version      | Date       | Highlights                                                                                                     |
 | ------------ | ---------- | -------------------------------------------------------------------------------------------------------------- |
+| **v1.42.14** | 2026-04-25 | Arrow up/down full history cycling, paste collapse threshold lowered, double separator removed, tool-call dropping gap fix, pinnedEndIdx transcript scroll wiring |
 | **v1.33.5**  | 2026-05-14 | models.dev context window source-of-truth, `maxOutputFor()`, production rate limiter (static table + circuit breaker + TPM window + header parsing), proactive compaction wired to real model context limit, WAL checkpoint on session close |
 | **v1.33.3**  | 2026-04-25 | Startup perf (parallel BYOK, lazy MCP, deferred DB, fire-and-forget extensions), tool auto-retry, paste cursor fix, **event listener leak fix**, **per-turn stream timeout**, **MCP lazy load race fix**, **vim paste fallback**, **flicker cap increase + scroll indicator**, **paste collapse line-only**, **per-tool timeouts** |
 | **v1.20.25** | 2026-05-03 | Self-test suite, version sync                                                                                  |
@@ -453,4 +520,4 @@ Current rate-limiter uses a static per-provider RPS token bucket with no awarene
 
 ---
 
-_Last updated: 2026-04-25. CI publishing v1.33.3 to npm._
+_Last updated: 2026-04-25. Current build v1.42.14._

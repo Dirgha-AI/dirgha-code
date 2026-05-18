@@ -10,8 +10,8 @@
  */
 import * as React from "react";
 import type { Palette } from "../../theme.js";
-export declare const PASTE_LINE_THRESHOLD = 2;
-export declare const PASTE_CHAR_THRESHOLD = 100;
+export declare const PASTE_LINE_THRESHOLD = 1;
+export declare const PASTE_CHAR_THRESHOLD = 2;
 export interface PasteSegment {
     start: number;
     end: number;

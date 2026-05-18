@@ -154,10 +154,11 @@ export const askSubcommand: Subcommand = {
     if (system) messages.push({ role: "system", content: system });
     messages.push({ role: "user", content: prompt });
 
-    const provider = providers.forModel(model);
+    const resolvedProvider = providers.forModel(model);
+
     taskDelegatorRef.current = new SubagentDelegator({
       registry,
-      provider,
+      providers,
       defaultModel: model,
       cwd,
       parentSessionId: sessionId,
@@ -169,7 +170,7 @@ export const askSubcommand: Subcommand = {
       messages,
       tools: sanitized.definitions,
       maxTurns,
-      provider,
+      provider: resolvedProvider,
       toolExecutor: executor,
       events,
       ...(modeHooks !== undefined ? { hooks: modeHooks } : {}),

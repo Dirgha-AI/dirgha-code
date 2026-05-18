@@ -21,17 +21,21 @@ import type { Tool, ToolRegistry } from "../tools/registry.js";
 import { createToolExecutor } from "../tools/exec.js";
 import { LoopDetector } from "../subagents/loop-detector.js";
 import { createSessionStore } from "../context/session.js";
+import type { ProviderRegistry } from "../providers/index.js";
 
 /**
  * Safe default tool allowlist for sub-agents. Covers read/write/search and
  * common dev operations while excluding high-privilege tools (e.g. network
  * requests, approval bypass, registry mutation). A parent agent can grant
  * additional tools by supplying an explicit toolAllowlist on SubagentRequest.
+ *
+ * NOTE: these names MUST match the actual tool.name in the registry.
+ * See src/tools/registry.ts for the canonical list.
  */
 export const DEFAULT_SUBAGENT_TOOLS = new Set([
-  'read_file', 'write_file', 'edit_file', 'search_grep', 'search_glob',
-  'shell', 'browser', 'go_to_definition', 'find_references', 'hover',
-  'list_symbols', 'git_read', 'task',
+  'fs_read', 'fs_write', 'fs_edit', 'search_grep', 'search_glob',
+  'shell', 'browser', 'go_to_definition', 'find_references', 'hover_documentation',
+  'document_symbols', 'git', 'task', 'rtk',
 ]);
 
 export interface SubagentRequest {
@@ -53,7 +57,12 @@ export interface SubagentResult {
 
 export interface DelegatorOptions {
   registry: ToolRegistry;
-  provider: Provider;
+  /** ProviderRegistry for model-aware routing. When set, `provider` is
+   *  ignored and the provider is resolved via `providers.forModel()`. */
+  providers?: ProviderRegistry;
+  /** @deprecated use providers instead — kept for backward compat with
+   *  callers that resolve a single Provider upfront (e.g. slash/spawn.ts). */
+  provider?: Provider;
   defaultModel: string;
   cwd: string;
   parentSessionId: string;
@@ -113,13 +122,21 @@ export class SubagentDelegator {
 
     const loopDetector = new LoopDetector();
 
+    // Resolve the provider for the requested model. When providers is given,
+    // route through the registry so different models reach different providers.
+    // Fall back to the deprecated single-provider field for backward compat.
+    const resolvedModel = req.model ?? this.opts.defaultModel;
+    const provider = this.opts.providers
+      ? this.opts.providers.forModel(resolvedModel)
+      : this.opts.provider!;
+
     const result = await runAgentLoop({
       sessionId,
-      model: req.model ?? this.opts.defaultModel,
+      model: resolvedModel,
       messages,
       tools: sanitized.definitions,
       maxTurns: req.maxTurns ?? 6,
-      provider: this.opts.provider,
+      provider,
       toolExecutor: executor,
       events,
       session: subSession,
@@ -135,8 +152,19 @@ export class SubagentDelegator {
     const lastAssistant = [...result.messages]
       .reverse()
       .find((m) => m.role === "assistant");
+    // Include the raw error message when the loop errored with no output
+    let output = "";
+    if (lastAssistant) {
+      output = extractText(lastAssistant);
+    } else if (result.stopReason === "error") {
+      // Try to extract an error message from the last user/tool messages
+      const lastMsg = result.messages[result.messages.length - 1];
+      output = lastMsg && lastMsg.role === "tool"
+        ? `[sub-agent error] ${extractText(lastMsg).slice(0, 500)}`
+        : `[sub-agent error] loop stopped with reason: ${result.stopReason}`;
+    }
     const returnValue: SubagentResult = {
-      output: lastAssistant ? extractText(lastAssistant) : "",
+      output,
       usage: result.usage,
       transcript: result.messages,
       stopReason: result.stopReason,

@@ -455,26 +455,28 @@ export function useEventProjection(
           return;
         }
         case "toolcall_end": {
-          // Remove the pending "generating..." placeholder when the
-          // tool call JSON is fully received. tool_exec_start follows
-          // with the real item.
+          // Instead of deleting the pending placeholder (which creates a gap),
+          // upgrade it in-place with the real argument summary so the tool
+          // item lives continuously from toolcall_start to tool_exec_end.
           const endId = event.id;
+          const buf = toolcallArgBuffers.get(endId);
+          const argSummary = buf ? summariseInput(buf) : "tool call";
           toolcallArgBuffers.delete(endId);
           pendingToolUpdatesRef.current.push((prev) =>
-            prev.filter(
-              (it) =>
-                !(
-                  it.kind === "tool" &&
-                  it.id === endId &&
-                  it.status === "pending"
-                ),
+            prev.map((it) =>
+              it.kind === "tool" && it.id === endId && it.status === "pending"
+                ? { ...it, argSummary }
+                : it,
             ),
           );
           scheduleToolFlush();
           return;
         }
         case "tool_exec_start": {
-          const item: TranscriptItem = {
+          // Upsert: upgrade the pending placeholder left by toolcall_end,
+          // or push a fresh item if the toolcall_start/toolcall_end cycle
+          // was skipped (edge case).
+          const execStartItem: TranscriptItem = {
             kind: "tool",
             id: event.id,
             name: event.name,
@@ -483,7 +485,17 @@ export function useEventProjection(
             outputPreview: "",
             startedAt: Date.now(),
           };
-          pendingToolUpdatesRef.current.push((prev) => [...prev, item]);
+          pendingToolUpdatesRef.current.push((prev) => {
+            const idx = prev.findIndex(
+              (it) => it.kind === "tool" && it.id === event.id,
+            );
+            if (idx !== -1) {
+              const copy = [...prev];
+              copy[idx] = execStartItem;
+              return copy;
+            }
+            return [...prev, execStartItem];
+          });
           scheduleToolFlush();
           return;
         }
@@ -644,6 +656,20 @@ export function useEventProjection(
     for (const t of progressTimerRef.current.values()) clearTimeout(t);
     progressTimerRef.current.clear();
     pendingProgressRef.current.clear();
+    // Flush pending tool updates into liveItemsRef synchronously.
+    // These are normally batched via queueMicrotask (scheduleToolFlush)
+    // but that microtask may not have fired before commitLive is called
+    // from the finally block of runTurn. Without this drain, tool items
+    // that arrived between the last microtask flush and commitLive are
+    // lost forever — the ref gets reset to [] after commit, and the
+    // microtask fires too late to matter.
+    const pendingToolUpdates = pendingToolUpdatesRef.current.splice(0);
+    if (pendingToolUpdates.length > 0) {
+      liveItemsRef.current = pendingToolUpdates.reduce(
+        (acc, fn) => fn(acc),
+        liveItemsRef.current,
+      );
+    }
     // Flush any accumulated-but-not-yet-flushed text into liveItemsRef.
     const pt = pendingTextRef.current;
     if (pt) {

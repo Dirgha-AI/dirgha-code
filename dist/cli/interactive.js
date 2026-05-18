@@ -40,7 +40,7 @@ export async function runInteractive(opts) {
     if (opts.taskDelegatorRef) {
         opts.taskDelegatorRef.current = new SubagentDelegator({
             registry: opts.registry,
-            provider: opts.providers.forModel(opts.config.model),
+            providers: opts.providers,
             defaultModel: opts.config.model,
             cwd: opts.cwd,
             parentSessionId: sessionId,

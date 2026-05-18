@@ -166,10 +166,10 @@ export const verifySubcommand: Subcommand = {
           `\nattempt ${attempt}/${retries + 1}: ${goal}\n`,
         ),
       );
-      const provider = providers.forModel(model);
+      const resolvedProvider = providers.forModel(model);
       taskDelegatorRef.current = new SubagentDelegator({
         registry,
-        provider,
+        providers,
         defaultModel: model,
         cwd: process.cwd(),
         parentSessionId: sessionId,
@@ -180,7 +180,7 @@ export const verifySubcommand: Subcommand = {
         messages,
         tools: sanitized.definitions,
         maxTurns,
-        provider,
+        provider: resolvedProvider,
         toolExecutor: executor,
         events,
       }).catch((err) => ({

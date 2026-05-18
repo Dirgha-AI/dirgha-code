@@ -1,12 +1,13 @@
 /**
- * Virtualised transcript list for long sessions.
+ * Virtualised transcript list — always-on viewport slicing.
  *
  * Renders only the items within the visible terminal viewport plus a
- * 5-item buffer above and below.  Item count is used as a rough proxy
- * for lines — the goal is to keep the in-memory render tree small
- * rather than achieving pixel-perfect viewport clipping.
+ * 5-item buffer above and below. Uses pinned-absolute-index scrolling
+ * so the viewport never shifts when new items arrive mid-scroll.
  *
- * When scrolled above the bottom, a `[N items above]` spacer is shown.
+ * When items exist below the viewport, a `[N items below · ↓ see]`
+ * indicator is shown. When items exist above, a `[N items above]`
+ * indicator is shown.
  */
 
 import * as React from "react";
@@ -28,21 +29,23 @@ export const VirtualTranscript = React.memo(function VirtualTranscript(
   const { stdout } = useStdout();
   const rows = stdout?.rows ?? 24;
 
-  const { scrollOffset, isAtBottom } = useTranscriptScroll(
+  // Reserve rows for prompt + status lines below the transcript.
+  const buffer = 5;
+  const visibleCount = Math.max(1, rows - buffer);
+
+  const { pinnedEndIdx, isAtBottom, belowCount } = useTranscriptScroll(
     items.length,
+    visibleCount,
     autoScroll,
     inputFocus,
   );
 
-  const buffer = 5;
-  const visibleCount = Math.max(1, rows - buffer);
-  const endIdx = items.length - scrollOffset;
-  // visibleCount already subtracts buffer. Only subtract one more buffer
-  // (not two) so the viewport doesn't shrink by double.
+  // Slice the viewport: show `visibleCount` items ending at `pinnedEndIdx`,
+  // with an extra `buffer` items above for smooth scroll-out.
+  const endIdx = pinnedEndIdx;
   const visibleStart = Math.max(0, endIdx - visibleCount);
   const paddedStart = Math.max(0, visibleStart - buffer);
   const visibleItems = items.slice(paddedStart, endIdx);
-
   const aboveCount = paddedStart;
 
   return (
@@ -57,10 +60,17 @@ export const VirtualTranscript = React.memo(function VirtualTranscript(
       {visibleItems.map((item) => (
         <React.Fragment key={item.id}>{renderItem(item)}</React.Fragment>
       ))}
-      {!isAtBottom && scrollOffset > 0 && (
+      {belowCount > 0 && (
         <Box>
           <Text dimColor>
-            [{scrollOffset} item{scrollOffset !== 1 ? "s" : ""} below]
+            [{belowCount} item{belowCount !== 1 ? "s" : ""} below · PageDown]
+          </Text>
+        </Box>
+      )}
+      {!isAtBottom && (
+        <Box>
+          <Text dimColor>
+            [at item {pinnedEndIdx}/{items.length} · End to follow]
           </Text>
         </Box>
       )}

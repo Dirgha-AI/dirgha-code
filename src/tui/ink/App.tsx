@@ -66,6 +66,7 @@ import { InputBox } from "./components/InputBox.js";
 import { PromptQueueIndicator } from "./components/PromptQueueIndicator.js";
 // TaskIndicator removed from persistent UI — stale cross-session tasks cluttered bootup
 import { SubagentPanel } from "./components/SubagentPanel.js";
+import { SubagentDashboard } from "./components/SubagentDashboard.js";
 import { GPUJobIndicator } from "./components/GPUJobIndicator.js";
 import { ModelPicker, type ModelEntry } from "./components/ModelPicker.js";
 import { ModelSwitchPrompt } from "./components/ModelSwitchPrompt.js";
@@ -111,6 +112,7 @@ import { useToolProgress } from "./use-tool-progress.js";
 import { useDeclinedVersions } from "./use-declined-versions.js";
 import { useStartupHealth, type HealthResult } from "./use-startup-health.js";
 import { useFlickerDetector } from "./use-flicker-detector.js";
+import { useTranscriptScroll } from "./use-transcript-scroll.js";
 import {
   useRenderMetrics,
   type RenderMetricsGetters,
@@ -390,27 +392,34 @@ export function App(props: AppProps): React.JSX.Element {
     (transcript.length + projection.liveItems.length) * 2 + 15;
   const flicker = useFlickerDetector(estimatedLineCount);
 
-  // When the live viewport overflows the terminal, cap the number of live
-  // items rendered per frame. This prevents Ink from repainting the full
-  // scrollback on every streaming tick, which is the root cause of flicker.
-  // Reuse the stdout already obtained by useFlickerDetector — a second
-  // useStdout() call would register a duplicate resize listener.
-  const { stdout: _flickerStdout } = useStdout();
-  const _termRows = _flickerStdout?.rows ?? 24;
-  const _maxLiveItems = flicker.overflowDetected
-    ? Math.max(4, Math.floor((_termRows - 6) / 1.5))
-    : Infinity;
-  // Preserve array identity when no truncation needed — avoids spurious
-  // useMemo recalculation on every render when overflow is not active.
-  const _liveItemCount = projection.liveItems.length;
-  const _overflowCount =
-    flicker.overflowDetected && _maxLiveItems < _liveItemCount
-      ? _liveItemCount - _maxLiveItems
-      : 0;
-  const _visibleLiveItems =
-    _overflowCount > 0
-      ? projection.liveItems.slice(-_maxLiveItems)
-      : projection.liveItems;
+  // Hoisted early: input is focused when no overlays (except @-file / slash
+  // completions) are open and no pending approval/key prompts are showing.
+  // Defined here so useTranscriptScroll below can reference it.
+  const scrInputFocus =
+    pendingKey === null &&
+    pendingApproval === null &&
+    (overlays.active === null ||
+      overlays.active === "atfile" ||
+      overlays.active === "slash");
+
+  // Transcript scroll state — pinned-absolute-index virtual scrolling.
+  // Uses terminal rows to determine the visible window size. Auto-scrolls
+  // to follow new content only when the user is at the bottom.
+  const { stdout: scrStdout } = useStdout();
+  const _termRows = scrStdout?.rows ?? 24;
+  const visibleCount = Math.max(4, Math.floor((_termRows - 6) / 1.5));
+  const scroll = useTranscriptScroll(
+    projection.liveItems.length,
+    visibleCount,
+    true,          // autoScroll — follow new items when at bottom
+    scrInputFocus, // only intercept Ctrl+PageUp/Down when input is focused
+  );
+
+  // Visible window into live items based on scroll position.
+  // pinnedEndIdx is the absolute end index; we take up to `visibleCount`
+  // items ending at that position.
+  const scrollStart = Math.max(0, scroll.pinnedEndIdx - visibleCount);
+  const _visibleLiveItems = projection.liveItems.slice(scrollStart, scroll.pinnedEndIdx);
 
   // Render performance metrics — track frame timing, expose for StatusBar.
   const renderMetrics: RenderMetricsGetters = useRenderMetrics();
@@ -1177,6 +1186,19 @@ export function App(props: AppProps): React.JSX.Element {
     }
   });
 
+  // End key scrolls transcript back to the live tail (shows latest items).
+  // When input is focused, require Ctrl+End to avoid interfering with
+  // text insertion/IME. Uses a ref to keep the key-holding callback stable
+  // across renders (avoids Ink's useInput re-registration churn).
+  const scrollRef = React.useRef(scroll);
+  scrollRef.current = scroll;
+  useInput((_ch, key) => {
+    if (!key.end) return;
+    // With focused input only intercept Ctrl+End; unfocused accepts plain End.
+    if (scrInputFocus && !key.ctrl) return;
+    scrollRef.current.scrollToBottom();
+  });
+
   const handleModelPick = React.useCallback(
     (id: string): void => {
       overlays.closeOverlay();
@@ -1325,12 +1347,7 @@ export function App(props: AppProps): React.JSX.Element {
     [overlays, ARGLESS_SLASH, handleSubmit],
   );
 
-  const inputFocus =
-    pendingKey === null &&
-    pendingApproval === null &&
-    (overlays.active === null ||
-      overlays.active === "atfile" ||
-      overlays.active === "slash");
+  const inputFocus = scrInputFocus;
 
   // Active theme name — driven by local state so the picker can flip it
   // live. Initial value comes from config; subsequent changes are
@@ -1396,17 +1413,17 @@ export function App(props: AppProps): React.JSX.Element {
   const liveJsx = React.useMemo(
     () => (
       <>
-        {_overflowCount > 0 && (
+        {scroll.belowCount > 0 && (
           <Box paddingX={1}>
             <Text color="gray" italic>
-              [↑ {_overflowCount} more item{_overflowCount === 1 ? "" : "s"} above — scroll up]
+              [↓ {scroll.belowCount} more item{scroll.belowCount === 1 ? "" : "s"} below — scroll down]
             </Text>
           </Box>
         )}
         {renderTranscript(_visibleLiveItems, thinkingStreaming)}
       </>
     ),
-    [_visibleLiveItems, thinkingStreaming, _overflowCount],
+    [_visibleLiveItems, thinkingStreaming, scroll.belowCount],
   );
 
   const providerEntries = React.useMemo(
@@ -1557,6 +1574,7 @@ export function App(props: AppProps): React.JSX.Element {
             />
           )}
           <SubagentPanel events={props.events} />
+          <SubagentDashboard events={props.events} />
           <GPUJobIndicator />
           <PromptQueueIndicator queued={promptQueue} />
           <Divider />

@@ -13,8 +13,11 @@ import * as React from "react";
 import { Box, Text } from "ink";
 import type { Palette } from "../../theme.js";
 
-export const PASTE_LINE_THRESHOLD = 2;
-export const PASTE_CHAR_THRESHOLD = 100;
+// Lowered thresholds catch ANY multi-character burst (paste, terminal
+// chunk replay). A single keypress can never insert >1 char per tick, so
+// any delta >= 2 chars or >= 1 line switch is treated as a paste.
+export const PASTE_LINE_THRESHOLD = 1;
+export const PASTE_CHAR_THRESHOLD = 2;
 
 export interface PasteSegment {
   start: number;

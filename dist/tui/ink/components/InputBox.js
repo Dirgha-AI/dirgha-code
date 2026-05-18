@@ -58,11 +58,12 @@ export function InputBox(props) {
     const [pasteSegment, setPasteSegment] = React.useState(null);
     const [pasteExpanded, setPasteExpanded] = React.useState(false);
     const prevValueRef = React.useRef(props.value);
-    // Prompt history recall: up arrow pulls the most recent submitted prompt
-    // for editing (replaces current input). Down arrow on a recalled prompt
-    // restores the previous input. Does NOT cycle through all history.
+    // Prompt history recall: up arrow cycles backward through submitted
+    // prompts (most recent first). Down arrow cycles forward, eventually
+    // restoring the original unsubmitted input. Uses a cache map keyed by
+    // index (-1 = original, 0 = history[0], 1 = history[1], ...).
     const [historyIdx, setHistoryIdx] = React.useState(null);
-    const savedInputRef = React.useRef("");
+    const historyCacheRef = React.useRef(new Map());
     const history = props.promptHistory ?? [];
     // Incremented whenever value is set externally (history recall, dequeue).
     // Passed as `key` to TextInput so it remounts and cursor resets to end.
@@ -167,8 +168,8 @@ export function InputBox(props) {
         // looks like a paste (>=200 added chars or >=4 lines), skip the
         // DEL/BS stripper — those bytes are likely part of the pasted
         // content, not terminal backspace artifacts.
-        const PASTE_CHAR_THRESHOLD = 200;
-        const PASTE_LINE_THRESHOLD = 4;
+        const PASTE_CHAR_THRESHOLD = 2;
+        const PASTE_LINE_THRESHOLD = 1;
         const isPasteDelta = deltaChars >= PASTE_CHAR_THRESHOLD ||
             (deltaChars > 0 &&
                 (next.split("\n").length - prev.split("\n").length) >=
@@ -230,41 +231,50 @@ export function InputBox(props) {
         }
     }, { isActive: true });
     useInput((inputCh, key) => {
-        // Up-arrow pulls the last submitted prompt for editing (single recall,
-        // not a cycle). A second up-arrow pushes deeper — matches the common
-        // "I want to re-send what I just typed" flow. Down arrow restores the
-        // prior input. While busy the always-active handler (above) dequeues
-        // from the prompt queue instead.
+        // Up/down arrow cycle through prompt history (matching bash/zsh
+        // muscle memory). Cache preserves every visited level including the
+        // original unsubmitted input at index -1. While busy the always-active
+        // handler (above) dequeues from the prompt queue instead.
         if (key.upArrow && history.length > 0) {
-            if (historyIdx === null) {
-                // First pull: save current input, recall most recent only.
-                savedInputRef.current = props.value;
-                setHistoryIdx(0);
-                prevValueRef.current = history[0];
-                props.onChange(history[0]);
-                setPasteSegment(null);
-                setPasteExpanded(false);
-                setTextInputKey((k) => k + 1);
-            }
-            // Second+ pulls are intentionally no-ops — we only recall the
-            // single most recent prompt to avoid disorienting deep scrolls.
-            return;
-        }
-        if (key.downArrow && historyIdx !== null) {
-            // Restore the saved input and reset.
-            setHistoryIdx(null);
-            prevValueRef.current = savedInputRef.current;
-            props.onChange(savedInputRef.current);
+            const nextIdx = historyIdx === null ? 0 : historyIdx + 1;
+            if (nextIdx >= history.length)
+                return; // At oldest entry, no-op.
+            // Save current text before moving.
+            historyCacheRef.current.set(historyIdx ?? -1, props.value);
+            setHistoryIdx(nextIdx);
+            // Restore cached text at target index, or load from history array.
+            const cached = historyCacheRef.current.get(nextIdx);
+            const val = cached ?? history[nextIdx];
+            prevValueRef.current = val;
+            props.onChange(val);
             setPasteSegment(null);
             setPasteExpanded(false);
             setTextInputKey((k) => k + 1);
             return;
         }
-        // Any other input resets history navigation.
-        // inputCh may be empty for some key events (e.g. modifier-only);
-        // reset based on the key object rather than requiring a character.
-        if (historyIdx !== null && !key.upArrow && !key.downArrow) {
-            setHistoryIdx(null);
+        if (key.downArrow && historyIdx !== null) {
+            historyCacheRef.current.set(historyIdx, props.value);
+            const nextIdx = historyIdx - 1;
+            if (nextIdx < -1)
+                return; // Past cache bottom — shouldn't happen.
+            if (nextIdx === -1) {
+                // Restore original unsubmitted input and exit history mode.
+                setHistoryIdx(null);
+                const original = historyCacheRef.current.get(-1) ?? "";
+                historyCacheRef.current.delete(-1);
+                prevValueRef.current = original;
+                props.onChange(original);
+            }
+            else {
+                setHistoryIdx(nextIdx);
+                const cached = historyCacheRef.current.get(nextIdx) ?? history[nextIdx];
+                prevValueRef.current = cached;
+                props.onChange(cached);
+            }
+            setPasteSegment(null);
+            setPasteExpanded(false);
+            setTextInputKey((k) => k + 1);
+            return;
         }
         // Paste-collapsed mode special keys.
         if (pasteSegment !== null && !pasteExpanded) {
@@ -388,10 +398,9 @@ export function InputBox(props) {
             }
         }
     }, { isActive: focus });
-    const borderColour = props.busy ? palette.brand : palette.accent;
     const promptColour = props.busy ? palette.brand : palette.accent;
     const collapsed = pasteSegment !== null && !pasteExpanded;
-    return (_jsxs(Box, { flexDirection: "column", children: [_jsx(Box, { borderStyle: "single", borderTop: true, borderBottom: false, borderLeft: false, borderRight: false, borderColor: borderColour, height: 0 }), _jsx(Box, { paddingX: 1, children: _jsxs(Box, { gap: 1, flexGrow: 1, children: [_jsx(Text, { color: promptColour, children: "\u276F" }), collapsed && pasteSegment !== null ? (_jsx(PasteCollapseView, { value: props.value, segment: pasteSegment, expanded: false, palette: palette })) : (_jsx(TextInput, { value: props.value, onChange: handleChange, onSubmit: props.onSubmit, placeholder: props.placeholder ?? "Ask dirgha anything…", showCursor: !props.busy, focus: focus && !vimActive }, textInputKey))] }) }), _jsxs(Box, { paddingX: 1, justifyContent: "space-between", children: [_jsxs(Box, { gap: 1, children: [props.vimMode === true && (_jsxs(Text, { color: vimActive ? palette.accent : palette.brand, bold: true, children: ["[", vimModeLabel(vimState.mode), "]"] })), pasteSegment !== null && pasteExpanded && (_jsxs(Text, { color: palette.textMuted, dimColor: true, children: ["[Pasted ", pasteSegment.lines === 1 ? "1 line" : `${pasteSegment.lines} lines`, " expanded \u00B7 Ctrl+E collapse]"] })), props.busy && (_jsx(BusyHint, { palette: palette, liveDurationMs: props.liveDurationMs, vimMode: props.vimMode === true }))] }), ctrlCArmed && (_jsx(Text, { color: palette.accent, bold: true, children: "Press Ctrl+C again to exit." }))] })] }));
+    return (_jsxs(Box, { flexDirection: "column", children: [_jsx(Box, { paddingX: 1, children: _jsxs(Box, { gap: 1, flexGrow: 1, children: [_jsx(Text, { color: promptColour, children: "\u276F" }), collapsed && pasteSegment !== null ? (_jsx(PasteCollapseView, { value: props.value, segment: pasteSegment, expanded: false, palette: palette })) : (_jsx(TextInput, { value: props.value, onChange: handleChange, onSubmit: props.onSubmit, placeholder: props.placeholder ?? "Ask dirgha anything…", showCursor: !props.busy, focus: focus && !vimActive }, textInputKey))] }) }), _jsxs(Box, { paddingX: 1, justifyContent: "space-between", children: [_jsxs(Box, { gap: 1, children: [props.vimMode === true && (_jsxs(Text, { color: vimActive ? palette.accent : palette.brand, bold: true, children: ["[", vimModeLabel(vimState.mode), "]"] })), pasteSegment !== null && pasteExpanded && (_jsxs(Text, { color: palette.textMuted, dimColor: true, children: ["[Pasted ", pasteSegment.lines === 1 ? "1 line" : `${pasteSegment.lines} lines`, " expanded \u00B7 Ctrl+E collapse]"] })), props.busy && (_jsx(BusyHint, { palette: palette, liveDurationMs: props.liveDurationMs, vimMode: props.vimMode === true }))] }), ctrlCArmed && (_jsx(Text, { color: palette.accent, bold: true, children: "Press Ctrl+C again to exit." }))] })] }));
 }
 function vimModeLabel(m) {
     return m === "NORMAL" ? "NORMAL" : "INSERT";

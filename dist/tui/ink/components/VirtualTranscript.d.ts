@@ -1,12 +1,13 @@
 /**
- * Virtualised transcript list for long sessions.
+ * Virtualised transcript list — always-on viewport slicing.
  *
  * Renders only the items within the visible terminal viewport plus a
- * 5-item buffer above and below.  Item count is used as a rough proxy
- * for lines — the goal is to keep the in-memory render tree small
- * rather than achieving pixel-perfect viewport clipping.
+ * 5-item buffer above and below. Uses pinned-absolute-index scrolling
+ * so the viewport never shifts when new items arrive mid-scroll.
  *
- * When scrolled above the bottom, a `[N items above]` spacer is shown.
+ * When items exist below the viewport, a `[N items below · ↓ see]`
+ * indicator is shown. When items exist above, a `[N items above]`
+ * indicator is shown.
  */
 import * as React from "react";
 import type { TranscriptItem } from "../use-event-projection.js";
