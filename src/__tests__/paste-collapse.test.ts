@@ -49,8 +49,8 @@ describe("detectPaste", () => {
     expect(seg).not.toBeNull();
   });
 
-  it("returns null for single-char delta (below 2-char threshold)", () => {
-    // 1 char added — below PASTE_CHAR_THRESHOLD (2) and line threshold (1)
+  it("returns null for single-char delta (below 200-char threshold)", () => {
+    // 1 char added — below PASTE_CHAR_THRESHOLD (200) and line threshold (4)
     const seg = detectPaste("hello", "hello!");
     expect(seg).toBeNull();
   });

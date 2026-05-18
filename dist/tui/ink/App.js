@@ -312,7 +312,7 @@ export function App(props) {
     const { stdout: scrStdout } = useStdout();
     const _termRows = scrStdout?.rows ?? 24;
     const visibleCount = Math.max(4, Math.floor((_termRows - 6) / 1.5));
-    const scroll = useTranscriptScroll(projection.liveItems.length, visibleCount, true, // autoScroll — follow new items when at bottom
+    const scroll = useTranscriptScroll(projection.liveItems.length, visibleCount, false, // autoScroll disabled — viewport stays still, user presses End to jump down
     scrInputFocus);
     // Visible window into live items based on scroll position.
     // pinnedEndIdx is the absolute end index; we take up to `visibleCount`

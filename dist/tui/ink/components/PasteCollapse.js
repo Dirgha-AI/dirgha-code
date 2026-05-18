@@ -1,10 +1,9 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { Box, Text } from "ink";
-// Lowered thresholds catch ANY multi-character burst (paste, terminal
-// chunk replay). A single keypress can never insert >1 char per tick, so
-// any delta >= 2 chars or >= 1 line switch is treated as a paste.
-export const PASTE_LINE_THRESHOLD = 1;
-export const PASTE_CHAR_THRESHOLD = 2;
+// A single keypress inserts at most one char per tick, so only deltas
+// above these thresholds signal a paste (or large terminal chunk replay).
+export const PASTE_LINE_THRESHOLD = 4;
+export const PASTE_CHAR_THRESHOLD = 200;
 /**
  * Returns a segment describing a just-pasted block when the delta between
  * two consecutive buffer values looks like a paste. Returns null when the

@@ -411,7 +411,7 @@ export function App(props: AppProps): React.JSX.Element {
   const scroll = useTranscriptScroll(
     projection.liveItems.length,
     visibleCount,
-    true,          // autoScroll — follow new items when at bottom
+    false,         // autoScroll disabled — viewport stays still, user presses End to jump down
     scrInputFocus, // only intercept Ctrl+PageUp/Down when input is focused
   );
 
