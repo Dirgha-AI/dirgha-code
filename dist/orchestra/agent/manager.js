@@ -112,21 +112,25 @@ export async function killAgent(sessionId, agentId) {
     if (!agent || (agent.status !== "running" && agent.status !== "spawning")) {
         return false;
     }
-    // Find the child process and kill it.
-    try {
-        process.kill(agent.pid, "SIGTERM");
-        // Give it 3 seconds then SIGKILL.
-        setTimeout(() => {
-            try {
-                process.kill(agent.pid, "SIGKILL");
-            }
-            catch {
-                // Already dead.
-            }
-        }, 3000);
-    }
-    catch {
-        // Process may already be dead.
+    // Only send signals if the process actually exists (pid > 0).
+    // PID 0 would mean a still-spawning agent whose process hasn't been
+    // registered yet; process.kill(0, ...) hits the caller's process group.
+    if (agent.pid > 0) {
+        try {
+            process.kill(agent.pid, "SIGTERM");
+            // Give it 3 seconds then SIGKILL.
+            setTimeout(() => {
+                try {
+                    process.kill(agent.pid, "SIGKILL");
+                }
+                catch {
+                    // Already dead.
+                }
+            }, 3000);
+        }
+        catch {
+            // Process may already be dead.
+        }
     }
     registry.updateAgent(sessionId, agentId, { status: "killed" });
     writeLog(sessionId, agentId, "exit", { code: -1, killed: true });
