@@ -52,9 +52,10 @@ export const DEEPSEEK_CATALOGUE = [
         vision: false,
         thinkingMode: 'opt-in',
         thinkingParam: DEEPSEEK_THINKING_PARAM,
-        inputPerM: 0.27,
-        outputPerM: 1.10,
-        cachedInputPerM: 0.07,
+        inputPerM: 0.43,
+        outputPerM: 0.87,
+        cachedInputPerM: 0.11,
+        notes: 'flagship v4 model; api.deepseek.com direct',
         tags: ['agents'],
     },
     {
@@ -70,6 +71,7 @@ export const DEEPSEEK_CATALOGUE = [
         inputPerM: 0.07,
         outputPerM: 0.28,
         cachedInputPerM: 0.02,
+        notes: 'fast v4 variant; api.deepseek.com direct',
         tags: ['fast'],
     },
 ];
