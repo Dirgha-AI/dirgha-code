@@ -46,7 +46,7 @@
   },
   "optionalDependencies": {
     "@xenova/transformers": "^2.17.2",
-    "better-sqlite3": "12.9.0",
+    "better-sqlite3": "12.10.0",
     "chokidar": "^5.0.0",
     "sqlite-vec": "^0.1.9"
   },
