@@ -32,6 +32,8 @@ import {
 import {
   detectPaste,
   PasteCollapseView,
+  PASTE_CHAR_THRESHOLD,
+  PASTE_LINE_THRESHOLD,
   type PasteSegment,
 } from "./PasteCollapse.js";
 
@@ -39,9 +41,6 @@ export interface InputBoxProps {
   value: string;
   onChange: (value: string) => void;
   onSubmit: (value: string) => void;
-  busy: boolean;
-  /** Live elapsed ms for the current turn — drives BusyHint without a separate timer. */
-  liveDurationMs?: number;
   placeholder?: string;
   vimMode?: boolean;
   /** Parent wants to know when the @-token changes (null = none active). */
@@ -220,9 +219,9 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
       // Detect paste BEFORE running the DEL/BS sanitizer. When the delta
       // looks like a paste (>=200 added chars or >=4 lines), skip the
       // DEL/BS stripper — those bytes are likely part of the pasted
-      // content, not terminal backspace artifacts.
-      const PASTE_CHAR_THRESHOLD = 2;
-      const PASTE_LINE_THRESHOLD = 1;
+      // content, not terminal backspace artifacts. The thresholds here
+      // match PasteCollapse.tsx's detectPaste thresholds so the guard
+      // only arms for actual multi-tick pastes, not ordinary typing.
       const isPasteDelta =
         deltaChars >= PASTE_CHAR_THRESHOLD ||
         (deltaChars > 0 &&
@@ -508,13 +507,6 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
               [Pasted {pasteSegment.lines === 1 ? "1 line" : `${pasteSegment.lines} lines`} expanded · Ctrl+E collapse]
             </Text>
           )}
-          {props.busy && (
-            <BusyHint
-              palette={palette}
-              liveDurationMs={props.liveDurationMs}
-              vimMode={props.vimMode === true}
-            />
-          )}
         </Box>
         {ctrlCArmed && (
           <Text color={palette.accent} bold>
@@ -528,35 +520,4 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
 
 function vimModeLabel(m: VimMode): string {
   return m === "NORMAL" ? "NORMAL" : "INSERT";
-}
-
-/**
- * Busy-state hint with a live elapsed-second counter, matching
- * gemini-cli's `(esc to cancel, 12s)` pattern.
- *
- * Elapsed seconds come from the `liveDurationMs` prop that App.tsx already
- * updates on a 1s interval — no second internal timer needed.
- */
-function BusyHint({
-  palette,
-  liveDurationMs,
-  vimMode,
-}: {
-  palette: ReturnType<typeof useTheme>;
-  liveDurationMs?: number;
-  vimMode?: boolean;
-}): React.JSX.Element {
-  const elapsed = Math.floor((liveDurationMs ?? 0) / 1000);
-  const label =
-    elapsed < 60
-      ? `${elapsed}s`
-      : elapsed < 3600
-        ? `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`
-        : `${Math.floor(elapsed / 3600)}h ${Math.floor((elapsed % 3600) / 60)}m`;
-  const escLabel = vimMode ? "esc normal" : "esc cancel";
-  return (
-    <Text color={palette.textMuted}>
-      {escLabel} · {label} · ctrl+c stop
-    </Text>
-  );
 }

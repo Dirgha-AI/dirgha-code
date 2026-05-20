@@ -411,7 +411,7 @@ export function App(props: AppProps): React.JSX.Element {
   const scroll = useTranscriptScroll(
     projection.liveItems.length,
     visibleCount,
-    false,         // autoScroll disabled — viewport stays still, user presses End to jump down
+    true,          // autoScroll — follow live tail when user has not scrolled up
     scrInputFocus, // only intercept Ctrl+PageUp/Down when input is focused
   );
 
@@ -442,7 +442,7 @@ export function App(props: AppProps): React.JSX.Element {
     const ema = frameEmaRef.current;
     const floor = minFlushMs();
     if (ema > floor * 1.5) {
-      adaptiveFlushRef.current.floorMs = Math.min(ema * 1.2, 500);
+      adaptiveFlushRef.current.floorMs = Math.min(ema * 1.2, 200);
     } else if (ema < floor * 0.8) {
       const current = adaptiveFlushRef.current.floorMs;
       adaptiveFlushRef.current.floorMs = Math.max(
@@ -1557,7 +1557,14 @@ export function App(props: AppProps): React.JSX.Element {
             )}
           </Static>
           <Box flexDirection="column" flexGrow={1}>{liveJsx}</Box>
-          {busy && projection.liveItems.length === 0 && <GeneratingIndicator elapsedMs={liveDurationMs} liveOutputTokens={liveOutputTokens} />}
+          {busy && (
+            <ActivityIndicator
+              activeTools={activeTools}
+              liveOutputTokens={liveOutputTokens}
+              liveDurationMs={liveDurationMs}
+              hasLiveItems={projection.liveItems.length > 0}
+            />
+          )}
           {pendingApproval !== null && approvalBusRef.current && (
             <ApprovalPrompt
               request={pendingApproval}
@@ -1582,8 +1589,6 @@ export function App(props: AppProps): React.JSX.Element {
             value={input}
             onChange={setInput}
             onSubmit={handleSubmit}
-            busy={busy}
-            liveDurationMs={liveDurationMs}
             vimMode={props.config.vimMode === true}
             onAtQueryChange={overlays.setAtQuery}
             onSlashQueryChange={overlays.setSlashQuery}
@@ -1923,21 +1928,49 @@ function TranscriptRow({
   }
 }
 
-function GeneratingIndicator(props: {
-  elapsedMs: number;
+/**
+ * ActivityIndicator — verb-based status line above the Divider.
+ *
+ * Shows what the agent is doing right now in a single line, following
+ * the Claude Code pattern (Thinking…, Reading file…, Running shell…).
+ *
+ * States:
+ *   - Warming up (busy, no output, no tools) → "Thinking… · 8s"
+ *   - Streaming text (liveItems, no tools)    → "Generating… · 12s"
+ *   - Tool running (active tools)              → "Running {tool}… · 15s · esc cancel"
+ */
+function ActivityIndicator(props: {
+  activeTools: Array<{ id: string; name: string; elapsedMs: number }>;
   liveOutputTokens: number;
+  liveDurationMs: number;
+  hasLiveItems: boolean;
 }): React.JSX.Element {
   const palette = useTheme();
-  const elapsedSec = Math.round(props.elapsedMs / 1000);
-  const slow = elapsedSec >= 5 && props.liveOutputTokens === 0;
-  const label = slow
-    ? `warming up · ${elapsedSec}s · first token can take 10–30s on free models`
-    : `generating · ${elapsedSec}s`;
+  const elapsedSec = Math.round(props.liveDurationMs / 1000);
+  const elapsedLabel =
+    elapsedSec < 60
+      ? `${elapsedSec}s`
+      : `${Math.floor(elapsedSec / 60)}m ${elapsedSec % 60}s`;
+
+  let verb = "Thinking…";
+  if (props.activeTools.length > 0) {
+    const t = props.activeTools[0]!;
+    verb = `Running ${t.name}…`;
+  } else if (props.hasLiveItems) {
+    verb = "Generating…";
+  } else if (elapsedSec >= 5 && props.liveOutputTokens === 0) {
+    verb = "Warming up…";
+  }
+
+  const escHint = props.activeTools.length > 0 ? " · esc cancel" : "";
+
   return (
     <Box gap={1} marginBottom={1}>
-      <SpinnerGlyph isActive={true} color={palette.text.secondary} />
+      {(props.activeTools.length > 0 || (!props.hasLiveItems && props.liveOutputTokens === 0)) && (
+        <SpinnerGlyph isActive={true} color={palette.text.secondary} />
+      )}
       <Text color={palette.text.secondary} dimColor>
-        {label}
+        {verb} · {elapsedLabel}{escHint}
       </Text>
     </Box>
   );

@@ -92,7 +92,7 @@ interface Output {
 }
 
 const DEFAULT_TIMEOUT_MS = 120_000;
-const MAX_OUTPUT_BYTES = 256 * 1024;
+const MAX_OUTPUT_BYTES = 32 * 1024; // 32 KB — keeps 2 shell calls per context window
 
 export const shellTool: Tool = {
   name: "shell",
@@ -226,6 +226,7 @@ export const shellTool: Tool = {
             cwd,
             env: ctx.env,
             stdio: ["pipe", "pipe", "pipe"],
+            detached: true, // own process group — kill(-pgid) reaches piped descendants
           });
 
     const childProcess = await (child instanceof Promise
@@ -291,22 +292,33 @@ export const shellTool: Tool = {
       }, "STDERR"),
     );
 
-    /** Gracefully terminate: SIGTERM, then SIGKILL after 2 s. */
-    const killChild = (): void => {
-      childProcess.kill("SIGTERM");
+    /**
+     * Terminate the child. Kills the entire process group (via -pgid) so
+     * piped commands (sh -c "curl … | jq …") don't orphan descendants.
+     *
+     * Grace period: 250 ms on user abort (ESC feels instant), 2 s on
+     * timeout (child may be mid-network-call, needs a moment to flush).
+     */
+    const killChild = (reason: "abort" | "timeout"): void => {
+      try {
+        process.kill(-childProcess.pid!, "SIGTERM");
+      } catch {
+        /* already gone */
+      }
+      const graceMs = reason === "abort" ? 250 : 2_000;
       setTimeout(() => {
         try {
-          childProcess.kill("SIGKILL");
+          process.kill(-childProcess.pid!, "SIGKILL");
         } catch {
           /* already gone */
         }
-      }, 2_000);
+      }, graceMs);
     };
 
-    const timer = setTimeout(killChild, timeoutMs);
+    const timer = setTimeout(() => killChild("timeout"), timeoutMs);
 
     const onAbort = (): void => {
-      killChild();
+      killChild("abort");
     };
     if (ctx.signal) {
       ctx.signal.addEventListener("abort", onAbort, { once: true });
