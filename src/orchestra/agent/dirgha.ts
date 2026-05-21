@@ -11,6 +11,8 @@ export interface DirghaAgentOptions {
   extraArgs?: string[];
   /** Working directory. */
   cwd?: string;
+  /** Extra environment variables to pass to the agent. */
+  env?: Record<string, string | undefined>;
 }
 
 /**
@@ -31,6 +33,7 @@ export async function spawnDirghaAgent(
     command: "dirgha",
     args,
     cwd: opts.cwd,
+    env: opts.env,
   };
 
   return spawnAgent(sessionId, label, task, "dirgha", spawnOpts);

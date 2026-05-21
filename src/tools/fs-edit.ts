@@ -13,10 +13,20 @@ import { summariseDiff, unifiedDiff } from "./diff.js";
 import { decodeLiteralUnicodeEscapes, isValidCwdPath } from "../utils/fs.js";
 
 interface Input {
-  path: string;
+  path?: string;
+  /** Alias for `path` — LSP tools use `filePath`; fs tools accept both. */
+  filePath?: string;
   oldString: string;
   newString: string;
   replaceAll?: boolean;
+}
+
+function resolvePath(raw: Record<string, unknown>): string {
+  const filePath = typeof raw.filePath === "string" ? raw.filePath : undefined;
+  const path = typeof raw.path === "string" ? raw.path : undefined;
+  const resolved = path ?? filePath;
+  if (!resolved) throw new Error("fs_edit requires 'path' or 'filePath'");
+  return resolved;
 }
 
 export const fsEditTool: Tool = {
@@ -27,11 +37,12 @@ export const fsEditTool: Tool = {
     type: "object",
     properties: {
       path: { type: "string" },
+      filePath: { type: "string", description: "Alias for `path`." },
       oldString: { type: "string" },
       newString: { type: "string" },
       replaceAll: { type: "boolean" },
     },
-    required: ["path", "oldString", "newString"],
+    required: ["oldString", "newString"],
   },
   requiresApproval: () => true,
   async execute(
@@ -41,12 +52,13 @@ export const fsEditTool: Tool = {
     ToolResult<{ replacements: number; added: number; removed: number }>
   > {
     const input = rawInput as Input;
-    const check = isValidCwdPath(ctx.cwd, input.path, { allowOutside: ctx.autoApprove === true && (ctx.sandboxMode === 'off' || ctx.sandboxMode == null) });
+    const resolvedPath = resolvePath(rawInput as Record<string, unknown>);
+    const check = isValidCwdPath(ctx.cwd, resolvedPath, { allowOutside: ctx.autoApprove === true && (ctx.sandboxMode === 'off' || ctx.sandboxMode == null) });
     if (!check.valid) return { content: check.error, isError: true };
     const abs = check.resolved;
     const info = await stat(abs).catch(() => undefined);
     if (!info || !info.isFile())
-      return { content: `No such file: ${input.path}`, isError: true };
+      return { content: `No such file: ${resolvedPath}`, isError: true };
     const before = await readFile(abs, "utf8");
 
     const oldString = decodeLiteralUnicodeEscapes(input.oldString);
@@ -62,7 +74,7 @@ export const fsEditTool: Tool = {
     const exactCount = countOccurrences(before, oldString);
     if (exactCount === 0) {
       return {
-        content: `oldString not found in ${input.path}. Provide more surrounding context or verify the file.`,
+        content: `oldString not found in ${resolvedPath}. Provide more surrounding context or verify the file.`,
         isError: true,
       };
     }
@@ -78,14 +90,14 @@ export const fsEditTool: Tool = {
       : before.replace(oldString, newString);
 
     const diff = unifiedDiff(before, after, {
-      fromLabel: input.path,
-      toLabel: input.path,
+      fromLabel: resolvedPath,
+      toLabel: resolvedPath,
     });
     const { added, removed } = summariseDiff(diff);
 
     await writeFile(abs, after, "utf8");
 
-    const summary = `Edited ${input.path}: ${input.replaceAll ? exactCount : 1} replacement(s) (+${added} / -${removed})`;
+    const summary = `Edited ${resolvedPath}: ${input.replaceAll ? exactCount : 1} replacement(s) (+${added} / -${removed})`;
     const content = diff ? `${summary}\n\n${diff}` : summary;
 
     return {

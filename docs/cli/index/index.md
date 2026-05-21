@@ -612,4 +612,95 @@ Current rate-limiter uses a static per-provider RPS token bucket with no awarene
 
 ---
 
-_Last updated: 2026-04-25. Current build v1.42.14._
+---
+
+## Production Gaps & Known Bugs
+
+> Audited 2026-04-25 by dirgha-session. 41 test files, 481/484 tests passing, 340 source files (~59K LOC), 9 stale `.bak` files.
+
+### P0 — Tool Parameter Name Inconsistency (Agent UX Bug)
+
+**Files:** `src/tools/fs-read.ts:27` vs `src/tools/lsp-definition.ts:15`
+
+`fs_read`, `fs_write`, `fs_edit` use parameter name `path`. LSP tools (`go_to_definition`, `find_references`, `hover_documentation`, `document_symbols`) use `filePath`. An LLM agent that learns the LSP convention will call `fs_read` with `filePath`, producing JSON Schema validation errors. The error message (`The "paths[1]" argument must be of type string`) does not name the offending parameter, making it undebuggable for both the agent and the human.
+
+**Fix:** Add `filePath` as an accepted alias in all `fs_*` tools that take a `path` param, falling back to `path` when `filePath` is absent. Or standardize all tools to use `path` and update LSP tools to accept both names with `path` as canonical.
+
+### P0 — File Size Convention Violations
+
+**Constraint:** Every src file ≤ 200 lines (per `DIRGHA.md`). **Reality:**
+
+| File | Lines | Over By |
+|------|-------|---------|
+| `kernel/agent-loop.ts` | 1,311 | 6.5× |
+| `cli/main.ts` | 1,076 | 5.4× |
+| `intelligence/prices.ts` | 1,186 | 5.9× |
+| `tui/ink/use-event-projection.ts` | 778 | 3.9× |
+| `fleet/cli-command.ts` | 644 | 3.2× |
+| `cli/interactive.ts` | 626 | 3.1× |
+
+`agent-loop.ts` alone has 5 internal subsystems (history repair, stream orchestration, compaction, error recovery, tool execution) that should be separate modules.
+
+### P0 — Stale `.bak` Files in Source Tree
+
+Nine backup files shipped in the source tree — dead weight that also confuses tooling:
+
+```
+src/kernel/agent-loop.ts.bak (17KB)
+src/kernel/abort-utils.ts.bak
+src/kernel/tool-timeout.ts.bak
+src/providers/custom-provider.ts.bak
+src/providers/openai-compat.ts.bak
+src/providers/openrouter.ts.bak
+src/cli/slash/models.ts.bak
+src/cli/slash/provider.ts.bak
+src/tui/ink/components/StatusBar.tsx.bak
+```
+
+All should be deleted. If they represent rollback safety, use git.
+
+### P1 — Parity Mock Coverage Gaps
+
+**Files:** `src/parity/runner.ts:66-78`
+
+Parity mocks only exist for `nvidia`, `openrouter`, and `openai`. `anthropic` and `gemini` throw `"Parity mock for ${id} not yet implemented in runner"`. Adding mocks for Anthropic's content-block format and Gemini's native format would catch response-parsing regressions before they ship.
+
+### P1 — `as any` / `as unknown as` Cast Count Still Elevated
+
+98 type assertion casts remain (`as unknown as`, `as any`) despite the `@ts-ignore` cleanup. Most are in provider adapters and the scoped registry in `subagents/delegator.ts:215`. The scoped registry cast is a known pattern but should use a proper interface-compatible factory instead of a raw cast.
+
+### P1 — No Shell Completion Support
+
+**Gap:** No `dirgha completion bash/zsh/fish` subcommand. Competitors (Gemini CLI, Claude Code) ship shell completions. Implementation path: generate from the subcommand registry (`src/cli/subcommands/index.ts`).
+
+### P2 — Context Window Estimation is Char/4 Approximation
+
+**Files:** `src/kernel/agent-loop.ts:570-581`
+
+Token estimation for proactive compaction uses `Math.ceil(content.length / 4)`, which is a rough heuristic. It doesn't account for tokenizer differences across model families (Claude vs GPT vs Gemini tokenizers vary by 10-30%). This means the 80% compaction threshold can fire too early or too late.
+
+### P2 — No Distributed Tracing / Span IDs
+
+Agent loop, fleet agents, and sub-agents have no span/correlation IDs beyond `sessionId`. Diagnosing a multi-agent bug requires grepping JSONL by timestamp. A simple `traceId` + `parentSpanId` on events would make fleet debugging tractable.
+
+### P2 — Memory System: No Eviction Policy
+
+**Files:** `src/context/memory.ts`
+
+The memory store grows unbounded — no LRU, no TTL, no size cap. Long-running CLI users will accumulate stale embeddings indefinitely. Embedding count is bounded only by disk.
+
+### P3 — Fleet Agent Prompts Lack Guardrails
+
+**Files:** `src/fleet/runner.ts:50-71`
+
+The `DECOMPOSE_SYSTEM` prompt is a single hardcoded string with no version/knobs. It has no explicit instruction to avoid hallucinating file paths or making destructive assumptions. An LLM decomposer given a vague goal can produce subtask prompts that delete the wrong thing.
+
+### P3 — `orchestra` Bin Relies on Loose Process Supervision
+
+**Files:** `src/orchestra/bin.ts`
+
+The orchestra subsystem spawns agents as subprocesses but has no health-check loop, no restart policy, and no structured log format. It works for ad-hoc use but would need a process supervisor (PM2, systemd) for any persistent deployment.
+
+---
+
+_Last updated: 2026-04-25. Current build v1.42.14. Audit session: 2026-04-25._
