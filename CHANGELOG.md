@@ -2,6 +2,13 @@
 
 All notable changes are tracked here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); we use [Semantic Versioning](https://semver.org/).
 
+## [1.43.3](https://github.com/Dirgha-AI/dirgha-code/compare/v1.43.2...v1.43.3) (2026-05-21)
+
+
+### Bug Fixes
+
+* **orchestra:** pass LLM keys to spawned agents, add timeout, surface log errors ([65686df](https://github.com/Dirgha-AI/dirgha-code/commit/65686dfaa7f65097d8056bba9182ea591349a53e))
+
 ## [1.42.3] — 2026-04-25
 
 ### Bug Fixes
