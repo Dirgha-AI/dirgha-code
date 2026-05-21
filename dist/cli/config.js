@@ -144,22 +144,20 @@ export async function loadConfig(cwd = process.cwd()) {
     const merged = merge(DEFAULT_CONFIG, userPartial, projectPartial, envPartial);
     validate(merged);
     migrateConfigSchema(merged);
-    // Migrate any model IDs the upstream provider has dropped, so users
-    // with stale `~/.dirgha/config.json` don't 400 on every call.
-    const originalModel = merged.model;
-    const originalCheap = merged.cheapModel;
-    const originalSummary = merged.summaryModel;
-    merged.model = migrateDeprecatedModel(merged.model);
-    merged.cheapModel = migrateDeprecatedModel(merged.cheapModel);
-    merged.summaryModel = migrateDeprecatedModel(merged.summaryModel);
-    if (originalModel !== merged.model) {
-        process.stderr.write(`[dirgha] model "${originalModel}" migrated to "${merged.model}"\n`);
-    }
-    if (originalCheap !== merged.cheapModel) {
-        process.stderr.write(`[dirgha] cheapModel "${originalCheap}" migrated to "${merged.cheapModel}"\n`);
-    }
-    if (originalSummary !== merged.summaryModel) {
-        process.stderr.write(`[dirgha] summaryModel "${originalSummary}" migrated to "${merged.summaryModel}"\n`);
+    // Check for deprecated-model IDs (models a specific provider has
+    // dropped) and WARN the user, but do NOT silently rewrite the model.
+    // Silent rewrites break cost expectations, user's preferred provider,
+    // and model-specific behavior. The warning prints once and the user
+    // can update their config with `dirgha config set model <id>` or
+    // pass `-m <id>` to override at runtime.
+    for (const key of ["model", "cheapModel", "summaryModel"]) {
+        const val = merged[key];
+        if (val && val !== migrateDeprecatedModel(val)) {
+            const hint = migrateDeprecatedModel(val);
+            process.stderr.write(`[dirgha] ⚠ ${key} "${val}" is deprecated by its provider.` +
+                (hint !== val ? ` Consider: dirgha config set ${key} ${hint}` : "") +
+                `\n`);
+        }
     }
     return merged;
 }

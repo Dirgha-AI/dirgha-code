@@ -182,7 +182,7 @@ export const DEFAULT_MODEL_PER_PROVIDER: Record<string, string> = {
   openrouter: "inclusionai/ring-2.6-1t:free",
   fireworks: "accounts/fireworks/models/deepseek-v3",
   dirgha: "deepseek",
-  deepseek: "deepseek-chat",
+  deepseek: "deepseek-v4-pro",
   mistral: "mistral/mistral-large-latest",
   cohere: "cohere/command-a-03-2025",
   cerebras: "cerebras/llama-3.3-70b",

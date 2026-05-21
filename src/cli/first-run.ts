@@ -41,7 +41,7 @@ const CONFIG_PATH = join(homedir(), ".dirgha", "config.json");
 const PROVIDER_DEFAULTS: Record<string, string> = {
   NVIDIA_API_KEY: "deepseek-ai/deepseek-v4-pro",
   OPENROUTER_API_KEY: "openai/gpt-5-mini",
-  DEEPSEEK_API_KEY: "deepseek-v4-flash",
+  DEEPSEEK_API_KEY: "deepseek-v4-pro",
   ANTHROPIC_API_KEY: "claude-sonnet-4-6",
   OPENAI_API_KEY: "gpt-5-mini",
   GEMINI_API_KEY: "gemini-2.5-flash",

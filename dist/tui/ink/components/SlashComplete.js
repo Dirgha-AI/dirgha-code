@@ -92,12 +92,11 @@ function SlashCompleteInner(props) {
             setCursor(c => Math.min(matches.length - 1, c + 1));
             return;
         }
-        // Tab picks the highlighted command (inserts it, leaves room for args).
-        // Enter does NOT pick — it falls through to InputBox so the user's typed
-        // command submits exactly as written. Without this fall-through, picking
-        // a non-argless command (e.g. /memory) appends a trailing space and the
-        // input never submits, leaving stale text in the buffer.
-        if (key.tab) {
+        // Enter OR Tab picks the highlighted command (inserts it, leaves room
+        // for args). The old behaviour was Enter-fallthrough (so the typed
+        // text submitted as-is), but users consistently expect Enter to pick
+        // from the dropdown like every other autocomplete in existence.
+        if (key.tab || key.return) {
             const pick = matches[cursor];
             if (pick)
                 props.onPick(pick.name);

@@ -58,7 +58,17 @@ function ProviderPickerInner(props) {
             setCursor(c => Math.min(Math.max(0, filtered.length - 1), c + 1));
             return;
         }
-        if (key.return) {
+        // key.return covers \r (CR); input === '\n' covers terminals that
+        // send LF for Enter (parseKeypress names it 'enter', not 'return').
+        const isEnter = key.return ||
+            ch === '\n' ||
+            ch === '\r' ||
+            (ch === '' &&
+                !key.escape && !key.upArrow && !key.downArrow &&
+                !key.leftArrow && !key.rightArrow && !key.tab &&
+                !key.backspace && !key.delete && !key.ctrl && !key.meta &&
+                !key.pageUp && !key.pageDown && !key.home && !key.end);
+        if (isEnter) {
             const picked = filtered[cursor];
             if (picked)
                 props.onPick(picked.id);

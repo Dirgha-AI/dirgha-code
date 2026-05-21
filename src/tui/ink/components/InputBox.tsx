@@ -101,6 +101,9 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
   const [pasteSegment, setPasteSegment] = React.useState<PasteSegment | null>(
     null,
   );
+  // Mirror of pasteSegment state so handleChange can read the latest
+  // accumulated segment during a multi-tick paste burst (guard window).
+  const pasteSegmentRef = React.useRef<PasteSegment | null>(null);
   const [pasteExpanded, setPasteExpanded] = React.useState(false);
   const prevValueRef = React.useRef<string>(props.value);
   // Prompt history recall: up arrow cycles backward through submitted
@@ -188,10 +191,14 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
   // Also clears segment when the user edits INSIDE the pasted block by
   // comparing the expected segment content against the actual buffer.
   React.useEffect(() => {
-    if (pasteSegment === null) return;
+    if (pasteSegment === null) {
+      pasteSegmentRef.current = null;
+      return;
+    }
     const valueLen = props.value.length;
     if (valueLen < pasteSegment.end || valueLen > pasteSegment.end + 500) {
       setPasteSegment(null);
+      pasteSegmentRef.current = null;
       setPasteExpanded(false);
       // Bump key so TextInput remounts with cursor at end of value.
       // The paste collapse hid TextInput; when it reappears the internal
@@ -204,6 +211,7 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
     const segContent = props.value.slice(pasteSegment.start, pasteSegment.end);
     if (segContent.length !== pasteSegment.chars) {
       setPasteSegment(null);
+      pasteSegmentRef.current = null;
       setPasteExpanded(false);
       // Same cursor-resync as above — TextInput reappears after collapse
       // and must have cursor at the correct position.
@@ -257,7 +265,24 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
       prevValueRef.current = sanitized;
       const seg = detectPaste(prev, sanitized);
       if (seg !== null) {
-        setPasteSegment(seg);
+        // Multi-tick paste: when a follow-up chunk arrives during the
+        // paste guard window, merge it into the existing segment so the
+        // collapse covers the *entire* pasted block — not just the last
+        // chunk (which would leak earlier chunks as visible text).
+        const prevSeg = pasteSegmentRef.current;
+        if (prevSeg !== null && isGuardActive) {
+          const merged: PasteSegment = {
+            start: prevSeg.start,
+            end: Math.max(prevSeg.end, seg.end),
+            lines: prevSeg.lines + seg.lines,
+            chars: prevSeg.chars + seg.chars,
+          };
+          pasteSegmentRef.current = merged;
+          setPasteSegment(merged);
+        } else {
+          pasteSegmentRef.current = seg;
+          setPasteSegment(seg);
+        }
         setPasteExpanded(false);
       }
       props.onChange(sanitized);
@@ -431,7 +456,8 @@ export function InputBox(props: InputBoxProps): React.JSX.Element {
           return;
         }
         if (vimState.mode === "NORMAL" && !key.ctrl && !key.meta) {
-          if (key.return) {
+          // key.return covers \r; ch === '\n' covers LF-Enter terminals.
+          if (key.return || inputCh === "\n") {
             // In NORMAL mode, Enter still submits.
             props.onSubmit(props.value);
             return;

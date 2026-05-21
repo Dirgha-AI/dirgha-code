@@ -66,6 +66,24 @@ export interface AgentLoopConfig {
         reason(): string | null;
     };
     /**
+     * Ordered list of fallback models for autonomous sessions. When the
+     * primary model returns a "model_not_found" or "deprecated" error,
+     * the agent loop advances through this list — building a new provider
+     * for each entry via `providerFactory` — instead of silently
+     * rewriting the model ID. The user explicitly declares their fallback
+     * preferences in their config.
+     */
+    fallbackModels?: Array<{
+        model: string;
+    }>;
+    /**
+     * Factory for constructing a new Provider instance for a given model
+     * ID. Required when `fallbackModels` is set — the agent loop calls it
+     * to build a provider for each fallback entry it activates during
+     * error recovery.
+     */
+    providerFactory?: (modelId: string) => Provider;
+    /**
      * Optional session for per-turn crash-safe checkpointing. When provided,
      * each assistant message and each batch of tool results is appended to the
      * session immediately after it is produced, rather than waiting for the

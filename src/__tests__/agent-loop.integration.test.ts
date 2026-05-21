@@ -305,6 +305,107 @@ describe('Test E: multi-turn — tool_use then text', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Test G: fallback chain — model_not_found triggers user-declared failover
+// ---------------------------------------------------------------------------
+
+describe('Test G: fallback chain activation', () => {
+  it('advances through fallbackModels after a model_not_found error', async () => {
+    const primaryProvider = new MockProvider([
+      { type: 'error', message: 'model_not_found: deepseek-v4-pro not available' },
+    ]);
+    // This is the fallback provider that will be used after failover.
+    // It must NOT have the error in its script.
+    const fallbackProvider = new MockProvider([
+      { type: 'text', content: 'Fallback model response' },
+    ]);
+
+    const session = makeSession();
+    const collected = collectEvents(session.events);
+
+    const result = await runAgentLoop({
+      ...session,
+      model: 'deepseek-ai/deepseek-v4-pro',
+      provider: primaryProvider,
+      fallbackModels: [
+        { model: 'deepseek-ai/deepseek-v4-flash' },
+      ],
+      providerFactory: (_modelId: string) => fallbackProvider,
+      toolExecutor: new MockToolExecutor(),
+    });
+
+    // The loop should have recovered via fallback and completed successfully.
+    expect(result.stopReason).toBe('end_turn');
+    expect(result.turnCount).toBe(1);
+
+    // The final assistant message should contain the fallback text.
+    const assistantMessages = result.messages.filter(
+      (m) => m.role === 'assistant',
+    );
+    expect(assistantMessages.length).toBeGreaterThan(0);
+    const text = extractText(assistantMessages as typeof session.messages);
+    expect(text).toBe('Fallback model response');
+
+    // A failover event must have been emitted.
+    const failoverEvent = collected.find(
+      (ev) =>
+        ev.type === 'error' &&
+        'failoverModel' in ev &&
+        ev.failoverModel === 'deepseek-ai/deepseek-v4-flash',
+    );
+    expect(failoverEvent).toBeDefined();
+  });
+
+  it('skips fallback entry matching current model (would loop)', async () => {
+    // Same model in fallbackModels as the primary — should skip it.
+    const provider = new MockProvider([
+      { type: 'error', message: 'model_not_found' },
+    ]);
+    // A distinct fallback provider that shouldn't be reached since we skip
+    // the matching entry.
+    const fallbackProvider = new MockProvider([
+      { type: 'text', content: 'Should not reach this' },
+    ]);
+
+    const session = makeSession();
+    const collected = collectEvents(session.events);
+
+    const result = await runAgentLoop({
+      ...session,
+      model: 'same-model',
+      provider,
+      fallbackModels: [
+        { model: 'same-model' },   // matches primary — should be skipped
+      ],
+      providerFactory: (_modelId: string) => fallbackProvider,
+      toolExecutor: new MockToolExecutor(),
+    });
+
+    // The loop should NOT recover — the only fallback entry matched the
+    // current model and was skipped.
+    expect(result.stopReason).toBe('error');
+  });
+
+  it('does not activate fallback chain without fallbackModels config', async () => {
+    const provider = new MockProvider([
+      { type: 'error', message: 'model_not_found' },
+    ]);
+
+    const session = makeSession();
+    collectEvents(session.events);
+
+    const result = await runAgentLoop({
+      ...session,
+      model: 'deepseek-ai/deepseek-v4-pro',
+      provider,
+      // No fallbackModels — should surface the error as-is.
+      toolExecutor: new MockToolExecutor(),
+    });
+
+    expect(result.stopReason).toBe('error');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Test F: AbortController aborts the loop early
 // ---------------------------------------------------------------------------
 

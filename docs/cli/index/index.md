@@ -1,6 +1,6 @@
 # Dirgha CLI — Index
 
-> Latest: **v1.33.5** | [npm](https://www.npmjs.com/package/@dirgha/code) | [GitHub](https://github.com/Dirgha-AI/dirgha-code)
+> Latest: **v1.42.14** (build) | [npm](https://www.npmjs.com/package/@dirgha/code) | [GitHub](https://github.com/Dirgha-AI/dirgha-code)
 
 ## Quick Links
 
@@ -11,6 +11,7 @@
 | [Models & Providers](#models--providers)           | Per-provider catalogues, live sync, vendor prefix routing, health monitor     |
 | [Context Windows & Rate Limits](#context-windows--rate-limits) | models.dev sync, maxOutputFor, circuit breaker, TPM sliding window |
 | [Authentication & Login](#authentication--login)   | Device OAuth, TUI token loading, signup flow, secure approval                 |
+| [Security & Sandbox](#security--sandbox)           | Env sanitization (safeEnvironment), sandbox modes (bwrap/seatbelt/noop), tool approval bus, skill scanner, supply-chain audit |
 | [Autonomous Systems](#autonomous-systems)          | Self-healing failover, remote config, auto-update, startup health, event listener leak fix, MCP lazy load race fix |
 | [Sub-agents & Delegation](#sub-agents--delegation)  | Subagent Dashboard, task tool fixes, provider routing, error propagation |
 | [Testing & Quality](#testing--quality)             | Self-test suite, E2E tests, regression guards, CI pipeline                    |
@@ -277,6 +278,97 @@ Fallback URL and signup link added to device auth output. Handle `?code=` pre-fi
 **Files:** `src/cli/slash/keys.ts`
 
 `/keys set` writes to keystore file AND now sets `process.env[envVar]`. Previously only wrote to file — provider constructors read `process.env` which was still empty, causing auth failures mid-session.
+
+---
+
+## Security & Sandbox
+
+### Env sanitization (safeEnvironment)
+
+**Files:** `src/utils/env.ts:82-100`, `src/tools/exec.ts:61-62`, `src/tools/registry.ts:12-17`
+
+Every tool that spawns child processes (shell, git, github, search-grep, rtk, lsp) runs under `safeEnvironment()`, which strips API keys and secrets from the environment before the child process inherits it.
+
+**Data flow:**
+
+```
+createToolExecutor (tools/exec.ts:62)
+  → env = opts.env ?? safeEnvironment()
+    → ctx.env passed to tool.execute()
+      → spawn(cmd, { env: ctx.env })
+```
+
+`safeEnvironment()` applies three-stage filtering against `process.env`:
+
+1. **Allowlist** (`ALLOW_LIST`, line 37-73): PATH, HOME, USER, SHELL, TERM, NODE_ENV, SSH_AUTH_SOCK, XDG_* — pass through immediately.
+2. **Suffix blacklist** (line 94): keys ending in `_API_KEY`, `_SECRET`, `_TOKEN`, `_PASSWORD`, `_CREDENTIAL`, `_PRIVATE_KEY` are stripped.
+3. **Pattern blacklist** (line 96): regexes matching `OPENAI_`, `ANTHROPIC_`, `AWS_`, `GROQ_`, `API_KEY`, `SECRET`, `TOKEN`, `PASSWORD`, `CREDENTIAL` — stripped.
+
+Everything that survives all three gates passes through to the child process.
+
+**Tools that use `safeEnvironment()`:**
+| Tool | Source | Method |
+|------|--------|--------|
+| shell | `ctx.env` (executor default) | `safeEnvironment()` |
+| git | `ctx.env` (executor default) | `safeEnvironment()` |
+| github | `ctx.env` (executor default) | `safeEnvironment()` |
+| search-grep | direct call at line 91 | `safeEnvironment()` |
+| rtk | direct call at line 130 | `safeEnvironment()` |
+| lsp/client | direct call at line 323 | `safeEnvironment()` |
+| hooks/config-bridge | direct call at line 42 | `safeEnvironment()` |
+| fleet/worktree | direct call at line 38+ | `safeEnvironment()` |
+
+**Known bypass:** `src/orchestra/agent/manager.ts:80` passes raw `{ ...process.env, ...opts.env }` to spawned orchestra sub-agents. This is a separate execution context from the main agent's tool calls — it runs the CLI binary itself, not a shell. Still flagged for future hardening.
+
+### Sandbox modes
+
+**Files:** `src/safety/sandbox/bwrap.ts`, `src/safety/sandbox/seatbelt.ts`, `src/safety/sandbox/noop.ts`, `src/safety/sandbox/select.ts`
+
+Three sandbox adapters, selected by platform:
+
+| Mode | Platform | Mechanism |
+|------|----------|-----------|
+| `bwrap` | Linux | Bubblewrap — bind-mounts cwd rw, /usr /etc /lib ro, unshares net/ipc/pid |
+| `seatbelt` | macOS | `sandbox-exec` with per-process .sb profile |
+| `noop` | Fallback | Direct spawn with no isolation — reports `platform: 'noop'` |
+
+Configured via `/sandbox` slash command. Modes: `off` (direct spawn), `auto` (sandbox when available), `strict` (sandbox + block network).
+
+The shell tool (`src/tools/shell.ts:148-211`) routes commands through the sandbox adapter when active. Non-shell tools (git, github, search-grep) always run unsandboxed.
+
+### Tool approval bus
+
+**Files:** `src/kernel/agent-loop.ts:1128-1178`
+
+Every tool call passes through the approval bus before execution. The bus checks `requiresApproval()` per-tool:
+
+- `shell`: always requires approval
+- `fs_write`, `fs_edit`: always requires approval
+- `github.pr_create`, `github.issue_create`: requires approval
+- `fs_read`, `search_grep`, `search_glob`, `git`: auto-approved (read-only)
+
+Auto-approve allowlist is configurable. YOLO mode (`--yolo`) bypasses all approval checks.
+
+### Skill scanner
+
+**Files:** `src/security/skill-scanner.ts`
+
+Before a skill file is loaded, the scanner checks for:
+- URL patterns that could exfiltrate data
+- Suspicious `require` / `import` patterns
+- Shell injection vectors in `exec()` / `spawn()` calls
+
+Flagged skills are blocked unless the user explicitly approves. See `docs/agents/skill-security.md`.
+
+### Supply-chain audit
+
+**Files:** `docs/security/SUPPLY-CHAIN.md`
+
+Every npm dependency is audited for:
+- Maintainer count and recency
+- Download count vs publish frequency
+- Postinstall scripts
+- Network access at install time
 
 ---
 

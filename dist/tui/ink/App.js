@@ -312,7 +312,7 @@ export function App(props) {
     const { stdout: scrStdout } = useStdout();
     const _termRows = scrStdout?.rows ?? 24;
     const visibleCount = Math.max(4, Math.floor((_termRows - 6) / 1.5));
-    const scroll = useTranscriptScroll(projection.liveItems.length, visibleCount, false, // autoScroll disabled — viewport stays still, user presses End to jump down
+    const scroll = useTranscriptScroll(projection.liveItems.length, visibleCount, true, // autoScroll — follow live tail when user has not scrolled up
     scrInputFocus);
     // Visible window into live items based on scroll position.
     // pinnedEndIdx is the absolute end index; we take up to `visibleCount`
@@ -341,7 +341,7 @@ export function App(props) {
         const ema = frameEmaRef.current;
         const floor = minFlushMs();
         if (ema > floor * 1.5) {
-            adaptiveFlushRef.current.floorMs = Math.min(ema * 1.2, 500);
+            adaptiveFlushRef.current.floorMs = Math.min(ema * 1.2, 200);
         }
         else if (ema < floor * 0.8) {
             const current = adaptiveFlushRef.current.floorMs;
@@ -1332,7 +1332,7 @@ export function App(props) {
     // the logo) on every overflow redraw, repainting it on every chat
     // turn that fills the screen. `use-flicker-detector` already warns
     // when this is about to happen.
-    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: spinnerCtx, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: transcript, children: (item) => (_jsx(Box, { flexDirection: "column", children: renderTranscriptItem(item) }, item.id)) }), _jsx(Box, { flexDirection: "column", flexGrow: 1, children: liveJsx }), busy && projection.liveItems.length === 0 && _jsx(GeneratingIndicator, { elapsedMs: liveDurationMs, liveOutputTokens: liveOutputTokens }), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: onResolveApproval })), pendingFailover !== null && (_jsx(ModelSwitchPrompt, { failedModel: pendingFailover.failedModel, failoverModel: pendingFailover.failoverModel, onAccept: onAcceptFailover, onReject: onRejectFailover, onPicker: onPickerFailover })), _jsx(SubagentPanel, { events: props.events }), _jsx(SubagentDashboard, { events: props.events }), _jsx(GPUJobIndicator, {}), _jsx(PromptQueueIndicator, { queued: promptQueue }), _jsx(Divider, {}), _jsx(InputBox, { value: input, onChange: setInput, onSubmit: handleSubmit, busy: busy, liveDurationMs: liveDurationMs, vimMode: props.config.vimMode === true, onAtQueryChange: overlays.setAtQuery, onSlashQueryChange: overlays.setSlashQuery, onRequestOverlay: overlays.openOverlay, promptHistory: promptHistory, onRequestYoloToggle: () => {
+    return (_jsx(ThemeProvider, { activeTheme: themeName, children: _jsx(SpinnerContext.Provider, { value: spinnerCtx, children: _jsxs(Box, { flexDirection: "column", children: [_jsx(Static, { items: transcript, children: (item) => (_jsx(Box, { flexDirection: "column", children: renderTranscriptItem(item) }, item.id)) }), _jsx(Box, { flexDirection: "column", flexGrow: 1, children: liveJsx }), busy && (_jsx(ActivityIndicator, { activeTools: activeTools, liveOutputTokens: liveOutputTokens, liveDurationMs: liveDurationMs, hasLiveItems: projection.liveItems.length > 0 })), pendingApproval !== null && approvalBusRef.current && (_jsx(ApprovalPrompt, { request: pendingApproval, onResolve: onResolveApproval })), pendingFailover !== null && (_jsx(ModelSwitchPrompt, { failedModel: pendingFailover.failedModel, failoverModel: pendingFailover.failoverModel, onAccept: onAcceptFailover, onReject: onRejectFailover, onPicker: onPickerFailover })), _jsx(SubagentPanel, { events: props.events }), _jsx(SubagentDashboard, { events: props.events }), _jsx(GPUJobIndicator, {}), _jsx(PromptQueueIndicator, { queued: promptQueue }), _jsx(Divider, {}), _jsx(InputBox, { value: input, onChange: setInput, onSubmit: handleSubmit, vimMode: props.config.vimMode === true, onAtQueryChange: overlays.setAtQuery, onSlashQueryChange: overlays.setSlashQuery, onRequestOverlay: overlays.openOverlay, promptHistory: promptHistory, onRequestYoloToggle: () => {
                             const next = mode === "yolo" ? "act" : "yolo";
                             setMode(next);
                             // Wire the approval bus so mid-turn tool calls are immediately
@@ -1497,14 +1497,36 @@ function TranscriptRow({ item, isStreaming = false, }) {
             return (_jsx(Box, { marginBottom: 1, children: _jsx(Text, { color: "yellow", children: item.text }) }));
     }
 }
-function GeneratingIndicator(props) {
+/**
+ * ActivityIndicator — verb-based status line above the Divider.
+ *
+ * Shows what the agent is doing right now in a single line, following
+ * the Claude Code pattern (Thinking…, Reading file…, Running shell…).
+ *
+ * States:
+ *   - Warming up (busy, no output, no tools) → "Thinking… · 8s"
+ *   - Streaming text (liveItems, no tools)    → "Generating… · 12s"
+ *   - Tool running (active tools)              → "Running {tool}… · 15s · esc cancel"
+ */
+function ActivityIndicator(props) {
     const palette = useTheme();
-    const elapsedSec = Math.round(props.elapsedMs / 1000);
-    const slow = elapsedSec >= 5 && props.liveOutputTokens === 0;
-    const label = slow
-        ? `warming up · ${elapsedSec}s · first token can take 10–30s on free models`
-        : `generating · ${elapsedSec}s`;
-    return (_jsxs(Box, { gap: 1, marginBottom: 1, children: [_jsx(SpinnerGlyph, { isActive: true, color: palette.text.secondary }), _jsx(Text, { color: palette.text.secondary, dimColor: true, children: label })] }));
+    const elapsedSec = Math.round(props.liveDurationMs / 1000);
+    const elapsedLabel = elapsedSec < 60
+        ? `${elapsedSec}s`
+        : `${Math.floor(elapsedSec / 60)}m ${elapsedSec % 60}s`;
+    let verb = "Thinking…";
+    if (props.activeTools.length > 0) {
+        const t = props.activeTools[0];
+        verb = `Running ${t.name}…`;
+    }
+    else if (props.hasLiveItems) {
+        verb = "Generating…";
+    }
+    else if (elapsedSec >= 5 && props.liveOutputTokens === 0) {
+        verb = "Warming up…";
+    }
+    const escHint = props.activeTools.length > 0 ? " · esc cancel" : "";
+    return (_jsxs(Box, { gap: 1, marginBottom: 1, children: [(props.activeTools.length > 0 || (!props.hasLiveItems && props.liveOutputTokens === 0)) && (_jsx(SpinnerGlyph, { isActive: true, color: palette.text.secondary })), _jsxs(Text, { color: palette.text.secondary, dimColor: true, children: [verb, " \u00B7 ", elapsedLabel, escHint] })] }));
 }
 function initialHistory(props) {
     if (_cachedInitialMessages !== null)

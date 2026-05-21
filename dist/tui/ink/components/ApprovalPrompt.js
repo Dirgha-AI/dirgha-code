@@ -20,7 +20,7 @@ function ApprovalPromptInner(props) {
     const palette = useTheme();
     const { request, onResolve } = props;
     useInput((ch, key) => {
-        if (key.return) {
+        if (key.return || ch === '\n') {
             onResolve('approve');
             return;
         } // default

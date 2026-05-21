@@ -6,7 +6,6 @@
  * "nvidia/..."); bare ids fall through to the catch-all rules at the
  * end.
  */
-import { migrateDeprecatedModel } from "../intelligence/prices.js";
 import { NIM_CATALOGUE } from "./nim-catalogue.js";
 // Specific model IDs that NVIDIA NIM serves — derived from the NIM_CATALOGUE
 // so there is a single source of truth. Also include NIM-hosted models that
@@ -104,15 +103,14 @@ const RULES = [
     },
 ];
 export function routeModel(modelId) {
-    const migrated = migrateDeprecatedModel(modelId);
     for (const rule of RULES) {
-        if (rule.match(migrated))
+        if (rule.match(modelId))
             return rule.provider;
     }
-    throw new Error(`No provider configured for model "${migrated}". Add a routing rule in providers/dispatch.ts.`);
+    throw new Error(`No provider configured for model "${modelId}". Add a routing rule in providers/dispatch.ts.`);
 }
 export function resolveModelForDispatch(modelId) {
-    return migrateDeprecatedModel(modelId);
+    return modelId;
 }
 export function isKnownProvider(id) {
     return (id === "anthropic" ||

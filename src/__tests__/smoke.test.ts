@@ -11,7 +11,7 @@ import { mkdtempSync } from "node:fs";
 import { join } from "node:path";
 import { createEventStream } from "../kernel/event-stream.js";
 import { runAgentLoop } from "../kernel/agent-loop.js";
-import { NvidiaProvider } from "../providers/nvidia.js";
+import { DeepSeekProvider } from "../providers/deepseek.js";
 import {
   createToolRegistry,
   createToolExecutor,
@@ -36,7 +36,7 @@ describe("v2 integration smoke", () => {
       },
     ]);
 
-    const provider = new NvidiaProvider({
+    const provider = new DeepSeekProvider({
       apiKey: "test",
       baseUrl: mock.url,
       timeoutMs: 5_000,
@@ -56,7 +56,7 @@ describe("v2 integration smoke", () => {
 
     const result = await runAgentLoop({
       sessionId: randomUUID(),
-      model: "moonshotai/kimi-k2-instruct",
+      model: "deepseek-v4-flash",
       messages: [{ role: "user", content: "say hello" }],
       tools: sanitized.definitions,
       maxTurns: 1,

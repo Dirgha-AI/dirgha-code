@@ -70,4 +70,42 @@ describe("detectPaste", () => {
     expect(seg!.start).toBe(0);
     expect(seg!.end).toBe(text.length);
   });
+
+  it("detects second chunk of a multi-tick paste correctly", () => {
+    // Simulate chunk 1: 100 lines
+    const chunk1 = "line".repeat(50) + "\n".repeat(99);
+    const seg1 = detectPaste("", chunk1);
+    expect(seg1).not.toBeNull();
+
+    // Simulate chunk 2 appended: additional 100 lines
+    const chunk2 = chunk1 + "\n".repeat(100);
+    const seg2 = detectPaste(chunk1, chunk2);
+    expect(seg2).not.toBeNull();
+    // The second segment represents the delta between chunks, not the full paste.
+    // Merging is handled by InputBox; this test ensures detectPaste returns
+    // correct delta-segment positions so the merge can work correctly.
+    expect(seg2!.start).toBe(chunk1.length);
+  });
+
+  it("detectPaste segments can be merged for multi-chunk paste", () => {
+    const prev = "";
+    const chunk1 = "A".repeat(60);
+    const chunk2 = chunk1 + "B".repeat(60);
+
+    const seg1 = detectPaste(prev, chunk1)!;
+    const seg2 = detectPaste(chunk1, chunk2)!;
+
+    // Merge: second chunk extends the first
+    const merged = {
+      start: seg1.start,
+      end: Math.max(seg1.end, seg2.end),
+      lines: seg1.lines + seg2.lines,
+      chars: seg1.chars + seg2.chars,
+    };
+
+    expect(merged.start).toBe(0);
+    expect(merged.chars).toBe(120);
+    // The full text between merged.start and merged.end should match chunk2
+    expect(chunk2.slice(merged.start, merged.end).length).toBe(merged.chars);
+  });
 });

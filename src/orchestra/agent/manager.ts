@@ -13,6 +13,7 @@
 
 import { spawn, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { safeEnvironment } from "../../utils/env.js";
 import { registry } from "../core/registry.js";
 import type { AgentSlot, OrchestraSession } from "../core/types.js";
 import { writeLog } from "../orchestration/log.js";
@@ -77,7 +78,7 @@ export async function spawnAgent(
   try {
     child = spawn(command, args, {
       cwd: opts.cwd,
-      env: { ...process.env, ...opts.env },
+      env: { ...safeEnvironment(), ...opts.env },
       stdio: ["pipe", "pipe", "pipe"],
     });
   } catch (err) {

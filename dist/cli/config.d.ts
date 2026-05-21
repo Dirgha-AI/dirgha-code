@@ -127,6 +127,23 @@ export interface DirghaConfig {
         }>;
     };
     /**
+     * Ordered list of fallback models for autonomous sessions. When the
+     * primary model returns a "model not found" or "deprecated" error,
+     * the agent loop advances through this list — building a new provider
+     * for each entry — instead of silently rewriting the model ID.
+     *
+     * Each entry must include a `model` field. The model ID is routed to
+     * the appropriate provider via the same dispatch logic as `model`.
+     *
+     *   "fallbackModels": [
+     *     { "model": "deepseek-ai/deepseek-v4-flash" },
+     *     { "model": "anthropic/claude-sonnet-4" }
+     *   ]
+     */
+    fallbackModels?: Array<{
+        model: string;
+    }>;
+    /**
      * Optional remote endpoint for text embeddings. When set, kb_search
      * and any other embedding consumer POST `{texts: string[]}` here and
      * expect `{vectors: number[][]}` back. Leave unset to use the local

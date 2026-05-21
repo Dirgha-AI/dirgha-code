@@ -76,8 +76,8 @@ describe("routeModel", () => {
     it("google/gemini-2.5-pro → openrouter", () => {
       expect(routeModel("google/gemini-2.5-pro")).toBe("openrouter");
     });
-    it("minimaxai/minimax-m2 → nvidia (auto-migrated to -m2.7 in NIM catalogue)", () => {
-      expect(routeModel("minimaxai/minimax-m2")).toBe("nvidia");
+    it("minimaxai/minimax-m2 → openrouter (NIM_DEPRECATED, no auto-migration)", () => {
+      expect(routeModel("minimaxai/minimax-m2")).toBe("openrouter");
     });
     it("z-ai/glm-5.1 → zai (1.10.1: native Z.AI provider)", () => {
       // Used to fall through to openrouter; 1.10.1 added native Z.AI dispatch

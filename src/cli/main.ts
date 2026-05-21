@@ -50,7 +50,6 @@ import { createCompactionTransform } from "../context/compaction.js";
 import {
   contextWindowFor,
   findPrice,
-  findFailover,
   resolveModelAlias,
 } from "../intelligence/prices.js";
 import { routeModel } from "../providers/dispatch.js";
@@ -787,30 +786,11 @@ async function main(): Promise<void> {
   });
 
   // Provider construction can fail eagerly (e.g. ANTHROPIC_API_KEY
-  // unset). When it does AND the user has a known failover model in
-  // the registry, swap to that before we even reach the agent loop.
-  // Same audit `failover` entry as runtime-error failover.
-  let activeModel = model;
-  let provider;
-  try {
-    provider = providers.forModel(model);
-  } catch (err) {
-    const fallback = findFailover(model);
-    if (!fallback) throw err;
-    process.stderr.write(
-      `\n[failover] ${model} → ${fallback} (${err instanceof Error ? err.message : String(err)})\n`,
-    );
-    void appendAudit({
-      kind: "failover",
-      actor: sessionId,
-      summary: `${model} → ${fallback}`,
-      from: model,
-      to: fallback,
-      reason: err instanceof Error ? err.message : String(err),
-    });
-    activeModel = fallback;
-    provider = providers.forModel(fallback);
-  }
+  // unset). We surface the error to the user — no silent auto-failover
+  // to a different provider, since that has cost and subscription
+  // implications the user must control.
+  const activeModel = model;
+  const provider = providers.forModel(model);
   // Now that provider + activeModel are settled, instantiate the
   // delegator that the `task` tool delegate-shim references.
   taskDelegatorRef.current = new SubagentDelegator({
@@ -867,6 +847,8 @@ async function main(): Promise<void> {
     tools: sanitized.definitions,
     maxTurns,
     provider,
+    fallbackModels: config.fallbackModels,
+    providerFactory: (fbModel) => providers.forModel(fbModel),
     toolExecutor: executor,
     events,
     contextTransform: compactionTransform,

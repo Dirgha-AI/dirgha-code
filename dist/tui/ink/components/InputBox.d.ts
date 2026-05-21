@@ -22,9 +22,8 @@ export interface InputBoxProps {
     value: string;
     onChange: (value: string) => void;
     onSubmit: (value: string) => void;
-    busy: boolean;
-    /** Live elapsed ms for the current turn — drives BusyHint without a separate timer. */
-    liveDurationMs?: number;
+    /** Kept for internal conditional rendering (cursor, prompt colour, queue); parent no longer passes it. */
+    busy?: boolean;
     placeholder?: string;
     vimMode?: boolean;
     /** Parent wants to know when the @-token changes (null = none active). */

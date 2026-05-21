@@ -23,7 +23,7 @@ import { Box, Text, useApp, useInput } from "ink";
 import TextInput from "ink-text-input";
 import { useTheme } from "../theme-context.js";
 import { applyVimKey, createVimState, } from "./vim-bindings.js";
-import { detectPaste, PasteCollapseView, } from "./PasteCollapse.js";
+import { detectPaste, PasteCollapseView, PASTE_CHAR_THRESHOLD, PASTE_LINE_THRESHOLD, } from "./PasteCollapse.js";
 const CTRL_C_TIMEOUT_MS = 1500;
 function lastAtToken(value) {
     // The last `@` must be at column 0 or preceded by whitespace to count.
@@ -56,6 +56,9 @@ export function InputBox(props) {
     const armTimerRef = React.useRef(null);
     const [vimState, setVimState] = React.useState(() => createVimState());
     const [pasteSegment, setPasteSegment] = React.useState(null);
+    // Mirror of pasteSegment state so handleChange can read the latest
+    // accumulated segment during a multi-tick paste burst (guard window).
+    const pasteSegmentRef = React.useRef(null);
     const [pasteExpanded, setPasteExpanded] = React.useState(false);
     const prevValueRef = React.useRef(props.value);
     // Prompt history recall: up arrow cycles backward through submitted
@@ -136,11 +139,14 @@ export function InputBox(props) {
     // Also clears segment when the user edits INSIDE the pasted block by
     // comparing the expected segment content against the actual buffer.
     React.useEffect(() => {
-        if (pasteSegment === null)
+        if (pasteSegment === null) {
+            pasteSegmentRef.current = null;
             return;
+        }
         const valueLen = props.value.length;
         if (valueLen < pasteSegment.end || valueLen > pasteSegment.end + 500) {
             setPasteSegment(null);
+            pasteSegmentRef.current = null;
             setPasteExpanded(false);
             // Bump key so TextInput remounts with cursor at end of value.
             // The paste collapse hid TextInput; when it reappears the internal
@@ -153,6 +159,7 @@ export function InputBox(props) {
         const segContent = props.value.slice(pasteSegment.start, pasteSegment.end);
         if (segContent.length !== pasteSegment.chars) {
             setPasteSegment(null);
+            pasteSegmentRef.current = null;
             setPasteExpanded(false);
             // Same cursor-resync as above — TextInput reappears after collapse
             // and must have cursor at the correct position.
@@ -167,9 +174,9 @@ export function InputBox(props) {
         // Detect paste BEFORE running the DEL/BS sanitizer. When the delta
         // looks like a paste (>=200 added chars or >=4 lines), skip the
         // DEL/BS stripper — those bytes are likely part of the pasted
-        // content, not terminal backspace artifacts.
-        const PASTE_CHAR_THRESHOLD = 2;
-        const PASTE_LINE_THRESHOLD = 1;
+        // content, not terminal backspace artifacts. The thresholds here
+        // match PasteCollapse.tsx's detectPaste thresholds so the guard
+        // only arms for actual multi-tick pastes, not ordinary typing.
         const isPasteDelta = deltaChars >= PASTE_CHAR_THRESHOLD ||
             (deltaChars > 0 &&
                 (next.split("\n").length - prev.split("\n").length) >=
@@ -203,7 +210,25 @@ export function InputBox(props) {
         prevValueRef.current = sanitized;
         const seg = detectPaste(prev, sanitized);
         if (seg !== null) {
-            setPasteSegment(seg);
+            // Multi-tick paste: when a follow-up chunk arrives during the
+            // paste guard window, merge it into the existing segment so the
+            // collapse covers the *entire* pasted block — not just the last
+            // chunk (which would leak earlier chunks as visible text).
+            const prevSeg = pasteSegmentRef.current;
+            if (prevSeg !== null && isGuardActive) {
+                const merged = {
+                    start: prevSeg.start,
+                    end: Math.max(prevSeg.end, seg.end),
+                    lines: prevSeg.lines + seg.lines,
+                    chars: prevSeg.chars + seg.chars,
+                };
+                pasteSegmentRef.current = merged;
+                setPasteSegment(merged);
+            }
+            else {
+                pasteSegmentRef.current = seg;
+                setPasteSegment(seg);
+            }
             setPasteExpanded(false);
         }
         props.onChange(sanitized);
@@ -363,7 +388,8 @@ export function InputBox(props) {
                 return;
             }
             if (vimState.mode === "NORMAL" && !key.ctrl && !key.meta) {
-                if (key.return) {
+                // key.return covers \r; ch === '\n' covers LF-Enter terminals.
+                if (key.return || inputCh === "\n") {
                     // In NORMAL mode, Enter still submits.
                     props.onSubmit(props.value);
                     return;
@@ -400,26 +426,9 @@ export function InputBox(props) {
     }, { isActive: focus });
     const promptColour = props.busy ? palette.brand : palette.accent;
     const collapsed = pasteSegment !== null && !pasteExpanded;
-    return (_jsxs(Box, { flexDirection: "column", children: [_jsx(Box, { paddingX: 1, children: _jsxs(Box, { gap: 1, flexGrow: 1, children: [_jsx(Text, { color: promptColour, children: "\u276F" }), collapsed && pasteSegment !== null ? (_jsx(PasteCollapseView, { value: props.value, segment: pasteSegment, expanded: false, palette: palette })) : (_jsx(TextInput, { value: props.value, onChange: handleChange, onSubmit: props.onSubmit, placeholder: props.placeholder ?? "Ask dirgha anything…", showCursor: !props.busy, focus: focus && !vimActive }, textInputKey))] }) }), _jsxs(Box, { paddingX: 1, justifyContent: "space-between", children: [_jsxs(Box, { gap: 1, children: [props.vimMode === true && (_jsxs(Text, { color: vimActive ? palette.accent : palette.brand, bold: true, children: ["[", vimModeLabel(vimState.mode), "]"] })), pasteSegment !== null && pasteExpanded && (_jsxs(Text, { color: palette.textMuted, dimColor: true, children: ["[Pasted ", pasteSegment.lines === 1 ? "1 line" : `${pasteSegment.lines} lines`, " expanded \u00B7 Ctrl+E collapse]"] })), props.busy && (_jsx(BusyHint, { palette: palette, liveDurationMs: props.liveDurationMs, vimMode: props.vimMode === true }))] }), ctrlCArmed && (_jsx(Text, { color: palette.accent, bold: true, children: "Press Ctrl+C again to exit." }))] })] }));
+    return (_jsxs(Box, { flexDirection: "column", children: [_jsx(Box, { paddingX: 1, children: _jsxs(Box, { gap: 1, flexGrow: 1, children: [_jsx(Text, { color: promptColour, children: "\u276F" }), collapsed && pasteSegment !== null ? (_jsx(PasteCollapseView, { value: props.value, segment: pasteSegment, expanded: false, palette: palette })) : (_jsx(TextInput, { value: props.value, onChange: handleChange, onSubmit: props.onSubmit, placeholder: props.placeholder ?? "Ask dirgha anything…", showCursor: !props.busy, focus: focus && !vimActive }, textInputKey))] }) }), _jsxs(Box, { paddingX: 1, justifyContent: "space-between", children: [_jsxs(Box, { gap: 1, children: [props.vimMode === true && (_jsxs(Text, { color: vimActive ? palette.accent : palette.brand, bold: true, children: ["[", vimModeLabel(vimState.mode), "]"] })), pasteSegment !== null && pasteExpanded && (_jsxs(Text, { color: palette.textMuted, dimColor: true, children: ["[Pasted ", pasteSegment.lines === 1 ? "1 line" : `${pasteSegment.lines} lines`, " expanded \u00B7 Ctrl+E collapse]"] }))] }), ctrlCArmed && (_jsx(Text, { color: palette.accent, bold: true, children: "Press Ctrl+C again to exit." }))] })] }));
 }
 function vimModeLabel(m) {
     return m === "NORMAL" ? "NORMAL" : "INSERT";
-}
-/**
- * Busy-state hint with a live elapsed-second counter, matching
- * gemini-cli's `(esc to cancel, 12s)` pattern.
- *
- * Elapsed seconds come from the `liveDurationMs` prop that App.tsx already
- * updates on a 1s interval — no second internal timer needed.
- */
-function BusyHint({ palette, liveDurationMs, vimMode, }) {
-    const elapsed = Math.floor((liveDurationMs ?? 0) / 1000);
-    const label = elapsed < 60
-        ? `${elapsed}s`
-        : elapsed < 3600
-            ? `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`
-            : `${Math.floor(elapsed / 3600)}h ${Math.floor((elapsed % 3600) / 60)}m`;
-    const escLabel = vimMode ? "esc normal" : "esc cancel";
-    return (_jsxs(Text, { color: palette.textMuted, children: [escLabel, " \u00B7 ", label, " \u00B7 ctrl+c stop"] }));
 }
 //# sourceMappingURL=InputBox.js.map

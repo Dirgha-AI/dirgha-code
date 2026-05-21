@@ -36,7 +36,7 @@ function ApprovalPromptInner(props: ApprovalPromptProps): React.JSX.Element {
   const { request, onResolve } = props;
 
   useInput((ch, key) => {
-    if (key.return) { onResolve('approve'); return; }            // default
+    if (key.return || ch === '\n') { onResolve('approve'); return; }            // default
     if (ch === 'y' || ch === 'Y') { onResolve('approve'); return; }
     if (ch === 'n' || ch === 'N') { onResolve('deny'); return; }
     if (ch === 'a' || ch === 'A') { onResolve('approve_once'); return; }

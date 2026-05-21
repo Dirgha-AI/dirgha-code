@@ -140,6 +140,21 @@ export interface DirghaConfig {
     after_tool_call?: Array<{ command: string; matcher?: string }>;
   };
   /**
+   * Ordered list of fallback models for autonomous sessions. When the
+   * primary model returns a "model not found" or "deprecated" error,
+   * the agent loop advances through this list — building a new provider
+   * for each entry — instead of silently rewriting the model ID.
+   *
+   * Each entry must include a `model` field. The model ID is routed to
+   * the appropriate provider via the same dispatch logic as `model`.
+   *
+   *   "fallbackModels": [
+   *     { "model": "deepseek-ai/deepseek-v4-flash" },
+   *     { "model": "anthropic/claude-sonnet-4" }
+   *   ]
+   */
+  fallbackModels?: Array<{ model: string }>;
+  /**
    * Optional remote endpoint for text embeddings. When set, kb_search
    * and any other embedding consumer POST `{texts: string[]}` here and
    * expect `{vectors: number[][]}` back. Leave unset to use the local
@@ -312,28 +327,22 @@ export async function loadConfig(
   const merged = merge(DEFAULT_CONFIG, userPartial, projectPartial, envPartial);
   validate(merged);
   migrateConfigSchema(merged);
-  // Migrate any model IDs the upstream provider has dropped, so users
-  // with stale `~/.dirgha/config.json` don't 400 on every call.
-  const originalModel = merged.model;
-  const originalCheap = merged.cheapModel;
-  const originalSummary = merged.summaryModel;
-  merged.model = migrateDeprecatedModel(merged.model);
-  merged.cheapModel = migrateDeprecatedModel(merged.cheapModel);
-  merged.summaryModel = migrateDeprecatedModel(merged.summaryModel);
-  if (originalModel !== merged.model) {
-    process.stderr.write(
-      `[dirgha] model "${originalModel}" migrated to "${merged.model}"\n`,
-    );
-  }
-  if (originalCheap !== merged.cheapModel) {
-    process.stderr.write(
-      `[dirgha] cheapModel "${originalCheap}" migrated to "${merged.cheapModel}"\n`,
-    );
-  }
-  if (originalSummary !== merged.summaryModel) {
-    process.stderr.write(
-      `[dirgha] summaryModel "${originalSummary}" migrated to "${merged.summaryModel}"\n`,
-    );
+  // Check for deprecated-model IDs (models a specific provider has
+  // dropped) and WARN the user, but do NOT silently rewrite the model.
+  // Silent rewrites break cost expectations, user's preferred provider,
+  // and model-specific behavior. The warning prints once and the user
+  // can update their config with `dirgha config set model <id>` or
+  // pass `-m <id>` to override at runtime.
+  for (const key of ["model", "cheapModel", "summaryModel"] as const) {
+    const val = merged[key];
+    if (val && val !== migrateDeprecatedModel(val)) {
+      const hint = migrateDeprecatedModel(val);
+      process.stderr.write(
+        `[dirgha] ⚠ ${key} "${val}" is deprecated by its provider.` +
+          (hint !== val ? ` Consider: dirgha config set ${key} ${hint}` : "") +
+          `\n`,
+      );
+    }
   }
   return merged;
 }

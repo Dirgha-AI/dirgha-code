@@ -187,9 +187,11 @@ export function useEventProjection(events, opts = {}) {
                             //      onSessionTitle, mark scan done, fall through
                             //      to the normal flush with the cleaned content.
                             //   2. No newline yet AND content still looks like the
-                            //      start of a marker: keep buffering (return early
-                            //      without flushing — the user shouldn't see the
-                            //      marker letters appear character-by-character).
+                            //      start of a marker: flush it anyway but keep
+                            //      scanning — the user shouldn't see a blank
+                            //      screen while we wait for the marker to arrive.
+                            //      Next flush will strip if the full marker was
+                            //      matched.
                             //   3. Content does NOT start like a marker: give up
                             //      scanning, fall through to normal flush.
                             if (titleScanRef.current === "scanning") {
@@ -215,15 +217,19 @@ export function useEventProjection(events, opts = {}) {
                                     }
                                     // Fall through with the cleaned content.
                                 }
-                                else if (!p.content.length ||
-                                    "[session-title]".startsWith(p.content) ||
+                                else if ("[session-title]".startsWith(p.content) ||
                                     (p.content.startsWith("[session-title]") &&
                                         !p.content.includes("\n"))) {
-                                    // Still potentially a marker, just incomplete.
+                                    // Still potentially a marker — flush what we have
+                                    // but keep scanning so the next flush strips it.
+                                    // The user sees streaming text immediately instead
+                                    // of waiting for the marker to complete.
+                                    lastFlushedTextRef.current = p.content;
+                                    setLive((prev) => upsertText(prev, p.id, p.content));
                                     return;
                                 }
                                 else {
-                                    // Doesn't match and never will.
+                                    // Doesn't match and never will — flush normally.
                                     titleScanRef.current = "done";
                                 }
                             }

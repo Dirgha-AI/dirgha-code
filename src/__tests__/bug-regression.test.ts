@@ -27,6 +27,51 @@ describe("dispatch — DeepSeek model routing regression", () => {
   });
 });
 
+describe("dispatch — DeepSeek model identity preservation", () => {
+  const DEEPSEEK_MODELS = [
+    "deepseek-v4-flash",
+    "deepseek-v4-pro",
+    "deepseek-chat",
+    "deepseek-reasoner",
+    "deepseek-coder",
+    "deepseek-prover-v2",
+  ];
+
+  it("migrateDeprecatedModel does not touch any DeepSeek v4 model", async () => {
+    const { migrateDeprecatedModel } = await import(
+      "../intelligence/prices.js"
+    );
+    for (const model of DEEPSEEK_MODELS) {
+      expect(migrateDeprecatedModel(model)).toBe(model);
+    }
+  });
+
+  it("resolveModelAlias does not alias any DeepSeek model", async () => {
+    const { resolveModelAlias } = await import(
+      "../intelligence/prices.js"
+    );
+    for (const model of DEEPSEEK_MODELS) {
+      expect(resolveModelAlias(model)).toBe(model);
+    }
+  });
+
+  it("full pipeline preserves model identity for all DeepSeek models", async () => {
+    // This ensures flash stays flash, pro stays pro through the
+    // full chain: resolveModelAlias → migrateDeprecatedModel → routeModel
+    const { resolveModelAlias, migrateDeprecatedModel } = await import(
+      "../intelligence/prices.js"
+    );
+    for (const model of DEEPSEEK_MODELS) {
+      const aliased = resolveModelAlias(model);
+      const migrated = migrateDeprecatedModel(aliased);
+      const provider = routeModel(migrated);
+      expect(aliased).toBe(model);
+      expect(migrated).toBe(model);
+      expect(provider).toBe("deepseek");
+    }
+  });
+});
+
 describe("dispatch — other providers unchanged", () => {
   it("routes claude-sonnet-4-6 to anthropic", () => {
     expect(routeModel("claude-sonnet-4-6")).toBe("anthropic");

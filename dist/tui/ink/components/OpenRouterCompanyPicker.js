@@ -51,7 +51,9 @@ export function OpenRouterCompanyPicker(props) {
             setCursor((c) => Math.min(Math.max(0, filtered.length - 1), c + 1));
             return;
         }
-        if (key.return) {
+        // key.return covers \r (CR); input === '\n' covers terminals that
+        // send LF for Enter (parseKeypress names it 'enter', not 'return').
+        if (key.return || ch === "\n") {
             const picked = filtered[cursor];
             if (picked)
                 props.onPick(picked.id);

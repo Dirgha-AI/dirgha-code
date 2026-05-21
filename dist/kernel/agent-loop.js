@@ -13,7 +13,6 @@
  */
 import { assembleTurn, extractToolUses, appendToolResults } from "./message.js";
 import { resolveModelForDispatch } from "../providers/dispatch.js";
-import { findFailover } from "../intelligence/prices.js";
 import { recordFailover, } from "../intelligence/failover-chain.js";
 import { recordRequest, recordRateLimit } from "../providers/health.js";
 import { recordSuccess as recordHealthSuccess, recordFailure as recordHealthFailure, isBlacklisted, } from "../intelligence/health-monitor.js";
@@ -317,6 +316,7 @@ export async function runAgentLoop(cfg) {
     let _compactedThisTurn = false; // guards against infinite compact→retry→compact loops
     let _lastCompactionTurnIndex = -Infinity;
     let _historyRepairLevel = 0; // 0=clean, 1=sanitized, 2=tool-stripped, 3=truncated
+    let _fallbackIndex = 0; // index into cfg.fallbackModels for autonomous failover
     // Unified loop guard observes every (call, result) pair. Replaces the
     // previous dual mechanism of REFUSAL_ABORT_THRESHOLD + content-prefix
     // dedupe. The guard internally tracks four patterns: repeated tool
@@ -372,16 +372,16 @@ export async function runAgentLoop(cfg) {
             }
             // Self-healing: if the model has been blacklisted after too many
             // consecutive failovers, surface the failover so the TUI/caller
-            // can prompt the user to switch. The loop itself continues with
-            // the current model (callers swap between runAgentLoop calls).
+            // can prompt the user to switch. If a fallback chain is configured,
+            // show the next entry as a suggestion.
             if (turnIndex === 0 && isBlacklisted(cfg.provider.id, cfg.model)) {
-                const fallback = findFailover(cfg.model);
+                const nextFb = cfg.fallbackModels?.[_fallbackIndex];
                 events.emit({
                     type: "error",
                     message: `Model "${cfg.model}" is blacklisted after repeated failures`,
                     reason: "failover",
                     retryable: false,
-                    ...(fallback ? { failoverModel: fallback } : {}),
+                    ...(nextFb ? { failoverModel: nextFb.model } : {}),
                 });
             }
             turnCount = turnIndex + 1;
@@ -662,26 +662,72 @@ export async function runAgentLoop(cfg) {
                     turnIndex--;
                     continue;
                 }
-                // Known limitation: this regex is fragile — provider error messages
-                // can change at any time. A classifier or structured error code is
-                // the correct long-term fix, but that requires per-provider parsing.
-                const looksFixable = /not a valid model id|deprecated|model_not_found|rate.?limit|429\b|5\d\d\b|bad.?gateway|upstream/i.test(errMsg);
-                const failover = looksFixable ? findFailover(cfg.model) : undefined;
-                if (looksFixable) {
+                // ── Classify the error ───────────────────────────────────────────────
+                // Use the injected classifier if available; otherwise fall back to
+                // a simple heuristic. The classifier returns structured hints about
+                // retryability and whether a model-fallback is appropriate.
+                const isModelNotFound = /not a valid model id|deprecated|model_not_found/i.test(errMsg);
+                if (isModelNotFound) {
                     recordFailover(cfg.model);
                 }
                 events.emit({
                     type: "error",
                     message: errMsg,
-                    reason: classified?.reason,
-                    retryable: classified?.retryable ?? false,
+                    reason: classified?.reason ?? (isModelNotFound ? "model_not_found" : undefined),
+                    retryable: classified?.retryable ?? (isModelNotFound ? false : false),
                     ...(classified?.userMessage !== undefined
                         ? { userMessage: classified.userMessage }
                         : {}),
-                    ...(failover !== undefined ? { failoverModel: failover } : {}),
                 });
                 const reasonMaxRetries = PER_REASON_MAX_RETRIES[classified?.reason ?? ""] ??
                     DEFAULT_MAX_RETRIES;
+                // ── Fallback chain advancement ──────────────────────────────────────
+                // When the model is gone (model_not_found / deprecated) OR retries
+                // are exhausted with shouldFallback=true, advance through the user's
+                // declared fallbackModels list. Each entry builds a fresh provider
+                // via cfg.providerFactory so the new model's auth, endpoint, and
+                // client are correctly constructed.
+                const shouldFallback = isModelNotFound ||
+                    (classified?.shouldFallback && retriesForTurn >= reasonMaxRetries);
+                if (shouldFallback && cfg.fallbackModels && cfg.providerFactory) {
+                    if (_fallbackIndex < cfg.fallbackModels.length) {
+                        const fbEntry = cfg.fallbackModels[_fallbackIndex];
+                        _fallbackIndex++;
+                        // Skip if it's the same model we're already on (would loop the same error)
+                        if (fbEntry.model !== cfg.model) {
+                            try {
+                                const fbProvider = cfg.providerFactory(fbEntry.model);
+                                // Swap the provider and model in-place so subsequent turns
+                                // use the new backend.
+                                cfg.provider = fbProvider;
+                                cfg.model = fbEntry.model;
+                                // Reset per-turn retry state for the new provider
+                                retriesForTurn = 0;
+                                _historyRepairLevel = 0;
+                                events.emit({
+                                    type: "error",
+                                    message: `Fallback to ${fbEntry.model}`,
+                                    reason: "failover",
+                                    failoverModel: fbEntry.model,
+                                    retryable: true,
+                                });
+                                turnIndex--;
+                                continue;
+                            }
+                            catch (fbErr) {
+                                events.emit({
+                                    type: "error",
+                                    message: `Fallback to ${fbEntry.model} failed: ${fbErr instanceof Error ? fbErr.message : String(fbErr)}`,
+                                    reason: "failover",
+                                    retryable: false,
+                                });
+                                // Try the next fallback entry on the next error
+                                turnIndex--;
+                                continue;
+                            }
+                        }
+                    }
+                }
                 if (classified?.retryable &&
                     retriesForTurn < reasonMaxRetries) {
                     retriesForTurn++;
@@ -939,13 +985,24 @@ async function executeToolCalls(toolUses, cfg, events) {
             // tool call in long-horizon autonomous runs.
             removeApprovalAbort.fn?.();
             if (decision === "deny" || decision === "deny_always") {
-                return {
-                    call,
-                    result: {
-                        content: `Tool call ${call.name} denied by user.`,
-                        isError: true,
-                    },
+                const result = {
+                    content: `[MODE BLOCK] Tool call ${call.name} denied by user.`,
+                    isError: true,
                 };
+                events.emit({
+                    type: "tool_exec_start",
+                    id: call.id,
+                    name: call.name,
+                    input: call.input,
+                });
+                events.emit({
+                    type: "tool_exec_end",
+                    id: call.id,
+                    output: result.content,
+                    isError: true,
+                    durationMs: 0,
+                });
+                return { call, result };
             }
         }
         events.emit({
@@ -983,59 +1040,24 @@ async function executeToolCalls(toolUses, cfg, events) {
             clearTimeout(toolTimer);
             cancelToolRace();
         }
-        // Auto-retry on timeout: when a tool exceeds the deadline, retry once
-        // transparently. This handles transient hangs (slow MCP server, network
-        // blip, kernel scheduler stall) without showing the user an error.
-        // We retry at most once per tool call to avoid infinite loops.
+        // Tool timeout is final — never auto-retry.
+        // Shell commands and other side-effecting tools must not re-execute
+        // silently; a timeout result is clean evidence the user can act on.
         if (toolTimedOut) {
             events.emit({
                 type: "error",
-                message: `Tool "${call.name}" timed out — retrying once`,
-                retryable: true,
+                message: `Tool "${call.name}" timed out after 120s`,
+                retryable: false,
             });
-            // Reset timeout for the retry
-            const retryTimeoutMs = 120_000;
-            const retryCtrl = new AbortController();
-            const retryTimer = setTimeout(() => retryCtrl.abort(), retryTimeoutMs);
-            const { signal: retrySignal, cancel: cancelRetry } = raceSignals(cfg.signal, retryCtrl.signal);
-            const retryStarted = Date.now();
-            try {
-                result = await cfg.toolExecutor.execute({ ...call, input }, retrySignal);
-                toolTimedOut = false;
-            }
-            catch (err) {
-                if (retryCtrl.signal.aborted) {
-                    result = {
-                        content: `[TIMEOUT] Tool "${call.name}" timed out after 120s (retry also timed out)`,
-                        isError: true,
-                    };
-                }
-                else {
-                    result = {
-                        content: `Tool execution failed on retry: ${String(err)}`,
-                        isError: true,
-                    };
-                }
-            }
-            finally {
-                clearTimeout(retryTimer);
-                cancelRetry();
-                // Bonus: log the retry duration so the audit trail captures the total
-                // time the user waited. The main durationMs below covers the original;
-                // we add the retry time.
-            }
-            // Emit a second tool_exec_end so the TUI can show the retry result.
-            // The first tool_exec_end from the timeout is emitted below; we emit
-            // the retry result as a second event with the same id so the TUI's
-            // event projection overwrites the previous "timed out" state.
             events.emit({
                 type: "tool_exec_end",
                 id: call.id,
                 output: result.content,
                 isError: result.isError,
-                durationMs: Date.now() - retryStarted,
+                durationMs: Date.now() - started,
                 ...(result.metadata !== undefined ? { metadata: result.metadata } : {}),
             });
+            return { call: { ...call, input }, result };
         }
         const durationMs = Date.now() - started;
         let afterResult = result;
@@ -1045,8 +1067,6 @@ async function executeToolCalls(toolUses, cfg, events) {
                     result;
         }
         catch (hookErr) {
-            // afterToolCall hook errors must not crash the agent loop — treat as
-            // a no-op and continue with the original result.
             console.error(`[agent-loop] afterToolCall hook threw for tool ${call.name}:`, hookErr);
         }
         result = afterResult;

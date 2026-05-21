@@ -3,6 +3,7 @@
 # Dirgha Code
 
 [![npm](https://img.shields.io/npm/v/@dirgha/code?style=flat-square&color=000)](https://www.npmjs.com/package/@dirgha/code)
+[![Tests](https://img.shields.io/badge/tests-472%20passed-brightgreen?style=flat-square)](https://github.com/Dirgha-AI/dirgha-code/actions)
 [![License](https://img.shields.io/badge/license-FSL--1.1--MIT-d4a373?style=flat-square)](./LICENSE)
 [![Sponsor](https://img.shields.io/badge/sponsor-%E2%99%A1-c25a4f?style=flat-square)](https://dirgha.ai/contribute)
 

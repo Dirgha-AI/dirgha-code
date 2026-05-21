@@ -44,7 +44,7 @@ function KeySetOverlayInner(props: KeySetOverlayProps): React.JSX.Element {
       setMasked((m) => !m);
       return;
     }
-    if (key.return) {
+    if (key.return || _ch === "\n") {
       if (value.trim()) props.onSave(value.trim());
       return;
     }

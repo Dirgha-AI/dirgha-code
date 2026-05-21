@@ -17,7 +17,8 @@ import type {
 
 export type ScriptStep =
   | { type: 'text'; content: string; delayMs?: number }
-  | { type: 'tool_use'; name: string; input: Record<string, unknown>; id?: string };
+  | { type: 'tool_use'; name: string; input: Record<string, unknown>; id?: string }
+  | { type: 'error'; message: string; pattern?: string };
 
 let _idCounter = 0;
 function nextId(): string {
@@ -79,6 +80,11 @@ export class MockProvider implements Provider {
           outputTokens: content.length > 0 ? 1 : 0,
         };
       }
+    } else if (step.type === 'error') {
+      // Error step — throw to simulate provider failure (model_not_found, etc.)
+      const err = new Error(step.message);
+      (err as { pattern?: string }).pattern = step.pattern;
+      throw err;
     } else {
       // tool_use step
       const id = step.id ?? nextId();

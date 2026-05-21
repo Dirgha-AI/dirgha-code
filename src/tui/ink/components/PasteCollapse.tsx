@@ -15,8 +15,8 @@ import type { Palette } from "../../theme.js";
 
 // A single keypress inserts at most one char per tick, so only deltas
 // above these thresholds signal a paste (or large terminal chunk replay).
-export const PASTE_LINE_THRESHOLD = 4;
-export const PASTE_CHAR_THRESHOLD = 200;
+export const PASTE_LINE_THRESHOLD = 2;
+export const PASTE_CHAR_THRESHOLD = 50;
 
 export interface PasteSegment {
   start: number;

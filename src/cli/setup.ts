@@ -78,7 +78,7 @@ export const PROVIDERS: ProviderEntry[] = [
     label: "DeepSeek",
     env: "DEEPSEEK_API_KEY",
     helpUrl: "https://platform.deepseek.com/api_keys",
-    suggested: ["deepseek-chat", "deepseek-v4-pro", "deepseek-reasoner"],
+    suggested: ["deepseek-v4-pro", "deepseek-v4-flash", "deepseek-chat", "deepseek-reasoner"],
   },
   {
     label: "Mistral",

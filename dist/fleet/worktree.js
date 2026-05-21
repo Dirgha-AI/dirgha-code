@@ -14,11 +14,57 @@
  * stranded — see registerExitCleanup().
  */
 import { execFile, execFileSync } from 'node:child_process';
-import { existsSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readdirSync, rmSync, symlinkSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { promisify } from 'node:util';
 import { safeEnvironment } from '../utils/env.js';
 const pexec = promisify(execFile);
+/**
+ * Best-effort symlink every node_modules directory found up to 4 levels deep
+ * from repoRoot into the corresponding location inside worktreePath.
+ * Never throws.
+ */
+function linkNodeModules(repoRoot, worktreePath) {
+    try {
+        const scanDir = (dir, depth) => {
+            if (depth > 4)
+                return;
+            let entries;
+            try {
+                entries = readdirSync(dir, { withFileTypes: true });
+            }
+            catch {
+                return;
+            }
+            for (const entry of entries) {
+                if (!entry.isDirectory())
+                    continue;
+                const name = entry.name;
+                if (name === 'node_modules') {
+                    const relPath = relative(repoRoot, join(dir, name));
+                    const sourcePath = join(repoRoot, relPath);
+                    const linkPath = join(worktreePath, relPath);
+                    const parentDir = join(linkPath, '..');
+                    try {
+                        if (existsSync(parentDir) && !existsSync(linkPath)) {
+                            symlinkSync(sourcePath, linkPath, 'dir');
+                        }
+                    }
+                    catch {
+                        // best effort
+                    }
+                }
+                else if (!name.startsWith('.') && name !== 'node_modules') {
+                    scanDir(join(dir, name), depth + 1);
+                }
+            }
+        };
+        scanDir(repoRoot, 0);
+    }
+    catch {
+        // best effort
+    }
+}
 /** Slug: lowercase alphanumerics + hyphens, bounded length. */
 export function slug(input, maxLen = 40) {
     return input
@@ -86,6 +132,7 @@ export async function createWorktree(branch, opts) {
         ? ['worktree', 'add', path, branch]
         : ['worktree', 'add', '-b', branch, path, base];
     await pexec('git', args, { cwd: repoRoot, env: safeEnvironment() });
+    linkNodeModules(repoRoot, path);
     const baseCommit = await getHeadSha(path);
     const handle = { path, branch, repoRoot, baseCommit };
     trackForCleanup(handle);
