@@ -1,6 +1,6 @@
 {
   "name": "@dirgha/code",
-  "version": "1.43.1",
+  "version": "1.43.2",
   "description": "CLI coding agent for complex agentic workflows and long-horizon development. Local models (llama.cpp / Ollama), BYOK across 17 providers, parallel agents, persistent memory, scanned skills.",
   "type": "module",
   "main": "./dist/index.js",
@@ -19,7 +19,7 @@
   ],
   "scripts": {
     "postinstall": "echo '[dirgha] run \"npx dirgha setup\" to complete setup after install'",
-"postinstall-legacy": "test -d dist && node dist/cli/main.js setup --features --auto 2>/dev/null || true",
+    "postinstall-legacy": "test -d dist && node dist/cli/main.js setup --features --auto 2>/dev/null || true",
     "build": "tsc -p tsconfig.json && node scripts/postbuild.mjs && node scripts/patch-ink-text-input.mjs",
     "build:watch": "tsc -p tsconfig.json --watch",
     "clean": "rm -rf ./dist",
