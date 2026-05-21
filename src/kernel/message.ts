@@ -147,6 +147,17 @@ export function assembleTurn(events: AgentEvent[]): AssembledTurn {
   flushText();
   flushThinking();
 
+  // Recovery: flush any buffered tool calls that were opened but never closed.
+  for (const [id, entry] of toolJsonBuf) {
+    parts.push({
+      type: "tool_use",
+      id,
+      name: entry.name,
+      input: safeParse(entry.json),
+    });
+  }
+  toolJsonBuf.clear();
+
   return {
     message: { role: "assistant", content: parts },
     inputTokens,
