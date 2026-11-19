@@ -64,7 +64,8 @@
   },
   "overrides": {
     "esbuild": ">=0.25.0",
-    "protobufjs": ">=7.5.5"
+    "protobufjs": ">=7.5.5",
+    "sharp": "^0.35.5"
   },
   "engines": {
     "node": ">=22.0.0"

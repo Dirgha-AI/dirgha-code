@@ -8,7 +8,7 @@ Maintenance release. No runtime source changes.
 
 ### Security
 
-* **deps:** bump transitive `tar` 7.5.15 → 7.5.23, `ws` 8.20.0 → 8.23.0 and `protobufjs` 8.2.0 → 8.8.1 (lockfile only) to clear one critical and two high npm audit advisories. Four high advisories remain in `sharp` (libvips), pulled in by `kokoro-js` and the optional `@xenova/transformers`; no fix is available inside their version ranges.
+* **deps:** bump transitive `tar` 7.5.15 → 7.5.23, `ws` 8.20.0 → 8.23.0 and `protobufjs` 8.2.0 → 8.8.1 (lockfile only) to clear one critical and two high npm audit advisories. The four remaining high advisories in `sharp` (libvips/libheif/librsvg), pulled in by `kokoro-js` and the optional `@xenova/transformers`, are cleared by forcing `sharp` 0.35.5 via `overrides`. Verified: the publish gate (`npm audit --audit-level=high --omit=dev --omit=optional`) exits 0 with "found 0 vulnerabilities" on npm 10 and 11, and kokoro-js on-device TTS was smoke-tested with sharp 0.35.5 (9.05 s WAV generated on Windows CPU). Note: making `kokoro-js` optional alone does not clear the gate — npm audit reports optional-chain advisories even with `--omit=optional`.
 
 ### Packaging
 
