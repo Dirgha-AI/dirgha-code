@@ -8,13 +8,13 @@
 [![License](https://img.shields.io/badge/license-FSL--1.1--MIT-d4a373?style=flat-square)](./LICENSE)
 [![Sponsor](https://img.shields.io/badge/sponsor-%E2%99%A1-c25a4f?style=flat-square)](https://dirgha.ai/contribute)
 
-**Dirgha Code is a source-available CLI coding agent (FSL-1.1-MIT, converts to MIT after two years). It works with 17 model providers on your own keys, or fully offline with Ollama or llama.cpp, and adds parallel agents and persistent memory. One install command.**
+**Dirgha Code is an open-source CLI coding agent. It works with 17 model providers on your own keys, or fully offline with Ollama or llama.cpp, and adds parallel agents and persistent memory. One install command.**
 
 </div>
 
 ## The Seed: Why the CLI Comes First
 
-Every operating system starts with a kernel. Dirgha Code, the source-available command-line agent, is the kernel of Dirgha AI OS. It is the smallest and easiest piece of the stack to install and change: one install command, runs fully offline, ships under FSL-1.1-MIT (each release converts to MIT two years after it is published).
+Every operating system starts with a kernel. Dirgha Code, the open-source command-line agent, is the kernel of Dirgha AI OS. It is the smallest and easiest piece of the stack to install and change: one install command, runs fully offline.
 
 By design, the CLI is the entry point for every developer — whether you're on a 10 Gbps fiber line or a shared 4G hotspot, in a WeWork in Bengaluru or a basement in Berlin. No browser, no paid account, no telemetry by default. Just `npm install -g @dirgha/code` and a terminal.
 
@@ -161,14 +161,14 @@ We're a small team. We answer issues. We accept PRs from first-time contributors
 
 ## Related projects
 
-- [**LOKAHI**](https://github.com/Dirgha-AI/lokahi) (Apache-2.0): a gate that checks each MCP tool call against a signed, community-written manifest before it runs. Reference implementation, not yet independently reviewed.
+- [**LOKAHI**](https://github.com/Dirgha-AI/lokahi) (Apache-2.0, v0.1.4): a gate that checks each MCP tool call against a signed, community-written manifest before it runs. Reference implementation, not yet independently reviewed.
 - [**Ahimsa AI**](https://github.com/Dirgha-AI/ahimsa-ai) (MIT): a design-time impact assessment (AIA v1.1) that compiles approved projects into LOKAHI manifests.
 - [**Synthetic Humanism**](https://github.com/Dirgha-AI/synthetic-humanism) (MIT): the essays behind LOKAHI and Ahimsa AI, plus a benchmark that runs both against 20 documented AI failures.
 - [**Startup Agent Skills**](https://github.com/salikshah/startup-agent-skills) (MIT): SKILL.md packs for startup strategy, growth and positioning, tested against Dirgha Code and other agent CLIs.
 
 ## License
 
-[FSL-1.1-MIT](./LICENSE): the Functional Source License, a source-available licence. You can use, modify and redistribute the code for any purpose except offering a competing commercial product. Two years after each release is published, that release converts to the MIT License. FSL is not an OSI-approved open-source licence; see [LICENSING.md](./LICENSING.md) for details.
+[FSL-1.1-MIT](./LICENSE): the Functional Source License. You can use, modify and redistribute the code for any purpose except offering a competing commercial product. Two years after each release is published, that release converts to the MIT License. See [LICENSING.md](./LICENSING.md) for details.
 
 ---
 

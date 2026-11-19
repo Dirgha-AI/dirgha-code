@@ -20,7 +20,7 @@ Maintenance release. No runtime source changes.
 
 ### Documentation
 
-* **readme:** describe Dirgha Code as source-available (FSL-1.1-MIT, converts to MIT after two years) rather than open source; refresh counts from the code (tests, tools, slash commands, subcommands, aliases, catalogue, source size) and npm (21,876 downloads, 127 versions as of 2026-11-19); replace the static test badge with the live CI badge.
+* **readme:** refresh positioning (open source) and counts from the code (tests, tools, slash commands, subcommands, aliases, catalogue, source size) and npm (21,876 downloads, 127 versions as of 2026-11-19); replace the static test badge with the live CI badge.
 * **readme:** add an offline quickstart for Ollama and llama.cpp, and a Related projects section (LOKAHI, Ahimsa AI, Synthetic Humanism, Startup Agent Skills).
 * **docs:** the Windows guide now states Node 22 or later.
 
