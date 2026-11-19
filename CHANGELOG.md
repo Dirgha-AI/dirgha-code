@@ -2,6 +2,29 @@
 
 All notable changes are tracked here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); we use [Semantic Versioning](https://semver.org/).
 
+## [1.43.4] — unreleased (prepared 2026-11-19)
+
+Maintenance release. No runtime source changes.
+
+### Security
+
+* **deps:** bump transitive `tar` 7.5.15 → 7.5.23, `ws` 8.20.0 → 8.23.0 and `protobufjs` 8.2.0 → 8.8.1 (lockfile only) to clear one critical and two high npm audit advisories. Four high advisories remain in `sharp` (libvips), pulled in by `kokoro-js` and the optional `@xenova/transformers`; no fix is available inside their version ranges.
+
+### Packaging
+
+* **package:** `license` is now the SPDX id `FSL-1.1-MIT` (was `SEE LICENSE IN LICENSE`).
+* **package:** `engines.node` is now `>=22`, matching what the `ink@7` dependency already required. Node 18 and 20 were never supported in practice.
+* **package:** add keywords for local and offline use (`ollama`, `llama.cpp`, `local-llm`, `offline`, `mcp`, `terminal`).
+* **repo:** rebuilt the committed `dist/` so it matches the source and the published 1.43.3 tarball; removed stray `a.out` and `probe.txt` from the repo root.
+
+### Documentation
+
+* **readme:** describe Dirgha Code as source-available (FSL-1.1-MIT, converts to MIT after two years) rather than open source; refresh counts from the code (tests, tools, slash commands, subcommands, aliases, catalogue, source size) and npm (21,876 downloads, 127 versions as of 2026-11-19); replace the static test badge with the live CI badge.
+* **readme:** add an offline quickstart for Ollama and llama.cpp, and a Related projects section (LOKAHI, Ahimsa AI, Synthetic Humanism, Startup Agent Skills).
+* **docs:** the Windows guide now states Node 22 or later.
+
+This file has no entries for most releases between 1.25.0 and 1.43.3. For those, see the [GitHub releases](https://github.com/Dirgha-AI/dirgha-code/releases) (each links a compare view) and the git history.
+
 ## [1.42.3] — 2026-04-25
 
 ### Bug Fixes
