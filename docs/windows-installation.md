@@ -58,9 +58,9 @@ The compile step runs once. Every subsequent `npm install -g @dirgha/code` upgra
 
 ## Node.js version
 
-Dirgha requires Node.js 18 or later. We recommend **Node 22 LTS** or **Node 24** for the best experience.
+Dirgha requires Node.js 22 or later (its terminal UI library, Ink 7, needs Node 22). We recommend **Node 22 LTS** or **Node 24**.
 
-Node 18 and 20 have reached end-of-life upstream and will stop receiving security patches. If you're on an older version, install a current release from [nodejs.org](https://nodejs.org).
+Node 18 and 20 have reached end-of-life upstream and no longer receive security patches. If you're on an older version, install a current release from [nodejs.org](https://nodejs.org).
 
 You can check your current version with:
 

@@ -67,7 +67,7 @@
     "protobufjs": ">=7.5.5"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.0.0"
   },
   "keywords": [
     "cli",
@@ -79,7 +79,13 @@
     "tool-calling",
     "openrouter",
     "anthropic",
-    "openai"
+    "openai",
+    "ollama",
+    "llama.cpp",
+    "local-llm",
+    "offline",
+    "mcp",
+    "terminal"
   ],
   "homepage": "https://github.com/Dirgha-AI/dirgha-code",
   "repository": {
@@ -90,5 +96,5 @@
     "url": "https://github.com/Dirgha-AI/dirgha-code/issues"
   },
   "author": "Dirgha AI Team",
-  "license": "SEE LICENSE IN LICENSE"
+  "license": "FSL-1.1-MIT"
 }
