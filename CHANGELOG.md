@@ -14,6 +14,7 @@ Maintenance release. No runtime source changes.
 
 * **package:** `license` is now the SPDX id `FSL-1.1-MIT` (was `SEE LICENSE IN LICENSE`).
 * **package:** `engines.node` is now `>=22`, matching what the `ink@7` dependency already required. Node 18 and 20 were never supported in practice.
+* **package:** `kokoro-js` (on-device TTS) moves from `dependencies` to `optionalDependencies`. The TTS tool already degrades gracefully when it is absent (dynamic import in `src/tools/studio.ts`); install `kokoro-js` alongside Dirgha Code to enable on-device speech. This keeps the default install lighter and the voice stack swappable.
 * **package:** add keywords for local and offline use (`ollama`, `llama.cpp`, `local-llm`, `offline`, `mcp`, `terminal`).
 * **repo:** rebuilt the committed `dist/` so it matches the source and the published 1.43.3 tarball; removed stray `a.out` and `probe.txt` from the repo root.
 
