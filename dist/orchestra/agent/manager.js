@@ -15,6 +15,46 @@ import { randomUUID } from "node:crypto";
 import { safeEnvironment } from "../../utils/env.js";
 import { registry } from "../core/registry.js";
 import { writeLog } from "../orchestration/log.js";
+/** Env var names for known LLM providers that spawned agents need. */
+const LLM_PROVIDER_KEY_VARS = Object.freeze([
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "DEEPSEEK_API_KEY",
+    "OPENROUTER_API_KEY",
+    "NVIDIA_API_KEY",
+    "MISTRAL_API_KEY",
+    "COHERE_API_KEY",
+    "CEREBRAS_API_KEY",
+    "TOGETHER_API_KEY",
+    "PERPLEXITY_API_KEY",
+    "XAI_API_KEY",
+    "GROQ_API_KEY",
+    "ZAI_API_KEY",
+    "GLM_API_KEY",
+    "FIREWORKS_API_KEY",
+]);
+/**
+ * Build the environment for a spawned agent: safe-clean parent env
+ * plus any LLM provider keys the parent has set.
+ */
+function buildSpawnEnv(extraEnv) {
+    const env = { ...safeEnvironment() };
+    // Pass through known LLM provider keys from the parent.
+    for (const key of LLM_PROVIDER_KEY_VARS) {
+        const val = process.env[key];
+        if (val)
+            env[key] = val;
+    }
+    if (extraEnv) {
+        for (const [k, v] of Object.entries(extraEnv)) {
+            if (v !== undefined)
+                env[k] = v;
+        }
+    }
+    return env;
+}
 /**
  * Spawn an agent subprocess and wire it into the session registry + log.
  * Returns the agent id and the child process handle.
@@ -46,7 +86,7 @@ export async function spawnAgent(sessionId, label, task, adapter, opts = {}) {
     try {
         child = spawn(command, args, {
             cwd: opts.cwd,
-            env: { ...safeEnvironment(), ...opts.env },
+            env: buildSpawnEnv(opts.env),
             stdio: ["pipe", "pipe", "pipe"],
         });
     }
@@ -81,9 +121,39 @@ export async function spawnAgent(sessionId, label, task, adapter, opts = {}) {
             writeLog(sessionId, agentId, "output", { line, stream: "stderr" });
         }
     });
+    // Spawn timeout: kill the child if it hasn't exited within timeoutMs.
+    const timeoutMs = opts.timeoutMs ?? 120_000;
+    let timeoutHandle;
+    if (timeoutMs > 0) {
+        timeoutHandle = setTimeout(() => {
+            const elapsed = Date.now() - now;
+            registry.updateAgent(sessionId, agentId, {
+                status: "failed",
+                exitCode: -3,
+                elapsedMs: elapsed,
+            });
+            writeLog(sessionId, agentId, "exit", {
+                code: -3,
+                elapsedMs: elapsed,
+                reason: `spawn timeout after ${timeoutMs}ms`,
+            });
+            try {
+                child.kill("SIGTERM");
+            }
+            catch { /* already dead */ }
+            setTimeout(() => {
+                try {
+                    child.kill("SIGKILL");
+                }
+                catch { /* already dead */ }
+            }, 3000);
+        }, timeoutMs);
+    }
     // Wait for exit.
     const done = new Promise((resolve) => {
         child.on("exit", (code) => {
+            if (timeoutHandle)
+                clearTimeout(timeoutHandle);
             const elapsed = Date.now() - now;
             registry.updateAgent(sessionId, agentId, {
                 status: code === 0 ? "done" : "failed",
@@ -94,6 +164,8 @@ export async function spawnAgent(sessionId, label, task, adapter, opts = {}) {
             resolve(code ?? -1);
         });
         child.on("error", (err) => {
+            if (timeoutHandle)
+                clearTimeout(timeoutHandle);
             registry.updateAgent(sessionId, agentId, {
                 status: "failed",
                 exitCode: -2,

@@ -8,6 +8,14 @@ import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { summariseDiff, unifiedDiff } from "./diff.js";
 import { decodeLiteralUnicodeEscapes, isValidCwdPath } from "../utils/fs.js";
+function resolvePath(raw) {
+    const filePath = typeof raw.filePath === "string" ? raw.filePath : undefined;
+    const path = typeof raw.path === "string" ? raw.path : undefined;
+    const resolved = path ?? filePath;
+    if (!resolved)
+        throw new Error("fs_write requires 'path' or 'filePath'");
+    return resolved;
+}
 export const fsWriteTool = {
     name: "fs_write",
     description: "Write content to a file. Creates parent directories when createDirs is true. Overwrites existing files.",
@@ -15,18 +23,20 @@ export const fsWriteTool = {
         type: "object",
         properties: {
             path: { type: "string" },
+            filePath: { type: "string", description: "Alias for `path`." },
             content: { type: "string" },
             createDirs: {
                 type: "boolean",
                 description: "Create parent directories if they do not exist.",
             },
         },
-        required: ["path", "content"],
+        required: ["content"],
     },
     requiresApproval: () => true,
     async execute(rawInput, ctx) {
         const input = rawInput;
-        const check = isValidCwdPath(ctx.cwd, input.path, { allowOutside: ctx.autoApprove === true && (ctx.sandboxMode === 'off' || ctx.sandboxMode == null) });
+        const resolvedPath = resolvePath(rawInput);
+        const check = isValidCwdPath(ctx.cwd, resolvedPath, { allowOutside: ctx.autoApprove === true && (ctx.sandboxMode === 'off' || ctx.sandboxMode == null) });
         if (!check.valid)
             return { content: check.error, isError: true };
         const abs = check.resolved;
@@ -40,14 +50,14 @@ export const fsWriteTool = {
             await mkdir(dirname(abs), { recursive: true });
         const sanitized = decodeLiteralUnicodeEscapes(input.content);
         const diff = unifiedDiff(before, sanitized, {
-            fromLabel: input.path,
-            toLabel: input.path,
+            fromLabel: resolvedPath,
+            toLabel: resolvedPath,
         });
         const { added, removed } = summariseDiff(diff);
         await writeFile(abs, sanitized, "utf8");
         const summary = existed
-            ? `Updated ${input.path} (+${added} / -${removed})`
-            : `Created ${input.path} (${sanitized.length} bytes)`;
+            ? `Updated ${resolvedPath} (+${added} / -${removed})`
+            : `Created ${resolvedPath} (${sanitized.length} bytes)`;
         return {
             content: summary,
             data: {

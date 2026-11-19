@@ -17,6 +17,7 @@ export async function spawnDirghaAgent(sessionId, label, task, opts = {}) {
         command: "dirgha",
         args,
         cwd: opts.cwd,
+        env: opts.env,
     };
     return spawnAgent(sessionId, label, task, "dirgha", spawnOpts);
 }

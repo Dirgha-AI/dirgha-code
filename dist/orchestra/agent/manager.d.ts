@@ -27,6 +27,8 @@ export interface SpawnOptions {
     cwd?: string;
     /** Environment variables. */
     env?: Record<string, string | undefined>;
+    /** Spawn timeout in ms (default 120 000). SIGTERM on timeout, SIGKILL after 3 s. */
+    timeoutMs?: number;
 }
 /**
  * Spawn an agent subprocess and wire it into the session registry + log.

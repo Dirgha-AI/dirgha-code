@@ -6,6 +6,15 @@
 import { readFile, stat } from "node:fs/promises";
 import { isValidCwdPath, isBinary } from "../utils/fs.js";
 const MAX_BYTES = 2 * 1024 * 1024;
+/** Resolve the canonical path from `filePath` or `path`, failing if neither is set. */
+function resolvePath(raw) {
+    const filePath = typeof raw.filePath === "string" ? raw.filePath : undefined;
+    const path = typeof raw.path === "string" ? raw.path : undefined;
+    const resolved = path ?? filePath;
+    if (!resolved)
+        throw new Error("fs_read requires 'path' or 'filePath'");
+    return resolved;
+}
 export const fsReadTool = {
     name: "fs_read",
     description: "Read a text file from disk. Returns contents with 1-based line numbers. Use offset/limit to page through large files.",
@@ -15,6 +24,10 @@ export const fsReadTool = {
             path: {
                 type: "string",
                 description: "Absolute or cwd-relative path to the file.",
+            },
+            filePath: {
+                type: "string",
+                description: "Alias for `path`. Use path or filePath interchangeably.",
             },
             offset: {
                 type: "integer",
@@ -27,19 +40,21 @@ export const fsReadTool = {
                 description: "Maximum number of lines to return.",
             },
         },
-        required: ["path"],
+        // Either path or filePath must be present; the execute handler validates.
+        required: [],
     },
     async execute(rawInput, ctx) {
         const input = rawInput;
-        const check = isValidCwdPath(ctx.cwd, input.path, { allowOutside: ctx.autoApprove === true && (ctx.sandboxMode === 'off' || ctx.sandboxMode == null) });
+        const resolvedPath = resolvePath(rawInput);
+        const check = isValidCwdPath(ctx.cwd, resolvedPath, { allowOutside: ctx.autoApprove === true && (ctx.sandboxMode === 'off' || ctx.sandboxMode == null) });
         if (!check.valid)
             return { content: check.error, isError: true };
         const abs = check.resolved;
         const info = await stat(abs).catch(() => undefined);
         if (!info)
-            return { content: `No such file: ${input.path}`, isError: true };
+            return { content: `No such file: ${resolvedPath}`, isError: true };
         if (!info.isFile())
-            return { content: `Not a file: ${input.path}`, isError: true };
+            return { content: `Not a file: ${resolvedPath}`, isError: true };
         if (info.size > MAX_BYTES) {
             return {
                 content: `File too large (${info.size} bytes, max ${MAX_BYTES}). Use offset/limit.`,
@@ -49,7 +64,7 @@ export const fsReadTool = {
         const buffer = await readFile(abs);
         if (isBinary(buffer))
             return {
-                content: `File appears to be binary: ${input.path}`,
+                content: `File appears to be binary: ${resolvedPath}`,
                 isError: true,
             };
         const text = buffer.toString("utf8");

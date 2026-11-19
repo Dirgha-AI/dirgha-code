@@ -26,10 +26,15 @@ export function createLog(sessionId) {
 export function appendLog(entry) {
     try {
         const path = logPath(entry.sessionId);
+        const dir = tmpdir();
+        if (!existsSync(dir))
+            mkdirSync(dir, { recursive: true });
         appendFileSync(path, JSON.stringify(entry) + "\n", "utf-8");
     }
-    catch {
-        // Non-fatal — log writes must never crash the orchestrator.
+    catch (err) {
+        // Non-fatal — log writes must never crash the orchestrator,
+        // but surface the error so root cause is visible.
+        process.stderr.write(`[orchestra] log write failed: ${err.message}\n`);
     }
 }
 /** Convenience: build and write a structured entry in one call. */

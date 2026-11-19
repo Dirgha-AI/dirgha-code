@@ -8,6 +8,14 @@
 import { readFile, stat, writeFile } from "node:fs/promises";
 import { summariseDiff, unifiedDiff } from "./diff.js";
 import { decodeLiteralUnicodeEscapes, isValidCwdPath } from "../utils/fs.js";
+function resolvePath(raw) {
+    const filePath = typeof raw.filePath === "string" ? raw.filePath : undefined;
+    const path = typeof raw.path === "string" ? raw.path : undefined;
+    const resolved = path ?? filePath;
+    if (!resolved)
+        throw new Error("fs_edit requires 'path' or 'filePath'");
+    return resolved;
+}
 export const fsEditTool = {
     name: "fs_edit",
     description: "Replace an exact substring in a file. Fails on ambiguity (multiple matches) unless replaceAll is set. Use larger context around oldString to disambiguate.",
@@ -15,22 +23,24 @@ export const fsEditTool = {
         type: "object",
         properties: {
             path: { type: "string" },
+            filePath: { type: "string", description: "Alias for `path`." },
             oldString: { type: "string" },
             newString: { type: "string" },
             replaceAll: { type: "boolean" },
         },
-        required: ["path", "oldString", "newString"],
+        required: ["oldString", "newString"],
     },
     requiresApproval: () => true,
     async execute(rawInput, ctx) {
         const input = rawInput;
-        const check = isValidCwdPath(ctx.cwd, input.path, { allowOutside: ctx.autoApprove === true && (ctx.sandboxMode === 'off' || ctx.sandboxMode == null) });
+        const resolvedPath = resolvePath(rawInput);
+        const check = isValidCwdPath(ctx.cwd, resolvedPath, { allowOutside: ctx.autoApprove === true && (ctx.sandboxMode === 'off' || ctx.sandboxMode == null) });
         if (!check.valid)
             return { content: check.error, isError: true };
         const abs = check.resolved;
         const info = await stat(abs).catch(() => undefined);
         if (!info || !info.isFile())
-            return { content: `No such file: ${input.path}`, isError: true };
+            return { content: `No such file: ${resolvedPath}`, isError: true };
         const before = await readFile(abs, "utf8");
         const oldString = decodeLiteralUnicodeEscapes(input.oldString);
         const newString = decodeLiteralUnicodeEscapes(input.newString);
@@ -43,7 +53,7 @@ export const fsEditTool = {
         const exactCount = countOccurrences(before, oldString);
         if (exactCount === 0) {
             return {
-                content: `oldString not found in ${input.path}. Provide more surrounding context or verify the file.`,
+                content: `oldString not found in ${resolvedPath}. Provide more surrounding context or verify the file.`,
                 isError: true,
             };
         }
@@ -57,12 +67,12 @@ export const fsEditTool = {
             ? splitJoin(before, oldString, newString)
             : before.replace(oldString, newString);
         const diff = unifiedDiff(before, after, {
-            fromLabel: input.path,
-            toLabel: input.path,
+            fromLabel: resolvedPath,
+            toLabel: resolvedPath,
         });
         const { added, removed } = summariseDiff(diff);
         await writeFile(abs, after, "utf8");
-        const summary = `Edited ${input.path}: ${input.replaceAll ? exactCount : 1} replacement(s) (+${added} / -${removed})`;
+        const summary = `Edited ${resolvedPath}: ${input.replaceAll ? exactCount : 1} replacement(s) (+${added} / -${removed})`;
         const content = diff ? `${summary}\n\n${diff}` : summary;
         return {
             content,

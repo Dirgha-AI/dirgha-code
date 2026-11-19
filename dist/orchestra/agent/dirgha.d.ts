@@ -8,6 +8,8 @@ export interface DirghaAgentOptions {
     extraArgs?: string[];
     /** Working directory. */
     cwd?: string;
+    /** Extra environment variables to pass to the agent. */
+    env?: Record<string, string | undefined>;
 }
 /**
  * Spawn a dirgha agent subprocess for a given task.
