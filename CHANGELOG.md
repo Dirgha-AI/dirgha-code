@@ -2,6 +2,14 @@
 
 All notable changes are tracked here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); we use [Semantic Versioning](https://semver.org/).
 
+## [1.43.4](https://github.com/Dirgha-AI/dirgha-code/compare/v1.43.3...v1.43.4) (2026-11-19)
+
+
+### Bug Fixes
+
+* **deps:** bump transitive tar, ws and protobufjs for npm audit ([daf787a](https://github.com/Dirgha-AI/dirgha-code/commit/daf787abac3e925eea98382c7512e4bd1867c57c))
+* **deps:** force sharp 0.35.5 via overrides to clear the publish audit gate ([deb7e0c](https://github.com/Dirgha-AI/dirgha-code/commit/deb7e0c790f12a8aace5988b67d6d9919c8a2d5c))
+
 ## [1.43.4] — unreleased (prepared 2026-11-19)
 
 Maintenance release. No runtime source changes.
