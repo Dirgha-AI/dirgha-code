@@ -29,6 +29,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Use npm 11 (the lock file is written by npm 11)
+        run: npm install -g npm@11
       - run: npm ci
       - name: Typecheck
         run: npm run typecheck
