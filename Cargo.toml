@@ -22,7 +22,7 @@ keywords = ["agent", "security", "robotics", "mcp", "sbom"]
 categories = ["command-line-utilities", "cryptography", "development-tools", "science::robotics"]
 
 [workspace.dependencies]
-aes-gcm = "0.10"
+aes-gcm = "0.11"
 blake3 = "1.5"
 deepseek-recipe-core = "0.2.0"
 ed25519-dalek = { version = "2.1", default-features = false, features = ["std"] }
