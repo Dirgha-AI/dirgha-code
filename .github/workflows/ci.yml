@@ -1,22 +1,40 @@
 name: CI
-on: [push, pull_request]
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
 jobs:
-  test:
+  rust:
+    name: Rust kernel (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Tests
+        run: cargo test --workspace
+      - name: Release build
+        run: cargo build --release -p native-host
+
+  typescript:
+    name: TypeScript CLI
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: '22' }
+        with:
+          node-version: 22
       - run: npm ci
-      - run: npm run build
-      - run: npm test
-      - run: node dist/cli/main.js doctor --json
-  smoke:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: '22' }
-      - run: npm ci
-      - run: npm run build
-      - run: npm run test:cli:offline
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build
+        run: npm run build
+      - name: Unit tests
+        run: npx vitest run --dir src
+      - name: Launcher tests
+        run: node --test ./bin/dirgha.test.mjs

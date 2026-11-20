@@ -1,0 +1,18 @@
+[package]
+name = "agent-loop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Bounded turn stepper implementing DeepSeek Harness (dsh) waterfall hooks, Xiryn sliding-window compaction, and durable session.v1.jsonl event logs."
+
+[dependencies]
+blake3 = { workspace = true }
+dirgha-core = { version = "0.2.0", path = "../dirgha-core" }
+llm-router = { version = "0.2.0", path = "../llm-router" }
+lokahi-gate = { version = "0.2.0", path = "../lokahi-gate" }
+serde = { workspace = true }
+serde_json = { workspace = true }

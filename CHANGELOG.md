@@ -2,29 +2,27 @@
 
 All notable changes are tracked here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); we use [Semantic Versioning](https://semver.org/).
 
-## [1.43.4] — unreleased (prepared 2026-11-19)
+## [2.0.0] - 2026-11-20
 
-Maintenance release. No runtime source changes.
+Dirgha 2.0: one harness for coding agents and robot simulation, now Apache-2.0.
+
+### Added
+- Rust kernel `dirgha-native-host` (about 1 MB) serving 24 MCP tools over stdio, browser native messaging and a local HTTP cockpit.
+- WebAssembly action gate built from `crates/lokahi-gate`; the TypeScript CLI refuses tool calls when the gate is missing or fails.
+- MuJoCo evaluation sidecar with seeded rollouts, failure classification and HTML replay.
+- Firefox MV3 extension that runs the gate in the browser.
 
 ### Security
+- Cockpit API requires a bearer token and sends no cross-origin headers.
+- Physical (S2) actions require an Ed25519 signature from a configured approver.
+- Ledger keys are random; verification uses a trusted public key.
 
-* **deps:** bump transitive `tar` 7.5.15 → 7.5.23, `ws` 8.20.0 → 8.23.0 and `protobufjs` 8.2.0 → 8.8.1 (lockfile only) to clear one critical and two high npm audit advisories. The four remaining high advisories in `sharp` (libvips/libheif/librsvg), pulled in by `kokoro-js` and the optional `@xenova/transformers`, are cleared by forcing `sharp` 0.35.5 via `overrides`. Verified: the publish gate (`npm audit --audit-level=high --omit=dev --omit=optional`) exits 0 with "found 0 vulnerabilities" on npm 10 and 11, and kokoro-js on-device TTS was smoke-tested with sharp 0.35.5 (9.05 s WAV generated on Windows CPU). Note: making `kokoro-js` optional alone does not clear the gate — npm audit reports optional-chain advisories even with `--omit=optional`.
+### Changed
+- Licence: Apache-2.0 from 2.0 onwards. 1.x releases keep FSL-1.1-MIT.
+- Robotics and hardware tools that do not call real services are labelled `Demo:` and return `"simulated": true`.
 
-### Packaging
-
-* **package:** `license` is now the SPDX id `FSL-1.1-MIT` (was `SEE LICENSE IN LICENSE`).
-* **package:** `engines.node` is now `>=22`, matching what the `ink@7` dependency already required. Node 18 and 20 were never supported in practice.
-* **package:** `kokoro-js` (on-device TTS) moves from `dependencies` to `optionalDependencies`. The TTS tool already degrades gracefully when it is absent (dynamic import in `src/tools/studio.ts`); install `kokoro-js` alongside Dirgha Code to enable on-device speech. This keeps the default install lighter and the voice stack swappable.
-* **package:** add keywords for local and offline use (`ollama`, `llama.cpp`, `local-llm`, `offline`, `mcp`, `terminal`).
-* **repo:** rebuilt the committed `dist/` so it matches the source and the published 1.43.3 tarball; removed stray `a.out` and `probe.txt` from the repo root.
-
-### Documentation
-
-* **readme:** refresh positioning (open source) and counts from the code (tests, tools, slash commands, subcommands, aliases, catalogue, source size) and npm (21,876 downloads, 127 versions as of 2026-11-19); replace the static test badge with the live CI badge.
-* **readme:** add an offline quickstart for Ollama and llama.cpp, and a Related projects section (LOKAHI, Ahimsa AI, Synthetic Humanism, Startup Agent Skills).
-* **docs:** the Windows guide now states Node 22 or later.
-
-This file has no entries for most releases between 1.25.0 and 1.43.3. For those, see the [GitHub releases](https://github.com/Dirgha-AI/dirgha-code/releases) (each links a compare view) and the git history.
+### Removed
+- The GPU marketplace and Bucky client.
 
 ## [1.42.3] — 2026-04-25
 

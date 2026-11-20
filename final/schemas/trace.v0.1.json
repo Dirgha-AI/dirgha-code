@@ -1,0 +1,254 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dirgha.dev/schemas/trace/v0.1.json",
+  "title": "Dirgha Episode Trace",
+  "description": "A reproducible record of one robot-policy episode.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "trace_id",
+    "episode_id",
+    "workspace_id",
+    "created_at",
+    "status",
+    "seed",
+    "repro_hash",
+    "versions",
+    "robot",
+    "scene",
+    "task",
+    "summary",
+    "metrics",
+    "events",
+    "artifacts",
+    "safety"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "trace_id": { "type": "string", "pattern": "^trc_[A-Za-z0-9_-]{8,64}$" },
+    "episode_id": { "type": "string", "pattern": "^ep_[A-Za-z0-9_-]{1,64}$" },
+    "workspace_id": { "type": "string", "minLength": 1 },
+    "run_id": { "type": "string" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "running", "completed", "failed", "aborted", "cancelled"]
+    },
+    "seed": { "type": "integer", "minimum": 0 },
+    "repro_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "result_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "config_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "trace_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "versions": {
+      "type": "object",
+      "required": ["dirgha", "simulator", "os"],
+      "additionalProperties": false,
+      "properties": {
+        "dirgha": { "type": "string" },
+        "simulator": { "type": "string" },
+        "physics": { "type": "string" },
+        "python": { "type": "string" },
+        "node": { "type": "string" },
+        "os": { "type": "string" },
+        "gpu_driver": { "type": "string" },
+        "container_digest": { "type": "string" },
+        "policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string" },
+            "version": { "type": "string" },
+            "adapter": { "type": "string" },
+            "checkpoint_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+            "license": { "type": "string" }
+          }
+        }
+      }
+    },
+    "robot": {
+      "type": "object",
+      "required": ["id", "asset_hash"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "asset_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "joint_names": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "scene": {
+      "type": "object",
+      "required": ["id", "asset_hash"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "asset_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "randomization_seed": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "task": {
+      "type": "object",
+      "required": ["id"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "language": { "type": "string" },
+        "success_criteria": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["success", "partial_progress", "steps", "duration_s", "safety_violations"],
+      "additionalProperties": false,
+      "properties": {
+        "success": { "type": ["boolean", "null"] },
+        "partial_progress": { "type": "number", "minimum": 0, "maximum": 1 },
+        "steps": { "type": "integer", "minimum": 0 },
+        "duration_s": { "type": "number", "minimum": 0 },
+        "safety_violations": { "type": "integer", "minimum": 0 },
+        "failure_mode": { "type": ["string", "null"] },
+        "failure_detail": { "type": ["string", "null"] }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "inference_latency_ms": { "$ref": "#/$defs/latency" },
+        "sim_step_ms": { "$ref": "#/$defs/latency" },
+        "cost_usd": { "type": "number", "minimum": 0 },
+        "episode_length_steps": { "type": "integer", "minimum": 0 },
+        "contact_count": { "type": "integer", "minimum": 0 },
+        "max_force_n": { "type": "number", "minimum": 0 },
+        "max_velocity_rad_s": { "type": "number", "minimum": 0 }
+      }
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["t", "type"],
+        "additionalProperties": false,
+        "properties": {
+          "t": { "type": "number", "minimum": 0 },
+          "step": { "type": "integer", "minimum": 0 },
+          "type": {
+            "type": "string",
+            "enum": [
+              "episode_start",
+              "episode_end",
+              "reset",
+              "observation",
+              "policy_load",
+              "policy_infer",
+              "action",
+              "reward",
+              "safety_check",
+              "safety_violation",
+              "approval_request",
+              "approval_granted",
+              "approval_denied",
+              "error",
+              "log",
+              "custom"
+            ]
+          },
+          "data": { "type": "object", "additionalProperties": true }
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "uri", "media_type", "sha256", "bytes"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string" },
+          "uri": { "type": "string" },
+          "media_type": { "type": "string" },
+          "sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+          "bytes": { "type": "integer", "minimum": 0 },
+          "redacted": { "type": "boolean", "default": false }
+        }
+      }
+    },
+    "safety": {
+      "type": "object",
+      "required": ["profile", "checks", "violations"],
+      "additionalProperties": false,
+      "properties": {
+        "profile": { "type": "string" },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "passed"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string" },
+              "passed": { "type": "boolean" },
+              "limit": { "type": "number" },
+              "actual": { "type": "number" },
+              "detail": { "type": "string" }
+            }
+          }
+        },
+        "violations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "t", "detail"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string" },
+              "t": { "type": "number", "minimum": 0 },
+              "step": { "type": "integer", "minimum": 0 },
+              "detail": { "type": "string" },
+              "severity": { "type": "string", "enum": ["info", "warning", "error", "critical"] }
+            }
+          }
+        },
+        "approvals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "action_hash", "approved_by", "approved_at"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string" },
+              "action_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+              "approved_by": { "type": "string" },
+              "approved_at": { "type": "string", "format": "date-time" },
+              "expires_at": { "type": "string", "format": "date-time" }
+            }
+          }
+        }
+      }
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "client": { "type": "string" },
+        "session_id": { "type": "string" },
+        "tool_calls": { "type": "integer", "minimum": 0 },
+        "permissions": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+  "$defs": {
+    "latency": {
+      "type": "object",
+      "required": ["p50", "p95"],
+      "additionalProperties": false,
+      "properties": {
+        "p50": { "type": "number", "minimum": 0 },
+        "p95": { "type": "number", "minimum": 0 },
+        "p99": { "type": "number", "minimum": 0 },
+        "mean": { "type": "number", "minimum": 0 },
+        "count": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

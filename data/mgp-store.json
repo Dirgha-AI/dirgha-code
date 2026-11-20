@@ -1,0 +1,55 @@
+{
+  "records": {
+    "mgp_01": {
+      "record_id": "mgp_01",
+      "task_domain": "browser",
+      "summary": "Verified Generation-Bound Compact Agent-DOM snapshot on Firefox MV3",
+      "entities": [
+        "firefox",
+        "lokahi"
+      ],
+      "verified_by_lokahi": true,
+      "record_blake3": "faecdd101a48541928344be9f6984650bb47034a122abdcd6307638688ba629e"
+    }
+  },
+  "inverted_index": {
+    "agent": [
+      "mgp_01"
+    ],
+    "bound": [
+      "mgp_01"
+    ],
+    "compact": [
+      "mgp_01"
+    ],
+    "dom": [
+      "mgp_01"
+    ],
+    "firefox": [
+      "mgp_01"
+    ],
+    "generation": [
+      "mgp_01"
+    ],
+    "mv3": [
+      "mgp_01"
+    ],
+    "on": [
+      "mgp_01"
+    ],
+    "snapshot": [
+      "mgp_01"
+    ],
+    "verified": [
+      "mgp_01"
+    ]
+  },
+  "entity_graph": {
+    "firefox": [
+      "mgp_01"
+    ],
+    "lokahi": [
+      "mgp_01"
+    ]
+  }
+}

@@ -1,48 +1,54 @@
 {
   "name": "@dirgha/code",
-  "version": "1.43.4",
-  "description": "CLI coding agent for complex agentic workflows and long-horizon development. Local models (llama.cpp / Ollama), BYOK across 17 providers, parallel agents, persistent memory, scanned skills.",
+  "version": "2.0.0",
+  "description": "Dirgha Code v2.0 (2.0.0) — Sovereign Coding CLI & TUI, <1ms Lokahi WASM Capability Firewall, 235+ Provider Router, Physical AI MuJoCo CI, and 29-Tool MCP Server.",
+  "license": "Apache-2.0",
+  "author": "Salik Shah",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Dirgha-AI/dirgha.git"
+  },
+  "homepage": "https://github.com/Dirgha-AI/dirgha",
+  "bugs": {
+    "url": "https://github.com/Dirgha-AI/dirgha/issues"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "dirgha": "./dist/cli/main.js"
+    "dirgha": "./bin/dirgha.mjs",
+    "dirgha-code": "./bin/dirgha.mjs",
+    "dirgha-native-host": "./bin/dirgha.mjs"
   },
   "files": [
+    "bin/dirgha.mjs",
+    "bin/build-native.mjs",
     "dist/",
     "scaffold-templates/",
+    "vendor/",
+    "extensions/firefox-mv3/lokahi_gate.wasm",
+    "extensions/firefox-mv3/manifest.json",
+    "extensions/firefox-mv3/background.js",
+    "extensions/firefox-mv3/content-agent-dom.js",
+    "include/dirgha_kernel.h",
+    "plugins/dsh-plugin-dirgha/",
+    "plugins/robotics-physical-ai/plugin.toml",
+    "plugins/robotics-physical-ai/mujoco_eval_sidecar.py",
+    "plugins/robotics-skills-pack/plugin.toml",
     "README.md",
-    "LICENSE",
-    "CREDITS.md",
     "CHANGELOG.md",
-    "vendor/"
+    "CREDITS.md",
+    "LICENSE",
+    "NOTICE",
+    "THIRD_PARTY_NOTICES.md"
   ],
   "scripts": {
-    "postinstall": "echo '[dirgha] run \"npx dirgha setup\" to complete setup after install'",
-    "postinstall-legacy": "test -d dist && node dist/cli/main.js setup --features --auto 2>/dev/null || true",
     "build": "tsc -p tsconfig.json && node scripts/postbuild.mjs && node scripts/patch-ink-text-input.mjs",
-    "build:watch": "tsc -p tsconfig.json --watch",
-    "clean": "rm -rf ./dist",
-    "test": "vitest run --dir src",
-    "test:cli": "node scripts/qa-app/run-all.mjs",
-    "test:cli:offline": "node scripts/qa-app/run-all.mjs --offline",
-    "test:tui": "bash scripts/qa-app/picker-flow.sh",
-    "test:smoke": "bash scripts/smoke-matrix.sh all",
-    "test:agent-db-smoke": "vitest run --dir src regression-smoke",
+    "build:native": "node ./bin/build-native.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "verify-install": "bash scripts/verify-install.sh",
-    "prepublish-guard": "bash scripts/prepublish-guard.sh",
-    "prepublishOnly": "npm run prepublish-guard && npm run build && npm run verify-install",
-    "lint": "eslint src --max-warnings 0",
-    "lint:fix": "eslint src --fix --max-warnings 0",
-    "license-check": "license-checker --production --excludePackages 'argparse@1.0.10' --failOn 'GPL;AGPL;LGPL'",
-    "gate": "bash scripts/gate.sh",
-    "changelog:update": "node scripts/changelog-bump.mjs"
-  },
-  "dependencies": {
-    "ink": "^7.0.2",
-    "ink-text-input": "^6.0.0",
-    "react": "^19.2.0"
+    "test": "vitest run --dir src && node --test ./bin/dirgha.test.mjs",
+    "doctor": "node ./bin/dirgha.mjs doctor",
+    "prepublishOnly": "npm run build && npm test"
   },
   "optionalDependencies": {
     "@xenova/transformers": "^2.17.2",
@@ -50,6 +56,33 @@
     "chokidar": "^5.0.0",
     "kokoro-js": "^1.2.1",
     "sqlite-vec": "^0.1.9"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "keywords": [
+    "dirgha",
+    "cli",
+    "coding-agent",
+    "llm",
+    "byok",
+    "agent",
+    "mcp",
+    "robotics",
+    "mujoco",
+    "lerobot",
+    "security",
+    "sarif",
+    "sbom",
+    "wasm",
+    "openrouter",
+    "anthropic",
+    "openai"
+  ],
+  "dependencies": {
+    "ink": "^7.0.2",
+    "ink-text-input": "^6.0.0",
+    "react": "^19.2.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "7.6.13",
@@ -66,36 +99,5 @@
     "esbuild": ">=0.25.0",
     "protobufjs": ">=7.5.5",
     "sharp": "^0.35.5"
-  },
-  "engines": {
-    "node": ">=22.0.0"
-  },
-  "keywords": [
-    "cli",
-    "coding-agent",
-    "llm",
-    "byok",
-    "ai",
-    "agent",
-    "tool-calling",
-    "openrouter",
-    "anthropic",
-    "openai",
-    "ollama",
-    "llama.cpp",
-    "local-llm",
-    "offline",
-    "mcp",
-    "terminal"
-  ],
-  "homepage": "https://github.com/Dirgha-AI/dirgha-code",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/Dirgha-AI/dirgha-code.git"
-  },
-  "bugs": {
-    "url": "https://github.com/Dirgha-AI/dirgha-code/issues"
-  },
-  "author": "Dirgha AI Team",
-  "license": "FSL-1.1-MIT"
+  }
 }

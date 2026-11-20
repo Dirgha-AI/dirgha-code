@@ -11,10 +11,24 @@
  */
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { existsSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 
 const MCP_CONFIG_PATH = join(homedir(), '.dirgha', 'mcp.json');
+
+function resolveLocalNativeHostBin(): string | null {
+  try {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const rootDir = resolve(here, '..', '..');
+    const exe = process.platform === 'win32' ? 'dirgha-native-host.exe' : 'dirgha-native-host';
+    const candidate = join(rootDir, 'target', 'release', exe);
+    return existsSync(candidate) ? candidate : null;
+  } catch {
+    return null;
+  }
+}
 
 export interface McpServerEntry {
   type: 'stdio' | 'http';
@@ -31,12 +45,22 @@ export interface McpServerEntry {
 }
 
 export async function loadMcpConfig(): Promise<Record<string, McpServerEntry>> {
+  let entries: Record<string, McpServerEntry> = {};
   try {
     const raw = await readFile(MCP_CONFIG_PATH, 'utf8');
-    return JSON.parse(raw) as Record<string, McpServerEntry>;
+    entries = JSON.parse(raw) as Record<string, McpServerEntry>;
   } catch {
-    return {};
+    entries = {};
   }
+  const nativeBin = resolveLocalNativeHostBin();
+  if (nativeBin && !entries['dirgha-sovereign-kernel']) {
+    entries['dirgha-sovereign-kernel'] = {
+      type: 'stdio',
+      command: nativeBin,
+      args: ['--mcp'],
+    };
+  }
+  return entries;
 }
 
 export async function saveMcpConfig(

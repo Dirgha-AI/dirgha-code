@@ -1,0 +1,19 @@
+[package]
+name = "memory-mgp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Governed Memory Protocol (HKUDS/MGP v0.1.1), LightRAG entity-relation graph recall, Xiryn AES-256-GCM origin-bound OS Vault, and Physical AI repro_hash trace store."
+
+[dependencies]
+aes-gcm = { workspace = true }
+blake3 = { workspace = true }
+dirgha-core = { version = "0.2.0", path = "../dirgha-core" }
+hex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }

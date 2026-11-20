@@ -1,0 +1,312 @@
+{
+  "name": "dirgha-harness",
+  "version": "0.1.0",
+  "description": "Agent-native CI, replay and safety gating for robot policies.",
+  "transports": ["stdio", "http+sse"],
+  "default_permissions": ["read", "sim", "eval"],
+  "tools": [
+    {
+      "name": "dirgha_workspace_get",
+      "description": "Return the resolved workspace: robot, scene, task, policy, simulation, eval and safety configuration.",
+      "safety_class": "S0",
+      "requires_approval": false,
+      "idempotent": true,
+      "timeout_ms": 5000,
+      "inputSchema": {
+        "type": "object",
+        "required": ["workspace_id"],
+        "additionalProperties": false,
+        "properties": {
+          "workspace_id": { "type": "string" }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "required": ["ok", "data"],
+        "properties": {
+          "ok": { "type": "boolean" },
+          "data": { "type": "object" },
+          "error": { "type": ["object", "null"] },
+          "trace_id": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "dirgha_sim_reset",
+      "description": "Reset a simulation session to the initial state, optionally with a new seed.",
+      "safety_class": "S1",
+      "requires_approval": false,
+      "idempotent": false,
+      "timeout_ms": 10000,
+      "inputSchema": {
+        "type": "object",
+        "required": ["session_id"],
+        "additionalProperties": false,
+        "properties": {
+          "session_id": { "type": "string" },
+          "seed": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "required": ["ok", "data"],
+        "properties": {
+          "ok": { "type": "boolean" },
+          "data": { "type": "object" },
+          "error": { "type": ["object", "null"] },
+          "trace_id": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "dirgha_sim_step",
+      "description": "Apply an action to a simulation session for one or more physics steps and return the next state.",
+      "safety_class": "S1",
+      "requires_approval": false,
+      "idempotent": false,
+      "timeout_ms": 30000,
+      "inputSchema": {
+        "type": "object",
+        "required": ["session_id", "action"],
+        "additionalProperties": false,
+        "properties": {
+          "session_id": { "type": "string" },
+          "n_steps": { "type": "integer", "minimum": 1, "default": 1 },
+          "action": {
+            "type": "object",
+            "required": ["type", "values", "names", "timestamp", "frame"],
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["joint_position", "joint_velocity", "joint_effort", "eef_pose", "gripper", "trajectory"]
+              },
+              "values": { "type": "array", "items": { "type": "number" } },
+              "names": { "type": "array", "items": { "type": "string" } },
+              "timestamp": { "type": "number", "minimum": 0 },
+              "frame": { "type": "string" }
+            }
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "required": ["ok", "data"],
+        "properties": {
+          "ok": { "type": "boolean" },
+          "data": { "type": "object" },
+          "error": { "type": ["object", "null"] },
+          "trace_id": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "dirgha_sim_observe",
+      "description": "Return the current observation: joint state, sensor data and image artifact references.",
+      "safety_class": "S0",
+      "requires_approval": false,
+      "idempotent": true,
+      "timeout_ms": 10000,
+      "inputSchema": {
+        "type": "object",
+        "required": ["session_id"],
+        "additionalProperties": false,
+        "properties": {
+          "session_id": { "type": "string" },
+          "include_images": { "type": "boolean", "default": false }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "required": ["ok", "data"],
+        "properties": {
+          "ok": { "type": "boolean" },
+          "data": { "type": "object" },
+          "error": { "type": ["object", "null"] },
+          "trace_id": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "dirgha_policy_load",
+      "description": "Load a policy checkpoint and return its action/observation contract and metadata.",
+      "safety_class": "S1",
+      "requires_approval": false,
+      "idempotent": true,
+      "timeout_ms": 120000,
+      "inputSchema": {
+        "type": "object",
+        "required": ["workspace_id", "policy_id"],
+        "additionalProperties": false,
+        "properties": {
+          "workspace_id": { "type": "string" },
+          "policy_id": { "type": "string" },
+          "device": { "type": "string", "default": "cpu" }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "required": ["ok", "data"],
+        "properties": {
+          "ok": { "type": "boolean" },
+          "data": { "type": "object" },
+          "error": { "type": ["object", "null"] },
+          "trace_id": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "dirgha_policy_infer",
+      "description": "Run one inference call and return an action chunk with timing and model metadata.",
+      "safety_class": "S1",
+      "requires_approval": false,
+      "idempotent": false,
+      "timeout_ms": 60000,
+      "inputSchema": {
+        "type": "object",
+        "required": ["policy_session_id", "observation"],
+        "additionalProperties": false,
+        "properties": {
+          "policy_session_id": { "type": "string" },
+          "observation": { "type": "object" }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "required": ["ok", "data"],
+        "properties": {
+          "ok": { "type": "boolean" },
+          "data": { "type": "object" },
+          "error": { "type": ["object", "null"] },
+          "trace_id": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "dirgha_eval_run",
+      "description": "Run a reproducible evaluation suite. Returns a run id immediately; poll with dirgha_eval_status.",
+      "safety_class": "S1",
+      "requires_approval": false,
+      "idempotent": false,
+      "timeout_ms": 30000,
+      "inputSchema": {
+        "type": "object",
+        "required": ["workspace_id", "suite"],
+        "additionalProperties": false,
+        "properties": {
+          "workspace_id": { "type": "string" },
+          "suite": { "type": "string" },
+          "episodes": { "type": "integer", "minimum": 1 },
+          "seeds": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
+          "baseline_run_id": { "type": "string" },
+          "dry_run": { "type": "boolean", "default": false }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "required": ["ok", "data"],
+        "properties": {
+          "ok": { "type": "boolean" },
+          "data": { "type": "object" },
+          "error": { "type": ["object", "null"] },
+          "trace_id": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "dirgha_trace_get",
+      "description": "Return a summary and event index for a trace. Use include for sections; large media is by reference only.",
+      "safety_class": "S0",
+      "requires_approval": false,
+      "idempotent": true,
+      "timeout_ms": 10000,
+      "inputSchema": {
+        "type": "object",
+        "required": ["trace_id"],
+        "additionalProperties": false,
+        "properties": {
+          "trace_id": { "type": "string" },
+          "include": {
+            "type": "array",
+            "items": { "type": "string", "enum": ["summary", "events", "metrics", "safety", "artifacts", "steps"] },
+            "default": ["summary", "events", "metrics", "safety"]
+          },
+          "cursor": { "type": "string" },
+          "limit": { "type": "integer", "minimum": 1, "maximum": 1000 }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "required": ["ok", "data"],
+        "properties": {
+          "ok": { "type": "boolean" },
+          "data": { "type": "object" },
+          "error": { "type": ["object", "null"] },
+          "trace_id": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "dirgha_replay_create",
+      "description": "Create a shareable browser replay link for a trace. Returns a URL and an immutable trace hash.",
+      "safety_class": "S0",
+      "requires_approval": false,
+      "idempotent": true,
+      "timeout_ms": 10000,
+      "inputSchema": {
+        "type": "object",
+        "required": ["trace_id"],
+        "additionalProperties": false,
+        "properties": {
+          "trace_id": { "type": "string" },
+          "expires_in_s": { "type": "integer", "minimum": 60, "default": 604800 }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "required": ["ok", "data"],
+        "properties": {
+          "ok": { "type": "boolean" },
+          "data": { "type": "object" },
+          "error": { "type": ["object", "null"] },
+          "trace_id": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "dirgha_gate_check",
+      "description": "Evaluate a release gate against an eval run and return pass/fail with evidence. Does not approve hardware.",
+      "safety_class": "S0",
+      "requires_approval": false,
+      "idempotent": true,
+      "timeout_ms": 15000,
+      "inputSchema": {
+        "type": "object",
+        "required": ["workspace_id", "profile"],
+        "additionalProperties": false,
+        "properties": {
+          "workspace_id": { "type": "string" },
+          "profile": { "type": "string" },
+          "run_id": { "type": "string" }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "required": ["ok", "data"],
+        "properties": {
+          "ok": { "type": "boolean" },
+          "data": { "type": "object" },
+          "error": { "type": ["object", "null"] },
+          "trace_id": { "type": "string" }
+        }
+      }
+    }
+  ],
+  "not_exposed_in_v0_1": [
+    "dirgha_hardware_connect",
+    "dirgha_hardware_command",
+    "dirgha_hardware_estop",
+    "dirgha_gate_approve",
+    "dirgha_cloud_upload"
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "dirgha-sovereign-kernel": {
+      "command": "target/release/dirgha-native-host.exe",
+      "args": ["--mcp"],
+      "description": "Dirgha v2 Rust kernel: Lokahi <1ms Gate, Arniko 36-Scanner SARIF, PrivacyFlow Secret Masking, and Generation-Bound Agent-DOM."
+    }
+  }
+}

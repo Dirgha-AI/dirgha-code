@@ -1,0 +1,24 @@
+{
+  "name": "dirgha",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Agent-native CI, replay and safety gating for robot policies.",
+  "bin": {
+    "dirgha": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test dist/tests/*.test.js",
+    "test:python": ".venv\\Scripts\\python.exe -m pytest sidecar/tests -q"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "yaml": "^2.6.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "Dirgha Harness 2.0 — Sovereign Agent & Robotics Cockpit",
+  "short_name": "Dirgha Cockpit",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "description": "Multi-tile 3D MuJoCo, PCB Gerber, WebXR/Touch Teleop, Lokahi Rule 14 Approval & Event Cockpit.",
+  "categories": [
+    "developer",
+    "productivity",
+    "utilities"
+  ]
+}

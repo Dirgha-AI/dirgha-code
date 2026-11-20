@@ -1,0 +1,18 @@
+{
+  "name": "dsh-plugin-dirgha",
+  "version": "0.2.0",
+  "description": "DeepSeek Harness (dsh) Cordis bundle mounting Dirgha v2 Lokahi WASM Firewall, Arniko SARIF Auditor, and PrivacyFlow Secret Masking.",
+  "license": "Apache-2.0",
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "cordis",
+    "lokahi",
+    "arniko"
+  ],
+  "dsh": {
+    "bundle": "./cordis.patch.yml"
+  },
+  "main": "./index.ts"
+}

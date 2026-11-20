@@ -24,7 +24,6 @@ import { keysCommand } from "./keys.js";
 import { loginCommand } from "./login.js";
 import { mcpCommand } from "./mcp.js";
 import { voiceSlashCommand } from "./voice.js";
-import { gpuSlashCommand } from "./gpu.js";
 import { memoryCommand } from "./memory.js";
 import { modeCommand } from "./mode.js";
 import { modelsCommand } from "./models.js";
@@ -70,7 +69,6 @@ export const builtinSlashCommands: SlashCommand[] = [
   fsCommand,
   mcpCommand,
   voiceSlashCommand,
-  gpuSlashCommand,
 ];
 
 // Wire /help so it can introspect the full list without a circular import.

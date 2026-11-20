@@ -95,7 +95,7 @@ dirgha telemetry endpoint https://posthog.your-corp.example/capture
 dirgha telemetry enable
 ```
 
-The default endpoint is `https://t.dirgha.ai/v1/cli` (Posthog Cloud, hosted by Dirgha LLC). Wyoming, US jurisdiction.
+The default endpoint is `https://t.dirgha.ai/v1/cli` (Posthog Cloud, operated by Salik Shah, the maintainer).
 
 ## Retention
 
@@ -104,7 +104,7 @@ The default endpoint is `https://t.dirgha.ai/v1/cli` (Posthog Cloud, hosted by D
 
 ## Compliance
 
-- Dirgha LLC, Wyoming, USA — governing law for our processing
+- Salik Shah, the maintainer, is responsible for this processing
 - We do not knowingly collect data from users under 13 (COPPA)
 - EU users: lawful basis is consent (GDPR Art. 6(1)(a)); withdraw at any time via `dirgha telemetry disable`
 - India users: comply with DPDP 2023 — consent-based processing, deletion on request to `privacy@dirgha.ai`

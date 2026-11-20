@@ -1,0 +1,23 @@
+# Layer 3 Zero-Idle Lazy-Loaded Plugin Manifest (2.0.0 §4.3)
+# Reconciles the Oct 27 Physical AI / Robotics Decision Pack (`final/` & `specs/`)
+# as an on-demand plugin with 0 KB idle memory overhead on 2 GB RAM devices.
+
+[plugin]
+name = "robotics-physical-ai"
+version = "0.2.0"
+triggers = ["cmd:sim", "cmd:eval", "cmd:gate", "cmd:replay", "file:*.mjcf", "file:*.urdf"]
+max_size_kb = 48
+idle_evict_seconds = 60
+lokahi_manifest = "strict"
+
+[schemas]
+ir_schema = "../../final/schemas/dirgha.ir.v0.2.json"
+workspace_schema = "../../final/schemas/workspace.v0.1.json"
+trace_schema = "../../final/schemas/trace.v0.1.json"
+mcp_tools_schema = "../../final/schemas/mcp-tools.v0.1.json"
+
+[safety_mapping]
+# Enforced in <1 ms by `crates/lokahi-gate`
+s0_read_only = ["dirgha_workspace_get", "dirgha_sim_observe", "dirgha_trace_get", "dirgha_replay_create", "dirgha_gate_check"]
+s1_simulation = ["dirgha_sim_reset", "dirgha_sim_step", "dirgha_policy_load", "dirgha_policy_infer", "dirgha_eval_run"]
+s2_hardware_rule14_ahimsa_45s = ["dirgha_hardware_connect", "dirgha_hardware_command", "dirgha_hardware_estop", "dirgha_gate_approve"]

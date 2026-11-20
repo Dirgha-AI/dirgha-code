@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Dirgha Harness 2.0 — MuJoCo 3.17.0 Interactive Kinematic &amp; Telemetry Replay Studio</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 16px; background: #0f172a; color: #f8fafc; }
+  .header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid #334155; padding-bottom: 12px; margin-bottom: 14px; }
+  h2 { margin: 0; font-size: 18px; }
+  .kpi-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+  .kpi { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 10px 14px; font-size: 12.5px; }
+  .kpi strong { display: block; font-size: 16px; font-family: ui-monospace, monospace; color: #38bdf8; }
+  .studio-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); gap: 14px; margin-bottom: 14px; }
+  .panel { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  canvas { width: 100%; height: 240px; background: #090d16; border-radius: 6px; border: 1px solid #334155; display: block; }
+  .controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: #1e293b; border: 1px solid #334155; padding: 10px 12px; border-radius: 8px; margin-bottom: 14px; }
+  button { background: #2563eb; color: #fff; border: none; border-radius: 6px; padding: 6px 12px; cursor: pointer; font-weight: 600; font-size: 12px; }
+  button.ep-btn { background: #334155; }
+  button.ep-btn.active { background: #0ea5e9; color: #090d16; }
+  input[type=range] { flex: 1; min-width: 140px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; background: #1e293b; border-radius: 8px; overflow: hidden; }
+  th, td { padding: 8px 10px; border: 1px solid #334155; text-align: left; font-family: ui-monospace, monospace; }
+  th { background: #0f172a; color: #94a3b8; }
+  .badge { padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 700; }
+  .badge.pass { background: #065f46; color: #6ee7b7; }
+  .badge.fail { background: #7f1d1d; color: #fca5a5; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <h2>Dirgha 2.0 — MuJoCo 3.17.0 Interactive Kinematic &amp; Telemetry Studio (dirgha_2dof_reacher)</h2>
+    <span style="font-family:monospace;font-size:12px;color:#94a3b8;">Lokahi Rule 17 Limit: 4.00 rad/s</span>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi">Robot Model<strong>dirgha_2dof_reacher</strong></div>
+    <div class="kpi">Success Rate<strong>5/5 (100.0%)</strong></div>
+    <div class="kpi">Wilson 95% CI<strong>[0.5655, 1.0]</strong></div>
+    <div class="kpi">Peak Joint Velocity<strong>3.184 rad/s</strong></div>
+  </div>
+
+  <div class="controls">
+    <button type="button" id="play-btn">Pause</button>
+    <label for="frame-slider" style="font-size:12px;font-family:monospace;" id="step-label">Step: 0</label>
+    <input type="range" id="frame-slider" min="0" max="20" value="0" />
+    <div id="ep-buttons" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+  </div>
+
+  <div class="studio-grid">
+    <div class="panel">
+      <div style="font-size:12.5px;font-weight:600;color:#cbd5e1;">2D/3D Kinematic Arm Projection &amp; End-Effector Trail</div>
+      <canvas id="arm-canvas" width="420" height="240"></canvas>
+    </div>
+    <div class="panel">
+      <div style="font-size:12.5px;font-weight:600;color:#cbd5e1;">Joint Velocity Telemetry vs. Lokahi Rule 17 Safety Gate</div>
+      <canvas id="vel-canvas" width="420" height="240"></canvas>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>Episode</th><th>Seed</th><th>Verdict</th><th>Failure Mode</th><th>Peak Joint Vel</th><th>Final EEF Error</th></tr>
+    </thead>
+    <tbody><tr><td>#0</td><td>1000</td><td><span class='badge pass'>PASS</span></td><td>NONE</td><td>2.693 rad/s</td><td>0.0067 m</td></tr><tr><td>#1</td><td>1001</td><td><span class='badge pass'>PASS</span></td><td>NONE</td><td>3.184 rad/s</td><td>0.0090 m</td></tr><tr><td>#2</td><td>1002</td><td><span class='badge pass'>PASS</span></td><td>NONE</td><td>2.739 rad/s</td><td>0.0079 m</td></tr><tr><td>#3</td><td>1003</td><td><span class='badge pass'>PASS</span></td><td>NONE</td><td>2.797 rad/s</td><td>0.0086 m</td></tr><tr><td>#4</td><td>1004</td><td><span class='badge pass'>PASS</span></td><td>NONE</td><td>2.837 rad/s</td><td>0.0096 m</td></tr></tbody>
+  </table>
+
+  <script>
+    const DATA = {"robot_id": "dirgha_2dof_reacher", "mujoco_version": "3.17.0", "safety_limit_rad_s": 4.0, "episodes": [{"episode": 0, "seed": 1000, "succeeded": true, "failure_mode": "NONE", "peak_velocity_rad_s": 2.6927, "final_distance_m": 0.0067, "frames": [{"step": 0, "q1": 0.0139, "q2": 0.0949, "eef_x": 0.748, "eef_y": 0.0431, "vel_mag": 2.0321}, {"step": 10, "q1": -0.0248, "q2": 0.3241, "eef_x": 0.7342, "eef_y": 0.0935, "vel_mag": 1.621}, {"step": 20, "q1": -0.0285, "q2": 0.521, "eef_x": 0.7081, "eef_y": 0.1542, "vel_mag": 1.5203}, {"step": 30, "q1": -0.0178, "q2": 0.6855, "eef_x": 0.6748, "eef_y": 0.2096, "vel_mag": 1.4819}, {"step": 40, "q1": -0.0041, "q2": 0.8214, "eef_x": 0.6395, "eef_y": 0.2536, "vel_mag": 1.2309}, {"step": 50, "q1": 0.0078, "q2": 0.9328, "eef_x": 0.6062, "eef_y": 0.2859, "vel_mag": 1.0057}, {"step": 60, "q1": 0.0161, "q2": 1.0236, "eef_x": 0.5772, "eef_y": 0.3082, "vel_mag": 0.8184}, {"step": 70, "q1": 0.0211, "q2": 1.0975, "eef_x": 0.5529, "eef_y": 0.3232, "vel_mag": 0.6647}, {"step": 80, "q1": 0.0234, "q2": 1.1574, "eef_x": 0.533, "eef_y": 0.3331, "vel_mag": 0.5396}, {"step": 90, "q1": 0.0239, "q2": 1.2061, "eef_x": 0.5169, "eef_y": 0.3394, "vel_mag": 0.4381}, {"step": 100, "q1": 0.0233, "q2": 1.2457, "eef_x": 0.5039, "eef_y": 0.3435, "vel_mag": 0.3559}, {"step": 110, "q1": 0.0222, "q2": 1.2778, "eef_x": 0.4935, "eef_y": 0.3461, "vel_mag": 0.2893}, {"step": 120, "q1": 0.0208, "q2": 1.3039, "eef_x": 0.4852, "eef_y": 0.3478, "vel_mag": 0.2353}, {"step": 130, "q1": 0.0193, "q2": 1.3252, "eef_x": 0.4785, "eef_y": 0.3488, "vel_mag": 0.1915}, {"step": 140, "q1": 0.0179, "q2": 1.3424, "eef_x": 0.473, "eef_y": 0.3495, "vel_mag": 0.1558}, {"step": 150, "q1": 0.0166, "q2": 1.3565, "eef_x": 0.4687, "eef_y": 0.3498, "vel_mag": 0.1269}, {"step": 160, "q1": 0.0155, "q2": 1.368, "eef_x": 0.4651, "eef_y": 0.3501, "vel_mag": 0.1033}, {"step": 170, "q1": 0.0145, "q2": 1.3773, "eef_x": 0.4623, "eef_y": 0.3502, "vel_mag": 0.0842}, {"step": 180, "q1": 0.0136, "q2": 1.3849, "eef_x": 0.46, "eef_y": 0.3503, "vel_mag": 0.0686}, {"step": 190, "q1": 0.0129, "q2": 1.3911, "eef_x": 0.4581, "eef_y": 0.3503, "vel_mag": 0.0559}, {"step": 199, "q1": 0.0123, "q2": 1.3957, "eef_x": 0.4567, "eef_y": 0.3503, "vel_mag": 0.0465}]}, {"episode": 1, "seed": 1001, "succeeded": true, "failure_mode": "NONE", "peak_velocity_rad_s": 3.1837, "final_distance_m": 0.009, "frames": [{"step": 0, "q1": 0.0871, "q2": -0.3764, "eef_x": 0.7337, "eef_y": -0.0654, "vel_mag": 1.9357}, {"step": 10, "q1": 0.029, "q2": -0.0786, "eef_x": 0.7494, "eef_y": -0.0058, "vel_mag": 2.945}, {"step": 20, "q1": 0.0097, "q2": 0.1901, "eef_x": 0.743, "eef_y": 0.0733, "vel_mag": 2.52}, {"step": 30, "q1": 0.0112, "q2": 0.4142, "eef_x": 0.7188, "eef_y": 0.1489, "vel_mag": 2.1428}, {"step": 40, "q1": 0.0202, "q2": 0.5995, "eef_x": 0.6848, "eef_y": 0.2114, "vel_mag": 1.7013}, {"step": 50, "q1": 0.0297, "q2": 0.7517, "eef_x": 0.6483, "eef_y": 0.2584, "vel_mag": 1.3765}, {"step": 60, "q1": 0.0365, "q2": 0.8761, "eef_x": 0.6138, "eef_y": 0.2915, "vel_mag": 1.122}, {"step": 70, "q1": 0.0399, "q2": 0.9774, "eef_x": 0.5836, "eef_y": 0.3137, "vel_mag": 0.9124}, {"step": 80, "q1": 0.0406, "q2": 1.0598, "eef_x": 0.5583, "eef_y": 0.3282, "vel_mag": 0.741}, {"step": 90, "q1": 0.0392, "q2": 1.1266, "eef_x": 0.5376, "eef_y": 0.3374, "vel_mag": 0.6018}, {"step": 100, "q1": 0.0367, "q2": 1.1809, "eef_x": 0.5208, "eef_y": 0.3431, "vel_mag": 0.4889}, {"step": 110, "q1": 0.0336, "q2": 1.225, "eef_x": 0.5073, "eef_y": 0.3465, "vel_mag": 0.3974}, {"step": 120, "q1": 0.0304, "q2": 1.2609, "eef_x": 0.4964, "eef_y": 0.3486, "vel_mag": 0.3232}, {"step": 130, "q1": 0.0274, "q2": 1.2901, "eef_x": 0.4876, "eef_y": 0.3498, "vel_mag": 0.2631}, {"step": 140, "q1": 0.0246, "q2": 1.3139, "eef_x": 0.4805, "eef_y": 0.3504, "vel_mag": 0.2142}, {"step": 150, "q1": 0.0221, "q2": 1.3332, "eef_x": 0.4747, "eef_y": 0.3508, "vel_mag": 0.1744}, {"step": 160, "q1": 0.02, "q2": 1.349, "eef_x": 0.4701, "eef_y": 0.3509, "vel_mag": 0.1421}, {"step": 170, "q1": 0.0182, "q2": 1.3618, "eef_x": 0.4663, "eef_y": 0.3509, "vel_mag": 0.1158}, {"step": 180, "q1": 0.0166, "q2": 1.3723, "eef_x": 0.4633, "eef_y": 0.3509, "vel_mag": 0.0943}, {"step": 190, "q1": 0.0153, "q2": 1.3808, "eef_x": 0.4608, "eef_y": 0.3508, "vel_mag": 0.0769}, {"step": 199, "q1": 0.0143, "q2": 1.3871, "eef_x": 0.4589, "eef_y": 0.3507, "vel_mag": 0.064}]}, {"episode": 2, "seed": 1002, "succeeded": true, "failure_mode": "NONE", "peak_velocity_rad_s": 2.7393, "final_distance_m": 0.0079, "frames": [{"step": 0, "q1": -0.0983, "q2": -0.1031, "eef_x": 0.7409, "eef_y": -0.1097, "vel_mag": 1.907}, {"step": 10, "q1": -0.1337, "q2": 0.1533, "eef_x": 0.7464, "eef_y": -0.0465, "vel_mag": 2.4366}, {"step": 20, "q1": -0.1235, "q2": 0.3792, "eef_x": 0.7356, "eef_y": 0.0393, "vel_mag": 2.0525}, {"step": 30, "q1": -0.0949, "q2": 0.5693, "eef_x": 0.7095, "eef_y": 0.122, "vel_mag": 1.7265}, {"step": 40, "q1": -0.0634, "q2": 0.727, "eef_x": 0.6749, "eef_y": 0.1903, "vel_mag": 1.43}, {"step": 50, "q1": -0.0361, "q2": 0.8566, "eef_x": 0.6384, "eef_y": 0.2416, "vel_mag": 1.1697}, {"step": 60, "q1": -0.0155, "q2": 0.9622, "eef_x": 0.6045, "eef_y": 0.2778, "vel_mag": 0.9516}, {"step": 70, "q1": -0.0013, "q2": 1.048, "eef_x": 0.5751, "eef_y": 0.3025, "vel_mag": 0.7719}, {"step": 80, "q1": 0.0077, "q2": 1.1176, "eef_x": 0.5508, "eef_y": 0.3189, "vel_mag": 0.6255}, {"step": 90, "q1": 0.013, "q2": 1.174, "eef_x": 0.531, "eef_y": 0.3297, "vel_mag": 0.507}, {"step": 100, "q1": 0.0157, "q2": 1.2197, "eef_x": 0.5151, "eef_y": 0.3368, "vel_mag": 0.4112}, {"step": 110, "q1": 0.0169, "q2": 1.2568, "eef_x": 0.5024, "eef_y": 0.3414, "vel_mag": 0.3337}, {"step": 120, "q1": 0.0171, "q2": 1.2869, "eef_x": 0.4922, "eef_y": 0.3444, "vel_mag": 0.2711}, {"step": 130, "q1": 0.0167, "q2": 1.3114, "eef_x": 0.4841, "eef_y": 0.3464, "vel_mag": 0.2204}, {"step": 140, "q1": 0.0161, "q2": 1.3313, "eef_x": 0.4775, "eef_y": 0.3477, "vel_mag": 0.1792}, {"step": 150, "q1": 0.0154, "q2": 1.3474, "eef_x": 0.4722, "eef_y": 0.3486, "vel_mag": 0.1458}, {"step": 160, "q1": 0.0146, "q2": 1.3606, "eef_x": 0.468, "eef_y": 0.3492, "vel_mag": 0.1187}, {"step": 170, "q1": 0.0139, "q2": 1.3713, "eef_x": 0.4645, "eef_y": 0.3495, "vel_mag": 0.0966}, {"step": 180, "q1": 0.0132, "q2": 1.3801, "eef_x": 0.4618, "eef_y": 0.3498, "vel_mag": 0.0787}, {"step": 190, "q1": 0.0126, "q2": 1.3872, "eef_x": 0.4595, "eef_y": 0.3499, "vel_mag": 0.0641}, {"step": 199, "q1": 0.0121, "q2": 1.3924, "eef_x": 0.4579, "eef_y": 0.35, "vel_mag": 0.0533}]}, {"episode": 3, "seed": 1003, "succeeded": true, "failure_mode": "NONE", "peak_velocity_rad_s": 2.7974, "final_distance_m": 0.0086, "frames": [{"step": 0, "q1": -0.2522, "q2": -0.1847, "eef_x": 0.7043, "eef_y": -0.2482, "vel_mag": 1.7129}, {"step": 10, "q1": -0.2764, "q2": 0.0736, "eef_x": 0.7276, "eef_y": -0.1796, "vel_mag": 2.4616}, {"step": 20, "q1": -0.2462, "q2": 0.312, "eef_x": 0.7371, "eef_y": -0.0743, "vel_mag": 1.8284}, {"step": 30, "q1": -0.1947, "q2": 0.5144, "eef_x": 0.7246, "eef_y": 0.0327, "vel_mag": 1.6226}, {"step": 40, "q1": -0.1413, "q2": 0.6828, "eef_x": 0.6959, "eef_y": 0.124, "vel_mag": 1.5152}, {"step": 50, "q1": -0.0953, "q2": 0.8212, "eef_x": 0.6599, "eef_y": 0.1943, "vel_mag": 1.2505}, {"step": 60, "q1": -0.0595, "q2": 0.9341, "eef_x": 0.6238, "eef_y": 0.2447, "vel_mag": 1.0169}, {"step": 70, "q1": -0.0338, "q2": 1.0258, "eef_x": 0.5912, "eef_y": 0.2795, "vel_mag": 0.8238}, {"step": 80, "q1": -0.0162, "q2": 1.1, "eef_x": 0.5637, "eef_y": 0.3028, "vel_mag": 0.6664}, {"step": 90, "q1": -0.0046, "q2": 1.16, "eef_x": 0.5412, "eef_y": 0.3184, "vel_mag": 0.5391}, {"step": 100, "q1": 0.0027, "q2": 1.2085, "eef_x": 0.5231, "eef_y": 0.3287, "vel_mag": 0.4364}, {"step": 110, "q1": 0.0072, "q2": 1.2479, "eef_x": 0.5087, "eef_y": 0.3356, "vel_mag": 0.3536}, {"step": 120, "q1": 0.0098, "q2": 1.2798, "eef_x": 0.4971, "eef_y": 0.3402, "vel_mag": 0.2869}, {"step": 130, "q1": 0.0113, "q2": 1.3056, "eef_x": 0.4879, "eef_y": 0.3433, "vel_mag": 0.2329}, {"step": 140, "q1": 0.012, "q2": 1.3267, "eef_x": 0.4805, "eef_y": 0.3454, "vel_mag": 0.1892}, {"step": 150, "q1": 0.0123, "q2": 1.3437, "eef_x": 0.4746, "eef_y": 0.3469, "vel_mag": 0.1538}, {"step": 160, "q1": 0.0122, "q2": 1.3576, "eef_x": 0.4698, "eef_y": 0.3479, "vel_mag": 0.1251}, {"step": 170, "q1": 0.0121, "q2": 1.3689, "eef_x": 0.466, "eef_y": 0.3485, "vel_mag": 0.1018}, {"step": 180, "q1": 0.0118, "q2": 1.3781, "eef_x": 0.4629, "eef_y": 0.349, "vel_mag": 0.0828}, {"step": 190, "q1": 0.0115, "q2": 1.3856, "eef_x": 0.4604, "eef_y": 0.3493, "vel_mag": 0.0674}, {"step": 199, "q1": 0.0113, "q2": 1.3911, "eef_x": 0.4586, "eef_y": 0.3496, "vel_mag": 0.056}]}, {"episode": 4, "seed": 1004, "succeeded": true, "failure_mode": "NONE", "peak_velocity_rad_s": 2.8369, "final_distance_m": 0.0096, "frames": [{"step": 0, "q1": -0.4012, "q2": -0.2872, "eef_x": 0.6383, "eef_y": -0.3788, "vel_mag": 1.5081}, {"step": 10, "q1": -0.4156, "q2": -0.031, "eef_x": 0.6816, "eef_y": -0.3127, "vel_mag": 2.7763}, {"step": 20, "q1": -0.3687, "q2": 0.2246, "eef_x": 0.7195, "eef_y": -0.1945, "vel_mag": 2.5217}, {"step": 30, "q1": -0.2957, "q2": 0.4422, "eef_x": 0.7289, "eef_y": -0.0655, "vel_mag": 2.1914}, {"step": 40, "q1": -0.2208, "q2": 0.624, "eef_x": 0.7122, "eef_y": 0.0497, "vel_mag": 1.6811}, {"step": 50, "q1": -0.1557, "q2": 0.7739, "eef_x": 0.6804, "eef_y": 0.1408, "vel_mag": 1.3553}, {"step": 60, "q1": -0.1044, "q2": 0.8963, "eef_x": 0.6437, "eef_y": 0.2074, "vel_mag": 1.1022}, {"step": 70, "q1": -0.0666, "q2": 0.9956, "eef_x": 0.6086, "eef_y": 0.2537, "vel_mag": 0.8923}, {"step": 80, "q1": -0.04, "q2": 1.0759, "eef_x": 0.5781, "eef_y": 0.2851, "vel_mag": 0.7208}, {"step": 90, "q1": -0.0219, "q2": 1.1408, "eef_x": 0.5528, "eef_y": 0.3061, "vel_mag": 0.5822}, {"step": 100, "q1": -0.0099, "q2": 1.1932, "eef_x": 0.5322, "eef_y": 0.3201, "vel_mag": 0.4705}, {"step": 110, "q1": -0.002, "q2": 1.2355, "eef_x": 0.5158, "eef_y": 0.3295, "vel_mag": 0.3807}, {"step": 120, "q1": 0.003, "q2": 1.2699, "eef_x": 0.5027, "eef_y": 0.3358, "vel_mag": 0.3084}, {"step": 130, "q1": 0.0063, "q2": 1.2977, "eef_x": 0.4923, "eef_y": 0.3401, "vel_mag": 0.2501}, {"step": 140, "q1": 0.0083, "q2": 1.3202, "eef_x": 0.484, "eef_y": 0.3431, "vel_mag": 0.203}, {"step": 150, "q1": 0.0095, "q2": 1.3385, "eef_x": 0.4773, "eef_y": 0.3451, "vel_mag": 0.1649}, {"step": 160, "q1": 0.0101, "q2": 1.3534, "eef_x": 0.472, "eef_y": 0.3466, "vel_mag": 0.134}, {"step": 170, "q1": 0.0105, "q2": 1.3655, "eef_x": 0.4677, "eef_y": 0.3476, "vel_mag": 0.109}, {"step": 180, "q1": 0.0106, "q2": 1.3754, "eef_x": 0.4643, "eef_y": 0.3483, "vel_mag": 0.0886}, {"step": 190, "q1": 0.0106, "q2": 1.3834, "eef_x": 0.4615, "eef_y": 0.3488, "vel_mag": 0.0721}, {"step": 199, "q1": 0.0106, "q2": 1.3893, "eef_x": 0.4595, "eef_y": 0.3491, "vel_mag": 0.0599}]}]};
+    let currentEp = 0;
+    let currentFrame = 0;
+    let playing = true;
+
+    const armCanvas = document.getElementById('arm-canvas');
+    const armCtx = armCanvas.getContext('2d');
+    const velCanvas = document.getElementById('vel-canvas');
+    const velCtx = velCanvas.getContext('2d');
+    const slider = document.getElementById('frame-slider');
+    const stepLabel = document.getElementById('step-label');
+    const playBtn = document.getElementById('play-btn');
+    const epWrap = document.getElementById('ep-buttons');
+
+    DATA.episodes.forEach((ep, idx) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'ep-btn' + (idx === 0 ? ' active' : '');
+      b.textContent = 'Ep #' + ep.episode;
+      b.onclick = () => {
+        currentEp = idx;
+        currentFrame = 0;
+        document.querySelectorAll('.ep-btn').forEach((el, i) => el.classList.toggle('active', i === idx));
+        slider.max = Math.max(0, DATA.episodes[currentEp].frames.length - 1);
+        draw();
+      };
+      epWrap.appendChild(b);
+    });
+
+    slider.max = Math.max(0, DATA.episodes[0].frames.length - 1);
+    slider.oninput = (e) => {
+      playing = false;
+      playBtn.textContent = 'Play';
+      currentFrame = parseInt(e.target.value, 10) || 0;
+      draw();
+    };
+    playBtn.onclick = () => {
+      playing = !playing;
+      playBtn.textContent = playing ? 'Pause' : 'Play';
+    };
+
+    function draw() {
+      const ep = DATA.episodes[currentEp];
+      const frames = ep.frames;
+      if (!frames.length) return;
+      const f = frames[Math.min(currentFrame, frames.length - 1)];
+      slider.value = currentFrame;
+      stepLabel.textContent = 'Step: ' + f.step + ' | q1=' + f.q1.toFixed(2) + ', q2=' + f.q2.toFixed(2);
+
+      // Draw Kinematic Arm & Trail
+      armCtx.clearRect(0, 0, armCanvas.width, armCanvas.height);
+      const cx = 150, cy = 175, scale = 190;
+      // Target zone (0.45, 0.35)
+      const tx = cx + 0.45 * scale, ty = cy - 0.35 * scale;
+      armCtx.strokeStyle = '#10b981';
+      armCtx.fillStyle = 'rgba(16, 185, 129, 0.2)';
+      armCtx.beginPath();
+      armCtx.arc(tx, ty, 14, 0, Math.PI * 2);
+      armCtx.fill();
+      armCtx.stroke();
+
+      // End-effector trail
+      armCtx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+      armCtx.lineWidth = 2;
+      armCtx.beginPath();
+      frames.slice(0, currentFrame + 1).forEach((fr, i) => {
+        const ex = cx + fr.eef_x * scale;
+        const ey = cy - fr.eef_y * scale;
+        if (i === 0) armCtx.moveTo(ex, ey);
+        else armCtx.lineTo(ex, ey);
+      });
+      armCtx.stroke();
+
+      // Two-link projection
+      const x1 = cx + 0.40 * Math.cos(f.q1) * scale;
+      const y1 = cy - 0.40 * Math.sin(f.q1) * scale;
+      const x2 = cx + f.eef_x * scale;
+      const y2 = cy - f.eef_y * scale;
+
+      armCtx.strokeStyle = '#f8fafc';
+      armCtx.lineWidth = 5;
+      armCtx.beginPath();
+      armCtx.moveTo(cx, cy);
+      armCtx.lineTo(x1, y1);
+      armCtx.lineTo(x2, y2);
+      armCtx.stroke();
+
+      armCtx.fillStyle = '#38bdf8';
+      [[cx, cy], [x1, y1], [x2, y2]].forEach(([px, py]) => {
+        armCtx.beginPath();
+        armCtx.arc(px, py, 5, 0, Math.PI * 2);
+        armCtx.fill();
+      });
+
+      // Draw Velocity Telemetry Curve + Safety Limit
+      velCtx.clearRect(0, 0, velCanvas.width, velCanvas.height);
+      const maxPlot = Math.max(DATA.safety_limit_rad_s * 1.25, ep.peak_velocity_rad_s * 1.1, 4.5);
+      const limY = velCanvas.height - (DATA.safety_limit_rad_s / maxPlot) * (velCanvas.height - 30) - 15;
+      velCtx.strokeStyle = '#ef4444';
+      velCtx.setLineDash([5, 5]);
+      velCtx.beginPath();
+      velCtx.moveTo(0, limY);
+      velCtx.lineTo(velCanvas.width, limY);
+      velCtx.stroke();
+      velCtx.setLineDash([]);
+
+      velCtx.strokeStyle = '#38bdf8';
+      velCtx.lineWidth = 2.5;
+      velCtx.beginPath();
+      frames.forEach((fr, idx) => {
+        const px = 20 + (idx / Math.max(1, frames.length - 1)) * (velCanvas.width - 40);
+        const py = velCanvas.height - ((fr.vel_mag || 0) / maxPlot) * (velCanvas.height - 30) - 15;
+        if (idx === 0) velCtx.moveTo(px, py);
+        else velCtx.lineTo(px, py);
+        if (idx === currentFrame) {
+          velCtx.fillStyle = '#facc15';
+          velCtx.fillRect(px - 3, py - 3, 6, 6);
+        }
+      });
+      velCtx.stroke();
+    }
+
+    setInterval(() => {
+      if (!playing) return;
+      const len = DATA.episodes[currentEp].frames.length;
+      if (len > 0) {
+        currentFrame = (currentFrame + 1) % len;
+        draw();
+      }
+    }, 90);
+    draw();
+  </script>
+</body>
+</html>

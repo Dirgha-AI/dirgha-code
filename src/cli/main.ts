@@ -25,7 +25,6 @@ import {
 import { loadConfig } from "./config.js";
 import { parseFlags } from "./flags.js";
 import { runInteractive } from "./interactive.js";
-import { runInkTUI } from "../tui/ink/index.js";
 import { builtinSlashCommands } from "./slash/index.js";
 import { renderStreamingEvents } from "../tui/renderer.js";
 import { createSessionStore } from "../context/session.js";
@@ -565,6 +564,7 @@ async function main(): Promise<void> {
         .catch(() => undefined);
       // Fire Ink mount immediately with a pending ledger promise.
       // runInkTUI resolves it inline before composing the system prompt.
+      const { runInkTUI } = await import("../tui/ink/index.js");
       const inkPromise = runInkTUI({
         registry,
         providers,

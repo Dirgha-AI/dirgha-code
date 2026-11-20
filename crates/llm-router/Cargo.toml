@@ -1,0 +1,17 @@
+[package]
+name = "llm-router"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "30+ provider cascade router integrating deepseek-recipe-core@0.2 and HKUDS PrivacyFlow local secret handle masking."
+
+[dependencies]
+blake3 = { workspace = true }
+deepseek-recipe-core = { workspace = true }
+dirgha-core = { version = "0.2.0", path = "../dirgha-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }

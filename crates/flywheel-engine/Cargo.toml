@@ -1,0 +1,17 @@
+[package]
+name = "flywheel-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Bounded Self-Improving Flywheel combining HKUDS HELIX (96-port atoms), HKUDS AgentPilot (KL-UCB D1/D2/D3), and Terminal-RSI TB-GAE with Ed25519 lockfiles."
+
+[dependencies]
+blake3 = { workspace = true }
+ed25519-dalek = { workspace = true }
+hex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

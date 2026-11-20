@@ -1,0 +1,26 @@
+[package]
+name = "native-host"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Stdio length-prefixed JSON-RPC 2.0 daemon for Firefox/Chrome MV3 and MCP server (Traycer, OpenCode, DeepSeek Harness)."
+
+[[bin]]
+name = "dirgha-native-host"
+path = "src/main.rs"
+
+[dependencies]
+agent-loop = { version = "0.2.0", path = "../agent-loop" }
+arniko-audit = { version = "0.2.0", path = "../arniko-audit" }
+dirgha-core = { version = "0.2.0", path = "../dirgha-core" }
+dtrack-rs = { version = "0.2.0", path = "../dtrack-rs" }
+flywheel-engine = { version = "0.2.0", path = "../flywheel-engine" }
+llm-router = { version = "0.2.0", path = "../llm-router" }
+lokahi-gate = { version = "0.2.0", path = "../lokahi-gate" }
+memory-mgp = { version = "0.2.0", path = "../memory-mgp" }
+serde = { workspace = true }
+serde_json = { workspace = true }

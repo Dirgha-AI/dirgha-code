@@ -7,7 +7,6 @@ export * from './entitlements.js';
 
 // HTTP helpers + service clients.
 export * from './http.js';
-export * from './bucky-client.js';
 export * from './arniko-client.js';
 export * from './deploy-client.js';
 

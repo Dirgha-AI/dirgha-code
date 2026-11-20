@@ -1,0 +1,18 @@
+[package]
+name = "dirgha-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Core types, Generation-Bound Compact Agent-DOM, Xiryn sliding-window compaction, and capability contracts for Dirgha v2."
+
+[dependencies]
+blake3 = { workspace = true }
+ed25519-dalek = { workspace = true }
+hex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }

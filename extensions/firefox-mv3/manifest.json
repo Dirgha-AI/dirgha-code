@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "Dirgha v2 Sovereign Agentic Runtime & Lokahi Gate",
+  "version": "0.2.0",
+  "description": "Auditable local-first agentic harness for Firefox & Chromium: Generation-Bound Compact Agent-DOM, <1ms Lokahi WASM Gate, and Origin-Verified OS Vault.",
+  "license": "Apache-2.0",
+  "permissions": [
+    "activeTab",
+    "nativeMessaging",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "scripts": ["background.js"],
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content-agent-dom.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "dirgha-v2@dirgha.ai",
+      "strict_min_version": "128.0"
+    }
+  }
+}

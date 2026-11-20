@@ -53,7 +53,6 @@ import { webSubcommand } from './web.js';
 import { stateSubcommand } from './state.js';
 import { historySubcommand } from './history.js';
 import { voiceSubcommand } from './voice.js';
-import { gpuSubcommand } from './gpu.js';
 import { pingSubcommand } from './ping.js';
 import { registerSubcommand } from './register.js';
 import { nodeSubcommand } from './node.js';
@@ -92,7 +91,6 @@ export const subcommands: Subcommand[] = [
   historySubcommand,
   pingSubcommand,
   voiceSubcommand,
-  gpuSubcommand,
   registerSubcommand,
   nodeSubcommand,
 ];

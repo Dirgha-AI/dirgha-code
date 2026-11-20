@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="rgb(15, 23, 42)" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <title>Dirgha Harness 2.0 — Desktop &amp; Mobile Remote Control Cockpit</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
+      color: var(--color-text-primary, #111827);
+      background: var(--color-background-primary, #ffffff);
+      line-height: 1.45;
+      font-size: 13.5px;
+    }
+    .cockpit {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--color-border-primary, #e5e7eb);
+    }
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+      font-family: var(--font-mono, monospace);
+      font-size: 11.5px;
+      color: var(--color-text-secondary, #4b5563);
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: var(--border-radius-sm, 4px);
+      font-size: 11px;
+      font-weight: 600;
+      font-family: var(--font-mono, monospace);
+    }
+    .badge-success { background: var(--color-background-success, #ecfdf5); color: var(--color-text-success, #047857); }
+    .badge-warning { background: var(--color-background-warning, #fffbeb); color: var(--color-text-warning, #b45309); }
+    .badge-danger { background: var(--color-background-danger, #fef2f2); color: var(--color-text-danger, #b91c1c); }
+    .badge-info { background: var(--color-background-info, #eff6ff); color: var(--color-text-info, #1d4ed8); }
+    h1 { margin: 0; font-size: 18px; font-weight: 700; }
+    h2 { margin: 0; font-size: 14px; font-weight: 600; }
+    p { margin: 0; color: var(--color-text-secondary, #374151); font-size: 12.5px; }
+    .tile-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+      gap: 14px;
+    }
+    .tile {
+      background: var(--color-background-secondary, #f9fafb);
+      border: 1px solid var(--color-border-primary, #e5e7eb);
+      border-radius: var(--border-radius-md, 8px);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-width: 0;
+    }
+    .tile-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .tab-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    button {
+      appearance: none;
+      border: 1px solid var(--color-border-primary, #d1d5db);
+      background: var(--color-background-primary, #ffffff);
+      color: var(--color-text-primary, #111827);
+      padding: 5px 10px;
+      border-radius: var(--border-radius-sm, 6px);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button[aria-pressed="true"], button.primary {
+      background: var(--color-background-inverse, #111827);
+      color: var(--color-text-inverse, #ffffff);
+      border-color: var(--color-background-inverse, #111827);
+    }
+    button.approve { background: #047857; color: #ffffff; border-color: #047857; }
+    button.reject { background: #b91c1c; color: #ffffff; border-color: #b91c1c; }
+    canvas {
+      width: 100%;
+      height: 215px;
+      background: #090d16;
+      border-radius: 6px;
+      border: 1px solid var(--color-border-primary, #334155);
+      display: block;
+    }
+    .approval-item {
+      background: var(--color-background-primary, #ffffff);
+      border: 1px solid var(--color-border-primary, #e5e7eb);
+      border-radius: 6px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 12px;
+    }
+    .mono { font-family: var(--font-mono, monospace); font-size: 11px; }
+    .joy-pad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      max-width: 220px;
+    }
+  </style>
+</head>
+<body>
+  <div class="cockpit">
+    <header>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <div class="meta-row">
+          <span class="badge badge-success">LIVE COCKPIT &amp; MOBILE REMOTE</span>
+          <span>28 MCP Tools</span>
+          <span>•</span>
+          <span>Event Bus</span>
+          <span>•</span>
+          <span>Lokahi Rule 14 (45s Ahimsa)</span>
+        </div>
+        <h1>Dirgha Harness 2.0 — Multi-Tile Desktop &amp; Mobile Remote Control Cockpit</h1>
+      </div>
+      <div class="tab-row">
+        <button type="button" id="estop-btn" class="reject">HARDWARE E-STOP (S2 HOLD)</button>
+      </div>
+    </header>
+
+    <div class="tile-grid">
+      <!-- TILE 1: 3D MuJoCo / PCB Gerber / Isometric Anatomy Viewport -->
+      <section class="tile">
+        <div class="tile-head">
+          <h2>1. Multi-Modal Viewport (MuJoCo / PCB / Anatomy)</h2>
+          <div class="tab-row" role="group" aria-label="Viewport mode">
+            <button type="button" class="vp-btn" data-vp="mujoco" aria-pressed="true">MuJoCo 6-DoF</button>
+            <button type="button" class="vp-btn" data-vp="pcb" aria-pressed="false">EasyEDA PCB</button>
+            <button type="button" class="vp-btn" data-vp="anatomy" aria-pressed="false">Actuator Anatomy</button>
+          </div>
+        </div>
+        <canvas id="viewport-canvas" width="420" height="215"></canvas>
+        <div class="mono" id="vp-readout">Mode: MuJoCo 3.17.0 (so101_6dof_arm) | q=[0.12, 0.85, -0.40] | vel=1.84 rad/s (Limit 4.0)</div>
+      </section>
+
+      <!-- TILE 2: WebXR / Mobile Touch Teleop & VLA Confidence -->
+      <section class="tile">
+        <div class="tile-head">
+          <h2>2. WebXR / Touch Teleop &amp; VLA Brain Router</h2>
+          <span class="badge badge-warning" id="teleop-mode-badge">human-assisted TELEOP ACTIVE (π0 conf: 0.42)</span>
+        </div>
+        <p>Step end-effector pose or override autonomous <code>π0</code> / <code>GR00T</code> policy; recovery frames auto-bundle for Hugging Face <code>LeRobot</code> v2.0.</p>
+        <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;">
+          <div class="joy-pad">
+            <div></div>
+            <button type="button" data-dx="0" data-dy="0.04">EEF +Y</button>
+            <div></div>
+            <button type="button" data-dx="-0.04" data-dy="0">EEF -X</button>
+            <button type="button" id="grip-btn" class="primary">Grip</button>
+            <button type="button" data-dx="0.04" data-dy="0">EEF +X</button>
+            <div></div>
+            <button type="button" data-dx="0" data-dy="-0.04">EEF -Y</button>
+            <div></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;flex:1;min-width:140px;">
+            <div class="mono" id="teleop-coords">EEF Target: X=0.45m, Y=0.35m | Gripper: CLOSED</div>
+            <div class="mono" id="lerobot-counter">Recorded LeRobot Recovery Frames: 140 (50 Hz)</div>
+            <button type="button" id="push-lerobot-btn" class="approve">Store Recovery Episode Locally</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- TILE 3: 1-Tap Lokahi Rule 14 Approval Queue -->
+      <section class="tile">
+        <div class="tile-head">
+          <h2>3. Lokahi Rule 14 Approval Queue (Silence = Refusal)</h2>
+          <span class="badge badge-danger" id="timer-badge">Ahimsa Timer: 42s</span>
+        </div>
+        <div class="approval-item" id="app-card-1">
+          <div style="display:flex;justify-content:space-between;gap:6px;">
+            <strong>JLCPCB SMT Order ($51.50 USD — 5x FOC Driver v2)</strong>
+            <span class="badge badge-warning" id="app-status-1">AWAITING SIGNATURE</span>
+          </div>
+          <div class="mono">OriginBoundVault: https://cart.jlcpcb.com | Artifact BLAKE3: b18cded1...91c219d7f</div>
+          <div class="tab-row">
+            <button type="button" class="approve" data-approve="1">1-Tap Approve (Sign Ed25519)</button>
+            <button type="button" class="reject" data-reject="1">Reject (Fail-Closed)</button>
+          </div>
+        </div>
+        <div class="approval-item" id="app-card-2">
+          <div style="display:flex;justify-content:space-between;gap:6px;">
+            <strong>Promote so101_6dof_arm to S2 Physical Serial Bus</strong>
+            <span class="badge badge-warning" id="app-status-2">AWAITING SIGNATURE</span>
+          </div>
+          <div class="mono">repro_hash: b3092738...ab7d9c0f | Wilson CI: [0.5655, 1.0] | Peak Vel: 3.18 rad/s</div>
+          <div class="tab-row">
+            <button type="button" class="approve" data-approve="2">1-Tap Approve (Sign Ed25519)</button>
+            <button type="button" class="reject" data-reject="2">Reject (Fail-Closed)</button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <script>
+    let vpMode = 'mujoco';
+    let eefX = 0.45, eefY = 0.35;
+    let gripClosed = true;
+    let framesCount = 140;
+    let estopActive = false;
+    let timerSec = 42;
+
+    const canvas = document.getElementById('viewport-canvas');
+    const ctx = canvas.getContext('2d');
+    const readout = document.getElementById('vp-readout');
+
+    document.querySelectorAll('.vp-btn').forEach((btn) => {
+      btn.onclick = () => {
+        vpMode = btn.getAttribute('data-vp');
+        document.querySelectorAll('.vp-btn').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+        drawViewport();
+      };
+    });
+
+    document.querySelectorAll('[data-dx]').forEach((btn) => {
+      btn.onclick = () => {
+        if (estopActive) return;
+        eefX = Math.max(0.15, Math.min(0.68, eefX + parseFloat(btn.getAttribute('data-dx'))));
+        eefY = Math.max(0.10, Math.min(0.58, eefY + parseFloat(btn.getAttribute('data-dy'))));
+        framesCount += 5;
+        document.getElementById('teleop-coords').textContent =
+          `EEF Target: X=${eefX.toFixed(2)}m, Y=${eefY.toFixed(2)}m | Gripper: ${gripClosed ? 'CLOSED' : 'OPEN'}`;
+        document.getElementById('lerobot-counter').textContent =
+          `Recorded LeRobot Recovery Frames: ${framesCount} (50 Hz)`;
+        drawViewport();
+      };
+    });
+
+    document.getElementById('grip-btn').onclick = () => {
+      gripClosed = !gripClosed;
+      document.getElementById('teleop-coords').textContent =
+        `EEF Target: X=${eefX.toFixed(2)}m, Y=${eefY.toFixed(2)}m | Gripper: ${gripClosed ? 'CLOSED' : 'OPEN'}`;
+      drawViewport();
+    };
+
+    document.getElementById('estop-btn').onclick = (e) => {
+      estopActive = !estopActive;
+      e.target.textContent = estopActive ? 'RELEASE E-STOP (RESUME)' : 'HARDWARE E-STOP (S2 HOLD)';
+      readout.textContent = estopActive
+        ? 'E-STOP INTERLOCK ENGAGED — ALL ACTUATOR TORQUES ZEROED (LOKAHI S2)'
+        : `Mode: ${vpMode.toUpperCase()} | EEF=(${eefX.toFixed(2)}, ${eefY.toFixed(2)}) | Lokahi Gate: PASS`;
+      drawViewport();
+    };
+
+    document.getElementById('push-lerobot-btn').onclick = () => {
+      document.getElementById('teleop-mode-badge').textContent = 'AUTONOMOUS RESUMED (LeRobot v2 Synced)';
+      document.getElementById('teleop-mode-badge').className = 'badge badge-success';
+    };
+
+    document.querySelectorAll('[data-approve]').forEach((btn) => {
+      btn.onclick = () => {
+        const id = btn.getAttribute('data-approve');
+        const st = document.getElementById('app-status-' + id);
+        st.textContent = 'SIGNED & APPROVED (Ed25519)';
+        st.className = 'badge badge-success';
+      };
+    });
+
+    document.querySelectorAll('[data-reject]').forEach((btn) => {
+      btn.onclick = () => {
+        const id = btn.getAttribute('data-reject');
+        const st = document.getElementById('app-status-' + id);
+        st.textContent = 'REFUSED (FAIL-CLOSED)';
+        st.className = 'badge badge-danger';
+      };
+    });
+
+    function drawViewport() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (vpMode === 'mujoco') {
+        const cx = 120, cy = 175, scale = 190;
+        const tx = cx + eefX * scale, ty = cy - eefY * scale;
+        ctx.strokeStyle = '#1e293b';
+        for (let x = 20; x < canvas.width; x += 30) {
+          ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+        }
+        const mx = (cx + tx) * 0.5 - 22, my = (cy + ty) * 0.5 - 28;
+        ctx.strokeStyle = estopActive ? '#ef4444' : '#f8fafc';
+        ctx.lineWidth = 5;
+        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(mx, my); ctx.lineTo(tx, ty); ctx.stroke();
+        ctx.fillStyle = '#38bdf8';
+        [[cx, cy], [mx, my], [tx, ty]].forEach(([px, py]) => {
+          ctx.beginPath(); ctx.arc(px, py, 5, 0, Math.PI * 2); ctx.fill();
+        });
+        ctx.strokeStyle = '#10b981';
+        ctx.beginPath(); ctx.arc(tx, ty, gripClosed ? 9 : 15, 0, Math.PI * 2); ctx.stroke();
+      } else if (vpMode === 'pcb') {
+        // EasyEDA / KiCad FOC Servo Driver PCB Layout
+        ctx.fillStyle = '#064e3b';
+        ctx.fillRect(35, 20, 350, 175);
+        ctx.strokeStyle = '#10b981';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(35, 20, 350, 175);
+        // Copper traces
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(70, 60); ctx.lineTo(160, 60); ctx.lineTo(185, 95);
+        ctx.moveTo(160, 110); ctx.lineTo(270, 110); ctx.lineTo(310, 80);
+        ctx.stroke();
+        // STM32G431 & DRV8323RS IC footprints
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(110, 75, 52, 52);
+        ctx.fillRect(235, 70, 60, 60);
+        ctx.fillStyle = '#f8fafc';
+        ctx.font = '10px monospace';
+        ctx.fillText('U1: STM32G431', 98, 68);
+        ctx.fillText('U2: DRV8323RS', 228, 62);
+        ctx.fillText('CAN-FD 24V 30A FOC GERBER READY', 110, 175);
+      } else {
+        // 4-Tone Isometric Actuator Anatomy Cutaway
+        const cx = 210, cy = 108;
+        [
+          { r: 74, fill: '#334155', stroke: '#94a3b8', label: 'Stator Housing' },
+          { r: 52, fill: '#475569', stroke: '#cbd5e1', label: '9:1 Planetary Carrier' },
+          { r: 28, fill: '#0284c7', stroke: '#7dd3fc', label: 'Sun Gear & Encoder' }
+        ].forEach((part) => {
+          ctx.fillStyle = part.fill;
+          ctx.strokeStyle = part.stroke;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, part.r * 1.15, part.r * 0.72, -0.2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        });
+        ctx.fillStyle = '#f8fafc';
+        ctx.font = '11px monospace';
+        ctx.fillText('QDD Actuator Cutaway: Peak 19.6 Nm (SF=1.63x PASS)', 56, 198);
+      }
+    }
+
+    setInterval(() => {
+      if (timerSec > 0) {
+        timerSec -= 1;
+        document.getElementById('timer-badge').textContent = `Ahimsa Timer: ${timerSec}s`;
+      }
+    }, 1000);
+    drawViewport();
+  </script>
+</body>
+</html>

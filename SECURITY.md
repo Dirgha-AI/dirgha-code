@@ -1,79 +1,24 @@
-# Security policy
+# Security Policy & Generative AI Transparency Disclosure
 
-Thanks for helping keep Dirgha Code and its users safe.
+## 1. Reporting a Vulnerability
 
-## Reporting a vulnerability
+Please **do not** report security vulnerabilities through public GitHub issues.
+Report vulnerabilities privately to:
+- **Salik Shah:** `security@dirgha.ai`
+- **Sabin Ranjit:** external security contributor
 
-Please **do not** file a public GitHub issue for security problems.
+We acknowledge vulnerability reports within **48 hours** and provide a deterministic remediation patch and CVE/CSAF advisory within **14 days**.
 
-- Preferred: [private vulnerability report](https://github.com/dirghaai/dirgha-code/security/advisories/new) through GitHub's Security Advisories.
-- Alternative: email `security@dirgha.ai` with the word `SECURITY` in the subject.
+## 2. Cryptographic & Runtime Security Invariants
 
-We will acknowledge within **24 hours** (business days) and aim to triage within **72 hours**. We will keep you informed through remediation and credit you in the advisory unless you prefer to remain anonymous.
+1. **Pre-Execution WASM Firewall (`crates/lokahi-gate`):** Every tool call, browser action, and subprocess command is evaluated in `<1 ms` against 15 normative software/web rules plus 3 Physical AI (`S0`/`S1`/`S2`) rules.
+2. **Rule 14 (Ahimsa 45-Second Timeout):** High-privilege (`S2`) actions—including payment checkouts, credential autofill, destructive filesystem operations, and physical robot hardware commands—require a verified human approval within 45 seconds. Silence equals refusal (`DENY_TIMEOUT`).
+3. **Zero-Exposure Credential Handling (`PrivacyFlow` + OS Keychain Vault):** Secrets and PII are replaced locally with `<SECRET_HANDLE_01>` before any cloud LLM request is transmitted. Saved credentials reside in an `AES-256-GCM` SQLite table sealed by the host OS keychain (Windows DPAPI, macOS Keychain, Linux `secret-tool`) and are only autofilled after verifying the active page's exact origin.
+4. **Generation-Bound DOM Integrity:** Browser actions require a matching `(generation, idx)` pair and `BLAKE3` DOM digest; stale DOM references fail closed (`STALE_DOM_GENERATION`).
 
-## Scope
+## 3. Generative AI Policy & Provenance Disclosure (NLnet GenAI Policy v2.0 Compliance)
 
-In scope:
-
-- The `@dirgha/code` CLI and any code in this repository.
-- The `api.dirgha.ai` gateway as used by the CLI (auth, credit handling, routing).
-- Supply-chain issues in direct production dependencies declared in `package.json`.
-
-Out of scope:
-
-- Rate limits or availability of upstream model providers (report directly to the provider).
-- Issues requiring a user to run a modified, forked, or untrusted build.
-- Social-engineering attacks that rely on convincing a user to disclose their own API keys.
-- Denial-of-service via provider rate limits.
-- Vulnerabilities in example code under `docs/` or `examples/` that are explicitly for illustration.
-
-## What counts as a security issue
-
-High priority:
-
-- Remote code execution or sandbox escape in the CLI.
-- Prompt-injection vectors that cause the CLI to exfiltrate secrets, escalate tool permissions, or perform unconfirmed destructive actions.
-- Credential leakage — logging, persistence, telemetry, or transmission of user API keys, session tokens, or file contents to unintended destinations.
-- Auth bypass on the gateway (ability to consume credits without a valid session, or act as another user).
-- Billing bypass (circumvent credit checks, forge webhook events).
-- Supply-chain compromise (malicious version of a dependency we ship or pin).
-
-Lower priority but still reportable:
-
-- Privilege escalation in the permission system.
-- TOCTOU or race conditions in file-lock handling.
-- Insecure defaults in a supported configuration.
-
-## Responsible disclosure
-
-We ask that you:
-
-- Give us reasonable time to remediate before public disclosure (90 days is typical; we will request longer only if the fix genuinely takes longer).
-- Do not access or retain user data beyond what is needed to demonstrate the issue.
-- Do not run destructive tests against production infrastructure — a minimal proof-of-concept is sufficient.
-
-## Hall of fame
-
-Contributors who report valid issues are credited in `THANKS.md` and in the GitHub Security Advisory, unless they opt out.
-
-## v1.18.0 Security Hardening
-
-The following vulnerability classes were identified and fixed during the v1.18.0 audit cycle (May 2026):
-
-| Class                                                | Fix                                                           | File                               |
-| ---------------------------------------------------- | ------------------------------------------------------------- | ---------------------------------- |
-| Shell injection via `shell: true` in hooks           | Replaced with argv-split `spawn(bin, args, { shell: false })` | `src/hooks/config-bridge.ts`       |
-| Path traversal bypass via unvalidated relative paths | Relative paths now resolved against cwd before bounds check   | `src/safety/policy.ts`             |
-| Seatbelt profile injection via `)` metacharacters    | Unsafe characters rejected before escaping                    | `src/safety/sandbox/seatbelt.ts`   |
-| PowerShell command injection in `/paste`             | Base64-encoded script path in `-EncodedCommand`               | `src/cli/slash/paste.ts`           |
-| Null object spread crash via malformed config        | `value !== null` guard added to merge function                | `src/cli/config.ts`                |
-| Model choice silently discarded in wizard            | `cfg.defaultModel` → `cfg.model` key fixed                    | `src/cli/flows/wizard.ts`          |
-| Stdin hang on approval read                          | Error listener + settled flag prevent hang on TTY close       | `src/tui/approval.ts`              |
-| Path traversal in `/memory` commands                 | `assertValidKey()` enforced in `get`, `upsert`, `remove`      | `src/context/memory.ts`            |
-| Path traversal in `/session rename`                  | `basename()` validation on session id before path construction| `src/cli/slash/session.ts`         |
-| Path traversal in `scaffold --name`                  | `basename()` guard rejects names with path separators         | `src/cli/subcommands/scaffold.ts`  |
-| API key leak via overlay focus collision             | `inputFocus=false` when `KeySetOverlay` or `ApprovalPrompt` active | `src/tui/ink/App.tsx`         |
-
-## PGP
-
-If you need to encrypt your report, request a public key at `security@dirgha.ai`.
+In accordance with the **NLnet Foundation Generative AI Policy v2.0 (October 20, 2026)**:
+- All security, capability-sandbox, and supply-chain crates (`crates/lokahi-gate`, `crates/arniko-audit`, `crates/dirgha-core`, `crates/native-host`) and our deterministic `tree-sitter` AST remediation rules are reviewed, tested, and maintained by human engineers.
+- Automated AST fixes synthesized by `crates/arniko-audit` are **100% deterministic symbolic rewrites** and never invoke generative AI models.
+- Any contributor using an AI assistant for read-only code review or inside higher-level experimental plugins must disclose the model and version in the git commit trailer (`Assisted-by:`).

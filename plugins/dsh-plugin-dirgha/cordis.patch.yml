@@ -1,0 +1,11 @@
+# DeepSeek Harness (`dsh`) Cordis Bundle Overlay (2.0.0 §4.3)
+# Mounts `dsh-plugin-dirgha` into `dsh` profiles (`web`, `headless`, `sdk`, `acp`)
+plugins:
+  - id: dirgha-sovereign-governance
+    module: ./index.ts
+    config:
+      nativeHostBin: "../../target/release/dirgha-native-host.exe"
+      lokahiMode: "strict"
+      privacyFlowMasking: true
+      xirynSlidingWindowMaxImages: 2
+      xirynSlidingWindowMaxTools: 6

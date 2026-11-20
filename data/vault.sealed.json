@@ -1,0 +1,15 @@
+{
+  "entries": {
+    "vault_visa_01": {
+      "hint": {
+        "item_id": "vault_visa_01",
+        "kind": "payment_card",
+        "label": "Corporate Visa",
+        "masked_hint": "Visa ···· 4242",
+        "bound_origin": "https://checkout.stripe.com"
+      },
+      "nonce_hex": "0539bc02d6590b609d25bfc1",
+      "ciphertext_hex": "af1ad7c37d4eb0ea1f8b334a1494953d319ca3cb41c88ea3f587232826874764c8b368"
+    }
+  }
+}

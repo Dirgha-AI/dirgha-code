@@ -13,7 +13,6 @@ export type Feature =
   | 'deploy'
   | 'codeRegister'
   | 'privateSkills'
-  | 'teamsBucky'
   | 'customSandbox'
   | 'fleet'
   | 'tripleshot';
@@ -23,7 +22,6 @@ export interface Entitlements {
   features: Record<Feature, boolean>;
   limits: {
     dailyDeploys: number;
-    monthlyBuckyHours: number;
     maxSubagents: number;
   };
 }

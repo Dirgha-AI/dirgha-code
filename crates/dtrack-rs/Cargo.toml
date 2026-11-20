@@ -1,0 +1,18 @@
+[package]
+name = "dtrack-rs"
+version.workspace = true
+edition.workspace = true
+license = "Apache-2.0"
+repository.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Inspired by DTrackAuditor: CycloneDX 1.6 & SPDX 3.0 SBOM engine, OWASP Dependency-Track /api/v1/bom client, and EU CRA / BSI TR-03183 CSAF 2.0 VEX attestation generator."
+
+[dependencies]
+arniko-audit = { version = "0.2.0", path = "../arniko-audit" }
+blake3 = { workspace = true }
+ed25519-dalek = { workspace = true }
+hex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

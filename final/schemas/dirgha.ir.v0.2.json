@@ -1,0 +1,817 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dirgha.dev/schemas/ir/v0.2.json",
+  "title": "Dirgha IR",
+  "description": "Intermediate representation for a reproducible robot-policy evaluation workspace.",
+  "type": "object",
+  "required": ["version", "metadata", "robot", "scene", "task", "policy", "simulation", "eval", "safety"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": "0.2" },
+    "metadata": { "$ref": "#/$defs/metadata" },
+    "robot": { "$ref": "#/$defs/robot" },
+    "scene": { "$ref": "#/$defs/scene" },
+    "task": { "$ref": "#/$defs/task" },
+    "policy": { "$ref": "#/$defs/policy" },
+    "simulation": { "$ref": "#/$defs/simulation" },
+    "eval": { "$ref": "#/$defs/eval" },
+    "safety": { "$ref": "#/$defs/safety" },
+    "agent": { "$ref": "#/$defs/agent" },
+    "data": { "$ref": "#/$defs/data" },
+    "extensions": { "type": "object", "additionalProperties": true }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{1,63}$"
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+([+-][0-9A-Za-z.-]+)?$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "uri": {
+      "type": "string",
+      "minLength": 1
+    },
+    "vec3": {
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "quaternion": {
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 4,
+      "maxItems": 4,
+      "description": "Quaternion in [x, y, z, w] order."
+    },
+    "pose": {
+      "type": "object",
+      "required": ["position", "orientation"],
+      "additionalProperties": false,
+      "properties": {
+        "position": { "$ref": "#/$defs/vec3" },
+        "orientation": { "$ref": "#/$defs/quaternion" },
+        "frame": { "type": "string", "default": "world" }
+      }
+    },
+    "asset": {
+      "type": "object",
+      "required": ["path", "sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "$ref": "#/$defs/uri" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "media_type": { "type": "string" },
+        "license": { "type": "string" },
+        "provenance": { "type": "string" }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["id", "name", "version", "created_at"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "version": { "$ref": "#/$defs/semver" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "authors": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "license": { "type": "string" },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "homepage": { "type": "string", "format": "uri" },
+        "source": { "type": "string" }
+      }
+    },
+    "joint": {
+      "type": "object",
+      "required": ["name", "type", "parent", "child"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "type": {
+          "type": "string",
+          "enum": ["revolute", "continuous", "prismatic", "fixed", "floating", "planar"]
+        },
+        "parent": { "type": "string" },
+        "child": { "type": "string" },
+        "axis": { "$ref": "#/$defs/vec3" },
+        "origin": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "xyz": { "$ref": "#/$defs/vec3" },
+            "rpy": { "$ref": "#/$defs/vec3" }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "lower": { "type": "number" },
+            "upper": { "type": "number" },
+            "velocity": { "type": "number", "minimum": 0 },
+            "effort": { "type": "number", "minimum": 0 }
+          }
+        },
+        "calibration": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "offset": { "type": "number", "default": 0 },
+            "direction": { "type": "integer", "enum": [-1, 1], "default": 1 }
+          }
+        }
+      }
+    },
+    "actuator": {
+      "type": "object",
+      "required": ["name", "joint", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "joint": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": ["position", "velocity", "effort", "torque", "motor", "general"]
+        },
+        "gear": { "type": "number", "default": 1 },
+        "ctrl_range": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "force_range": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "dynamics": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "damping": { "type": "number", "minimum": 0 },
+            "armature": { "type": "number", "minimum": 0 },
+            "frictionloss": { "type": "number", "minimum": 0 }
+          }
+        }
+      }
+    },
+    "sensor": {
+      "type": "object",
+      "required": ["name", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": ["camera", "depth", "lidar", "force_torque", "imu", "tactile", "joint_state", "contact", "microphone", "custom"]
+        },
+        "frame": { "type": "string" },
+        "rate_hz": { "type": "number", "minimum": 0 },
+        "resolution": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 1 },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "noise": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": { "type": "string", "enum": ["none", "gaussian", "uniform"] },
+            "std": { "type": "number", "minimum": 0 },
+            "mean": { "type": "number" }
+          }
+        },
+        "topic": { "type": "string" }
+      }
+    },
+    "robot": {
+      "type": "object",
+      "required": ["id", "name", "assets", "base_frame", "joints", "actuators"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "assets": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/asset" },
+          "minItems": 1
+        },
+        "base_frame": { "type": "string", "default": "base_link" },
+        "joints": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/joint" },
+          "minItems": 1
+        },
+        "actuators": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/actuator" },
+          "minItems": 1
+        },
+        "sensors": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/sensor" },
+          "default": []
+        },
+        "end_effectors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "frame"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string" },
+              "frame": { "type": "string" },
+              "type": { "type": "string", "enum": ["gripper", "hand", "tool", "none"] },
+              "dof": { "type": "integer", "minimum": 0 }
+            }
+          },
+          "default": []
+        },
+        "joint_groups": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "default": {}
+        }
+      }
+    },
+    "object": {
+      "type": "object",
+      "required": ["name", "geometry", "pose"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "geometry": {
+          "type": "string",
+          "enum": ["box", "sphere", "cylinder", "capsule", "mesh", "plane", "heightfield"]
+        },
+        "size": { "$ref": "#/$defs/vec3" },
+        "pose": { "$ref": "#/$defs/pose" },
+        "mass": { "type": "number", "minimum": 0 },
+        "friction": { "type": "number", "minimum": 0 },
+        "restitution": { "type": "number", "minimum": 0, "maximum": 1 },
+        "mesh": { "$ref": "#/$defs/asset" },
+        "material": { "type": "string" },
+        "semantic_class": { "type": "string" },
+        "movable": { "type": "boolean", "default": true }
+      }
+    },
+    "camera": {
+      "type": "object",
+      "required": ["name", "position", "target"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "frame": { "type": "string", "default": "world" },
+        "position": { "$ref": "#/$defs/vec3" },
+        "target": { "$ref": "#/$defs/vec3" },
+        "up": { "$ref": "#/$defs/vec3" },
+        "fov": { "type": "number", "minimum": 1, "maximum": 179 },
+        "near": { "type": "number", "minimum": 0 },
+        "far": { "type": "number", "minimum": 0 },
+        "resolution": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 1 },
+          "minItems": 2,
+          "maxItems": 2
+        }
+      }
+    },
+    "light": {
+      "type": "object",
+      "required": ["name", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["directional", "point", "spot", "ambient"] },
+        "position": { "$ref": "#/$defs/vec3" },
+        "direction": { "$ref": "#/$defs/vec3" },
+        "color": { "$ref": "#/$defs/vec3" },
+        "intensity": { "type": "number", "minimum": 0 },
+        "range": { "type": "number", "minimum": 0 }
+      }
+    },
+    "physics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "engine": { "type": "string", "enum": ["mujoco", "isaac", "gazebo", "genesis", "newton", "custom"] },
+        "timestep": { "type": "number", "exclusiveMinimum": 0, "maximum": 0.1, "default": 0.002 },
+        "substeps": { "type": "integer", "minimum": 1, "default": 1 },
+        "solver": { "type": "string", "enum": ["newton", "cg", "newton_mgs", "pgs", "auto"] },
+        "iterations": { "type": "integer", "minimum": 1 },
+        "gravity": { "$ref": "#/$defs/vec3" },
+        "friction": { "type": "number", "minimum": 0 },
+        "contact": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "margin": { "type": "number", "minimum": 0 },
+            "max_contacts": { "type": "integer", "minimum": 1 }
+          }
+        }
+      }
+    },
+    "randomization": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "default": false },
+        "seed": { "type": "integer", "minimum": 0 },
+        "ranges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["target", "property", "min", "max"],
+            "additionalProperties": false,
+            "properties": {
+              "target": { "type": "string" },
+              "property": { "type": "string" },
+              "min": { "type": "number" },
+              "max": { "type": "number" },
+              "distribution": { "type": "string", "enum": ["uniform", "normal", "loguniform"] }
+            }
+          },
+          "default": []
+        }
+      }
+    },
+    "scene": {
+      "type": "object",
+      "required": ["id", "name", "assets", "objects"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "assets": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/asset" },
+          "default": []
+        },
+        "objects": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/object" },
+          "default": []
+        },
+        "cameras": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/camera" },
+          "default": []
+        },
+        "lights": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/light" },
+          "default": []
+        },
+        "physics": { "$ref": "#/$defs/physics" },
+        "randomization": { "$ref": "#/$defs/randomization" }
+      }
+    },
+    "success_criterion": {
+      "type": "object",
+      "required": ["name", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": ["predicate", "distance", "contact", "region", "grasp", "place", "trajectory", "custom"]
+        },
+        "expression": { "type": "string" },
+        "object": { "type": "string" },
+        "target": { "type": "string" },
+        "tolerance": { "type": "number", "minimum": 0 },
+        "window_s": { "type": "number", "minimum": 0 },
+        "weight": { "type": "number", "minimum": 0, "maximum": 1, "default": 1 }
+      }
+    },
+    "subtask": {
+      "type": "object",
+      "required": ["name", "weight"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "weight": { "type": "number", "minimum": 0, "maximum": 1 },
+        "criterion": { "$ref": "#/$defs/success_criterion" }
+      }
+    },
+    "task": {
+      "type": "object",
+      "required": ["id", "name", "type", "success_criteria"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": ["manipulation", "navigation", "inspection", "assembly", "teleop", "locomotion", "custom"]
+        },
+        "description": { "type": "string" },
+        "language": { "type": "string" },
+        "horizon_s": { "type": "number", "minimum": 0 },
+        "objects": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "success_criteria": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/success_criterion" },
+          "minItems": 1
+        },
+        "subtasks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/subtask" },
+          "default": []
+        },
+        "termination": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "max_steps": { "type": "integer", "minimum": 1 },
+            "max_time_s": { "type": "number", "minimum": 0 },
+            "conditions": {
+              "type": "array",
+              "items": { "type": "string" },
+              "default": []
+            }
+          }
+        },
+        "reward": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": { "type": "string", "enum": ["sparse", "dense", "custom", "none"] },
+            "expression": { "type": "string" },
+            "weights": {
+              "type": "object",
+              "additionalProperties": { "type": "number" }
+            }
+          }
+        }
+      }
+    },
+    "action_space": {
+      "type": "object",
+      "required": ["type", "dim", "names", "units", "frame", "rate_hz"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["joint_position", "joint_velocity", "joint_effort", "eef_pose", "gripper", "trajectory", "discrete"]
+        },
+        "dim": { "type": "integer", "minimum": 1 },
+        "names": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "units": { "type": "string", "enum": ["rad", "rad/s", "Nm", "m", "m/s", "normalized", "mixed"] },
+        "frame": { "type": "string" },
+        "rate_hz": { "type": "number", "exclusiveMinimum": 0 },
+        "normalize": { "type": "boolean", "default": false },
+        "chunk_size": { "type": "integer", "minimum": 1 },
+        "chunk_dt": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "observation_space": {
+      "type": "object",
+      "required": ["modalities"],
+      "additionalProperties": false,
+      "properties": {
+        "modalities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["rgb", "depth", "rgbd", "joint_state", "language", "proprioception", "tactile", "force_torque", "imu"]
+          },
+          "minItems": 1
+        },
+        "images": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "width", "height", "format"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string" },
+              "width": { "type": "integer", "minimum": 1 },
+              "height": { "type": "integer", "minimum": 1 },
+              "format": { "type": "string", "enum": ["jpeg", "png", "raw", "depth"] },
+              "frame": { "type": "string" }
+            }
+          },
+          "default": []
+        },
+        "proprioception": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "joints": { "type": "boolean", "default": true },
+            "velocities": { "type": "boolean", "default": true },
+            "efforts": { "type": "boolean", "default": false }
+          }
+        },
+        "language": { "type": "boolean", "default": false }
+      }
+    },
+    "inference": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "device": { "type": "string", "default": "cpu" },
+        "batch_size": { "type": "integer", "minimum": 1, "default": 1 },
+        "chunk_size": { "type": "integer", "minimum": 1 },
+        "temperature": { "type": "number", "minimum": 0, "default": 0 },
+        "top_k": { "type": "integer", "minimum": 1 },
+        "deterministic": { "type": "boolean", "default": true },
+        "timeout_ms": { "type": "integer", "minimum": 1, "default": 30000 }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "required": ["id", "name", "adapter", "action_space", "observation_space", "inference"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string" },
+        "adapter": {
+          "type": "string",
+          "enum": ["lerobot", "openpi", "gr00t", "http", "python", "custom"]
+        },
+        "model": { "type": "string" },
+        "checkpoint": { "type": "string" },
+        "checkpoint_hash": { "$ref": "#/$defs/sha256" },
+        "action_space": { "$ref": "#/$defs/action_space" },
+        "observation_space": { "$ref": "#/$defs/observation_space" },
+        "inference": { "$ref": "#/$defs/inference" },
+        "license": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string" },
+            "commercial_use": { "type": "boolean" },
+            "url": { "type": "string", "format": "uri" }
+          }
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "simulation": {
+      "type": "object",
+      "required": ["backend", "timestep", "headless"],
+      "additionalProperties": false,
+      "properties": {
+        "backend": {
+          "type": "string",
+          "enum": ["mujoco", "mujoco-wasm", "isaac-lab", "isaac-sim", "gazebo", "genesis", "omnisim", "custom"]
+        },
+        "timestep": { "type": "number", "exclusiveMinimum": 0, "maximum": 0.1, "default": 0.002 },
+        "substeps": { "type": "integer", "minimum": 1, "default": 1 },
+        "headless": { "type": "boolean", "default": true },
+        "realtime": { "type": "boolean", "default": false },
+        "seed": { "type": "integer", "minimum": 0, "default": 0 },
+        "physics": { "$ref": "#/$defs/physics" },
+        "rendering": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "fps": { "type": "integer", "minimum": 1, "default": 30 },
+            "resolution": {
+              "type": "array",
+              "items": { "type": "integer", "minimum": 1 },
+              "minItems": 2,
+              "maxItems": 2,
+              "default": [1280, 720]
+            },
+            "cameras": {
+              "type": "array",
+              "items": { "type": "string" },
+              "default": []
+            }
+          }
+        }
+      }
+    },
+    "metric": {
+      "type": "object",
+      "required": ["name", "type", "aggregation"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": ["success", "partial_progress", "safety_violations", "latency", "cost", "episode_length", "custom"]
+        },
+        "aggregation": {
+          "type": "string",
+          "enum": ["mean", "median", "p50", "p95", "p99", "sum", "rate", "wilson"]
+        },
+        "threshold": { "type": "number" },
+        "direction": { "type": "string", "enum": ["higher_is_better", "lower_is_better"] }
+      }
+    },
+    "baseline": {
+      "type": "object",
+      "required": ["name", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["random", "scripted", "previous", "reference", "human", "run"] },
+        "run_id": { "type": "string" },
+        "policy_id": { "type": "string" }
+      }
+    },
+    "eval": {
+      "type": "object",
+      "required": ["suite", "episodes", "seeds", "metrics"],
+      "additionalProperties": false,
+      "properties": {
+        "suite": { "type": "string" },
+        "episodes": { "type": "integer", "minimum": 1, "default": 20 },
+        "seeds": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0 },
+          "minItems": 1
+        },
+        "metrics": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/metric" },
+          "minItems": 1
+        },
+        "success_threshold": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.8 },
+        "max_safety_violations": { "type": "integer", "minimum": 0, "default": 0 },
+        "baselines": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/baseline" },
+          "default": []
+        },
+        "cost_budget_usd": { "type": "number", "minimum": 0 },
+        "time_budget_s": { "type": "number", "minimum": 0 },
+        "output": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "formats": {
+              "type": "array",
+              "items": { "type": "string", "enum": ["json", "markdown", "html", "mcap", "parquet"] },
+              "default": ["json", "markdown"]
+            },
+            "artifact_dir": { "type": "string", "default": "artifacts" }
+          }
+        }
+      }
+    },
+    "safety": {
+      "type": "object",
+      "required": ["profile"],
+      "additionalProperties": false,
+      "properties": {
+        "profile": { "type": "string", "default": "default" },
+        "workspace_limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "min": { "$ref": "#/$defs/vec3" },
+            "max": { "$ref": "#/$defs/vec3" },
+            "frame": { "type": "string", "default": "world" }
+          }
+        },
+        "joint_limits": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["joint", "min", "max"],
+            "additionalProperties": false,
+            "properties": {
+              "joint": { "type": "string" },
+              "min": { "type": "number" },
+              "max": { "type": "number" },
+              "velocity": { "type": "number", "minimum": 0 },
+              "effort": { "type": "number", "minimum": 0 }
+            }
+          },
+          "default": []
+        },
+        "velocity_limits": {
+          "type": "object",
+          "additionalProperties": { "type": "number", "minimum": 0 }
+        },
+        "force_limits": {
+          "type": "object",
+          "additionalProperties": { "type": "number", "minimum": 0 }
+        },
+        "max_episode_steps": { "type": "integer", "minimum": 1 },
+        "approvals": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "hardware_required": { "type": "boolean", "default": true },
+            "approvers": {
+              "type": "array",
+              "items": { "type": "string" },
+              "default": []
+            },
+            "token_ttl_s": { "type": "integer", "minimum": 1, "default": 300 },
+            "bind_to_action_hash": { "type": "boolean", "default": true }
+          }
+        },
+        "e_stop": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "hardware": { "type": "boolean", "default": true },
+            "software": { "type": "boolean", "default": true },
+            "watchdog_ms": { "type": "integer", "minimum": 10, "default": 500 }
+          }
+        },
+        "standards": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "disclaimer": { "type": "string" }
+      }
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "default": false },
+        "tools": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "permissions": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["read", "sim", "eval", "hardware:propose", "hardware:execute", "admin"] },
+          "default": ["read", "sim", "eval"]
+        },
+        "approval_required_for_hardware": { "type": "boolean", "default": true },
+        "trace_level": { "type": "string", "enum": ["summary", "events", "full"], "default": "events" },
+        "max_tool_calls_per_minute": { "type": "integer", "minimum": 1, "default": 60 }
+      }
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "datasets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "uri"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string" },
+              "uri": { "$ref": "#/$defs/uri" },
+              "license": { "type": "string" },
+              "hash": { "$ref": "#/$defs/sha256" },
+              "privacy": { "type": "string", "enum": ["public", "internal", "confidential", "restricted"] }
+            }
+          },
+          "default": []
+        },
+        "retention_days": { "type": "integer", "minimum": 1 },
+        "redaction": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "faces": { "type": "boolean", "default": false },
+            "screens": { "type": "boolean", "default": false },
+            "text": { "type": "boolean", "default": false }
+          }
+        }
+      }
+    }
+  }
+}

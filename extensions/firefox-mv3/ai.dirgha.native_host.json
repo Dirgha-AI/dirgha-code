@@ -1,0 +1,9 @@
+{
+  "name": "ai.dirgha.native_host",
+  "description": "Dirgha v2 Sovereign Rust Micro-Kernel Native Messaging Host",
+  "path": "target/release/dirgha-native-host.exe",
+  "type": "stdio",
+  "allowed_extensions": [
+    "dirgha-v2@dirgha.ai"
+  ]
+}

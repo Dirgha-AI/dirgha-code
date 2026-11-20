@@ -1,0 +1,36 @@
+# Layer 3 Assembled Robotics & Hardware Engineering Skills Pack
+# Bundles all 7 specialized Physical AI, mechanical verification, isometric anatomy,
+# and teleop/autonomy audit skills into Dirgha Harness 2.0.
+
+[plugin]
+name = "robotics-skills-pack"
+version = "0.2.0"
+triggers = [
+  "skill:hardware-design-review",
+  "skill:anatomy",
+  "skill:anatomy-reveal",
+  "skill:teleop-verifier",
+  "skill:disclosure-scorecard",
+  "skill:claim-register",
+  "skill:robotics-visual"
+]
+max_size_kb = 64
+idle_evict_seconds = 60
+lokahi_manifest = "strict"
+
+[skills]
+assembled = [
+  "hardware-design-review",
+  "anatomy",
+  "anatomy-reveal",
+  "teleop-verifier",
+  "disclosure-scorecard",
+  "claim-register",
+  "robotics-visual"
+]
+
+[workstation_tools]
+physics_engine = "mujoco-3.17-osmesa-cpu"
+cad_kernel = "cadquery-step-iso10303"
+mesh_rigger = "blender-headless-bpy"
+pcb_eda = "kicad-cli-easyeda-gerber"

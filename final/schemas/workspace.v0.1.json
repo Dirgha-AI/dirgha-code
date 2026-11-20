@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dirgha.dev/schemas/workspace/v0.1.json",
+  "title": "Dirgha Workspace",
+  "description": "The top-level dirgha.yaml configuration for a robot-policy evaluation workspace.",
+  "type": "object",
+  "required": ["version", "workspace", "robot", "scene", "task", "policy", "simulation", "eval", "safety"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": "0.1" },
+    "workspace": {
+      "type": "object",
+      "required": ["id", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{1,63}$" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "tags": { "type": "array", "items": { "type": "string" }, "default": [] }
+      }
+    },
+    "robot": { "$ref": "#/$defs/ref" },
+    "scene": { "$ref": "#/$defs/ref" },
+    "task": { "$ref": "#/$defs/ref" },
+    "policy": { "$ref": "#/$defs/ref" },
+    "simulation": {
+      "type": "object",
+      "required": ["backend"],
+      "additionalProperties": false,
+      "properties": {
+        "backend": {
+          "type": "string",
+          "enum": ["mujoco", "mujoco-wasm", "isaac-lab", "isaac-sim", "gazebo", "genesis", "omnisim", "custom"]
+        },
+        "headless": { "type": "boolean", "default": true },
+        "seed": { "type": "integer", "minimum": 0, "default": 0 },
+        "timestep": { "type": "number", "exclusiveMinimum": 0, "maximum": 0.1, "default": 0.002 },
+        "substeps": { "type": "integer", "minimum": 1, "default": 1 },
+        "realtime": { "type": "boolean", "default": false }
+      }
+    },
+    "eval": {
+      "type": "object",
+      "required": ["suite"],
+      "additionalProperties": false,
+      "properties": {
+        "suite": { "type": "string" },
+        "episodes": { "type": "integer", "minimum": 1, "default": 20 },
+        "seeds": { "type": "array", "items": { "type": "integer", "minimum": 0 }, "default": [0] },
+        "success_threshold": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.8 },
+        "max_safety_violations": { "type": "integer", "minimum": 0, "default": 0 },
+        "baseline_run_id": { "type": "string" },
+        "output_dir": { "type": "string", "default": "artifacts" },
+        "formats": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["json", "markdown", "html", "mcap", "parquet"] },
+          "default": ["json", "markdown"]
+        }
+      }
+    },
+    "safety": {
+      "type": "object",
+      "required": ["profile"],
+      "additionalProperties": false,
+      "properties": {
+        "profile": { "type": "string", "default": "default" },
+        "hardware_approval_required": { "type": "boolean", "default": true },
+        "max_episode_steps": { "type": "integer", "minimum": 1, "default": 1000 },
+        "watchdog_ms": { "type": "integer", "minimum": 10, "default": 500 },
+        "disclaimer": { "type": "string" }
+      }
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "permissions": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["read", "sim", "eval", "hardware:propose", "hardware:execute", "admin"] },
+          "default": ["read", "sim", "eval"]
+        },
+        "max_tool_calls_per_minute": { "type": "integer", "minimum": 1, "default": 60 }
+      }
+    },
+    "adapters": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sim": { "type": "string" },
+        "policy": { "type": "string" },
+        "hardware": { "type": "string" },
+        "trace": { "type": "string", "default": "native" }
+      }
+    },
+    "cloud": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "default": false },
+        "endpoint": { "type": "string", "format": "uri" },
+        "project_id": { "type": "string" },
+        "upload_artifacts": { "type": "boolean", "default": false }
+      }
+    }
+  },
+  "$defs": {
+    "ref": {
+      "type": "object",
+      "required": ["path"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": "string" },
+        "id": { "type": "string" },
+        "hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    }
+  }
+}
