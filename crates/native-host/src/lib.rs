@@ -136,7 +136,7 @@ impl NativeHostDaemon {
             "tools": [
                 {
                     "name": "lokahi_verify_action",
-                    "description": "Evaluate a proposed tool call, shell command, browser click, or robot S0/S1/S2 action against the 18 Lokahi formal rules (<1 ms) and append to the BLAKE3 audit ledger.",
+                    "description": "Evaluate a proposed tool call, shell command, browser click, or robot S0/S1/S2 action against the gate rules (shell, file, secret and network checks, robot joint limits, and the S2 approval check) and append the decision to the signed audit ledger. S2 actions need approval_signature_hex from a key in DIRGHA_APPROVER_PUBLIC_KEYS.",
                     "inputSchema": {
                         "type": "object",
                         "required": ["tool_name", "payload", "safety_class", "human_signature_verified", "approval_wait_ms"],
@@ -144,7 +144,7 @@ impl NativeHostDaemon {
                             "tool_name": { "type": "string" },
                             "payload": { "type": "string" },
                             "safety_class": { "type": "string", "enum": ["S0ReadOnly", "S1Simulation", "S2HardwareOrCritical"] },
-                            "human_signature_verified": { "type": "boolean" },
+                            "human_signature_verified": { "type": "boolean", "description": "Ignored; kept for compatibility. S2 approval needs a valid signature." },
                             "approval_wait_ms": { "type": "integer", "minimum": 0, "description": "Deprecated caller field; the gate owns timeout state" },
                             "approval_signature_hex": { "type": ["string", "null"] },
                             "approver_public_key_hex": { "type": ["string", "null"] },

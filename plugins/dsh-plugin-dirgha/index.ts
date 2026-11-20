@@ -120,7 +120,7 @@ export function apply(ctx: any, config: DirghaCordisConfig) {
     return next();
   });
 
-  // 2. Hook `tools/pre-execute` waterfall to enforce Lokahi 18 rules via `lokahi_gate.wasm`
+  // 2. Hook `tools/pre-execute` to enforce the gate rules via `lokahi_gate.wasm`
   ctx.on("tools/pre-execute", async (toolCall: any, next: () => Promise<any>) => {
     const payload = JSON.stringify(toolCall?.arguments ?? {});
     const isS2 = Boolean(toolCall?.safetyClass === "S2HardwareOrCritical");

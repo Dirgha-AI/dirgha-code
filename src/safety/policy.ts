@@ -215,7 +215,7 @@ export function createPolicyEngine(opts: PolicyEngineOptions): PolicyEngine {
     if (!gate.allowed) {
       return {
         allowed: false,
-        reason: "lokahi-gate-wasm: blocked by 18-rule Lokahi WASM capability firewall (<1 ms)",
+        reason: "lokahi-gate-wasm: blocked by the WebAssembly safety gate",
         requiresApproval: false,
       };
     }

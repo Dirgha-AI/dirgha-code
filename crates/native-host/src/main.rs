@@ -583,7 +583,7 @@ fn run_self_test_and_benchmark() {
     let mgp_path = data_dir.join("mgp-store.json");
     let vault_path = data_dir.join("vault.sealed.json");
 
-    // 1. Measure Lokahi 18-rule evaluation latency across 1,000 iterations
+    // 1. Measure gate evaluation latency across 1,000 iterations
     let sample_proposal = ActionProposal {
         tool_name: "dirgha_sim_step".into(),
         payload: "{\"session_id\":\"sim_01\",\"action\":\"step\"}".into(),

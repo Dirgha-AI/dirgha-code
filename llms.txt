@@ -1,0 +1,28 @@
+# Dirgha
+
+> Open-source agent harness for software and robots, by Dirgha AI. Runs a coding agent and MuJoCo robot simulations on your own machine, with any model provider or local models, and checks every action with a fail-closed safety gate before it runs. Apache-2.0.
+
+Dirgha has two parts behind one command: a TypeScript coding agent and a Rust kernel (`dirgha-native-host`, about 1 MB) that serves 24 MCP tools over stdio. Six robotics and hardware tools are demos and return `"simulated": true`. Full rules for teams live in LOKAHI.
+
+## Start here
+- [README](https://github.com/Dirgha-AI/dirgha/blob/main/README.md): what Dirgha is, install, commands, safety model, status
+- [AGENTS.md](https://github.com/Dirgha-AI/dirgha/blob/main/AGENTS.md): build, test and change rules for AI agents working on the code
+- [CHANGELOG](https://github.com/Dirgha-AI/dirgha/blob/main/CHANGELOG.md): release notes
+
+## Guides
+- [Local models](https://github.com/Dirgha-AI/dirgha/blob/main/docs/local-models.md): Ollama and llama.cpp
+- [Windows installation](https://github.com/Dirgha-AI/dirgha/blob/main/docs/windows-installation.md)
+- [Fleet tutorial](https://github.com/Dirgha-AI/dirgha/blob/main/docs/tutorials/fleet.md): parallel agents in git worktrees
+- [Sub-agents tutorial](https://github.com/Dirgha-AI/dirgha/blob/main/docs/tutorials/subagents.md)
+- [Extensions](https://github.com/Dirgha-AI/dirgha/blob/main/docs/extensions.md): plugin API
+- [Long-running commands](https://github.com/Dirgha-AI/dirgha/blob/main/docs/agents/long-running-commands.md)
+
+## Security
+- [SECURITY.md](https://github.com/Dirgha-AI/dirgha/blob/main/SECURITY.md)
+- [Supply chain](https://github.com/Dirgha-AI/dirgha/blob/main/docs/security/SUPPLY-CHAIN.md)
+- [Telemetry](https://github.com/Dirgha-AI/dirgha/blob/main/docs/privacy/CLI-TELEMETRY.md): off by default
+
+## Related
+- [LOKAHI](https://github.com/Dirgha-AI/lokahi): open rules format and gate for agent actions (`pip install lokahi`)
+- [Arniko](https://github.com/Dirgha-AI/arniko): security scanner for AI agent code
+- [Ahimsa AI](https://github.com/Dirgha-AI/ahimsa-ai): impact assessment that compiles to rules

@@ -429,7 +429,7 @@ fn verify_s2_approval(proposal: &ActionProposal, context: &GateContext) -> bool 
     key.verify(&canonical_action_digest(proposal), &Signature::from_bytes(&sig_array)).is_ok()
 }
 
-/// Evaluate all 18 normative rules (15 Software/Web + 3 Physical AI S0/S1/S2) deterministically.
+/// Evaluate the gate rules (software checks plus physical S0/S1/S2 checks) deterministically.
 pub fn evaluate_proposal(proposal: &ActionProposal) -> GateVerdict {
     evaluate_proposal_with_context(proposal, &GateContext::without_clock(Vec::new()))
 }
@@ -938,7 +938,7 @@ pub extern "C" fn lokahi_wasm_run_red_team_50() -> i32 {
 }
 
 /// Exported C-ABI (`cdylib` / WASM / Python `ctypes` / Node `ffi`) function that evaluates
-/// a UTF-8 command/payload buffer `(ptr, len)` against the 18 Lokahi safety rules in `<1 ms`.
+/// a UTF-8 command/payload buffer `(ptr, len)` against the gate rules.
 /// Returns `1` if `Allow`, `0` if `Deny`, and `-1` on invalid pointer/UTF-8.
 #[unsafe(no_mangle)]
 pub extern "C" fn lokahi_c_abi_evaluate_utf8(ptr: *const u8, len: usize, is_s2_critical: i32) -> i32 {

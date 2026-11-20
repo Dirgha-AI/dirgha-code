@@ -7,7 +7,7 @@ repository.workspace = true
 authors.workspace = true
 keywords.workspace = true
 categories.workspace = true
-description = "Formal 15+3 rule WebAssembly capability firewall (<1 ms), Rule 14 Ahimsa 45s timeout, 2-of-3 dissent freeze, and BLAKE3+Ed25519 audit ledger."
+description = "WebAssembly safety gate for agent actions: shell, file, secret and network checks, signed S2 approvals with a 45-second timeout, and a BLAKE3 + Ed25519 audit ledger."
 
 [lib]
 crate-type = ["cdylib", "rlib"]
