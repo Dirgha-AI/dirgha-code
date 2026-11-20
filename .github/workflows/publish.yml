@@ -1,0 +1,42 @@
+name: Publish to npm
+
+# Publishes @dirgha/code when a v2.x tag is pushed. Uses npm trusted
+# publishing (OIDC), so no npm token is stored in this repository, and
+# attaches a provenance statement to the package.
+on:
+  push:
+    tags: ["v2.*"]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Use npm 11 (trusted publishing and the lock file need it)
+        run: npm install -g npm@11
+
+      - name: Tag matches package.json version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/v}"
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "$PKG" ]; then echo "tag $TAG != package.json $PKG"; exit 1; fi
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npx vitest run --dir src
+      - run: node --test ./bin/dirgha.test.mjs
+
+      - name: Publish
+        run: npm publish --provenance --access public
